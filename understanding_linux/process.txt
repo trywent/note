@@ -1,0 +1,62 @@
+
+从内核的视角，多线程应用程序仅是一个普通进程。不同的执行流会有阻塞的可能。
+
+两个轻量级的进程可以共享一些资源，如地址空间，打开的文件等
+________________________________
+进程描述符：结构体task_struct
+
+进程状态：都是互斥的，只有一个状态
+等待状态的可中断与不可中断：
+等待的原因可以是等待某个资源。正常流程是，等到某个资源后进程被唤醒执行。被中断的情况是在资源还是不可用的情况下，
+进程被唤醒（通过信号）并执行。不可中断是该进程不能通过信号被唤醒
+
+进程链表：
+cpu要执行哪个进程，只从TASK__RUNNING状态的进程链表中选择。
+其他状态除了等待状态进程都没有组织成链表。
+
+等待队列：
+	等待队列表示一组睡眠的进程，当某一条件为真时，内核唤醒它们
+
+等待队列头是一个wait_queue_head_t数据结构
+struct __wait_queue_head{
+	spinlock_t lock;
+	struct list_head task_list;
+};
+
+typedef __wait_queue_head wait_queue_head_t;
+
+等待队列链表中的数据类型wait_queue_t
+struct __wait_queue{
+	unsigned int flag;
+	struct task_struct *task;
+	wait_queue_func_t func;
+	struct list_head task_list;
+
+};
+func表示睡眠进程以什么方式唤醒
+typedef __wait_queue wait_queue_t;
+防止唤醒等待同一互斥资源的进程（避免竞争，群兽反应），系统将睡眠进程分为两种：互斥进程(flag 为1)，
+非互斥进程（flag 为0）
+
+？？？理解：
+进入睡眠的流程，1，将进程加入到等待队列。2，调用schedule让cpu调度执行其他进程。3，被唤醒
+
+内核调用一系列wake_up函数来唤醒睡眠的进程。
+
+谁调用唤醒函数？好像是由释放资源的进程来唤醒
+
+/*****等待队列头好像可以随意定义一个，对进程是否等待的设置都是有程序自己确定****/
+
+将互斥进程插入队列使用函数prepare_to_wait_exclusive函数
+系统使用唤醒函数来唤醒睡眠的进程，实际调用到来wait_queue_t.func函数
+
+进程资源限制：
+	current->signal->rlim，rlim存放的是rlimit结构体数组。
+进程切换：
+硬件上下文，进程恢复执行前装入cpu寄存器的数据称为硬件上下文
+linux中cpu寄存器信息保存在thread_struct中thread字段
+任务状态段（task state segment）TSS,保存了进程的段描述符
+
+创建进程：
+
+内核线程：

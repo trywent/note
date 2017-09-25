@@ -1,0 +1,69 @@
+//note
+~/.vim/plugin
+~/.vim/doc
+~/.vim/syntax
+
+将plugin目录下文件放入~/.vim/plugin
+
+==================
+ctags:
+ctags -R *
+ts
+tp
+tn
+
+c++:
+ctags -R --c++-kinds=+p --fields=+iaS --extra=+q
+
+ 
+
+每个参数解释如下：
+
+-R:ctags循环生成子目录的tags
+
+--c++-kinds=+px :ctags记录c++文件中的函数声明和各种外部和前向声明
+
+--fields=+iaS :ctags要求描述的信息，其中i表示如果有继承，则标识出父类；a表示如果元素是类成员的话，要标明其调用权限（即是public还是private）；S表示如果是函数，则标识函数的signature。
+
+--extra=+q:强制要求ctags做如下操作—如果某个语法元素是类的一个成员，ctags默认会给其记录一行，可以要求ctags对同一个语法元斯屹记一行，这样可以保证在VIM中多个同名函数可以通过路径不同来区分。
+
+==================
+cscop:
+cscope -Rbkq
+- R 表示把所有子目录里的文件也建立索引
+- b 表示cscope不启动自带的用户界面，而仅仅建立符号数据库
+- q 生成cscope.in.out和cscope.po.out文件，加快cscope的索引速度
+- k 在生成索引文件时，不搜索/usr/include目录
+
+
+使用cs find 查找[3]  （也可以简化写成 cs f）后面添加需要得字符串类型：
+c:Find functions calling this function//查找调用本函数的函数
+d:Find functions called by this function //查找本函数调用的函数
+e:Find this egrep pattern//查找egrep模式，相当于egrep功能，但查找速度快多了
+f:Find this file //查找并打开文件，类似vim的find功能
+g:Find this definition//查找函数、宏、枚举等定义的位置，类似ctags的功能
+i:Find files #including this file //查找包含本文件的文件
+s:Find this C symbol //查找C语言符号，即查找函数名、宏、枚举值等出现的地方
+t:Find assignments to //查找指定的字符串
+例如：使用cscope查找do_fork函数的定义,在vim命令行下执行 :cs f g do_fork
+
+
+==================
+nerdTree:
+
+#自动打开树结构窗口
+autocmd VimEnter * NERDTree
+
+o 打开关闭文件或者目录
+t 在标签页中打开
+T 在后台标签页中打开
+! 执行此文件
+p 到上层目录
+P 到根目录
+K 到第一个节点
+J 到最后一个节点
+u 打开上层目录
+m 显示文件系统菜单（添加、删除、移动操作）
+? 帮助
+q 关闭
+

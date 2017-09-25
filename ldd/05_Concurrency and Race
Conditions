@@ -1,0 +1,27 @@
+Completions:
+
+Completions:告诉线程另一线程已经结束
+
+<linux/completion.h>
+创建：
+DECLARE_COMPLETION(my_completion);
+
+动态创建：
+struct completion my_completion;
+/* ... */
+init_completion(&my_completion);
+
+等待completion：
+void wait_for_completion(struct completion *c);//uninterruptible等待，不可杀进程
+
+另一端的结束通知:
+void complete(struct completion *c);     
+void complete_all(struct completion *c);
+当多个进程在等待时complete唤醒一个进程，complete_all唤醒所有进程。
+
+completion的复用：
+若使用了complete_all，则必须重新初始化。可使用INIT_COMPLETION(struct completion c)快速初始化
+
+结束并退出接口：
+void complete_and_exit(struct completion *c, long retval);
+

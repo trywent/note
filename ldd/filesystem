@@ -1,0 +1,7 @@
+//kernel文件系统
+/dev         //这里创建的文件会出现在/proc和sys
+/proc
+/sys
+
+
+

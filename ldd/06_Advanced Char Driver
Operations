@@ -1,0 +1,59 @@
+sleep:
+- 不要在原子执行中睡眠
+- 睡眠唤醒后要检测执行需要的资源是否存在
+- 有其它进程能够唤醒睡眠的进程
+
+<linux/wait.h>
+wait queue：所有睡眠的进程队列
+队列头结构：wait_queue_head_t
+
+创建：DECLARE_WAIT_QUEUE_HEAD(name);
+
+动态创建：
+wait_queue_head_t my_queue;
+init_waitqueue_head(&my_queue);
+
+进入睡眠：condition为true时会继续睡眠
+wait_event(queue/*睡眠队列*/, condition)       //不可中断睡眠
+wait_event_interruptible(queue, condition)  //可被信号打断
+wait_event_timeout(queue, condition, timeout)  //睡眠指定时间
+wait_event_interruptible_timeout(queue, condition, timeout)
+
+唤醒：
+void wake_up(wait_queue_head_t *queue);
+void wake_up_interruptible(wait_queue_head_t *queue);
+
+______________________
+睡眠的更深层次：
+wait_queue_head_t  //队列头
+wait_queue_t       //要睡眠的进程，唤醒信息
+
+进入睡眠流程：
+1.创建并初始化，wait_queue_t 
+2.设置当前进程状态为TASK_INTERRUPTIBLE或TASK_UNINTERRUPTIBLE，void set_current_state(int new_state)
+3.放弃cpu，schedule( );
+
+手动睡眠：
+1,创建睡眠实体：
+DEFINE_WAIT(my_wait)
+或
+wait_queue_t my_wait;
+init_wait(&my_wait);
+
+2,加入队列：
+void prepare_to_wait(wait_queue_head_t *queue,
+wait_queue_t *wait,
+int state);
+
+3,进入睡眠，schedule
+
+4,唤醒后清除：
+void finish_wait(wait_queue_head_t *queue, wait_queue_t *wait);
+
+
+
+
+
+
+
+

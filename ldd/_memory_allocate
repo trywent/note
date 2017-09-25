@@ -1,0 +1,226 @@
+#include <linux/slab.h>
+void *kmalloc(size_t size, int flags);//物理地址连续的内存
+__________________
+标识参数：
+GFP_ATOMIC :使用在中断处理或其他不在进程上下文的程序中，不能睡眠
+GFP_KERNEL :在内核空间分配内存。是通常使用的标识，可能睡眠(内存不足)
+GFP_USER :在用户空间分配内存，可能睡眠
+GFP_HIGHUSER :分配high memory
+GFP_NOIO
+GFP_NOFS :类似GFP_KERNEL,但约束内核在分配内存时的操作。GFP_NOFS不允许文件系统的调用，GFP_NOIO
+          不允许I/O操作。它们常用在文件系统，虚拟内存的代码中。这里分配内存可以睡眠，而这些代码
+	  中调用文件系统函数会有问题。
+
+上面的标志能够与下面的一起使用：
+__GFP_DMA :使内存分配在DMA-capable内存区。 
+__GFP_HIGHMEM :使内存分配在 high memory.
+__GFP_COLD :通常分配的内存是处理器的缓存中的内存。该标志表明不使用处理器缓存的内存，
+            而使用没有使用过的内存。通常为DMA分配内存
+__GFP_NOWARN :分配失败不输出警告信息
+__GFP_HIGH :高优先级的分配，甚至会请求最后的可用内存以解燃眉之急
+__GFP_REPEAT
+__GFP_NOFAIL
+__GFP_NORETRY :这些标识定义在内存分配困难时的操作。__GFP_REPEAT表明再尝试下，但还有可能失败
+		__GFP_NOFAIL表明不允许失败，必须分配。__GFP_NORETRY不能分配就算了。
+
+_____________________
+内存区域：
+linux中内存通常分为三个区DMA-capable memory, normal memory, and high memory.
+内存分配通常在normal memory。
+
+DMA-capable是外围设备能够直接访问的内存，通常所有的内存都是DMA-capable
+High memory是一种32位平台上使用大量内存的机制。
+
+内存区的实现在mm/page_alloc.c，这些区域的初始化在平台相关的代码中进行，通常在mm/init.c。
+______________________
+大小参数：
+内核对内存的处理是以页为单位的。kmalloc与用户空间的malloc有很大不同，面向堆分配内存会在页边界花费很多。
+linux中创建一些有固定大小内存的内存池，来分配内存。内存分配会将有合适大小内存的内存池中的内存，分配给
+请求者。
+
+内核只会分配固定大小的内存，通常比请求的要大。kmalloc最小能分配的内存根据系统页大小，通常为32或64byte
+分配最大限度也根据系统而不同，如果要使驱动可移植，最大不超过128kB。要获取更多内存使用其他方法。
+
+_______________________
+Lookaside Caches:
+驱动可能需要重复分配大小相同的内存多次。内核提供机制为这些内存创建池(lookaside cache).
+
+使用kmem_cache_create创建缓存，返回kmem_cache_t类型:
+kmem_cache_t *kmem_cache_create(const char *name, size_t size,size_t offset,unsigned long flags,
+			void (*constructor)(void *, kmem_cache_t *,unsigned long flags),
+			void (*destructor)(void *, kmem_cache_t *,unsigned long flags));
+size:创建内存块的个数
+name:通常是被缓存的结构的名字 
+offset: 第一个对象在页中的位移。能够是分配的对象对齐。
+标志位说明分配如何进行：
+SLAB_NO_REAP :在系统需要内存时不会减少缓存
+SLAB_HWCACHE_ALIGN :使分配的对象对齐
+SLAB_CACHE_DMA :分配的对象在DMA区
+
+constructor and destructor：
+两个参数是可选的。constructor用来初始化新分配的内存对象，destructor用来在释放内存到系统前
+清除对象中数据。这两个函数可能被执行多次，不一定是在对象分配或释放时立即执行，而且根据标志
+SLAB_CTOR_ATOMIC函数可能会睡眠。
+
+对象缓存建立后，调用kmem_cache_alloc分配对象:
+void *kmem_cache_alloc(kmem_cache_t *cache, int flags);//参数cache缓存，flags与kmalloc一样
+释放对象，使用kmem_cache_free:
+void kmem_cache_free(kmem_cache_t *cache, const void *obj);
+
+模块卸载后释放缓存:
+int kmem_cache_destroy(kmem_cache_t *cache);
+内核会统计缓存的使用，统计信息在/proc/slabinfo.
+
+_________________________
+Memory Pools:
+是一个lookaside 缓存内存池。紧急时刻，内存分配必须成功使用。
+
+内存池的类型是 mempool_t (defined in <linux/mempool.h>); 通过调用mempool_create创建:
+	mempool_t *mempool_create(int min_nr,mempool_alloc_t *alloc_fn,mempool_free_t *free_fn,
+			void *pool_data);
+
+min_nr：保持的内存对象个数
+分配内存和释放对象的函数：
+typedef void *(mempool_alloc_t)(int gfp_mask, void *pool_data);
+typedef void (mempool_free_t)(void *element, void *pool_data);
+最后一个参数pool_data，用来传到以上两个函数中。
+内核提供分配和释放的函数 (mempool_alloc_slab and mempool_free_slab)
+通常建立内存池做法:
+cache = kmem_cache_create(. . .);
+pool = mempool_create(MY_POOL_MINIMUM,
+mempool_alloc_slab, mempool_free_s,cache);
+内存池建立后，通过以下函数分配，释放内存对象:
+void *mempool_alloc(mempool_t *pool, int gfp_mask);
+void mempool_free(void *element, mempool_t *pool);
+
+当mempool创建后，内存分配函数会被调用足够次数来生成preallocated对象。当mempool_alloc
+请求内存时会调用内存分配函数请求内存对象，如果分配失败会返回preallocated内存对象。
+当preallocated对象少于minimum时，调用mempool_free,会将对象保留在池中，否则会返还给系统。
+
+改变mempool最小对象值:
+int mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask);
+释放mempool:
+void mempool_destroy(mempool_t *pool);
+调用该函数前必须释放所有的内存对象。
+
+========================
+get_free_page and Friends：
+当需要请求大量内存时，最好是请求页。
+
+get_zeroed_page(unsigned int flags);//返回一个内容初始化为0的页指针
+__get_free_page(unsigned int flags);//同上，不会清除内容
+__get_free_pages(unsigned int flags, unsigned int order);//返回2为底order指数个页，3时返回8页。内容不会清零。
+flags作用同kmalloc相同
+
+释放页:
+void free_page(unsigned long addr);//是下面函数的宏定义
+void free_pages(unsigned long addr, unsigned long order);
+
+______________________
+The alloc_pages Interface：
+
+linux页分配的真正核心是alloc_pages_node函数:
+struct page *alloc_pages_node(int nid, unsigned int flags,unsigned int order);
+
+有两个变种(宏定义包装的)：
+struct page *alloc_pages(unsigned int flags, unsigned int order);
+struct page *alloc_page(unsigned int flags);
+
+alloc_pages_node三个参数： nid 哪个NUMA node ID*的内存会被分配， flags是GFP_ 类型标志
+order是分配的大小。返回值是分配的内存或NULL。
+
+释放调用函数:
+void __free_page(struct page *page);
+void __free_pages(struct page *page, unsigned int order);
+void free_hot_page(struct page *page);
+void free_cold_page(struct page *page);
+
+如果知道内存是否存在processor cache，可使用free_hot_page(在processer缓存中)或free_cold_page.
+更有效释放内存。
+
+* NUMA (nonuniform memory access) computers are multiprocessor systems where memory is “local” to
+specific groups of processors (“nodes”). Access to local memory is faster than access to nonlocal memory.
+On such systems, allocating memory on the correct node is important. Driver authors do not normally have
+to worry about NUMA issues, however.
+
+=========================================
+vmalloc and Friends：
+分配在虚拟地址上连续的地址(物理地址不连续，内存通过调用多个alloc_page获得的)。
+虚拟内存的不同并不在使用硬件上，而在内核如何分配上。
+
+相关函数(ioremap,严格来讲并不是内存分配函数):
+#include <linux/vmalloc.h>
+void *vmalloc(unsigned long size);
+void vfree(void * addr);
+void *ioremap(unsigned long offset, unsigned long size);
+void iounmap(void * addr);
+
+The (virtual) address range used by kmalloc 和 __get_free_pages返回的地址都是和硬件地址一一对应的，
+这些函数返回的地址区间，不需要修改页表。vmalloc和ioremap返回的地址空间需要修改页表(使对应)。
+它们返回的指针有明显区别，在x86中vmalloc返回的地址超过kmalloc返回的地址。
+vmalloc使用的地址值定义在<asm/pgtable.h>，从VMALLOC_START到VMALLOC_END.
+
+ioremap 也创建新页表，但并不分配内存。ioremap返回的虚拟地址用来访问特殊的硬件地址。
+通常用来映射PCI的缓冲到虚拟地址空间。
+
+不能直接访问ioremap返回的地址，要使用I/O函数访问它(readb)。之所以这样的原因是，有些
+平台不能将PCI内存空间映射到处理器地址空间。ioremap和malloc都是面向页的(都修改页表)。
+
+_____________________________
+Per-CPU Variables:
+当创建per-CPU变量，每个cpu都有一个变量的拷贝。一个应用的例子是网络子系统中
+统计包的个数的变量是per-CPU变量，这样变量操作由于没有锁的更新快速。获取总数只
+将per-CPU变量相加。
+
+创建per-CPU变量使用宏@<linux/percpu.h>:
+DEFINE_PER_CPU(type, name);//type是数据类型，如果是数组int[2]
+
+访问per-CPU变量使用：
+get_cpu_var(sockets_in_use)++;//返回变量，进行操作。关闭cpu抢占
+put_cpu_var(sockets_in_use);  //操作完成调用
+
+访问其他CPU上变量：
+per_cpu(variable, int cpu_id); //调用者必须实现访问按去锁
+
+动态创建变量:
+void *alloc_percpu(type);
+void *__alloc_percpu(size_t size, size_t align);//要求对齐
+释放：
+free_percpu
+访问动态创建的变量通过per_cpu_ptr:
+per_cpu_ptr(void *per_cpu_var, int cpu_id);
+
+如果只是读取直接使用per_cpu_ptr返回的指针，如果操作变量要保证cpu不被抢占，
+通常执行流程：
+int cpu;
+cpu = get_cpu( )；
+ptr = per_cpu_ptr(per_cpu_var, cpu);
+/* work with ptr */
+put_cpu( );
+
+到处per-CPU变量到模块使用宏：
+EXPORT_PER_CPU_SYMBOL(per_cpu_var);
+EXPORT_PER_CPU_SYMBOL_GPL(per_cpu_var);
+
+模块中访问per-CPU变量，需申明:
+DECLARE_PER_CPU(type, name);//(不是DEFINE_PER_CPU)告诉编译器外部引用的变量
+______________________________
+Obtaining Large Buffers:
+请求大块内存有可能会失败。很少使用大内存的来进行操作。进行大量I/O操作的最好方式是通过
+ scatter/gather 操作。
+
+Acquiring a Dedicated Buffer at Boot Time：
+分配大量连续的物理内存时机只在启动时。系统启动后，执行子系统的初始化函数，可以在这些函数中
+请求内存。
+启动时分配内存调用:
+#include <linux/bootmem.h>
+void *alloc_bootmem(unsigned long size);
+void *alloc_bootmem_low(unsigned long size);
+void *alloc_bootmem_pages(unsigned long size);
+void *alloc_bootmem_low_pages(unsigned long size);
+如果没有_low，可能会分配hight memory。通常DMA操作,可能会需要_low(high memory 可能不能进行DMA操作)
+
+释放:
+void free_bootmem(unsigned long addr, unsigned long size);//不会返回给系统
+
+

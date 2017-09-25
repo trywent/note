@@ -1,0 +1,243 @@
+_____________________
+int open(const char *pathname, int flags, mode_t mode);
+pathname:文件路径
+flags:必须包含O_RDONLY,  O_WRONLY,  or  O_RDWR之一
+	文件打开标识 O_CREAT, O_EXCL,O_NOCTTY, and O_TRUNC
+	文件状态标识，可以通过fcntl进行修改
+mode:需要创建文件时，设置文件的权限
+
+ssize_t read(int fd, void *buf, size_t count);//返回实际读取的数据个数
+ssize_t write(int fd, const void *buf, size_t count);//返回写入的数据个数
+
+_____________________
+
+select,pselect:等待文件描述符准备好执行IO操作
+
+
+poll，ppoll:等待文件描述符上的事件，直到文件描述符能够执行IO操作。会阻塞直到事件发生
+ppoll与poll的区别是，ppoll除了超时结束等待，还会在收到某个信号后结束等待。
+
+epoll:(仅比poll快)
+poll的变种可用做边界触发，水平触发，能够监听多个文件描述符
+
+-epoll_create返回指向epoll实例的指针。结束使用close()关闭
+-epoll_ctl注册感兴趣的文件描述符。注册在当前epoll上的文件描述符被称为epoll set
+-epoll_wait开始工作
+
+epoll事件分发接口能够作用为 edge-triggered (ET)和level-triggered (LT)。
+1，在pipe读取端的文件描述符(rfd),注册到epoll实例。
+2，pipe写入端，写入2kB数据
+3，对epoll_wait的调用会返回rfd    //边界触发,产生事件
+4，pipe读取端，从rfd读取1KB数据
+5，调用epoll_wait                //边界触发，不会获取事件
+
+
+epoll_wait返回epoll_event:
+
+	typedef union epoll_data {
+               void    *ptr;
+               int      fd;
+               uint32_t u32;
+               uint64_t u64;
+           } epoll_data_t;
+
+           struct epoll_event {
+               uint32_t     events;    /* Epoll events */
+               epoll_data_t data;      /* User data variable */
+           };
+
+______________________
+socket:
+int socket(int domain, int type, int protocol)
+//创建一个socket用于通信，返回一个fd
+
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+//给socket分配一个名字。当sokcet创建后，只是在域名中定义了socket，socket并没有地址(名字)来定位。
+
+int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+//将socket连接到一个地址(从那接收数据，或发送数据到那去)。当sockfd的类型是SOCK_DGRAM，则该socket
+只接收addr的数据。如果sockfd的类型是SOCK_STREAM，则socket连接到，绑定addr的socket。两边对等通信。
+
+int listen(int sockfd, int backlog);
+//表示sockfd可以接收连接，backlog说明能够接收连接的个数
+
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+//用于可连接的socket类型(SOCK_STREAM, SOCK_SEQPACKET)。监听sockfd，接收请求的连接，
+addr被赋值为被接收连接的地址。返回一个用于通信的fd
+
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+//从socket接收数据
+
+_______________________
+Netlink：
+netlink_socket = socket(AF_NETLINK, socket_type, netlink_family);
+
+内核和用户空间进程间传送数据。Netlink是面向数据包的服务。
+socket_type是SOCK_RAW 或 SOCK_DGRAM。
+netlink_family 参数选择要通信的内核模块(通常使用内核事件NETLINK_KOBJECT_UEVENT)或netlink组
+
+
+内核中使用netlink：
+int cn_add_callback(struct cb_id *id, char *name, void (*callback) (struct cn_msg *, struct netlink_skb_parms *));
+//注册消息接收。connector核心收到与cb_id匹配的消息后，调用callback函数
+
+void cn_del_callback(struct cb_id *id);
+//注销cb_id对应的消息接收。
+
+void cn_netlink_send(struct cn_msg *msg, u32 __group, int gfp_mask);
+//内核发送消息到group
+
+struct cb_id
+{
+	__u32			idx;
+	__u32			val;
+};
+//注册到connector.h中
+
+
+_______________________________
+pipe:用于进程间的数据通信(单向的数据传输通道)
+
+int pipe(int pipefd[2]);//pipefd[0]读取端文件描述符，pipefd[1]写入端文件描述符
+
+使用fork创建新进程，子进程获得父进程的文件描述符拷贝。
+
+________________________________
+inotify:监测文件系统的事件(可以监听文件，文件夹)，使用read读取事件
+
+inotify_init():创建inotify实例，并返回该实例的文件描述符
+inotify_add_watch:增加或修改inotify的监听列表，列表中的每一项有一个路径和要监听事件的集合
+inotify_rm_watch:从监听列表中移除某一项
+
+
+________________________________
+信号量：
+//创建一个信号量，pshared为0则线程间信号，为1则进程间信号(需访问共享内存)。value信号的初始值
+int sem_init(sem_t *sem, int pshared, unsigned int value)
+
+//使信号量加1(释放信号)，另一个线程中sem_wait将被唤醒并锁定信号
+int sem_post(sem_t *sem)
+
+//减少信号量值(锁定信号)，
+int sem_wait(sem_t *sem)
+//若不能立即获得信号，不会等待直接返回错误
+int sem_trywait(sem_t *sem)
+//指定等待时间
+int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout)
+
+________________________________
+共享内存：
+//创建一个共享内存对象，能够被其他进程使用mmap映射到同一内存。(类似open函数)
+//共享内存对象的名字像文件名一样，/XXXXX
+int shm_open(const char *name, int oflag, mode_t mode);
+
+//移除一个共享内存对象
+int shm_unlink(const char *name);0
+________________________________
+内存映射(将文件或设备映射到内存)：
+//addr指定映射地址，不为空内核参考该地址分配内存，若为空则由内核选择分配地址
+//length指定分配大小，多少bytes
+//port指定映射的内存的访问级别，执行，读，写，访问
+//flags内存的更新是否对其他进程可见，是否更新底层文件
+//offset映射的文件位移，必须是页的整数倍
+void *mmap(void *addr, size_t length, int prot, int flags,int fd, off_t offset)
+
+
+int munmap(void *addr, size_t length);
+
+________________________________
+条件等待：
+//使所有的等待线程开始工作
+int pthread_cond_broadcast(pthread_cond_t *cond);
+
+
+//试至少一个等待线程开始工作
+int pthread_cond_signal(pthread_cond_t *cond); 
+
+//等待条件
+pthread_cond_wait() 
+
+pthread_cond_timedwait(),
+
+
+________________________________
+fork:(创建新进程)
+
+pid_t fork(void); //父进程中返回子进程id，子进程中返回0
+
+fork()  creates  a new process by duplicating the calling process.  The
+       new process, referred to as the child, is an  exact  duplicate  of  the
+       calling  process,  referred  to as the parent, except for the following
+       points:
+
+       *  The child has its own unique process ID, and this PID does not match
+          the ID of any existing process group (setpgid(2)).
+
+       *  The  child's  parent  process ID is the same as the parent's process
+          ID.
+
+       *  The child does not inherit  its  parent's  memory  locks  (mlock(2),
+          mlockall(2)).
+
+       *  Process  resource  utilizations (getrusage(2)) and CPU time counters
+          (times(2)) are reset to zero in the child.
+
+       *  The child's set of pending  signals  is  initially  empty  (sigpend‐
+          ing(2)).
+
+       *  The  child  does  not  inherit semaphore adjustments from its parent
+          (semop(2)).
+
+       *  The child does not inherit record locks from its parent (fcntl(2)).
+
+       *  The child does not inherit timers  from  its  parent  (setitimer(2),
+          alarm(2), timer_create(2)).
+
+       *  The  child  does not inherit outstanding asynchronous I/O operations
+          from its parent (aio_read(3), aio_write(3)), nor does it inherit any
+          asynchronous I/O contexts from its parent (see io_setup(2)).
+
+
+The  process  attributes  in  the  preceding  list are all specified in
+       POSIX.1-2001.  The parent and child also differ  with  respect  to  the
+       following Linux-specific process attributes:
+
+       *  The  child does not inherit directory change notifications (dnotify)
+          from its parent (see the description of F_NOTIFY in fcntl(2)).
+
+       *  The prctl(2) PR_SET_PDEATHSIG setting is reset  so  that  the  child
+          does not receive a signal when its parent terminates.
+
+       *  Memory mappings that have been marked with the madvise(2) MADV_DONT‐
+          FORK flag are not inherited across a fork().
+
+       *  The  termination  signal  of  the  child  is  always  SIGCHLD   (see
+          clone(2)).
+
+       Note the following further points:
+*  The  child  process  is  created  with  a single thread—the one that
+          called fork().  The entire virtual address space of  the  parent  is
+          replicated  in the child, including the states of mutexes, condition
+          variables, and other pthreads objects; the use of  pthread_atfork(3)
+          may be helpful for dealing with problems that this can cause.
+
+       *  The  child inherits copies of the parent's set of open file descrip‐
+          tors.  Each file descriptor in the child refers  to  the  same  open
+          file  description (see open(2)) as the corresponding file descriptor
+          in the parent.  This means that the two descriptors share open  file
+          status  flags, current file offset, and signal-driven I/O attributes
+          (see the description of F_SETOWN and F_SETSIG in fcntl(2)).
+
+       *  The child inherits copies of the parent's set of open message  queue
+          descriptors  (see  mq_overview(7)).   Each  descriptor  in the child
+          refers to the same open message queue description as the correspond‐
+          ing  descriptor  in the parent.  This means that the two descriptors
+          share the same flags (mq_flags).
+
+       *  The child inherits copies of the  parent's  set  of  open  directory
+          streams  (see opendir(3)).  POSIX.1-2001 says that the corresponding
+          directory streams in the parent and child may  share  the  directory
+          stream positioning; on Linux/glibc they do not.
+
+
+

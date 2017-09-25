@@ -1,0 +1,77 @@
+//soc card
+//device 各soc平台实现
+audio_card_init{
+- 创建，platform_device_alloc("soc-audio", -1)
+- 设置设备数据(用于注册声卡设备)，platform_set_drvdata(snd_soc_card)
+- 注册，platform_device_add
+}
+
+//driver
+snd_soc_init{
+- 
+- platform_driver_register(&soc_driver) //soc_driver.driver.name= "soc-audio"
+}
+
+soc_probe{
+- 获取声卡数据，snd_soc_card=platform_get_drvdata
+- 注册声卡，snd_soc_register_card{
+	- 初始化链表，snd_soc_initialize_card_lists
+	- 加入到链表，list_add(&card->list, &card_list)
+	- 初始化soc_card，snd_soc_instantiate_cards-->snd_soc_instantiate_card
+	}
+}
+
+//初始化所有soc_card
+snd_soc_instantiate_cards(遍历所有card)-->snd_soc_instantiate_card{
+- soc_bind_dai_link{
+	- 遍历list_for_each_entry(dai_list)，找到并设置card->rtd
+	- 遍历list_for_each_entry(codec_list),找到并设置rtd->codec，rtd->codec_dai
+	- 遍历list_for_each_entry(platform_list),设置rtd->platform
+	}
+- 创建card，snd_card_create{
+	- 创建ctl设备，snd_ctl_create@control.c
+	- snd_info_card_create
+	}@init.c
+
+- 初始dai，soc_probe_dai_link{
+	- 创建ctl设备，soc_probe_codec{
+		- snd_soc_add_controls
+		}
+	- 创建pcm设备，soc_new_pcm-->snd_pcm_new
+	}
+- 注册声卡snd_card,snd_card_register{
+	- 创建card0/1，device_create(sound_class)
+	- 注册声卡上的设备，snd_device_register_all-->dev->ops->dev_register
+	}@device.c
+}@soc-core.c
+
+_____________
+//dai
+snd_soc_register_dai{
+- list_add(&dai->list, &dai_list);
+- 初始化声卡，snd_soc_instantiate_cards-->snd_soc_instantiate_card
+}
+
+
+
+_____________
+//codec
+snd_soc_register_codec{
+- 加入到链表，list_add(&codec->list, &codec_list)
+- 初始化声卡，snd_soc_instantiate_cards-->snd_soc_instantiate_card
+}
+
+=============
+//ctl设备
+snd_ctl_create-->snd_ctl_dev_register@control.c
+
+
+//pcm设备
+snd_pcm_new-->@pcm.c
+
+sound/soc/soc-core.c
+sound/core/init.c
+sound/core/control.c
+sound/core/info.c
+sound/core/device.c
+sound/core/pcm.c

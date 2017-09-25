@@ -1,0 +1,12 @@
+//
+Interrupts and Exceptions
+中断(interrupt)
+- 可屏蔽中断。一般由I/O设备产生，被屏蔽的中断可不处理
+- 不可屏蔽中断。一般由硬件错误产生，由cpu识别
+
+异常(exception)
+- Processor-detected exceptions。不恰当的指令执行
+- Faults。可恢复的错误，eip保存了产生错误的指令的地址
+- Traps。用于debug
+- Abort。不可恢复错误，导致进程终止
+- Programmed exceptions。int或int3指令。通常称为软件中断，用于系统调用

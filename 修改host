@@ -1,0 +1,8 @@
+
+/etc/hosts
+
+
+sudo rcnscd restart
+
+或：
+/etc/init.d/networking restart

@@ -1,0 +1,63 @@
+//
+HZ，频率每秒振动次数(每秒中断的次数)
+jiffies,系统启动后到当前经过的中断次数（系统启动计时器，除HZ就是秒数）
+
+
+//时钟源
+timer_opts{
+name //时钟源名字
+mark_offset //记录上次触发中断的时间
+get_offset  //返回上次触发中断到当前经过的时间
+monotonic_clock //kernel初始化到现在经过纳秒时间
+delay  //
+}
+
+//xtime当期日期
+timespec{
+tv_sec  //从1970到该日期的秒数
+tv_nsec //上一秒到当前的纳秒数
+}
+
+___________________
+时间更新：
+1,单核系统
+- 从rtc读取时间初始化xtime
+- 更新启动时间wall_to_monotonic
+- 若支持HEPT(High Precision Event Timer高精度时间),则使能它
+- select_timer选择适合的时间源,cur_timer
+- setup_irq使能中断
+- 中断处理{
+	- 调用cur_timer.mark_offset,检查是否有错过的中断，并记录当前中断时间
+	- do_timer_interrupt，更新jiffies，更新日期，进程执行时间
+	}
+
+
+2，多核系统。两种计时器全局计时器，各cpu计时器
+- 全局计时器中断处理，timer_interrupt()-->do_timer_interrupt
+- cpu计时器
+	- apic_timer_interrupt-->smp_apic_timer_interrupt(
+	- 
+
+
+____________
+//更新系统统计信息
+
+//-更新cpu统计信息
+update_process_times{
+- account_user_time(timer中断时进程在用户模式)或account_system_time(在内核模式){
+	- 更新当前进程，用户模式花费的时间utime，内核模式耗费的时间stime
+	- 检查进程是否超出限定时间
+	- 检查进程timer
+	}
+
+- 调用raise_softirq
+- 调用scheduler_tick
+}
+
+//-更新系统负载(system load)
+update_times-->calc_load{
+- 统计进程状态为TASK_RUNNING或TASK_UNINTERRUPTIBLE的进程
+}
+
+//-读取代码执行信息(Profiling the Kernel Code)
+

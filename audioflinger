@@ -1,0 +1,24 @@
+//
+
+
+
+
+
+
+
+
+//录音
+AudioFlinger::openInput_l{
+- *inHwDev = findSuitableHwDev_l //获取设备
+- *inHwHal = inHwDev->hwDevice() //设备对应的hal接口
+- inHwHal->open_input_stream(inHwHal, *input)
+- thread = new RecordThread()
+}
+
+
+
+
+
+
+
+frameworks/av/services/audioflinger/AudioFlinger.cpp

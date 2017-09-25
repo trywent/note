@@ -1,0 +1,159 @@
+//process
+原来的多线程程序，只是在用户空间表现出多线程。实际在内核上的调度还是一个进程(一旦有睡眠，其他线程都不能执行)。
+
+
+
+linux提同轻量级进程用来解决多线程问题。轻量及进程能够共享地址空间，数据。同时能够被内核单独调度。
+
+linux中多线程程序的轻量级进程组成thread group。系统调用入getpid，kill，_exit都是对thread group操作。
+
+_________________________
+进程描述符：
+进程描述符是包含了进程管理必要信息的结构体（task struct）。（进程的信息有，优先级，状态，进程关系）
+
+进程描述符的两个域，状态和进程父子关系
+进程状态：
+TASK_RUNNING          进程在cpu上执行，或者等待被执行
+
+TASK_INTERRUPTIBLE    进程被挂起(睡眠)等待某个条件为真时醒来(变成TASK_RUNNING)。等待条件可能是中断，资源，信号
+
+TASK_UNINTERRUPTIBLE  与TASK_INTERRUPTIBLE一样，除了不能通过信号被唤醒。
+
+TASK_STOPPED          进程停止。进程收到SIGSTOP，SIGTSTP，SIGTTOU信号后进入该状态
+
+TASK_TRACED           进程被debugger程序停止。当进程被其他进程监视(调用ptrace系统调用)
+
+还有两个状态同时存在state和exit state两个域的状态。表示进程执行结束。
+
+EXIT_ZOMBIE           进程已经结束，但是父进程还没有调用wait4()或waitpi()系统调用返回死掉进程的信息。
+		      在调用类似wait()函数前，内核不会销毁死掉进程的数据，以防父进程还有使用。
+
+
+EXIT_DEAD	      最终状态，进程被系统移除。父进程调用了wait4()或waitpid()。
+		      将状态由EXIT_ZOMBIE转为EXIT_DEAD可以防止其他进程调用wait()引起的竞态。？？？
+
+
+_________________________
+进程的标识：
+进程都有task_struct结构体，可以用该结构体的指针来标识一个进程。
+同样在类unix系统中进程描述符中还有pid域用来存放进程ID。PID通常只是父进程PID+1，他有上限，在32为或64位系统中上限不同。
+
+linux中轻量级进程都有不同的PID。同时unix标准中同一组的线程要有共同同的PID(多线程程序的管理)。
+为了遵守这个标准，linux中使用线程组。线程组中的线程相同的标识是头线程的PID(组中第一个轻量级进程的PID)。共
+享的PID保存在每个进程的tgid域中，通过getpid()系统调用获得的值是tgid。头线程的tgid和pid的值是一样的。
+
+-----------------
+进程描述符的处理：
+进程描述符存放在动态内存区。linux将进程相关的两种数据放在一个进程内存区(per-process memory area)。
+一个thread_info指向进程描述符，一个内核进程栈(esp指向该位置)。这个内存区的大小是8192bytes。
+
+识别当前进程：
+thread_info结构体和内核栈提供了一个有效的方法。内核能够通过内核栈(esp)获得thread_info的地址。
+后的thread_info后能够获得进程描述符的地址(宏current能够获得)。如：current-->pid就可以获得进程ID
+
+双向链表：
+list_head数据结构，使用LIST_HEAD(list_name)宏定义一个名为list_name链表
+list_add(n,p) 将n放到p的后面 
+list_add_tail(n,p) 将n放到p的前面 
+list_entry(p,t,m)   返回t类型结构体的地址。该结构体包含一个名为m的list_head，p是list_head的地址。
+list_for_each(p,h)  遍历h为头的链表，将每个list_head的地址由p返回
+list_for_each_entry(p,h,m)  也是遍历返回，但返回的是嵌入list_head的数据结构  
+
+进程链表：头进程init_task task_struct。被称为0号进程。宏SET_LINKS(插入),REMOVE_LINKS(删除)
+
+TASK_RUNNING进程链表：
+当cpu要执行一个进程，只会在运行那些在TASK_RUNNING状态的进程。
+
+早期的内核将可执行的进程放入一个链表中(开销比较大，扫描整个链表找优先级最高的进程)。
+为提高效率，linux2.6将可执行进程按照不同优先级，排到不同链表(根据不同优先级总共有140种)。
+为了维护这些链表，内核使用prio_array_t数据结构。
+//结构
+prio_array_t->queue[140]  //140种优先级
+
+-------------------------
+进程的关系：
+进程描述符中有几个域用来说明进程的继承关系。
+real_parent	指向创建该进程的进程或1号进程(当该进程父进程不存在，死亡)
+parent		通常与real_parent相同，除了其他进程调用ptrace()来见识该进程
+children	指向子进程链表的头进程
+sibling		指向兄弟进程链表中的下一个
+
+pidhash表和链表：
+为了能够根据PID快速获得进程描述符，内核构建了4中哈希表：
+PIDTYPE_PID	pid     进程id
+PIDTYPE_TGID	tgid	线程组头进程id	
+PIDTYPE_PGID	pgrp	进程组头进程id
+PIDTYPE_SID	session	session头进程
+
+哈希表的大小由实际的RAM大小决定。
+pid_hash[2048] //维护一个PID的进程哈希链表
+-------------------------
+//进程的组织维护
+TASK_STOPPED , EXIT_ZOMBIE , EXIT_DEAD //没有维护单独的链表
+
+
+TASK_INTERRUPTIBLE ,TASK_UNINTERRUPTIBLE //加入到等待队列
+
+//当某些进程等待一些资源，时间等。需要停止运行时则加入到等待队列中
+wait_queue_head_t  //队列头，等待同一事件的进程可以加入到同一队列中
+wait_queue_t  //成员，
+struct _ _wait_queue {
+	unsigned int flags; //标记是否是排他唤醒(条件满足时只唤醒某一个进程)，还是非排他。
+	struct task_struct * task;
+	wait_queue_func_t func; //用于唤醒进程的函数
+	struct list_head task_list;
+};
+typedef struct _ _wait_queue wait_queue_t
+当等待的事件发生时可以同时唤醒所有等待进程，或者选择唤醒某个进程
+
+//进入睡眠
+void sleep_on(wait_queue_head_t *wq)
+{
+wait_queue_t wait;
+init_waitqueue_entry(&wait, current);
+current->state = TASK_UNINTERRUPTIBLE;
+add_wait_queue(wq,&wait); /* wq points to the wait queue head*/
+schedule( );
+remove_wait_queue(wq, &wait);
+}
+//唤醒
+void wake_up(wait_queue_head_t *q)
+{
+struct list_head *tmp;
+wait_queue_t *curr;
+list_for_each(tmp, &q->task_list) {
+curr = list_entry(tmp, wait_queue_t, task_list);
+if (curr->func(curr, TASK_INTERRUPTIBLE|TASK_UNINTERRUPTIBLE,
+0, NULL) && curr->flags)
+break;
+}
+}
+_________________________
+//Process Switch (80x86有硬件切换进程功能 far jmp.不过linux使用软件切换)
+切换进程需保存硬件上下文 //linux中在切换进程时保存到process->thread结构体中
+
+切换步骤：
+1 切换全局页表目录
+2 切换kernel mode stack和硬件上下文
+
+_________________________
+//Creating Processes
+
+
+clone-->sys_clone
+fork-->clone
+vfork-->clone
+
+clone-->do_forck-->copy_process
+
+
+//kernel thread
+1,kernel线程只运行在内核模式
+2，kernel线程访问的地址时高位地址
+
+
+____________________
+//destory process
+
+exit_group-->do_exit  //结束进程group
+_exit       //结束单个进程

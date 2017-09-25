@@ -1,0 +1,10 @@
+//memory managerment
+页描述符(数据结构page)：记录页框的状态
+mem_map数组存放页描述符(描述符32byte)
+virt_to_page(addr):获取线性地址addr对应的页框描述符
+pfn_to_page(pfn):页框号pfn对应的页框描述符
+
+
+内存节点(memory node) //系统中内存分为多个节点
+
+内存区域(memory zone)

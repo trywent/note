@@ -1,0 +1,39 @@
+//Advanced Packaging Tool (APT) 
+
+add-apt-repository //增加仓库到source.list
+_______________
+查看包信息：
+dpkg -s package
+
+sudo apt update //更新可用软件信息
+
+sudo apt-cache search name //查找包名信息
+_______________
+安装软件：
+sudo apt-get install //安装和卸载用空格分隔的多个软件包
+
+sudo  dpkg  -i  package.deb //安装deb包
+
+sudo apt upgrade//更新
+
+sudo update-alternatives --config java //指定软件版本
+_______________
+卸载软件：
+sudo dpkg -r package
+
+sudo apt remove package
+_______________
+查看可用的软件版本：
+apt-cache policy package
+
+安装指定版本软件：
+sudo apt-get install package=version
+
+不再更新：
+apt-mark hold package
+
+
+===============管理包：
+列出所有包：
+dpkg -l
+

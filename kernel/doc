@@ -1,0 +1,4 @@
+sudo apt-get install xmlto
+
+1. make mandocs   
+2. make installmandocs 
