@@ -1,0 +1,11 @@
+
+CLOCK_REALTIME  时间值会被用户或NTP改变
+CLOCK_MONOTONIC 时间值是线性增长的，不会受NTP的影响改变时间值，但会根据误差改变时钟频率值。
+CLOCK_MONOTONIC_RAW 是在当前晶振下的时间值，时间值，频率都不会改变
+
+
+CLOCK_MONOTONIC never experiences discontinuities due to NTP time adjustments, but it does change in frequency as NTP learns what error exists between the local oscillator and the upstream servers.
+
+CLOCK_MONOTONIC_RAW is simply the local oscillator, not disciplined by NTP. This could be very useful if you want to implement some other time synchronization algorithm against a clock which is not fighting you due to NTP. While NTP is reputed to be "gentle" with time adjustments, it's more accurate to say it's gentle with the absolute time. It's willing to slew the clock by 500ppm which is pretty dramatic if you're in a position to measure your clock frequency against some other standard.
+
+The utility of CLOCK_MONOTONIC_RAW is going to be limited until facilities like pthread_timedwait_monotonic offer an option to use that timebase.

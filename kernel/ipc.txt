@@ -1,0 +1,119 @@
+————————————————————————————
+首先打开binder内核模块的驱动，打开后会将文件描述符与线程关联起来。内核模块用来区分IPC的发起者和接收者。
+通过文件描述符和使用ioctl命令接口来进行IPC模块的交互操作。
+ioctl命令BINDER_WRITE_READ
+struct binder_write_read
+{
+    ssize_t     write_size;
+    const void* write_buffer;//包含ipc要操作的命令和数据
+    ssize_t     read_size;
+    void*       read_buffer;//包含ipc操作后返回的数据
+};
+
+用户代码维护一个线程池（可设置最多个数），等待处理传入的transactions。驱动负责通知线程来处理
+
+————————————————————————————
+BinderDriverCommandProtocol：发送
+线程可以通过传入命令 bcSET_THREAD_ENTRY 带参数（同时发送bcREGISTER_LOOPER,） 让驱动获知一个新的处理线程
+
+重要的命名： bcTRANSACTION, bcREPLY。这两个命令都会发起一个IPC传输，并返回一个结果给发起线程。
+紧跟的参数是一个结构 binder_transaction_data
+struct binder_transaction_data
+{
+    // The first two are only used for bcTRANSACTION and brTRANSACTION,
+    // identifying the target and contents of the transaction.
+    union {
+        size_t  handle;     // target descriptor of command transaction
+        void    *ptr;       // target descriptor of return transaction
+    } target;
+    uint32  code;           // transaction command
+    
+    // General information about the transaction.
+    uint32  flags;
+    int32   priority;       // requested/current thread priority
+    size_t  data_size;      // number of bytes of data
+    size_t  offsets_size;   // number of bytes of object offsets
+    
+    // If this transaction is inline, the data immediately
+    // follows here; otherwise, it ends with a pointer to
+    // the data buffer.
+    union {
+        struct {
+            const void  *buffer;    // transaction data
+            const void  *offsets;   // binder object offsets
+        } ptr;
+        uint8   buf[8];
+    } data;
+};
+
+target中handle决定哪个进程来处理这次传输的命令。驱动会将传输的数据分发到线程池中等待的线程。
+———————————————————————————————
+BinderDriverReturnProtocol：接收
+enum BinderDriverReturnProtocol {
+    .......
+    
+    brTRANSACTION,
+    brREPLY,
+    
+        binder_transaction_data: the received command.    
+    .......	  
+};
+接收端的等待线程收到数据buffer中，包含brTRANSACTION命令和接收到的数据binder_transaction_data。
+将数据处理执行相关代码，返回结果。将bcREPLY回复命令和返回数据装入binder_transaction_data，执行ioctl命令
+BINDER_WRITE_READ发送数据到驱动，然后数据回复到原始进程。
+
+原始的发起进程会从ioctl操作BINDER_WRITE_READ中，收到包含brREPLY命令的数据的回复。
+
+一个调用流程:发起IPC都是通过BINDER_WRITE_READ命令的ioctl操作
+1)原始进程发起IPC传输(远程调用):-->bcTRANSACTION    
+2)接收进程收到远程调用请求：<--brTRANSACTION
+3)接收进程发起IPC传输(返回结果):-->bcREPLY
+1)原始进程接收到执行结果：<--brREPLY
+
+      发起请求---bcTRANSACTION--->           ---brTRANSACTION--->等待请求
+[发起端]                              [驱动]                                [接收端(调用对应方法)]
+      等待结果<---brREPLY---                   <---bcREPLY---返回结果
+
+原始进程在等待结果时，也有可能收到brTRANSACTION。因为接收端也请求了远程调用。
+________________________________
+对象映射，对象引用
+驱动的一个重要功能就是实现，进程间的对象映射。
+有两种不同的对象引用方式：进程内存中的address，抽象的32位handle，这两种方式使用上是互斥的。在本地进程中对对象的引用都是通过address。对远程进程中对象的引用都是通过handle。
+
+在请求远程调用时binder_transaction_data中target是远程对象的引用handle。当收到回复时target是本地对象的引用
+ptr地址。驱动维护进程间handle和ptr的映射。
+
+ipc的传输也要能够实现对象的引用的传输。将对象的引用放入buffer传输。在接收进程驱动负责将引用转换。为了正确
+转换，驱动需要知道对象的引用在传输数据中的位置。由binder_transaction_data->data中buffer和offset确定。
+
+驱动开始时并不知道任何binder对象，只有在进行传输后才会记录对象
+
+===============================
+android中实现：
+RefBase
+↳IBinder
+ ↳BpBinder
+-------------------------------
+RefBase
+↳BpRefBase(const sp<IBinder>& o)//mRemote=o.get()
+  ↳BpInterface(const sp<IBinder>& )//@模板，实现相应的接口类
+    ↳IServiceManager//接口函数getService,addService,都是通过remote()->transact实现)	
+
+jb/frameworks/native/include/binder/IInterface.h
+jb/frameworks/native/include/binder/Binder.h
+jb/frameworks/native/libs/binder/IServiceManager.cpp
+_______________________________
+第一个IPC操作，serviceManager:通过IServiceManager
+gDefaultServiceManager=interface_cast<IServiceManager>(ProcessState::self()->getContextObject(NULL))
+//接口的封装
+mRemote=getContextObject()-->getStrongProxyForHandle(0)-->new BpBinder(0)//进行远程操作的接口
+
+------------------------------
+发送端远程操作：
+remote()->transact@IServiceManager.cpp-->BpBinder::transact-->IPCThreadState::self()->transact-->
+IPCThreadState->transact-->writeTransactionData--waitForResponse-->talkWithDriver-->ioctl
+@TPCThreadState.cpp-->binder_ioctl-->(写入数据)binder_thread_write-->binder_transaction-->binder_get_ref-->
+binder_new_node@binder.c
+
+
+jb/frameworks/native/libs/binder/BpBinder.cpp

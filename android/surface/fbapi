@@ -1,0 +1,13 @@
+//操作步骤
+open("/dev/graphics/fb0", O_RDWR) //打开
+mmap				//映射fb
+wirte				//写数据
+ioctl(FBIOPUT_VSCREENINFO)	//更新配置文件
+
+
+
+//driver中接口
+do_fb_ioctl(FBIOPUT_VSCREENINFO)-->fb_set_par@fbmem.c 	//设置参数
+do_fb_ioctl(FBIOBLANK)-->fb_blank@fbmem.c		//行场点时钟被关闭
+do_fb_ioctl(FBIOPAN_DISPLAY)-->fb_pan_display@fbmem.c	//开始显示（如设置显示位置)
+

@@ -1,0 +1,379 @@
+//
+ac97(Audio Codec97),数字/模拟信号分离。
+模拟：“Audio Codec”(多媒体数字信号编解码器)
+数字：“Digital Control”(数字信号控制器)
+
+=========================
+卡设备结构：snd_card
+//创建并初始化snd_card结构
+int snd_card_create(int idx, const char *xid,
+		    struct module *module, int extra_size,
+		    struct snd_card **card_ret)
+
+//注册分配给snd_card中的所有devices
+int snd_card_register(struct snd_card *card)
+
+
+//取消所有提供给用户空间的API的连接
+int snd_card_disconnect(struct snd_card *card)
+
+//释放snd_card结构
+int snd_card_free(struct snd_card *card){
+- snd_card_disconnect
+- 释放结构体空间，snd_card_do_free
+}
+
+#define snd_card_set_dev(card, devptr) ((card)->dev = (devptr))
+_________________________
+Components:(pcm,mixer,MIDI)
+
+组件结构：snd_device
+
+//创建一个snd_device
+int snd_device_new(struct snd_card *card, snd_device_type_t type,
+		   void *device_data, struct snd_device_ops *ops)
+
+
+
+kernel/sound/core/init.c
+kernel/include/sound/core.h
+kernel/sound/core/device.c
+
+_________________________
+PCM接口：是ALSA的中间层，每个卡设备有至多4个PCM实例(这个限制是设备编号的原因(64位平台更多))
+
+一个pcm实例包含pcm播放，捕获流。每个pcm流有一个或多个子流。有些声卡支持多个流播放，
+若流使用完成再打开会出错。
+
+
+//创建PCM实例，只是对snd_device_new的封装
+int snd_pcm_new(struct snd_card *card, const char *id, int device,
+		int playback_count, int capture_count,
+	        struct snd_pcm ** rpcm)
+
+
+//设置播放，捕获操作snd_pcm_ops
+SNDRV_PCM_STREAM_PLAYBACK
+SNDRV_PCM_STREAM_CAPTURE
+
+void snd_pcm_set_ops(struct snd_pcm *pcm, int direction, struct snd_pcm_ops *ops)
+
+//运行时实例，当打开pcm流后会获得一个pcm流的运行时实例(substream->runtime)
+struct snd_pcm_runtime{}
+
+//硬件描述符
+snd_pcm_hardware
+
+
+//pcm配置，PCM Configurations
+hw_params
+sw_params
+
+kernel/sound/core/pcm.c
+kernel/sound/core/pcm_lib.c
+_________________________
+控制接口：(mixer接口都在此实现)
+
+
+struct snd_kcontrol_new{
+...
+	snd_ctl_elem_iface_t iface;	//接口类型，MIXER,CARD,HWDEP, PCM, RAWMIDI, TIMER
+
+	snd_kcontrol_info_t *info;	//获取控制的详细信息
+	snd_kcontrol_get_t *get;	//获取控制值
+	snd_kcontrol_put_t *put;	//从用户空间设置值
+...
+}
+
+控制的命名方式：“SOURCE DIRECTION FUNCTION”
+
+
+kernel/include/sound/control.h
+
+===================
+machine驱动，平台相关代码：连接platform和codec
+
+platform驱动，平台相关代码：
+DMA和DAI控制，配置。
+
+codec驱动，没有平台相关代码：
+音频录制，播放。
+
+
+====================
+ASoC Machine Driver:(平台驱动和codec的粘合剂)
+
+
+/* SoC machine 作为一个平台设备注册*/
+struct snd_soc_card {
+	char *name;
+
+	...
+
+	int (*probe)(struct platform_device *pdev);
+	int (*remove)(struct platform_device *pdev);
+
+	/* the pre and post PM functions are used to do any PM work before and
+	 * after the codec and DAIs do any PM work. */
+	int (*suspend_pre)(struct platform_device *pdev, pm_message_t state);
+	int (*suspend_post)(struct platform_device *pdev, pm_message_t state);
+	int (*resume_pre)(struct platform_device *pdev);
+	int (*resume_post)(struct platform_device *pdev);
+
+	...
+
+	/* CPU <--> Codec DAI links  */
+	struct snd_soc_dai_link *dai_link;
+	int num_links;
+
+	...
+};
+____________________
+Machine DAI Configuration:将cpu的ADI接口与codec粘合
+
+/* snd_soc_dai_link用来设置设备上每个DAI接口
+ * corgi digital audio interface glue - connects codec <--> CPU 
+ */
+static struct snd_soc_dai_link corgi_dai = {
+	.name = "WM8731",
+	.stream_name = "WM8731",
+	.cpu_dai_name = "pxa-is2-dai",
+	.codec_dai_name = "wm8731-hifi",
+	.platform_name = "pxa-pcm-audio",
+	.codec_name = "wm8713-codec.0-001a",
+	.init = corgi_wm8731_init,
+	.ops = &corgi_ops,
+};
+
+struct snd_soc_card then sets up the machine with its DAIs. e.g.
+
+/* snd_soc_card关联设备和DAIs接口
+ * corgi audio machine driver 
+ */
+static struct snd_soc_card snd_soc_corgi = {
+	.name = "Corgi",
+	.dai_link = &corgi_dai,
+	.num_links = 1,
+};
+
+====================
+codec:
+硬件无关的。代码中没有平台相关的处理
+
+codec驱动实现功能：
+ 1) Codec DAI and PCM configuration
+ 2) Codec control IO - using I2C, 3 Wire(SPI) or both APIs
+ 3) Mixers and audio controls
+ 4) Codec audio operations
+可选的功能:
+ 5) DAPM description.//电源管理
+ 6) DAPM event handler.
+ 7) DAC Digital mute control.
+
+
+1 - Codec DAI and PCM configuration
+-----------------------------------
+Each codec driver must have a struct snd_soc_dai_driver to define its DAI and
+PCM capabilities and operations. This struct is exported so that it can be
+registered with the core by your machine driver.
+
+e.g.
+
+static struct snd_soc_dai_ops wm8731_dai_ops = {
+	.prepare	= wm8731_pcm_prepare,
+	.hw_params	= wm8731_hw_params,
+	.shutdown	= wm8731_shutdown,
+	.digital_mute	= wm8731_mute,
+	.set_sysclk	= wm8731_set_dai_sysclk,
+	.set_fmt	= wm8731_set_dai_fmt,
+};
+
+struct snd_soc_dai_driver wm8731_dai = {
+	.name = "wm8731-hifi",
+	.playback = {
+		.stream_name = "Playback",
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = WM8731_RATES,
+		.formats = WM8731_FORMATS,},
+	.capture = {
+		.stream_name = "Capture",
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = WM8731_RATES,
+		.formats = WM8731_FORMATS,},
+	.ops = &wm8731_dai_ops,
+	.symmetric_rates = 1,
+};
+
+
+2 - Codec control IO
+--------------------
+codec通常通过i2c或spi接口控制(AC97控制和数据传输都通过DAI)
+
+codec通过缓存寄存器数据，提供寄存器数据的读写。
+	/* IO control data and register cache */
+	void *control_data; /* codec control (i2c/3wire) data */
+	void *reg_cache;
+
+读写函数:-
+    unsigned int (*read)(struct snd_soc_codec *, unsigned int);
+    int (*write)(struct snd_soc_codec *, unsigned int, unsigned int);
+
+硬件读写函数(通常指向I2C, SPI or AC97的读写函数):-
+	hw_write_t hw_write;
+	hw_read_t hw_read;
+
+
+3 - Mixers and audio controls
+-----------------------------
+所有的codec mixers和audio controls可使用以下宏定义@soc.h.
+
+    #define SOC_SINGLE(xname, reg, shift, mask, invert)
+
+定义了一个控制:-
+  xname = Control name e.g. "Playback Volume"
+  reg = codec register
+  shift = control bit(s) offset in register
+  mask = control bit size(s) e.g. mask of 7 = 3 bits
+  invert = the control is inverted
+
+Other macros include:-
+
+    #define SOC_DOUBLE(xname, reg, shift_left, shift_right, mask, invert)
+
+A stereo control
+
+    #define SOC_DOUBLE_R(xname, reg_left, reg_right, shift, mask, invert)
+
+A stereo control spanning 2 registers
+
+    #define SOC_ENUM_SINGLE(xreg, xshift, xmask, xtexts)
+
+Defines an single enumerated control as follows:-
+
+   xreg = register
+   xshift = control bit(s) offset in register
+   xmask = control bit(s) size
+   xtexts = pointer to array of strings that describe each setting
+
+   #define SOC_ENUM_DOUBLE(xreg, xshift_l, xshift_r, xmask, xtexts)
+
+Defines a stereo enumerated control
+
+
+4 - Codec Audio Operations
+--------------------------
+ALSA 操作:-
+
+/* SoC audio ops */
+struct snd_soc_ops {
+	int (*startup)(struct snd_pcm_substream *);
+	void (*shutdown)(struct snd_pcm_substream *);
+	int (*hw_params)(struct snd_pcm_substream *, struct snd_pcm_hw_params *);
+	int (*hw_free)(struct snd_pcm_substream *);
+	int (*prepare)(struct snd_pcm_substream *);
+};
+
+5 - DAPM description.
+---------------------
+睡眠
+
+6 - DAPM event handler
+----------------------
+
+Power states:-
+
+	SNDRV_CTL_POWER_D0: /* full On */
+	/* vref/mid, clk and osc on, active */
+
+	SNDRV_CTL_POWER_D1: /* partial On */
+	SNDRV_CTL_POWER_D2: /* partial On */
+
+	SNDRV_CTL_POWER_D3hot: /* Off, with power */
+	/* everything off except vref/vmid, inactive */
+
+	SNDRV_CTL_POWER_D3cold: /* Everything Off, without power */
+
+
+7 - Codec DAC digital mute control
+----------------------------------
+静音，停止向DAC写数据
+i.e.
+
+static int wm8974_mute(struct snd_soc_dai *dai, int mute)
+{
+	struct snd_soc_codec *codec = dai->codec;
+	u16 mute_reg = snd_soc_read(codec, WM8974_DAC) & 0xffbf;
+
+	if (mute)
+		snd_soc_write(codec, WM8974_DAC, mute_reg | 0x40);
+	else
+		snd_soc_write(codec, WM8974_DAC, mute_reg);
+	return 0;
+}
+====================
+ASoC Platform Driver:
+可分为：音频数据访问(audio DMA)，数字音频配置(SoC DAI(digit audio interface) configuration),控制(control)
+____________________
+audio DMA:
+/* 音频处理函数SoC audio ops */
+struct snd_soc_ops {
+	int (*startup)(struct snd_pcm_substream *);
+	void (*shutdown)(struct snd_pcm_substream *);
+	int (*hw_params)(struct snd_pcm_substream *, struct snd_pcm_hw_params *);
+	int (*hw_free)(struct snd_pcm_substream *);
+	int (*prepare)(struct snd_pcm_substream *);
+	int (*trigger)(struct snd_pcm_substream *, int);
+};
+
+snd_soc_platform_driver包含以上操作函数:
+struct snd_soc_platform_driver {
+	char *name;
+
+	int (*probe)(struct platform_device *pdev);
+	int (*remove)(struct platform_device *pdev);
+	int (*suspend)(struct platform_device *pdev, struct snd_soc_cpu_dai *cpu_dai);
+	int (*resume)(struct platform_device *pdev, struct snd_soc_cpu_dai *cpu_dai);
+
+	/* pcm creation and destruction */
+	int (*pcm_new)(struct snd_card *, struct snd_soc_codec_dai *, struct snd_pcm *);
+	void (*pcm_free)(struct snd_pcm *);
+
+	/*
+	 * For platform caused delay reporting.
+	 * Optional.
+	 */
+	snd_pcm_sframes_t (*delay)(struct snd_pcm_substream *,
+		struct snd_soc_dai *);
+
+	/* platform stream ops */
+	struct snd_pcm_ops *pcm_ops;
+};
+__________________
+SoC DAI Drivers:
+
+Each SoC DAI driver must provide the following features:-
+
+ 1) Digital audio interface (DAI) description
+ 2) Digital audio interface configuration
+ 3) PCM's description
+ 4) SYSCLK configuration
+ 5) Suspend and resume (optional)
+
+
+====================
+DAI(digital audio interface):有三种接口
+
+ac97：
+
+
+i2s：4线
+Tx 			  发送数据
+Rx 			  接收数据
+bit clock (BCLK) 	  位时钟
+left/right clock (LRC)    左右通道同步时钟(区分数据来自哪个通道)
+
+
+pcm：和i2s类似
+

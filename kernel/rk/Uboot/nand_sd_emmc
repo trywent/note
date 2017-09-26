@@ -1,0 +1,33 @@
+NAND - raw flash memory
+存储介质
+
+SD - "Secure Digital"
+控制器(实现FTL (Flash Translation Layer))+NAND
+
+eMMC - embedded MMC 
+嵌入到板子上的mmc设备
+
+
+================
+SdmmcInit-->SdmmcReinit(0){
+- 设置host中的配置，SDM_Init-->SDC_Init
+- 注册卡，SDM_IOCtrl(SDM_IOCTRL_REGISTER_CARD)
+
+}@sdmmcBoot.c
+
+SDM_IOCtrl{
+- _IdentifyCard{
+	- 设置power，SDC_ControlPower(cardId, TRUE)
+	- 设置bus，SDC_SetHostBusWidth
+	- 设置识别时时钟400k，SDC_UpdateCardFreq-->_ChangeFreq
+	- 发送命令识别卡，_Identify_SendCmd{
+				
+		}
+	- (升级卡设备)SD20_Init-->_SD_DecodeCID
+	- (emmc设备)
+	}
+}@hw_SDM.c
+
+common/cmd_mmc.c
+board/rockchip/common/common/emmc/sdmmcBoot.c
+board/rockchip/common/common/emmc/hw_SDM.c

@@ -1,0 +1,29 @@
+external/skia/src/ports/SkFontHost_FreeType.cpp
+
+diff --git a/car-release-1116/external/skia/src/ports/SkFontHost_FreeType.cpp b/
+index 11b051c..a91da2a 100644
+--- a/car-release-1116/external/skia/src/ports/SkFontHost_FreeType.cpp
++++ b/car-release-1116/external/skia/src/ports/SkFontHost_FreeType.cpp
+@@ -1014,7 +1014,8 @@ SkScalerContext_FreeType::SkScalerContext_FreeType(SkTypef
+     }
+ 
+     if (FT_IS_SCALABLE(fFace)) {
+-        err = FT_Set_Char_Size(fFace, SkFixedToFDot6(fScaleX), SkFixedToFDot6(f
++// 88 88        
++err = FT_Set_Char_Size(fFace, SkFixedToFDot6(fScaleX), SkFixedToFDot6(fScaleY),
+         if (err != 0) {
+             SkDEBUGF(("FT_Set_CharSize(%08x, 0x%x, 0x%x) returned 0x%x\n",
+                                     fFace, fScaleX, fScaleY,      err));
+@@ -1756,9 +1757,9 @@ bool find_name_and_attributes(SkStream* stream, SkString* 
+     }
+ 
+     int tempStyle = SkTypeface::kNormal;
+-    if (face->style_flags & FT_STYLE_FLAG_BOLD) {
++    //if (face->style_flags & FT_STYLE_FLAG_BOLD) {
+         tempStyle |= SkTypeface::kBold;
+-    }
++   // }
+     if (face->style_flags & FT_STYLE_FLAG_ITALIC) {
+         tempStyle |= SkTypeface::kItalic;
+     }
+

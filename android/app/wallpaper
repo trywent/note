@@ -1,0 +1,343 @@
+配置保存文件：
+/data/system/users/wallpaper
+
+default_wallpaper_component@core/res/res/values/config.xml
+____________________________________________
+WallpaperManager壁纸服务：
+new WallpaperManagerService--ServiceManager.addService(Context.WALLPAPER_SERVICE, wallpaper)
+@SystemServer.java
+
+获取服务
+getWallpaperManager-->WALLPAPER_FETCHER.getService-->new WallpaperManager@ContextImpl.java
+initGlobals-->new Globals()-->ServiceManager.getService(Context.WALLPAPER_SERVICE)
+@WallpaperManager.java
+
+________________________________
+
+onLongClick-->startWallpaper-->startActivityForResult(ACTION_SET_WALLPAPER)@Launcher.java-->
+(静态壁纸响应intent)onCreate-->getFragmentManager().findFragmentById(R.id.wallpaper_chooser_fragment)
+@WallpaperChooser.java-->
+
+
+设置壁纸：
+selectWallpaper-->wpm.setResource(mImages.get(position))@WallpaperChooserDialogFragment.java
+-->setWallpaper-->(写入图片)fos.write(图像buffer, 0, buffer长度amt)@WallpaperManager.java
+
+打开壁纸保存文件：
+setResource-->sGlobals.mService.setWallpaper@WallpaperManager.java-->setWallpaper
+(getCallingUserId@UserId.java获取的userId都为0)updateWallpaperBitmapLocked
+@WallpaperManagerService.java
+
+初始mWallpaperMap(存放userid，wallpaper)：
+1)switchUser(用户改变)@WallpaperManagerService.java
+2)new WallpaperManagerService-->(从xml文件中获取保存的壁纸信息)loadSettingsLocked(userId 0)-->
+mWallpaperMap.put@WallpaperManagerService.java
+
+saveSettingsLocked(获取信息文件，保存设置)
+
+清除所有壁纸(会变成默认壁纸)：
+clear()-->setResource(com.android.internal.R.drawable.default_wallpaper)@WallpaperManager.java
+默认壁纸位置：frameworks/base/core/res/res/drawable-nodpi/default_wallpaper.jpg
+
+
+packages/apps/Launcher2/src/com/android/launcher2/WallpaperChooser.java
+packages/apps/Launcher2/src/com/android/launcher2/WallpaperChooserDialogFragment.java
+---------------------------------
+设置动态壁纸：
+onLongClick-->startWallpaper-->startActivityForResult(ACTION_SET_WALLPAPER)@Launcher.java-->
+(动态壁纸响应intent)-->(选定动态壁纸)onItemClick-->LiveWallpaperPreview.showPreview
+(layout中设置button onClick方法)setLiveWallpaper-->mWallpaperManager.getIWallpaperManager()
+.setWallpaperComponent@LiveWallpaperActivity.java-->setWallpaperComponent(ComponentName)-->
+bindWallpaperComponentLocked(获取对应组件名的组件，)@WallPaperManagerService.java
+
+
+默认壁纸组件：com.android.internal.R.string.default_wallpaper_component
+没有设置默认的组件： new ComponentName("com.android.systemui", "com.android.systemui.ImageWallpaper");
+
+
+packages/wallpapers/LivePicker/src/com/android/wallpaper/livepicker/LiveWallpaperActivity.java
+packages/wallpapers/LivePicker/src/com/android/wallpaper/livepicker/LiveWallpaperPreview.java
+_________________________________
+获取壁纸：
+peekWallpaperBitmap-->getCurrentWallpaperLocked@Globals-->getWallpaper@WallpaperManagerService.java
+
+peekWallpaperBitmap-->Globals.getCurrentWallpaperLocked-->(没有获得壁纸，则返回默认壁纸)-->
+Globals.getDefaultWallpaperLocked(获取默认壁纸default_wallpaper)@WallpaperManager.java
+
+Launcher2/src/com/android/launcher2/WallpaperChooserDialogFragment.java
+frameworks/base/core/java/android/app/WallpaperManager.java
+frameworks/base/services/java/com/android/server/WallpaperManagerService.java
+
+__________________________________
+壁纸开机初始化：
+WallpaperManagerService-->loadSettingsLocked(userId 0)-->mWallpaperMap.put(初始默认壁纸)
+@WallpaperManagerService.java
+
+wallpaperF.systemReady@SystemServer.java-->systemReady-->switchWallpaper-->
+bindWallpaperComponentLocked(绑定壁纸服务，开始服务)--saveSettingsLocked(保存配置)
+@WallpaperManagerService.java
+
+画出壁纸：
+drawFrameLocked-->updateWallpaperLocked(获取壁纸mWallpaperManager.getBitmap)--
+drawWallpaperWithCanvas(绘制canvas)@ImageWallpaper.java
+
+壁纸消失：
+onReceive@PackageMonitor.java-->onHandleForceStop-->doPackagesChangedLocked-->
+clearWallpaperLocked(清除壁纸文件)-->bindWallpaperComponentLocked(设置默认壁纸)
+@WallpaperManagerService.java
+
+监听壁纸文件改变后，更新壁纸：
+wallpaperF.systemReady@SystemServer.java-->systemReady-->wallpaperObserver.startWatching
+-->WallpaperObserver.onEvent-->bindWallpaperComponentLocked(绑定壁纸服务，开始服务)-->
+bindService(WallpaperConnection,...)-->(绑定成功)WallpaperConnection.onServiceConnected-->
+attachServiceLocked-->conn.mService.attach@WallpaperManagerService.java
+
+保存壁纸配置：
+(绑定成功)WallpaperConnection.onServiceConnected-->saveSettingsLocked(保存配置)
+@WallpaperManagerService.java
+
+绑定服务：
+bindWallpaperComponentLocked(绑定壁纸服务，开始服务)-->bindService(WallpaperConnection,...)-->
+(绑定成功)WallpaperConnection.onServiceConnected@WallpaperManagerService.java
+
+注册apk监听：
+new WallpaperManagerService-->(监听wallpaper文件)mMonitor.register@WallpaperManagerService.java-->
+register@PackageMonitor.java
+
+监听apk变化：
+onReceive(ACTION_PACKAGE_RESTARTED)-->onHandleForceStop@PackageMonitor.java-->
+doPackagesChangedLocked@WallpaperManagerService.java
+
+
+备份壁纸：
+WallpaperObserver.onEvent-->BackupManager.dataChanged
+
+获取备份：
+migrateFromOld
+==========================
+静态壁纸初始化：
+bindWallpaperComponentLocked(绑定壁纸服务，开始服务)-->bindService(WallpaperConnection,...)
+-->(绑定成功)WallpaperConnection.onServiceConnected-->attachServiceLocked-->
+conn.mService.attach@WallpaperManagerService.java-->IWallpaperServiceWrapper.attach
+-->new IWallpaperEngineWrapper-->sendMessage(DO_ATTACH)-->executeMessage-->engine.attach
+-->Engine.attach-->Engine.updateSurface@WallpaperService.java-->onSurfaceChanged-->
+drawFrameLocked-->updateWallpaperLocked(获取壁纸mWallpaperManager.getBitmap)
+--drawWallpaperWithCanvas(绘制canvas)@ImageWallpaper.java
+
+
+壁纸窗口变化(是否可视):
+dispatchAppVisibility-->sendMessage(MSG_VISIBILITY_CHANGED)-->
+executeMessage(MSG_VISIBILITY_CHANGED)-->mEngine.doVisibilityChanged-->
+onVisibilityChanged-->reportVisibility-->doOffsetsChanged--(创建时也调用)updateSurface
+@WallpaperService.java
+
+
+设置壁纸大小：
+suggestDesireDimensions@WallpaperManager.java-->setDimensionHints@WallpaperManagerService.java
+-->setDesireSize-->mEngine.doDesiredSizeChanged-->设置mReqWidth@WallpaperService.java
+
+
+服务端：
+onBind-->new IWallpaperServiceWrapper@WallpaperService.java
+
+
+Engine{
+mSurfaceHolder = new BaseSurfaceHolder() //初始化SurfaceHolder
+mWindow = new BaseIWindow() //初始化窗口
+
+}
+
+Engine.attach{
+mSession = ViewRootImpl.getWindowSession(getMainLooper()) //初始化session
+}
+
+updateSurface-->mSession.add--mSession.relayout--mSession.finishDrawing@WallpaperService.java
+__________________________
+动态壁纸：
+(设置壁纸)configureLiveWallpaper-->startActivity(开始相应的壁纸)@LiveWallpaperPreview.java
+
+packages/wallpapers/LivePicker/src/com/android/wallpaper/livepicker/LiveWallpaperPreview.java
+
+
+fameworks/base/packages/SystemUI/src/com/android/systemui/ImageWallpaper.java
+frameworks/base/core/java/com/android/internal/content/PackageMonitor.java
+frameworks/base/core/java/android/service/wallpaper/WallpaperService.java
+
+___________________________
+壁纸选择：
+activity com.android.launcher2/.WallpaperChooser
+
+onCreateView-->findWallpapers-->addWallpapers(加入壁纸R.array.wallpapers)
+
+
+
+
+logcat -s ImageWallpaper WallpaperService
+
+packages/apps/Launcher2/src/com/android/launcher2/WallpaperChooser.java
+packages/apps/Launcher2/src/com/android/launcher2/WallpaperChooserDialogFragment.java
+frameworks/base/core/java/android/service/wallpaper/WallpaperService.java
+
+===========================
+动态壁纸预览：
+
+showPreview{
+- new Intent(activity, LiveWallpaperPreview.class)
+- 启动preview，startActivityForResult
+}@LiveWallpaperPreview.java
+
+packages/wallpapers/LivePicker/src/com/android/wallpaper/livepicker/LiveWallpaperPreview.java
+===========================
+壁纸窗口：
+setWallpaperOffsets-->ViewRootImpl.getWindowSession(mContext.getMainLooper()).setWallpaperPosition
+@WallpaperManager.javasetWallpaperPosition-->mService.setWindowWallpaperPositionLocked@Session.java
+-->setWindowWallpaperPositionLocked(WindowState changingTarget, boolean sync){
+- 获取壁纸目标窗口设置的壁纸位置，和每步位移值
+- 使用最新的位置，没步位移值更新壁纸窗口,updateWallpaperOffsetLocked{
+		- 更新壁纸窗口值，wallpaperWin
+		- 设置壁纸应用更新当前值，wallpaperWin.mClient.dispatchWallpaperOffsets
+	}
+- 计算壁纸窗口的显示大小，computeShownFrameLocked
+- 更新surface，setWallpaperOffset{
+		-  mH.sendMessage(H.SET_WALLPAPER_OFFSET)-->mH.handleMessage-->winAnimator.setWallpaperOffset
+	}
+
+}@WindowManagerService.java
+
+
+//设置壁纸大小
+suggestDesiredDimensions-->sGlobals.mService.setDimensionHints@WallpaperManager.java
+-->
+
+frameworks/base/services/java/com/android/server/wm/Session.java
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+
+
+==============================
+壁纸窗口：
+
+//设置所有窗口的layer
+assignLayersLocked{
+- 根据窗口的mBaseLayer，设置窗口mLayer
+- 输入法窗口，壁纸窗口需调整的进行调整
+}
+
+adjustWallpaperWindowsLocked{
+-查找mWindow中层次最高需要壁纸的窗口，若没有则查找的窗口为最底层的窗口，所有的壁纸窗口将在这个窗口的下面
+-当前正在进行应用切换，且壁纸正被显示则返回
+-目标窗口发生变化，且新旧两个目标窗口正在进行动画，则设置上下两个目标窗口，调整foundW，foundI
+-调整壁纸的大小
+-遍历mWallpaperTokens中所有壁纸窗口，将壁纸窗口移动到指定的位置foundI
+}
+
+移动壁纸窗口位置：
+adjustWallpaperWindowsLocked{
+- 查找mWindow中壁纸目标窗口(窗口是应用窗口，需要壁纸，没有隐藏，没有进行动画)，若是在动画，
+  则记录要显示动画的窗口。设置foundW，foundI(可能都为0)
+
+- 当前正在进行应用切换。mWallpaperTarget不为空且为应用窗口则返回，foundW不为空且是应用窗口则返回
+
+- 目标窗口发生变化mWallpaperTarget != foundW{
+		- 设置新的目标窗口，mWallpaperTarget = foundW
+		- 新旧两个目标窗口正同时进行动画{
+			- 新窗口mWallpaperTarget将要隐藏，mWallpaperTarget还是原来值不变		
+			- 根据新旧目标窗口的层次值，设置mUpperWallpaperTarget， mLowerWallpaperTarget
+		}
+	}
+- 目标窗口没有变化，且存在mUpperWallpaperTarget， mLowerWallpaperTarget{
+		- 检查动画是否结束，将mUpperWallpaperTarget， mLowerWallpaperTarget设空	
+	}
+
+- foundW不为空,foundW != null{
+		- 壁纸是否可见，isWallpaperVisible(foundW)
+		- 将壁纸移动到目标窗口所有的子窗口之下
+	}
+- 没有找到壁纸目标窗口，则将壁纸位置不变(位置为最高的壁纸窗口foundW = topCurW)
+
+- 根据新的目标，设置新的壁纸大小
+
+- 获取所有的壁纸窗口标记,mWallpaperTokens.get{
+		- 更新壁纸大小，updateWallpaperOffsetLocked{
+			- 
+		}
+		- 设置壁纸窗口应用端的可视性，dispatchWallpaperVisibility{
+			- wallpaper.mClient.dispatchAppVisibility	
+		}
+		- 设置壁纸层次，wallpaper.mWinAnimator.mAnimLayer = wallpaper.mLayer +
+				mWallpaperAnimLayerAdjustment
+		- 壁纸窗口不在合适位置，先移除，再加入到mWindows
+	}
+
+- 遍历mWallpaperTokens中所有壁纸窗口，将壁纸窗口移动到指定的位置foundI
+
+}@WindowManagerService.java
+
+
+
+
+调整显示层次：
+stepAnimationLocked-->updateLayers-->mService.setInputMethodAnimLayerAdjustment--mService.setWallpaperAnimLayerAdjustmentLocked@AppWindowAnimator.java
+
+setAnimation-->updateLayers-->mService.setInputMethodAnimLayerAdjustment--mService.setWallpaperAnimLayerAdjustmentLocked@AppWindowAnimator.java-->
+setWallpaperAnimLayerAdjustmentLocked{
+- 设置mWallpaperAnimLayerAdjustment
+- 设置壁纸窗口的层次，wallpaper.mWinAnimator.mAnimLayer 
+}@WindowManagerService.java
+
+
+显示/隐藏：
+updateWallpaperVisibilityLocked{
+- isWallpaperVisible
+- dispatchWallpaperVisibility
+}
+
+
+动画设置壁纸显示：
+finishExit-->animateLocked{
+- 遍历所有的应用窗口，updateAppWindowsLocked{
+		- appAnimator.stepAnimationLocked@WindowAnimator.java-->
+		finishExit-->hideWallpapersLocked@WindowStateAnimator.java-->
+		dispatchWallpaperVisibility@WindowManagerService.java
+		- 
+}@WindowStateAnimator.java
+
+__________________
+频谱      com.android.musicvis/.vis3.Visualization3
+bubbles   com.android.noisefield/.NoiseFieldWallpaper
+black hole   com.android.galaxy4/.Galaxy4Wallpaper
+魔幻烟雾   com.android.magicsmoke/.MagicSmoke
+phase beam com.android.phasebeam/.PhaseBeamWallpaper
+线光  com.android.wallpaper/.nexus.NexusWallpaper
+落叶  
+component="com.ayssbizhi.mogudongtai/com.zte.mobile.MushroomDay.WallpaperServiceMushroom"
+
+component="com.androidwasabi.livewallpaper.dandelion/.Dandelion"
+
+
+======================
+Figured it out...
+
+final String packName = "com.example2.app";
+    String mDrawableName = "app_icon";
+
+    try {
+        PackageManager manager = getPackageManager();
+        Resources mApk1Resources = manager.getResourcesForApplication(packName);
+
+        int mDrawableResID = mApk1Resources.getIdentifier(mDrawableName, "drawable",packName);
+
+        Drawable myDrawable = mApk1Resources.getDrawable( mDrawableResID );
+
+        if( myDrawable != null )
+            TEST.setBackgroundDrawable(myDrawable );
+
+    }
+    catch (NameNotFoundException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    }
+
+_______________________
+Nevertheles, you can still access resources from another app, even if this is not your app:
+
+Resources res = context.getPackageManager().getResourcesForApplication("com.example.foo")

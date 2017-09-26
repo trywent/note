@@ -1,0 +1,77 @@
+=========================
+ANDROID JNI：
+"JavaVM" and "JNIEnv"都是指向函数表指针的指针。在c++中它们是包含一个指向函数表的指针，和一个成员函数。JNI函
+数可以通过它获取到。JavaVM提供调用接口创建或销毁虚拟机，android中一个进程允许一个虚拟机。
+JNIEnv可提供大多数的jni函数，本地函数被调用时第一个传入的参数就是JNIEnv。JNIEnv是线程本地存储（Thread-
+local Storage）
+
+android中jni有些是系统服务使用的接口，其他应用的不能使用。系统服务启动后如何向虚拟机注册这些本地接口？
+一般应用使用的本地接口有时怎样注册的？
+
+
+jniRegisterNativeMethods实现：
+jb/libnativehelper/JNIHelper.cpp
+
+-----------------
+线程都可关联到java VM，不管是从java 创建（Thread.start）还是从本地代码实现。
+本地线程管理java VM，如 pthread_create通过 AttachCurrentThread or AttachCurrentThreadAsDaemon 函数关联
+
+-----------------
+由于查找fieldID，methodID比较费事（比较字符串），android中可以在类加载后提供本地方法用来查找和缓存这些ID
+-----------------
+本地和全局引用：
+所有的传入native method的参数和几乎所有JNI返回的引用都是本地引用（范围是在当前线程当前调用的本地方法中）
+natvie方法返回后，所有的jObject子类都是无效的引用（返回到java代码后再次进入）
+-----------------
+加载本地库的一般方法:
+1.system.loadLibrary 加载库
+2.提供方法jint JNI_OnLoad(JavaVM* vm, void* reserved)
+3.在JNI_OnLoad中注册本地方法（不是必须的）,返回版本号
+
+______________________
+为什么注册方法：
+Normally, in order for the JVM to find your native functions, they have to be named a certain way. e.g., for java.lang.Object.registerNatives, the corresponding C function is named Java_java_lang_Object_registerNatives. By using registerNatives (or rather, the JNI function RegisterNatives), you can name your C functions whatever you want.
+
+Here's the associated C code (from OpenJDK 6):
+
+static JNINativeMethod methods[] = {
+    {"hashCode",    "()I",                    (void *)&JVM_IHashCode},
+    {"wait",        "(J)V",                   (void *)&JVM_MonitorWait},
+    {"notify",      "()V",                    (void *)&JVM_MonitorNotify},
+    {"notifyAll",   "()V",                    (void *)&JVM_MonitorNotifyAll},
+    {"clone",       "()Ljava/lang/Object;",   (void *)&JVM_Clone},
+};
+
+JNIEXPORT void JNICALL
+Java_java_lang_Object_registerNatives(JNIEnv *env, jclass cls)
+{
+    (*env)->RegisterNatives(env, cls,
+                            methods, sizeof(methods)/sizeof(methods[0]));
+
+______________________
+Exceptions
+
+调用JNI函数必须处理异常(通过函数的返回值，ExceptionCheck, 或 ExceptionOccurred)和返回值。(抛出或处理)
+
+
+当出现异常时允许被调用的JNI函数：
+    DeleteGlobalRef
+    DeleteLocalRef
+    DeleteWeakGlobalRef
+    ExceptionCheck
+    ExceptionClear
+    ExceptionDescribe
+    ExceptionOccurred
+    MonitorExit
+    PopLocalFrame
+    PushLocalFrame
+    Release<PrimitiveType>ArrayElements
+    ReleasePrimitiveArrayCritical
+    ReleaseStringChars
+    ReleaseStringCritical
+    ReleaseStringUTFChars 
+
+
+本地代码通过调用ExceptionCheck or ExceptionOccurred检测异常，调用ExceptionClear清除异常.
+
+

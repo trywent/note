@@ -1,0 +1,24 @@
+logo:
+
+rk_fb_register{
+- 打开fb，fb_open
+- 设置参数，fb_set_par
+- 若是bmp，fb_prepare_bmp_logo@rk_fb.c-->fb_find_logo
+- 否则，fb_prepare_logo{
+	- 
+	}
+- fb_show_logo-->fb_show_logo_line{
+	- 是否旋转
+	- fb_do_show_logo-->info->fbops->fb_imageblit@fbmem.c-->cfb_imageblit{
+		- 
+		}@rk_fb.c
+	}
+}@rk_fb.c
+
+fb_find_logo{
+- 设置源，struct linux_logo *logo
+}@logo.c
+
+
+kernel/drivers/video/logo/logo.c
+kernel/drivers/video/rockchip/rk_fb.c

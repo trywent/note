@@ -1,0 +1,37 @@
+resumeTopActivityLocked{
+- 前一个应用不为空：
+	finishing{
+	- prepareAppTransition(prev.task == next.task? AppTransition.TRANSIT_ACTIVITY_CLOSE
+                            : AppTransition.TRANSIT_TASK_CLOSE)
+	}否则{
+	- prepareAppTransition(prev.task == next.task? AppTransition.TRANSIT_ACTIVITY_OPEN
+                            : AppTransition.TRANSIT_TASK_OPEN)
+	}
+- 前一个应用为空：
+	prepareAppTransition(AppTransition.TRANSIT_ACTIVITY_OPEN)
+
+}
+
+startActivityLocked{
+- prepareAppTransition(newTask? AppTransition.TRANSIT_TASK_OPEN
+                        : AppTransition.TRANSIT_ACTIVITY_OPEN)
+}
+
+
+//结束的应用为mResumedActivity
+finishActivityLocked{
+- prepareAppTransition(endTask? AppTransition.TRANSIT_TASK_CLOSE
+                    : AppTransition.TRANSIT_ACTIVITY_CLOSE)
+}
+
+updateTransitLocked-->prepareAppTransition
+
+
+moveTaskToFrontLocked{
+- updateTransitLocked(AppTransition.TRANSIT_TASK_TO_FRONT)
+- 
+}
+
+moveTaskToBackLocked{
+- prepareAppTransition(AppTransition.TRANSIT_TASK_TO_BACK
+}

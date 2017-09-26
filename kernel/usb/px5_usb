@@ -1,0 +1,14 @@
+//suspend
+usb_autosuspend_device-->pm_runtime_put_sync_autosuspend-->__pm_runtime_suspend
+-->rpm_suspend-->rpm_callback-->__rpm_callback-->usb_runtime_suspend-->
+usb_suspend_both-->generic_suspend-->hcd_bus_suspend-->hcd_suspend
+
+
+//resume
+usbdev_open-->usb_autoresume_device-->__pm_runtime_resume-->usb_runtime_resume-->
+usb_resume_both-->generic_resume-->hcd_bus_resume-->
+dwc_otg_hc_driver.bus_resume-->hcd_resume-->dwc_otg_hcd_resume@dwc_otg_hcd_linux.c
+
+
+
+kernel/drivers/usb/dwc_otg_310/dwc_otg_hcd_linux.c

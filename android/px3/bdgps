@@ -1,0 +1,13 @@
+handleMessage(ENABLE)-->handleEnable@GpsLocationProvider.java-->
+native_init-->android_location_GpsLocationProvider_init{
+- 
+}@com_android_server_location_GpsLocationProvider.cpp
+
+
+class_init_native@GpsLocationProvider.java-->android_location_GpsLocationProvider_class_init_native{
+- 缓存java中的域
+- 获取模块，hw_get_module(gps)
+}
+
+frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
+frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java

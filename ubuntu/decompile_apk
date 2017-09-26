@@ -1,0 +1,63 @@
+Step 1 :
+
+First download apktool  files
+1. apktool 1.4.3.tar.bz2
+
+2. apktool-install-linux-r04
+
+Step 2 :
+
+Unpack the both files to desktop
+
+Step 3 :
+
+Give all files root permission ,it can be given like this
+
+chown -R "root folder: root folder" Eg.. chown -R linux:linux
+replace linux:linux with what ever your root directory is
+Code:
+
+chown -R linux:linux
+
+" drag file into Terminal" " hit enter"
+(repeat for all 3 files)
+
+2. make all 3 files executable
+Code:
+
+sudo chmod +x
+"drag file to Terminal" " hit enter"
+
+( put in your password) it will only ask for this once
+(repeat for all 3 files)
+
+Step 4 : Move all files to bin folder
+
+navigate to Filesystem/usr/local
+right click on the bin folder and open as administrator
+drag the 3 files into the bin folder
+
+Step 5 : Start Apktool
+
+Code:
+
+ apktool
+
+Step 6 :
+
+Install framework files :  
+
+apktool if framework-res.apk
+
+Apktool usage 
+Notes: 
+d = decompile
+b = build/recompile
+-f = force overwrite (will overwrite if already exists) 
+if = will install framework files to use as resources
+
+Decompile an apk
+
+apktool d -f (apkto decompile) name of output directory
+
+Hope it helps

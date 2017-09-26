@@ -1,0 +1,56 @@
+//启动应用
+startActivity-->startActivityAsUser-->startActivityMayWait-->startActivityLocked
+
+
+//ActivtyManagerService
+
+
+
+
+//ActvityStackSupervisor
+setWindowManager-->createStackOnDisplay(HOME_STACK_ID,DEFAULT_DISPLAY)//创建launcher栈
+
+adjustStackFocus-->createStackOnDisplay(getNextStackId(),DEFAULT_DISPLAY)
+
+
+
+createActivityContainer{
+- new VirtualActivityContainer
+- parentActivity.mChildContainers.add
+}
+
+
+deleteActivityContainer{
+- mActivityContainers.remove(stackId)
+- mWindowManager.removeStack
+}
+
+
+===============
+mStacks使用栈顶来确定可见应用 frontStack
+
+
+/*mActivityDisplays对应dispaly
+ *  
+ * mDisplay  //屏幕信息
+ * mStacks //记录activity栈 attachActivities
+ */ 
+
+/* ActivityContainer 
+ * mStack =new ActivityStack    //应用栈
+ * mActivityDisplay = ActivityDisplay //关联到activityDisplay
+ * mStack.mStacks = ActivityDisplay.mStacks 
+ */
+
+
+//resuem top
+resumeTopActivitiesLocked{
+- getFocusedStack //获取焦点栈mFocusedStack
+- 判断是否可见栈，isFrontStack{
+	- 有mParentActivity，则判断mParentActivity.task.stack是否在栈顶
+	- 若是mStacks中最上栈，则为可见栈
+	}
+}
+
+
+frameworks/base/services/core/java/com/android/server/am/ActivityStackSupervisor.java

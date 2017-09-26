@@ -1,0 +1,36 @@
+
+创建：
+kthread_create@kthread.h-->(返回一个task_struct)kthread_create_on_node{
+- 
+}@kthread.c
+
+
+运行：
+wake_up_process(struct task_struct *p)@sched.c
+
+创建并运行：
+kthread_run{
+- kthread_create
+- wake_up_process
+}
+
+____________________
+初始worker：
+init_kthread_worker-->__init_kthread_worker{
+- 
+}@kthread.c
+
+初始work：
+init_kthread_work(work, fn){
+- (work)->func = (fn)
+}
+
+将work加入链表：
+queue_kthread_work(kthread_worker,kthread_work){
+- 将work加入到worker链表中，list_add_tail
+- 执行，wake_up_process(worker->task)
+}
+
+kernel/include/linux/kthread.h
+kernel/kernel/kthread.c
+kernel/kernel/sched.c

@@ -1,0 +1,53 @@
+//
+源：LOCAL_SRC_FILES
+库：LOCAL_JAVA_LIBRARIES
+编译目标：include $(BUILD_PACKAGE)
+
+
+include $(BUILD_SYSTEM)/base_rules.mk
+|- include $(BUILD_SYSTEM)/java.mk
+   | - package.mk
+
+
+LOCAL_SDK_VERSION //不能使用系统hide方法
+===============
+编译目标：
+CLEAR_VARS:= $(BUILD_SYSTEM)/clear_vars.mk
+BUILD_HOST_STATIC_LIBRARY:= $(BUILD_SYSTEM)/host_static_library.mk
+BUILD_HOST_SHARED_LIBRARY:= $(BUILD_SYSTEM)/host_shared_library.mk
+BUILD_STATIC_LIBRARY:= $(BUILD_SYSTEM)/static_library.mk
+BUILD_RAW_STATIC_LIBRARY := $(BUILD_SYSTEM)/raw_static_library.mk
+BUILD_SHARED_LIBRARY:= $(BUILD_SYSTEM)/shared_library.mk
+BUILD_EXECUTABLE:= $(BUILD_SYSTEM)/executable.mk
+BUILD_RAW_EXECUTABLE:= $(BUILD_SYSTEM)/raw_executable.mk
+BUILD_HOST_EXECUTABLE:= $(BUILD_SYSTEM)/host_executable.mk
+BUILD_PACKAGE:= $(BUILD_SYSTEM)/package.mk
+BUILD_PHONY_PACKAGE:= $(BUILD_SYSTEM)/phony_package.mk
+BUILD_HOST_PREBUILT:= $(BUILD_SYSTEM)/host_prebuilt.mk
+BUILD_PREBUILT:= $(BUILD_SYSTEM)/prebuilt.mk
+BUILD_MULTI_PREBUILT:= $(BUILD_SYSTEM)/multi_prebuilt.mk
+BUILD_JAVA_LIBRARY:= $(BUILD_SYSTEM)/java_library.mk
+BUILD_STATIC_JAVA_LIBRARY:= $(BUILD_SYSTEM)/static_java_library.mk
+BUILD_HOST_JAVA_LIBRARY:= $(BUILD_SYSTEM)/host_java_library.mk
+BUILD_DROIDDOC:= $(BUILD_SYSTEM)/droiddoc.mk
+BUILD_COPY_HEADERS := $(BUILD_SYSTEM)/copy_headers.mk
+BUILD_NATIVE_TEST := $(BUILD_SYSTEM)/native_test.mk
+BUILD_HOST_NATIVE_TEST := $(BUILD_SYSTEM)/host_native_test.mk
+BUILD_NOTICE_FILE := $(BUILD_SYSTEM)/notice_files.mk
+
+@build/core/config.mk 
+
+默认库：
+TARGET_DEFAULT_JAVA_LIBRARIES := core core-junit ext framework framework2
+________________
+编译应用程序包：
+$(LOCAL_BUILT_MODULE): $(all_res_assets) $(jni_shared_libraries) $(full_android_manifest)
+	@echo "target Package: $(PRIVATE_MODULE) ($@)"
+
+@build/core/package.mk
+
+
+================
+编译使用overlay：
+　　PRODUCT_PACKAGE_OVERLAYS: used by a particular product
+　　DEVICE_PACKAGE_OVERLAYS: used several products that share a common device model

@@ -1,0 +1,94 @@
+==================================
+广播注册：
+registerReceiver-->registerReceiverInternal{
+- mPackageInfo.getReceiverDispatcher-->getReceiverDispatcher{
+	- 先从map中查找
+	- 若没有则新建，ReceiverDispatcher
+	- 返回跨进程接口，InnerReceiver
+	}@LoadedApk.java
+- 注册到activityManager,ActivityManagerNative.getDefault().registerReceiver-->
+	registerReceiver{
+	- 查找注册者的app，并检查权限
+	- 若注册者不是应用，则callerPackage设为空
+	- 获取所有的sticky广播getStickiesLocked  //sticky类型intent被系统保存，后面的广播接收器能接收到
+	- 创建ReceiverList，加入到容器mRegisteredReceivers。并将filter加入到容器
+	- 处理所有的sticky广播。queue.enqueueParallelBroadcastLocked
+	}
+}@ContextImpl
+
+frameworks/base/core/java/android/app/LoadedApk.java
+frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/java/com/android/server/am/BroadcastQueue.java
+________________________
+发送：
+sendBroadcast-->ActivityManagerNative.getDefault().broadcastIntent@ContextImpl.java-->
+broadcastIntentLocked{(默认广播不会发送到stoped状态的应用,判断函数Intent.isExcludingStopped)
+- 首先检查广播权限
+- 处理特殊广播，应用移除广播
+- 处理特殊广播，应用加入广播
+- 若是时区，网络变化广播，则先发送message
+- 若是sticky广播，获取容器stickies=mStickyBroadcasts.get。将广播加入stickies.add
+- 收集接收器{
+	- 收集静态者测者receivers，collectReceiverComponents
+	- 动态注册者registeredReceivers，mReceiverResolver.queryIntent
+	- 若不是有序广播，且是主动注册。则执行主动注册的接收器。queue.scheduleBroadcastsLocked
+	- 移除新加入，数据被移除的应用注册的接收器
+	- 将registeredReceivers中接收器，按优先级插入到receivers
+	- 处理消息{
+		- 获取处理队列，broadcastQueueForIntent
+		- 广播记录，BroadcastRecord
+		- 记录加入到队列，enqueueOrderedBroadcastLocked
+		- 开始处理scheduleBroadcastsLocked
+		}
+	}
+
+}@ActivityManagerService.java
+
+_________________________
+ActivityManagerService中创建两个广播队列：
+        mFgBroadcastQueue = new BroadcastQueue(this, "foreground", BROADCAST_FG_TIMEOUT);
+        mBgBroadcastQueue = new BroadcastQueue(this, "background", BROADCAST_BG_TIMEOUT);
+
+将广播加入队列不同的类型的广播链表中mParallelBroadcasts(无序)，mOrderedBroadcasts(有序广播)：
+无序广播队列(动态注册的非有序广播)：
+enqueueParallelBroadcastLocked(当是无序的，且是注册的广播则加入该队列)-->mParallelBroadcasts.add
+(加入到ArrayList中)@BroadcastQueue.java
+
+有序广播队列(有序广播和非动态注册的广播)：
+enqueueOrderedBroadcastLocked(如果不是动态注册的，或是有序广播则加入该队列)-->
+mOrderedBroadcasts.add@BroadcastQueue.java
+
+
+处理：
+scheduleBroadcastsLocked-->sendMessage(BROADCAST_INTENT_MSG)-->handleMessage-->
+processNextBroadcast{
+- 处理非有序广播，deliverToRegisteredReceiverLocked-->performReceiveLocked{
+	- 若是应用在应用进程中执行,app.thread.scheduleRegisteredReceiver-->
+	- 若不是，receiver.performReceive
+	}
+}
+
+
+frameworks/base/services/java/com/android/server/am/BroadcastQueue.java
+
+
+_________________________
+
+发送启动完成广播：
+activityIdleInternal-->mService.finishBooting@ActivityStack.java-->finishBooting
+(发送广播，设置dev.bootcomplete sys.bootcomplete)@ActivityManagerService.java
+
+(打开显示)activityIdleInternal-->mService.enableScreenAfterBoot@ActivityStack.java
+
+ensureBootCompleted-->finishBooting(发送广播，设置dev.bootcomplete sys.bootcomplete)
+@ActivityManagerService.java
+
+
+
+activityIdleInternal@ActivityStack.java-->finishBooting@ActivityManagerService.java
+attach(应用进程开始，关联到应用)-->mgr.attachApplication@ActivityThread.java-->ActivityManagerProxy.attachApplication@ActivityManagerNative.java-->(跨进程)
+attachApplication(关联应用进程与进程号)-->attachApplicationLocked-->sendPendingBroadcastsLocked
+-->queue.sendPendingBroadcastsLocked@ActivityManagerService.java-->sendPendingBroadcastsLocked
+-->processCurBroadcastLocked@BroadcastQueue.java
+

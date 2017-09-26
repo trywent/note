@@ -1,0 +1,85 @@
+1)用户空间写 mem > sys/power/state
+2)kernel执行第一级休眠，early_suspend
+3)kernel中锁机制检测是否存在wake_lock锁，不存在则进入休眠suspend_work-->suspend
+
+
+
+========================
+LDO即low dropout regulator，是一种低压差线性稳压器
+
+RGE#:寄存器设置电压值
+VSET0[ ]和VSET1[ ]设置电压值。VSELR#选择(低电平时VSET0或，高电平VSET1)
+
+t136:OUT9
+=====================
+流程：
+static struct platform_suspend_ops rk30_pm_ops = {
+	.enter		= rk30_pm_enter,
+	.valid		= suspend_valid_only_mem,
+	.prepare 	= rk30_pm_prepare,
+	.finish		= rk30_pm_finish,
+};
+
+板级设置：
+rk30_pm_init{
+- 设置操作函数，suspend_set_ops(&rk30_pm_ops)-->赋值uspend_set_ops@suspend.c
+- 
+}@pm.c
+
+
+rk30_pm_enter{
+- SUSPEND
+- 设置电源管理标识rk_soc_pm_ctr_flags_sram，rk_soc_pm_ctr_bits_prepare
+- 输出中断脚信息，rk_pm_soc_prepare-->rk30_pm_dump_inten
+- rk30_suspend-->rk30_sram_suspend{
+	- board_pmu_suspend
+
+	}
+
+- RESUME
+- rk30_pwm_resume_voltage_set
+
+- 退出休眠打印irq信息，rk_pm_soc_finsh-->rk30_pm_dump_irq{
+		- 
+		- 输出中断脚信息
+		}
+}@pm.c
+
+
+kernel/arch/arm/mach-rk30/pm.c
+kernel/arch/arm/mach-rk30/ddr.c
+kernel/arch/arm/mach-rkpx3/board-rkpx3-sdk.c
+kernel/kernel/power/suspend.c
+=====================
+ACT8846:
+设备：
+i2c_register_board_info(1, i2c1_info)-->i2c1_info{
+.type = "act8846",
+.addr = 0x5a, 
+.flags= 0,
+.platform_data=&act8846_data,
+}@board-rkpx3-sdk.c
+
+act8846_data@board-pmu-act8846.c
+
+驱动：
+act8846_module_init-->i2c_add_driver(&act8846_i2c_driver)@act8846.c
+
+探测：
+act8846_i2c_probe{
+- 获取平台数据pdata = i2c->dev.platform_data
+- 设置稳定器，setup_regulators(act8846, pdata){
+	- 获取稳定器个数，pdata->num_regulators
+	- 遍历注册稳定器，regulator_register
+	}
+- 初始化act，pdata->set_init(act8846)
+}@act8846.c
+
+
+kernel/drivers/regulator/act8846.c
+kernel/arch/arm/mach-rk30/board-pmu-act8846.c
+kernel/arch/arm/mach-rkpx3/board-rkpx3-sdk.c
+________________________
+arm: out3-->vdd_cpu(regulator名)-->ACT_DCDC3
+
+

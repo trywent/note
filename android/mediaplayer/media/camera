@@ -1,0 +1,4 @@
+CameraService::instantiate()-->publish
+
+
+frameworks/av/media/mediaserver/main_mediaserver.cpp

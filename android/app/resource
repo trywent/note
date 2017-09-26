@@ -1,0 +1,75 @@
+//.mk文件中配置资源
+PRODUCT_AAPT_CONFIG := hdpi xhdpi normal
+PRODUCT_AAPT_PREF_CONFIG := xhdpi
+
+ldpi
+mdpi  //density 160
+hdpi
+===================
+//创建
+ContextImpl-->mResourcesManager.getTopLevelResources@ContextImpl.java
+-->AssetManager-->ensureSystemAssets-->init(true/*系统资源*/)@AssetManager.java
+-->android_content_AssetManager_init@android_util_AssetManager.cpp-->
+addDefaultAssets-->addAssetPath("/system/framework/framework-res.apk")-->
+mAssetPaths.add@AssetManager.cpp
+
+
+
+//获取值
+getDimensionPixelSize-->getValue-->mAssets.getResourceValue@Resource.java
+-->loadResourceValue@AssetManager.java-->android_content_AssetManager_loadResourceValue
+-->res.getResource
+
+
+
+
+frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/core/java/android/app/ResourcesManager.java
+frameworks/base/core/java/android/hardware/display/DisplayManagerGlobal.java
+frameworks/base/core/java/android/content/res/Resources.java
+frameworks/base/core/java/android/content/res/AssetManager.java
+frameworks/base/core/jni/android_util_AssetManager.cpp
+frameworks/base/libs/androidfw/AssetManager.cpp
+===================
+根据设备的属性决定合适的资源
+
+
+
+查找对应id的View：
+findViewById-->getWindow().findViewById(id)@Activity.java-->findViewById-->
+getDecorView().findViewById@Window.java-->mDecor.findViewById-->DecorView.findViewById
+@PhoneWindow.java-->findViewById-->findViewTraversal(id匹配说明查找到)@View.java-->
+
+(是ViewGroup容器)findViewTraversal-->v.findViewById(找到对应id的View)@ViewGroup.java-->findViewById
+-->findViewTraversal(return this)@View.java
+
+
+
+Assert
+===================
+Resource：
+
+获取：getResources
+
+创建：(Resource.getDisplayMetrics())
+ContextImpl@ContextImpl.java-->mResourcesManager.getTopLevelResources-->new Resources
+(getDisplayMetricsLocked())-->getDisplayMetricsLocked-->displayManager.getCompatibleDisplay{
+- getDisplayInfo
+- display.getMetrics(获取屏大小)@ResourcesManager.java-->mDisplayInfo.getAppMetrics
+	(获取应用大小)@Display.java
+}@DisplayManager.java
+
+
+//设置displayInfo中appWidth
+computeScreenConfigurationLocked-->mPolicy.getNonDecorDisplayWidth@WindowManagerService.java
+-->getNonDecorDisplayWidth(设置应用的窗口大小)@PhoneWindowManager.java
+
+//display
+DisplayManager.getDisplay(设置mDefaultDisplay)-->WindowManagerImpl(mDefaultDisplay)
+
+getDisplay-->getOrCreateDisplayLocked@DisplayManager.java-->getCompatibleDisplay
+
+getMetrics@Display.java-->getAppMetrics
+
+
+

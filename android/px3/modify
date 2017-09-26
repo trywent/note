@@ -1,0 +1,105 @@
+20150911:
+obd:
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
+frameworks/base/core/java/android/bluetooth/BluetoothSocket.java
+frameworks/base/core/java/android/bluetooth/BluetoothDevice.java
+===============
+uboot:
+打印：#define CONFIG_UART_NUM   		UART_CH1
+@uboot/include/configs/rk30xx.h
+
+显示：#define preg ((pLCDC_REG)LCDC1_BASE)
+@uboot/drivers/video/rk3188_lcdc.c
+
+malloc致死:
+rk616_set_reg{
+- calloc(sizeof(route),1)-->calloc(1,sizeof(rk616_route))
+}
+
+______________
+UUID:
+create_serial_number
+
+common/cmd_fastboot.c
+board/rockchip/common/common/emmc/hw_SD.c
+
+==============
+kernel:
+
+去掉配置#CONFIG_RK29_SUPPORT_MODEM=y
+
+sdmmc:
+RK29SDK_SD_CARD_PWR_EN INVALID_GPIO
+
+/home/w/px3/kernel/arch/arm/mach-rk30/board-rk3168-tb-sdmmc-conifg.c
+
+______________
+支持goc蓝牙：
+General setup：
+	  [*] System V IPC 
+
+
+==============
+system:
+Launcher3->Launcher2->Home
+
+Settings
+px3/build/target/product/core_base.mk
+px3/build/target/product/generic_no_telephony.mk
+
+______________
+启动完成：
+if (isFrontStack(mHomeStack)) @
+frameworks/base/services/java/com/android/server/am/ActivityStackSupervisor.java
+______________
+vold
+
+______________
+锁屏：
+showing = true;
+@frameworks/base/policy/src/com/android/internal/policy/impl/keyguard/KeyguardServiceDelegate.java
+
+______________
+睡眠：
+getScreenOffTimeoutLocked{
+- timeout=Integer.MAX_VALUE
+
+}
+______________
+应用方向：
+updateOrientationFromAppTokensLocked{
+- req= SCREEN_ORIENTATION_LANDSCAPE
+}
+
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+______________
+导航条：
+setInitialDisplaySize{
+- mStatusBarHeight //状态条高度 com.android.internal.R.dimen.status_bar_height
+- mHasNavigationBar //是否有导航调，com.android.internal.R.bool.config_showNavigationBar
+-
+}
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+
+
+______________
+sensor:
+/rksdk/BoardConfig.mk:BOARD_SENSOR_ST := true
+
+权限配置：
+init.connectivity.rc  @hardware/realtek/xxx/init.realtek.rc
+
+______________
+app:
+include device/rockchip/common/app/rkapk.mk
+
+device/rockchip/rksdk/device.mk
+
+______________
+库：
+
+移除tinyalsa，使用文强提供的库：
+device/rockchip/rksdk/device.mk  移除libtinyalsa
+
+device/rockchip/rkpx3/goc.mk  加入 goc/libtinyalsa.so:system/lib/libtinyalsa.so
+

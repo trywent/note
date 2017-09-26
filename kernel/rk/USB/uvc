@@ -1,0 +1,12 @@
+驱动：
+uvc_init-->usb_register(&uvc_driver.driver)@uvc_driver.c
+
+
+探测：
+uvc_probe{
+- 创建uvc设备，kzalloc
+- 初始化uvc设备
+- 注册V4L2设备，v4l2_device_register
+}
+
+kernel/drivers/media/video/uvc/uvc_driver.c

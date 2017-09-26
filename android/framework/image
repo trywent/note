@@ -1,0 +1,9 @@
+
+main-->archive-->_archive_dir-->_archive-->_eject-->fix_stat@mkbootfs.c-->
+fs_config(获取对应的目录或文件的权限android_dirs , android_files)@android_filesystem_config.h
+
+镜像权限设置：
+system/core/include/private/android_filesystem_config.h
+
+
+fs_config

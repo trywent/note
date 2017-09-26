@@ -1,0 +1,108 @@
+zip -Z store bootanimation.zip part0/*PNG part1/*PNG desc.txt
+存放在：
+/system/media/bootanimation.zip
+或
+/data/local/bootanimation.zip
+
+
+
+1024 600 10  //屏幕大小，每秒帧数
+p 0 0 part0   //c(显示完这部分complete)/p(部分)类型 重复次数 睡眠时间 文件夹
+
+system/core/include/private/android_filesystem_config.h
+===========================
+开始动画：
+readyToRun-->startBootAnim-->(开始动画服务)property_set("ctl.start", "bootanim")@SurfaceFlinger.cpp
+
+service bootanim /system/bin/bootanimation@init.rc-->main(开始新进程，运行BootAnimation)
+@bootanimation_main.cpp-->BootAnimation-->new SurfaceComposerClient()@BootAnimation.cpp
+
+BootAnimation继承Thread：
+onFirstRef-->run@BootAnimation.cpp-->androidCreateRawThreadEtc(_threadLoop,...)-->
+_threadLoop{
+- self->readyToRun@Threads.cpp-->readyToRun@BootAnimation.cpp
+- self->threadLoop-->threadLoop{
+	- android
+	- movie
+	}@BootAnimation.cpp
+}@Threads.cpp
+
+
+关闭动画：
+threadLoop-->android/movie(检查mExitPending退出循环)-->checkExit(查看"service.bootanim.exit")
+-->requestExit(设置mExitPending = true)@BootAnimation.cpp
+
+fameworks/base/cmds/bootanimation/bootanimation_main.cpp
+frameworks/base/cmds/bootanimation/BootAnimation.cpp
+system/core/libutils/Threads.cpp
+
+警告画面：
+关闭动画后，打开屏幕触摸才有效
+
+===========================
+H.handleMessage(WINDOW_FREEZE_TIMEOUT)
+
+
+performLayoutAndPlaceSurfacesLockedInner-->updateResizingWindows-->makeWindowFreezingScreenIfNeededLocked
+-->mH.sendMessageDelayed(WINDOW_FREEZE_TIMEOUT)
+
+updateRotationUncheckedLocked(将所有的显示窗口，更新方向)-->mH.sendMessageDelayed(WINDOW_FREEZE_TIMEOUT)
+
+移除：
+performLayoutAndPlaceSurfacesLockedInner-->mH.removeMessages(H.WINDOW_FREEZE_TIMEOUT)
+
+___________________________
+To rotate the texture around it's center you have to 
+1)translate to make the origin the center of the texture.
+2)rotate by an angle.
+3)translate it back (inverse transform of 1) 
+
+Code :
+ glMatrixMode(GL_TEXTURE);
+  glLoadIdentity();
+  glTranslatef(0.5,0.5,0.0);
+  glRotatef(angle,0.0,0.0,1.0);
+  glTranslatef(-0.5,-0.5,0.0);
+  glMatrixMode(GL_MODELVIEW);
+
+
+
+
+glBegin(GL_QUADS);
+glTexCoord2f(0.0f, 0.0f); glVertex2f(-8.0f, -8.0f);
+glTexCoord2f(0.0f, 5.0f); glVertex2f(-8.0f, 8.0f);
+glTexCoord2f(5.0f, 5.0f); glVertex2f(8.0f, 8.0f);
+glTexCoord2f(5.0f, 0.0f); glVertex2f(8.0f, -8.0f);
+glEnd();
+
+//set verteices
+	const GLfloat mask_vertices[] = {
+			xc, yc, 0,
+			xc+mAndroid[0].w, yc, 0,
+			xc+mAndroid[0].w, yc+mAndroid[0].h, 0,
+			xc, yc+mAndroid[0].h, 0
+	};
+
+	const GLfloat shine_vertices[] = {
+			xc, yc, 0,
+			xc+mAndroid[1].w, yc, 0,
+			xc+mAndroid[1].w, yc+mAndroid[1].h, 0,
+			xc, yc+mAndroid[1].h, 0
+	};
+
+//set texture cordinate
+	mTexCoords[0]=0;
+        mTexCoords[1]=1;
+	mTexCoords[2]=0;
+        mTexCoords[3]=0;
+	mTexCoords[4]=1;
+	mTexCoords[5]=0;
+	mTexCoords[6]=1;
+	mTexCoords[7]=1;
+
+	const GLushort indices[] = { 0, 1, 2,  0, 2, 3 };
+	int nelem = sizeof(indices)/sizeof(indices[0]);
+
+        glVertexPointer(3, GL_FLOAT, 0, mask_vertices);
+        glTexCoordPointer(2, GL_FLOAT, 0, mTexCoords);
+        glDrawElements(GL_TRIANGLES, nelem, GL_UNSIGNED_SHORT, indices);

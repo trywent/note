@@ -1,0 +1,201 @@
+//
+setInitialDisplaySize{
+        if(SystemProperties.get("ro.fytorientation.portrait","false").equals("true")) {//fyt 
+            mStatusBarHeight =SystemProperties.getInt("ro.fystatusbar",60);
+            // Height of the navigation bar when presented horizontally at bottom
+            mNavigationBarHeightForRotation[mPortraitRotation] =
+            mNavigationBarHeightForRotation[mUpsideDownRotation] =SystemProperties.getInt("ro.fynavigationbar",60);
+        }else{
+
+}
+
+========================
+    // The current size of the screen; really; extends into the overscan area of
+    // the screen and doesn't account for any system elements like the status bar.
+    int mOverscanScreenLeft, mOverscanScreenTop;
+    int mOverscanScreenWidth, mOverscanScreenHeight;
+    // The current visible size of the screen; really; (ir)regardless of whether the status
+    // bar can be hidden but not extending into the overscan area.
+    int mUnrestrictedScreenLeft, mUnrestrictedScreenTop;
+    int mUnrestrictedScreenWidth, mUnrestrictedScreenHeight;
+    // Like mOverscanScreen*, but allowed to move into the overscan region where appropriate.
+    int mRestrictedOverscanScreenLeft, mRestrictedOverscanScreenTop;
+    int mRestrictedOverscanScreenWidth, mRestrictedOverscanScreenHeight;
+    // The current size of the screen; these may be different than (0,0)-(dw,dh)
+    // if the status bar can't be hidden; in that case it effectively carves out
+    // that area of the display from all other windows.
+    int mRestrictedScreenLeft, mRestrictedScreenTop;
+    int mRestrictedScreenWidth, mRestrictedScreenHeight;
+
+
+//布局时使用的变量
+    // During layout, the current screen borders accounting for any currently
+    // visible system UI elements.
+    int mSystemLeft, mSystemTop, mSystemRight, mSystemBottom; //所有可见的用户界面
+    // For applications requesting stable content insets, these are them.
+    int mStableLeft, mStableTop, mStableRight, mStableBottom;
+    // For applications requesting stable content insets but have also set the
+    // fullscreen window flag, these are the stable dimensions without the status bar.
+    int mStableFullscreenLeft, mStableFullscreenTop;
+    int mStableFullscreenRight, mStableFullscreenBottom;
+    // During layout, the current screen borders with all outer decoration
+    // (status bar, input method dock) accounted for.
+    int mCurLeft, mCurTop, mCurRight, mCurBottom;
+    // During layout, the frame in which content should be displayed
+    // to the user, accounting for all screen decoration except for any
+    // space they deem as available for other content.  This is usually
+    // the same as mCur*, but may be larger if the screen decor has supplied
+    // content insets.
+    int mContentLeft, mContentTop, mContentRight, mContentBottom;
+    // During layout, the current screen borders along which input method
+    // windows are placed.
+    int mDockLeft, mDockTop, mDockRight, mDockBottom;
+
+
+setInitialDisplaySize{
+
+}
+/*根据屏幕方向displayRotation
+ *计算导航条，状态条窗口
+ *去掉导航条，状态条，获取app布局窗口
+ *
+ *
+*/
+beginLayoutLw(dw, dh, mRotation){
+- overscanLeft...     //overscan没有显示的区域
+- mOverscanScreenLeft //包含overscan的屏幕尺寸。不作为UI布局使用
+- mRestrictedOverscanScreenLeft //包含overscan的屏幕尺寸。可作为UI布局使用
+- mSystemLeft //去掉所有可见的systemui
+//以下都是不包含overscan
+- mUnrestrictedScreenLeft //去掉overscan的屏幕尺寸，
+- mRestrictedScreenLeft   //布局时去掉systemUI
+- mDock         //输入法窗口所放的窗口，(输入法包含在其中)
+- mCur	    	//布局期间，去掉了所有其它装饰(systemui,去掉输入法View窗口)。
+- mContent      //布局期间，去掉了所有其它装饰(systemui,去掉输入法的content窗口)
+- mStable...        //应用窗口，(去掉导航条，状态条）。布局时动态变化
+- mStableFullscreenTop //应用窗口，(去掉导航条，
+
+- 若导航调被用户请求隐藏，则设置fakewindow捕捉事件，mWindowManagerFuncs.addFakeWindow
+- mNavigationBar导航条存在{
+	- 导航条在竖屏底部{
+		- 设置mStableBottom，mDockBottom，mRestrictedScreenHeight，			
+			mRestrictedOverscanScreenHeight	,mSystemBottom
+		}
+	- 导航条在右边{
+		- 设置mStableRight...
+		}
+	- 设置mContentTop，mCurTop
+	- 计算导航条(从(0,0)开始根据资源文件中导航条大小)，mNavigationBar.computeFrameLw
+	}
+- mStatusBar状态条存在{	
+	- 计算状态条(布局依据全屏窗口)，mStatusBar.computeFrameLw
+	- 设置mStableTop，mDockTop，mContentTop，mCurTop。去掉状态条高度
+	- 设置mSystemTop，去掉状态条高度
+	}
+- 是否更新systemui，updateSystemUiVisibilityLw
+}
+
+
+
+
+layoutWindowLw(WindowState){
+- attr.flag //窗口标记
+- sysUiFl  //systemui状态getSystemUiVisibility
+- 若有输入法窗口，更新mContentBottom，mCurBottom。offsetInputMethodWindowLw
+- 非默认显示屏，isDefaultDisplay{
+	- 关联到其它窗口，设置为其它窗口大小
+	- 否则用全屏
+	}
+- 输入发窗口TYPE_INPUT_METHOD，{
+	- 设置pf, df, of为mDock
+	- 设置cf，vf为mStable  
+	}
+- 其它类型窗口，{ //一般类型的窗口
+	- 设置dcf
+	- (FLAG_LAYOUT_IN_SCREEN*全屏布局 并且 FLAG_LAYOUT_INSET_DECOR*布局不被systemui遮挡){//normal
+		- 有关联窗口，setAttachedWindowFrames
+		- 若是TYPE_STATUS_BAR_PANEL，设置pf,df,of为去掉statusBar
+		- (FLAG_LAYOUT_IN_OVERSCAN*全屏){
+			- 设置pf,df,of为mOverscanScreen
+			}
+		- (隐藏导航条,锁屏...){
+			- pf,df设置为mOverscanScreen。of设置mUnrestrictedScreen
+			}
+		- 其他{
+			- pf,df设置为mRestrictedOverscanScreen。of设置mUnrestrictedScreen
+			}
+		- 设置cf，去掉输入法。设置vf，去掉输入法窗口	
+		}
+	- (FLAG_LAYOUT_IN_SCREEN*全屏 或者隐藏导航条){//全屏
+		- 若是TYPE_STATUS_BAR_PANEL，设置pf,df,of，cf为去掉statusBar
+		- (TYPE_NAVIGATION_BAR|TYPE_NAVIGATION_BAR_PANEL),
+			设置pf,df,of全屏mUnrestrictedScreen
+		- (TYPE_SECURE_SYSTEM_OVERLAY|TYPE_BOOT_PROGRESS)
+			设置pf,df,of,cf全屏mOverscanScreen
+		- (TYPE_BOOT_PROGRESS|TYPE_UNIVERSE_BACKGROUND)
+			设置pf,df,of,cf全屏mOverscanScreen
+		- (TYPE_WALLPAPER)
+			设置pf,df,of,cf全屏mUnrestrictedScreen
+		- (FLAG_LAYOUT_IN_OVERSCAN*全屏){
+			- 设置pf,df,of,cf为mOverscanScreen
+			}
+		- (隐藏导航条,toast){
+			- pf,df,of,cf设置mUnrestrictedScreen
+			}
+		- 设置cf不小于stable，applyStableConstraints
+		- 设置f
+		}
+	- attach不为空，设置setAttachedWindowFrames
+	- 其他{
+		- (TYPE_STATUS_BAR_PANEL),设置pf,df,of,cf全屏mRestrictedScreen
+		- (TYPE_TOAST,TYPE_SYSTEM_ALERT,TYPE_VOLUME_OVERLAY),设置pf,df,of,cf全屏mStable
+		- 
+		}
+	}
+- 计算大小，win.computeFrameLw(pf, df, of, cf, vf, dcf)
+}
+
+
+//starting窗口
+addStartingWindow{
+- win = PolicyManager.makeNewWindow
+- win.setType(TYPE_APPLICATION_STARTING)
+}@PhoneWindowManager.java
+=================
+设置overscan：
+//开机设置
+
+//命令行重设
+runDisplayOverscan@Wm.java-->
+setOverscan-->setOverscanLocked-->mDisplaySettings.setOverscanLocked
+mDisplaySettings.getOverscanLocked@WindowManagerService.java
+
+
+configureDisplayPolicyLocked
+@WindowManagerService.java-->setDisplayOverscan@PhoneWindowManager.java
+
+=================
+systemUI:
+getSystemUiVisibility
+
+updateSystemUiVisibilityLw{
+- 焦点窗口，mFocusedWindow。若是锁屏窗口则返回
+- 强制清除全屏，SYSTEM_UI_CLEARABLE_FLAGS
+- 更新systemui，updateSystemBarsLw{
+	- 设置systemui状态，applyTranslucentFlagLw
+	- 是否允许透明systemui，areTranslucentBarsAllowed
+	- 设置状态条，导航条状态
+	- 更新systemui是否可见，updateVisibilityLw
+	}
+
+}
+
+statusBarVisibilityChanged@WindowManagerService.java-->adjustSystemUiVisibilityLw
+
+updateSystemBarsLw{
+- applyTranslucentFlagLw
+- 
+}@PhoneWindowManager.java
+
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+

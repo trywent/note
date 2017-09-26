@@ -1,0 +1,99 @@
+//注册接收器
+setView{
+-               
+- InputStage syntheticInputStage = new SyntheticInputStage
+- InputStage viewPostImeStage = new ViewPostImeInputStage(syntheticInputStage)
+- InputStage nativePostImeStage = new NativePostImeInputStage(viewPostImeStage)
+- InputStage earlyPostImeStage = new EarlyPostImeInputStage(nativePostImeStage)
+- InputStage imeStage = new ImeInputStage(earlyPostImeStage)
+- InputStage viewPreImeStage = new ViewPreImeInputStage(imeStage)
+- InputStage nativePreImeStage = new NativePreImeInputStage(viewPreImeStage)
+- mFirstInputStage = nativePreImeStage
+- mFirstPostImeInputStage = earlyPostImeStage
+
+- setView-->mWindowSession.addToDisplay(window,inputChannel)@ViewRootImpl.java-->
+	addWindow-->mInputManager.registerInputChannel@WindowManagerService.java
+}
+
+//输入事件
+dispatchInputEvent-->sendMessage(MSG_DISPATCH_INPUT_EVENT)-->enqueueInputEvent
+
+//输入法事件
+dispatchKeyFromIme-->sendMessage(MSG_DISPATCH_KEY_FROM_IME)@ViewRootImpl.java
+
+
+===================
+//处理输入事件
+WindowInputEventReceiver.onInputEvent-->enqueueInputEvent(将事件加入队列)-->
+doProcessInputEvents-->deliverInputEvent(QueuedInputEvent/*队列中事件*/){
+- 要跳过ime处理，stage为mFirstPostImeInputStage
+- 不跳过，stage为mFirstInputStage
+- 处理，stage.deliver
+}
+
+InputStage.deliver{
+- 若当前stage结束，则让下一步处理forward
+- 若当前stage丢弃，finish      //没有View，或当前没有获取焦点但事件是焦点事件
+- 否则，处理并根据结果执行下一步，apply(,onProcess())-->finish(结束)/forward(下一步)
+	-->onDeliverToNext-->deliver
+}
+
+1)
+NativePreImeInputStage.onProcess{
+- mInputQueue为空FORWARD
+}
+
+2)
+ViewPreImeInputStage.onPorcess{
+- 按键processKeyEvent
+- 触摸事件FORWARD
+}
+
+3)
+ImeInputStage.onProcess{
+- 输入法焦点，imm.dispatchInputEvent
+- FORWARD
+}
+
+4)
+EarlyPostImeInputStage.onProcess{
+- 按键，processKeyEvent{
+	- 
+	- FORWARD	
+	}
+- pointer，processPointerEvent
+}
+
+5)
+NativePostImeInputStage.onProcess{
+- mInputQueue不为空，mInputQueue.sendInputEvent
+- FORWARD
+}
+
+6)
+ViewPostImeInputStage.onProcess{
+- processKeyEvent{
+	- 各个view处理事件，mView.dispatchKeyEvent
+	}
+- 其它事件{
+	- handleDispatchDoneAnimating
+	- processPointerEvent
+	- processTrackballEvent
+	- processGenericMotionEvent
+	}
+}
+AsyncInputStage.apply(NativePreImeInputStage.onProcess)-->defer-->
+	enqueue(加入队列mQueueTail)
+
+frameworks/base/core/java/android/view/ViewRootImpl.java
+
+
+
+
+
+
+
+####################
+ViewPreImeInputStage.processKeyEvent@ViewRootImpl.java-->dispatchKeyEventPreIme
+-->onKeyPreIme@View.java
+

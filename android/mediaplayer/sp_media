@@ -1,0 +1,11 @@
+adev_open_input_stream
+
+in_read{
+- start_input_stream{
+	- 
+	- pcm_open(s_bt_sco,PORT_MM,)
+	}
+- 
+:exit ret<0
+- do_input_standby
+}

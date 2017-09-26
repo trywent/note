@@ -1,0 +1,79 @@
+===========================
+流和设备：
+
+设备值：
+public static final int DEVICE_BIT_DEFAULT = 0x40000000;
+public static final int DEVICE_OUT_SPEAKER = 0x2;
+public static final int DEVICE_OUT_WIRED_HEADSET = 0x4;
+public static final int DEVICE_OUT_WIRED_HEADPHONE = 0x8;
+
+流状态：
+VolumeStreamState{
+- 流类型，mStreamType
+- ConcurrentHashMap<Integer,Integer>，mIndex(音量值){
+	- <DEVICE_OUT_DEFAULT(0x40000000),音量值>//默认音量
+	- <device,音量值>            //设备，对应的音量
+	} 
+- 最大声音，mIndexMax
+- isMuted(是否有客户端设置静音)
+}@AudioService.java
+
+//创建流状态数组
+AudioService-->createStreamStates(创建初始化VolumeStreamState[] mStreamStates)@AudioService.java
+
+adjustStreamVolume{
+- 获取流对应的设备，getDeviceForStream(streamTypeAlias)-->AudioSystem.getDevicesForStream
+- adjustStreamVolume
+- AudioHandler.handleMessage(MSG_SET_DEVICE_VOLUME)-->setDeviceVolume-->streamState.applyDeviceVolume(device)
+}@AudioService.java
+
+
+//设置流静音
+setStreamMute-->mStreamStates[streamType].mute(IBinder cb)-->VolumeStreamState.mute{
+- 获取binder客户端死亡处理类，getDeathHandler
+- handler.mute(state)-->VolumeDeathHandler.mute{
+	- 若设置静音，注册死亡处理(主要处理在客户端死亡后，取消它设置的静音)
+	- 若设置不静音，注销死亡处理
+	- 是否更新音量，sendMsg
+	}
+}@AudioService.java
+
+
+frameworks/base/media/java/android/media/AudioService.java
+
+
+服务设置流音量：
+AudioManager.setStreamVolume-->AudioService.setStreamVolume{
+- 检查状态是否正确，ensureValidStreamType
+- 获取对应的别名流，streamTypeAlias = mStreamVolumeAlias
+- 获取对应的流状态，streamState = mStreamStates[streamTypeAlias]
+- 获取流对应的设备，getDeviceForStream
+- sendVolumeUpdate
+}
+____________________________
+流切换：
+STREAM_VOLUME_ALIAS@AudioService.java
+
+
+frameworks/base/media/java/android/media/AudioService.java
+____________________________
+触摸音效：
+playSoundEffect{
+- 是否设置打开触摸音效，querySoundEffectsEnabled
+- 若是执行音效，service.playSoundEffect-->playSoundEffectVolume-->sendMsg(MSG_PLAY_SOUND_EFFECT)
+		-->handleMessage-->onPlaySoundEffect{
+			- onLoadSoundEffects
+			- new MediaPlayer 
+			- mediaPlayer.setDataSource
+		}@AudioService.java
+}@AudioManager.java
+
+
+frameworks/base/media/java/android/media/AudioManager.java
+frameworks/base/media/java/android/media/AudioService.java
+=======================
+dump消息分析：
+- STREAM_TTS:
+   Mute count: 0   //被客户设置静音个数
+   Current: 8: 10, 2: 0, 40000000: 11, 4: 10,  //流打开的设备和音量
+

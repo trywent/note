@@ -1,0 +1,154 @@
+PCM:中文称脉冲编码调制(Pulse Code Modulation)
+
+
+==================
+ALSA concepts
+
+ALSA将硬件设备和它的组件，构成一个卡，设备，子设备的层次结构。
+ALSA卡与声卡是一一对应的。卡通过一个字符串ID或数字索引来识别。
+卡的设备从零开始编号，不同的设备可以单独使用。设备中可以有子设备，也是从零开始编号。
+
+PCM parameters and the configuration space()
+数字化声音的属性有采样率，通道数，格式。
+
+什么是ALSA文档中的配置空间？：
+如果所有的参数配置放在独立的空间中，则可以通过给定参数的范围来描述参数。
+通过ALSA访问设备时，每个设备的参数不是固定的。ALSA插件能够自动选择合适的参数，和进行格式转换。
+
+ALSA devices and plugins(ALSA设备含义不同与上面的硬件设备)
+ALSA设备用字符串表示，定义在ALSA的配置文件中，同时也是插件的包裹者。
+ALSA设备通常又在冒号后面跟上以逗号分隔的卡，硬件，子设备。
+
+hw插件，用来访问硬件(设置pcm参数，采样率，频道，采样格式)。hw:0，0
+plug插件，频道复制，采样数据转换。plughw:0,0
+file插件，将采样数据写入文件。
+有一些插件用来频道的混合和选择，route插件是一个混合矩阵。multi插件可以重定向频道。dmix和dshare插件
+支持客户端(播放器程序)共享设备。
+
+=======================
+配置ALSA：
+配置文件，/usr/share/alsa/alsa.conf(不能修改，该文件包含其他配置文件)，系统配置文件/etc/asoundrc,
+用户配置文件~/.asoundrc
+
+基本配置文件格式：
+ALSA配置文件包含层次结构的参数-值对。最高层是ALSA提供的接口。接口提供了打开，操作，关闭设备的API。
+第二层是接口能够使用的ALSA设备名。
+pcm接口 (PCM pulse code modulation 数字化声音)
+ctl接口 (control, 控制硬件混合设备和其他设置)
+seq接口 (顺序)
+hwdep接口 (硬件依赖功能)
+mixer接口 (混合控制的抽象)
+rawmidi接口 (MIDI数据I/O)
+
+假设要创建一个ALSA PCM设备用来访问声卡，来实现格式转换功能。实现自动格式转换的插件是plug插件。
+创建的PCM设备：
+pcm.plug0 {
+  type plug
+  slave {
+    pcm "hw:0,0"
+  }
+}
+设备plug0能够通过pcm接口访问，数据输出应被plug插件处理。
+
+
+____________________________
+高级配置：覆盖参数和参数类型
+
+pcm.!default { type hw  card 0 } //惊叹号使default配置被擦除
+在配置树中加入配置节点，如果该节点已经存在则配置会被当前配置覆盖。
+
+
+With a little experimentation, one can find out that aliases are in fact parameters of type string which contain as their value the name of the PCM device they refer to. pcm.default is defined as an alias in alsa.conf, necessitating the use of the exclamation mark if it is to be replaced by a compound definition.
+
+Similarly to the exclamation mark, other prefix characters can be used to qualify a parameter assignment. A question mark causes an assignment to be ignored if a previous value for the same parameter exists. (If you try to assign a subparameter of something which is not a compound, such as pcm.default.?card without a previous forced redefinition of pcm.default, you will still get an error.) So the following:
+
+pcm.?default { type hw card 1 }
+defines the first device of the second sound card as the default device, but only if no default device has been defined previously (say, in a system-wide configuration file).
+
+The remaining two prefix characters are + and –. Both require the assignment to respect the type of any earlier assignment/creation of the respective parameter. The plus sign prefix gives the default behaviour of creating a new parameter when necessary and can therefore be left out. The minus sign causes an error when trying to assign a parameter which did not previously exist.
+
+Parametrised device definitions
+
+In the section about plugins we have encountered a lot of ALSA devices which require arguments given after a colon following the device name and separated by commas. As I already mentioned above, these devices and the plugins behind them are actually quite different things, but devices can be viewed as wrappers round the plugins. In the basic configuration section we have defined a device using the plug plugin. The predefined devices we encountered in the plugin section differ from this simple device in that they are generic. The plughw device can be used for any sound card and (hardware) device, because one can give the card and device numbers as arguments after the colon. Though all parametrised devices are defined in alsa.conf and the ALSA documenation does not document their syntax, you can also define such devices of your own.
+
+Let's have a look at an abbreviated form of the definition of the plughw device in alsa.conf:
+
+plughw {
+  @args [ CARD DEV SUBDEV ]
+  @args.CARD {
+    type string
+  }
+  @args.DEV {
+    type integer
+  }
+  @args.SUBDEV {
+    type integer
+  }
+  type plug
+  slave.pcm {
+    type hw
+    card $CARD
+    device $DEV
+    subdevice $SUBDEV
+  }
+}
+The first line in the definition of the plughw compound is the declaration of its argument list. This is a data type which is new to us: an array. Its elements can also be assigned one by one:
+
+plughw {
+  @args.0 CARD
+  @args.1 DEV
+  @args.2 SUBDEV
+  ...
+As in the assignment of compounds, an equals sign can optionally be inserted, both in the collective and the element assignment. The following lines in the definition of plughw define the data type of each argument. (Apparently the value of each array element now serves as the name of a subparameter, which is highly interesting from a formal languages point of view. ;) ) In the original definition of plughw, the compounds defining the arguments also contain default definitions which use the @func keyword to call certain functions. If you are interested in that, have a look at alsa.conf.
+
+Then follows the actual definition of the new PCM device. It strongly resembles the definitions we have seen so far, except that the constant parameter values are replaced by arguments referenced by their name preceded by a dollar sign. To get an idea of the possibilities generic ALSA devices offer, you are encouraged to look at alsa.conf, where many are defined.
+
+There are two ways to use such a generic device. Its arguments can be given either in sequence starting with the first, or in any order as assignments to the argument name. Both "hw:1,0" and "hw:DEV=0,CARD=1" refer to the first device on the second sound card. For reasons I do not entirely understand, a parametrised device is not allowed in all circumstances where a non-parametrised device would be. The following is legal:
+
+pcm.hw0 { type hw card 0 device 0 }
+pcm.alias0 hw0
+But this is not:
+
+pcm.alias0 "hw:0,0"
+If you want to learn about yet more advanced features of the ALSA asoundrc, have a look at asoundrc.txt in the doc directory of the ALSA library sources. It says something there about servers and references to (possibly external) libraries which I have not taken the time to check out. Up to you.
+
+
+
+
+=======================================
+@http://www.alsa-project.org/
+
+ALSA(Advanced Linux Sound Architecture):
+当前提供的编程接口:
+1，Information Interface (/proc/asound)
+2，Control Interface (/dev/snd/controlCX)
+3，Mixer Interface (/dev/snd/mixerCXDX)
+4，PCM Interface (/dev/snd/pcmCXDX)
+5，Raw MIDI Interface (/dev/snd/midiCXDX)
+6，Sequencer Interface (/dev/snd/seq)
+7，Timer Interface (/dev/snd/timer)
+
+#########################################
+ALSA驱动：
+-创建pci_driver结构体，实现PCI ID，probe(初始化卡)，remove等
+-创建init()调用驱动注册函数pci_register_driver()
+-创建exit()，实现pci_unregister_driver()
+
+___________________
+卡和组件：
+卡(snd_card)用来管理组件(pcm,mixer)链表,管理资源。
+创建卡调用snd_card_create(index, id, module, extra_size, &card)
+
+组件：
+组件(snd_device),创建组件并关联到卡中snd_device_new(card, SNDRV_DEV_XXX, chip, &ops)
+
+注册和释放：
+当所有组件初始化完成，注册卡snd_card_register()
+释放snd_card_free()
+
+
+=====================
+应用编程接口：
+
+
+

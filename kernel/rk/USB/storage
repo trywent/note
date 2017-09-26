@@ -1,0 +1,54 @@
+驱动：
+usb_stor_init-->usb_register(&usb_storage_driver)-->usb_register_driver
+-->usb_storage_driver{
+.probe =	storage_probe,
+.id_table =	usb_storage_usb_ids,//所有的特殊设备
+}@usb.c
+
+设备：
+
+
+探测：
+storage_probe{
+- 探测特殊设备，usb_stor_probe1(,us_unusual_dev_list+偏移/*特殊设备us_unusual_dev*/){
+	- 
+	- get_device_info{
+		- 初始化us_data中的数据为，特殊设备us_unusual_dev
+		}
+	}
+- usb_stor_probe2{
+	- getpipe
+	- 初始化资源，usb_stor_acquire_resources{
+		- 创建请求，usb_alloc_urb
+		- 若有特殊设备初始函数，则调用us->unusual_dev->initFunction
+		- 开始进程kthread_run(usb_stor_control_thread)
+		}
+	- 
+	}
+}
+
+
+
+kernel/drivers/usb/storage/usb.c
+========================
+//创建us_unusual_dev设备
+static struct us_unusual_dev us_unusual_dev_list[] = {
+#	include "unusual_devs.h" 
+}
+
+kernel/drivers/usb/storage/usb.c
+
+
+________________________
+
+//创建usb设备id
+struct usb_device_id usb_storage_usb_ids[] = {
+#	include "unusual_devs.h"
+}
+//要忽略的设备
+static struct ignore_entry ignore_ids[] = {
+#	include "unusual_alauda.h"
+...
+}
+
+kernel/drivers/usb/storage/usual-tables.c

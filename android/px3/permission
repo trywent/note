@@ -1,0 +1,91 @@
+//
+权限值：
+#define AID_ROOT             0  /* traditional unix root user */
+#define AID_SYSTEM        1000  /* system server */
+
+android_ids[] = {
+    { "root",          AID_ROOT, },
+    { "system",        AID_SYSTEM, },
+    { "media_rw",      AID_MEDIA_RW, },
+}
+@system/core/include/private/android_filesystem_cofig.h
+
+权限字符串：
+<permission name="android.permission.WRITE_MEDIA_STORAGE" >
+       <group gid="media_rw" />
+</permission>
+@frameworks/base/data/etc/platform.xml
+________________________________
+parsePackage{
+- if (tagName.equals("uses-permission"))-->parseUsesPermission
+- 
+}@PackageParser.java
+
+将权限加入到packageInfo中：
+
+generatePackageInfo{
+- perm = p.requestedPermissions.get(i);pi.requestedPermissions[i] = perm;
+}
+
+导出权限：
+extractPerms{
+- 获取所有权限名，strList = info.requestedPermissions
+- 遍历所有权限{
+	- 根据权限名获取权限信息，mPm.getPermissionInfo(permName)
+	}
+}
+
+
+AppSecurityPermissions{
+- 导出权限extractPerms
+- 获取该userId的所有权限，getAllUsedPermissions
+- setPermissions(mPermsList)
+}
+
+frameworks/base/core/java/android/widget/AppSecurityPermissions.java
+frameworks/base/core/java/android/content/pm/PackageParser.java
+___________________
+根据权限字符串获取GID：
+Process.getGidForName@Process.java-->android_os_Process_getGidForName
+
+
+frameworks/base/core/java/android/os/Process.java
+frameworks/base/core/jni/android_util_Process.cpp
+___________________
+revokeUriPermissionLocked@ActivityManagerService.java
+
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+
+===================
+android.uid.system/phone/...:
+PackageManagerService-->mSettings.addSharedUserLPw@PackageManagerService.java
+
+//自动创建uid
+若AndoridManifest.xml中定义了android:sharedUserId="string"
+readSharedUserLPw-->addSharedUserLPw(name.intern(), userId, pkgFlags))@Settings.java
+
+
+frameworks/base/services/java/com/android/server/pm/PackageManagerService.java
+frameworks/base/services/core/java/com/android/server/pm/Settings.java
+
+
+================
+//应用状态服务
+
+startCoreServices-->mSystemServiceManager.startService(UsageStatsService.class)
+@SystemServer.java-->onStart-->publishBinderService(Context.USAGE_STATS_SERVICE)
+@UsageStatsService.java
+
+//判断权限
+hasPermission@UsageStatsService.java
+
+
+frameworks/base/services/usage/java/com/android/server/usage/UsageStatsService.java
+//有权查看使用情况的应用 (Context.USAGE_STATE_SERVICE).getAllPkgUsageStats
+onPreferenceChange-->setHasAccess-->mAppOpsManager.setMode@UsageAccessDetails.java
+-->
+
+
+
+packages/apps/Settings/src/com/android/settings/applications/UsageAccessDetails.java

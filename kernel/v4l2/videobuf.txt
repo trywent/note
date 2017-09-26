@@ -1,0 +1,159 @@
+videobuf层功能像用户空间和驱动之间的粘合剂。分配和处理存储视频帧的缓存。
+实现了POSIX（可移植操作系统接口）系统调用，read，write，poll。还有一些io相关的操作函数ioctl()，
+处理buffer的分配，queueing和dequeueing，流控制。
+
+buffer有三种类型：
+1，物理地址和虚拟地址都是分散的
+2，物理地址分散，虚拟地址连续
+3，物理地址连续
+(还有第四钟buffer，overlay)
+
+相关头文件：
+    <media/videobuf-dma-sg.h>		/* Physically scattered */
+    <media/videobuf-vmalloc.h>		/* vmalloc() buffers	*/
+    <media/videobuf-dma-contig.h>	/* Physically contiguous */
+
+=========================
+驱动中的数据结构要包含videobuf_queue结构，用来管理驱动中缓存队列。
+
+四个回调函数用来管理buffer：
+ struct videobuf_queue_ops {
+	int (*buf_setup)(struct videobuf_queue *q,
+			 unsigned int *count, unsigned int *size);
+
+	/*videobuf_buffer传入到buf_prepare.	设置buf的大小，高，宽
+          buffer的state域为VIDEOBUF_NEEDS_INIT，应该传到videobuf_iolock*/
+
+        int (*buf_prepare)(struct videobuf_queue *q,
+			   struct videobuf_buffer *vb,
+			   enum v4l2_field field);
+
+        /*当buffer要被I/O，会被传入buf_queue*/
+	void (*buf_queue)(struct videobuf_queue *q,
+			  struct videobuf_buffer *vb);
+
+	/*当buffer不再被使用*/
+	void (*buf_release)(struct videobuf_queue *q,
+			    struct videobuf_buffer *vb);
+    };
+buf_setup():IO操作前被调用，向videobuf提供信息。count为buffer的个数(2~32)，
+buf_prepare():每个buffer传入改函数，设置buffer大消息，长宽等。最后设置buffer状态为VIDEOBUF_PREPARED
+
+若buffer的状态是VIDEOBUF_NEEDS_INIT，则需调用：分配buffer的空间
+    int videobuf_iolock(struct videobuf_queue* q, struct videobuf_buffer *vb,
+			struct v4l2_framebuffer *fbuf);
+
+buf_queue()：buffer加入队列，等待处理。设置状态为VIDEOBUF_QUEUED
+buf_release()：buffer被释放，这是需保证buffer上没有IO操作
+    最后释放空间：
+    /* Scatter/gather drivers */
+    int videobuf_dma_unmap(struct videobuf_queue *q,
+			   struct videobuf_dmabuf *dma);
+    int videobuf_dma_free(struct videobuf_dmabuf *dma);
+
+    /* vmalloc drivers */
+    void videobuf_vmalloc_free (struct videobuf_buffer *buf);
+
+    /* Contiguous drivers */
+    void videobuf_dma_contig_free(struct videobuf_queue *q,
+
+				  struct videobuf_buffer *buf);
+检测buffer没有被占用：
+int videobuf_waiton(struct videobuf_buffer *vb, int non_blocking, int intr);
+
+==============================
+file operation：
+open():
+初始化videobuf queue，根据不同的buf有不同的调用函数：
+    void videobuf_queue_sg_init(struct videobuf_queue *q,
+				struct videobuf_queue_ops *ops,
+				struct device *dev,
+				spinlock_t *irqlock,
+				enum v4l2_buf_type type,
+				enum v4l2_field field,
+				unsigned int msize,
+				void *priv);
+
+    void videobuf_queue_vmalloc_init(struct videobuf_queue *q,
+				struct videobuf_queue_ops *ops,
+				struct device *dev,
+				spinlock_t *irqlock,
+				enum v4l2_buf_type type,
+				enum v4l2_field field,
+				unsigned int msize,
+				void *priv);
+
+    void videobuf_queue_dma_contig_init(struct videobuf_queue *q,
+				       struct videobuf_queue_ops *ops,
+				       struct device *dev,
+				       spinlock_t *irqlock,
+				       enum v4l2_buf_type type,
+				       enum v4l2_field field,
+				       unsigned int msize,
+				       void *priv);
+
+
+
+
+read():v4l2有两种API读取数据，read()系统调用和更复杂的流结构
+驱动要实现一下之一函数：
+    ssize_t videobuf_read_one(struct videobuf_queue *q,
+			      char __user *data, size_t count,
+			      loff_t *ppos, int nonblocking);
+
+    ssize_t videobuf_read_stream(struct videobuf_queue *q,
+				 char __user *data, size_t count,
+				 loff_t *ppos, int vbihack, int nonblocking);
+
+poll()函数的实现，直接调用：
+    unsigned int videobuf_poll_stream(struct file *file,
+				      struct videobuf_queue *q,
+				      poll_table *wait);
+
+内核映射用户空间内存mmap，调用函数：
+    int videobuf_mmap_mapper(struct videobuf_queue *q,
+			     struct vm_area_struct *vma);
+
+release函数实现，调用两个函数：
+    void videobuf_stop(struct videobuf_queue *q);
+    int videobuf_mmap_free(struct videobuf_queue *q);
+
+ioctl()函数：
+V4L2中有很多ioctl函数，有一部分和流I/O相关，
+
+    int videobuf_reqbufs(struct videobuf_queue *q,
+			 struct v4l2_requestbuffers *req);
+    int videobuf_querybuf(struct videobuf_queue *q, struct v4l2_buffer *b);
+    int videobuf_qbuf(struct videobuf_queue *q, struct v4l2_buffer *b);
+    int videobuf_dqbuf(struct videobuf_queue *q, struct v4l2_buffer *b,
+		       int nonblocking);
+    int videobuf_streamon(struct videobuf_queue *q);
+    int videobuf_streamoff(struct videobuf_queue *q);
+
+======================================
+buffer allocation:
+
+使用用户空间分配的内存(分散的内存)，由videobuf层处理。
+驱动要自己实现内存分配，在函数vidioc_reqbufs()中实现, *after*调用videobuf_reqbufs().  
+- struct videobuf_dmabuf *videobuf_to_dma(struct videobuf_buffer *buf);
+
+
+填充buffer(通常是中断处理中填充)：
+ - Obtain the next available buffer and make sure that somebody is actually
+   waiting for it.
+
+ - Get a pointer to the memory and put video data there.
+
+ - Mark the buffer as done and wake up the process waiting for it.
+
+会有buffer不存在情况。要有相应的处理
+当buffer没有用户在等待buffer时，不要移除或填充buffer。调用waitqueue_active()判别
+
+获取buffer内存指针：
+- 对于scatter/gather(非联系内存)驱动，通过scatterlist获取
+- 使用vmalloc()的驱动，通过void *videobuf_to_vmalloc(struct videobuf_buffer *buf)
+- 连续DMA内存的驱动，通过dma_addr_t videobuf_to_dma_contig(struct videobuf_buffer *buf)
+
+最后一步设置video_buffer中的大小域为实际的图像大小。设置状态VIDEOBUF_DONE，调用wake_up()。
+之后buffer属于videobuffer层，驱动不能再操作它
+

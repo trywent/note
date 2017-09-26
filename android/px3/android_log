@@ -1,0 +1,58 @@
+//log
+
+//slog log在system中
+Slog.e/i/w/d-->Log.println_native(Log.LOG_ID_SYSTEM, Log.ERROR/INFO/DEBUG)
+_______________
+//LOG log在main中
+/*
+ 将数据组织成一个数组包含3类信息，prio，tag，msg。一起写入到kernel
+*/
+
+
+LOG.I,D,E@Log.java-->println_native(LOG_ID_MAIN)-->android_util_Log_println_native@android_util_Log.cpp
+-->__android_log_buf_write-->write_to_log{
+- 没有初始化,write_to_log == __write_to_log_init{
+	- 打开设备，log_fds[LOG_ID_MAIN] = log_open("log/main"/"log/radio"/"log/events"/"log/system")
+	- 设置write_to_log = __write_to_log_kernel;
+	}
+- 写log，__write_to_log_kernel(根据log_id选择要写入log的文件)-->log_writev@logd_write.c-->writev
+}
+
+//LOG.wtf log在assert中
+
+_______________
+设置log输出层级：
+loglevel@init.rc-->do_loglevel@builtins.c-->klog_set_level@klog.c
+mian@init.c-->klog_init(打开文件 "/dev/__kmsg__"，设置输出)@klog.c
+
+
+/frameworks/base/core/java/android/util/Slog.java
+/frameworks/base/core/java/android/util/Log.java
+/frameworks/base/core/jni/android_util_Log.cpp
+/system/core/liblog/logd_write.c
+/system/core/init/builtins.c
+/system/core/libcutils/klog.c
+
+_____________
+使用android的log：
+一些本地库如何使用android的log系统。、
+在Android.mk中加入LOCAL_SHARED_LIBRARIES := libutils
+在文件中加入 #include "utils/Log.h"
+现在可以使用 ALOGE，I，D，V
+
+=============
+//logcat
+main{
+- 创建devices = new log_device_t(strdup("/dev/"LOGGER_LOG_MAIN)
+- 创建devices->next = new log_device_t(strdup("/dev/"LOGGER_LOG_SYSTEM))
+- 设置输出文件,setupOutput{
+	- 默认标准输出流，g_outFD = STDOUT_FILENO
+	- 否则打开文件，openLogFile
+	}
+- 打开并初始化输入文件，devices
+- readLogLines
+}
+
+
+system/core/logcat/logcat.cpp
+system/core/liblog/logprint.c

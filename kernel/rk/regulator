@@ -1,0 +1,62 @@
+
+========================
+使用regulator：
+
+框架：
+
+
+________________________
+regulator驱动接口：
+Regulators注册：
+struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
+	struct device *dev, struct regulator_init_data *init_data,
+	void *driver_data);
+
+Regulators注销：
+void regulator_unregister(struct regulator_dev *rdev);
+
+
+Regulator可以发送事件(温度，电压)：
+int regulator_notifier_call_chain(struct regulator_dev *rdev,
+				  unsigned long event, void *data);
+
+
+________________________
+设备使用regulator：
+获取释放regulator：
+regulator = regulator_get(dev, "Vcc");
+regulator_put(regulator);
+
+使能：
+int regulator_enable(regulator);
+int regulator_is_enabled(regulator); //查询是否打开
+
+int regulator_disable(regulator); //关闭
+int regulator_force_disable(regulator);//强制关闭
+
+电压控制：
+int regulator_set_voltage(regulator, min_uV, max_uV);//min_uV, max_uV为范围
+int regulator_get_voltage(regulator);//获取电压
+get_voltage()//获取电压值，不管是否使能
+
+电流控制：
+int regulator_set_current_limit(regulator, min_uA, max_uA);
+int regulator_get_current_limit(regulator);
+
+操作模式控制：
+间接控制：
+int regulator_set_optimum_mode(struct regulator *regulator, int load_uA);//根据所有耗电设备选择最佳模式
+
+直接控制：
+int regulator_set_mode(struct regulator *regulator, unsigned int mode);
+unsigned int regulator_get_mode(struct regulator *regulator);
+
+
+监听事件：
+int regulator_register_notifier(struct regulator *regulator,struct notifier_block *nb);//注册
+int regulator_unregister_notifier(struct regulator *regulator,struct notifier_block *nb);//注销
+
+
+======================
+notifiers:
+

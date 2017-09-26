@@ -1,0 +1,62 @@
+//请求焦点
+//AUDIOFOCUS_GAIN_TRANSIENT 暂时请求，上个焦点获取者暂停播放
+//AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK  暂时请求，上个焦点获取者可继续播放
+//AUDIOFOCUS_GAIN 获取焦点
+requestAudioFocus(listener,stream,类型){
+- 注册监听器，registerAudioFocusListener{
+	- 加入到，mAudioFocusIdListenerMap
+	}
+- service.requestAudioFocus(mICallBack,mAudioFocusDispatcher)-->-->requestAudioFocus{
+	- 是否可以重新设置焦点，canReassignAudioFocus
+	- cb.linkToDeath,监听客户端进程
+	- mFocusStack栈顶的请求者和请求类型没有变化，则返回
+	- 移除已经存在的相同请求者，并通知获取了焦点，removeFocusStackEntry{
+		- 移除FocusRequester
+		- 通知获取焦点notifyTopOfAudioFocusStack
+		}
+	- 通知其他client丢失/获取焦点，propagateFocusLossFromGain_syncAf-->
+		handleExternalFocusGain
+	- 加入栈，mFocusStack.push
+	- checkUpdateRemoteControlDisplay_syncAfRcs	
+	}@MediaFocusControl.java
+}@AudioManager.java
+
+//回调client处理焦点变化
+handleExternalFocusGain{
+- 获取丢失类型，focusLossForGainRequest
+- handleFocusLoss-->mFocusDispatcher.dispatchAudioFocusChange-->FocusEventHandlerDelegate
+	-->Handler.handleMessage-->listener.onAudioFocusChange@AudioManager.java
+}@FocusRequester.java
+
+
+
+//放弃焦点
+abandonAudioFocus(listener)@AudioManager.java-->abandonAudioFocus(listener,name)@AudioService.java
+-->abandonAudioFocus-->removeFocusStackEntry{
+- 从栈顶移除并释放FocusRequester，mFocusStack.pop
+- notifyTopOfAudioFocusStack{
+	- 若不在电话状态canReassignAudioFocus,则重新设置栈顶为焦点handleFocusGain
+	}
+}@MediaFocusControl.java
+
+
+//焦点变化
+onAudioFocusChange
+
+____________________
+//其他apk获取当前播放状态
+//remote controler
+registerMediaButtonEventReceiver-->registerMediaButtonIntent@AudioManager.java-->
+registerMediaButtonIntent@AudioService.java-->registerMediaButtonIntent-->
+pushMediaButtonReceiver_syncAfRcs{
+- 移除相同的receiver，mRCStack.removeElementAt
+- 创建RemoteControlStackEntry(this, mediaIntent)
+- 加入到栈mRCStack.push
+}
+
+updateRemoteControlDisplay_syncAfRcs
+
+frameworks/base/media/java/android/media/AudioManager.java
+frameworks/base/media/java/android/media/AudioService.java
+frameworks/base/media/java/android/media/MediaFocusControl.java
+frameworks/base/media/java/android/media/FocusRequester.java

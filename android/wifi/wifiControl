@@ -1,0 +1,104 @@
+//
+WifiController{
+- 设置mWifiStateMachine = service.mWifiStateMachine
+- addState(mApStaDisabledState, mDefaultState)    //wifi关闭时
+- addState(mStaDisabledWithScanState, mDefaultState) //wifi打开时
+- wifi打开设置初始状态，setInitialState(mStaDisabledWithScanState)
+- wifi关闭设置初始状态，setInitialState(mApStaDisabledState)
+}
+
+//1，开始状态ApStaDisabledState
+WifiService-->WifiController.start--ApStaDisabledState{
+- enter-->mWifiStateMachine.setSupplicantRunning
+- CMD_WIFI_TOGGLED打开wifi，transitionTo(mDeviceActiveState)
+}
+
+//2，DeviceActiveState
+DeviceActiveState{
+- enter{
+	- 
+	- mWifiStateMachine.setDriverStart //加载驱动
+	}
+- 
+}
+
+frameworks/base/services/java/com/android/server/wifi/WifiController.java
+
+=================
+WifiStateMachine{
+- 创建WifiNative //驱动加载
+- 创建WifiMonitor //监听supplicant
+- 加入状态，设置初始状态setInitialState(mInitialState)
+- 开始start()
+}
+
+//1,开始连接supplicant
+InitialState{
+- enter{
+	- 卸载驱动，mWifiNative.unloadDriver
+	- 创建，mWifiP2pChannel//连接mWifiP2pManager
+	- 创建mWifiApConfigChannel//连接wifiApConfigStore
+	}
+- - processMessage{
+	CMD_START_SUPPLICANT,{
+		- 加载驱动，mWifiNative.loadDriver
+		- 开始supplicant,mWifiNative.startSupplicant
+		- 开始监听，mWifiMonitor.startMonitoring-->(连接成功)
+			new MonitorThread.start@WifiMonitor.java
+		- 切换状态，mSupplicantStartingState
+		}
+	}
+}
+
+//2，连接supplicant
+SupplicantStartingState{
+
+- processMessage{
+	- SUP_CONNECTION_EVENT，连接成功{
+		- 设置wifi状态打开，setWifiState
+		- 切换mDriverStartedState
+		}
+	}
+
+}
+
+//3,已经加载wifi驱动
+DriverStartedState{
+- enter{
+	- 开始扫描，startBatchedScan
+	- 非连接模式，transitionTo(mScanModeState)
+	- 连接模式，transitionTo(mDisconnectedState)
+	}
+- processMessage{
+	- 
+	}
+}
+
+//4，wifi没有连接状态
+DisconnectedState{
+- enter{
+	- 
+	}
+- processMessage{
+	
+	}
+}
+_________________
+//WifiMonitor 监听supplicant消息
+WifiMonitorSingleton.startMonitoring{
+- 连接到supplicant，mWifiNative.connectToSupplicant
+- 连接成功，mWifiStateMachine.sendMessage(SUP_CONNECTION_EVENT)
+}
+
+
+MonitorThread.run{
+- 读取消息，mWifiNative.waitForEvent
+- 处理dispatchEvent{
+	- 启动成功，mStateMachine.sendMessage(WPS_SUCCESS_EVENT)
+	}
+}
+
+
+saveConfigCommand
+frameworks/base/wifi/java/android/net/wifi/WifiStateMachine.java
+frameworks/base/wifi/java/android/net/wifi/WifiMonitor.java

@@ -1,0 +1,41 @@
+
+dispatchUnhandledKey-->interceptFallback-->interceptKeyBeforeQueueing--interceptKeyBeforeDispatching
+
+interceptKeyBeforeQueueing{
+- KEYCODE_POWER
+}
+
+
+interceptKeyBeforeDispatching
+
+//计算窗口大小
+layoutWindowLw{
+- 不是默认显示器，设置成关联窗口或设置全屏
+- 输入发窗口
+- 其它窗口{
+	- 全屏窗口大小包含状态条，内容部分去除状态条
+		FLAG_LAYOUT_IN_SCREEN | FLAG_LAYOUT_INSET_DECOR{
+			- TYPE_STATUS_BAR_PANEL，设置全屏
+			- FLAG_LAYOUT_IN_OVERSCAN，设置overscan
+			- canHideNavigationBar，隐藏导航条，设置全屏
+			- 其他
+		}
+
+	- 全屏布局或者隐藏导航条，FLAG_LAYOUT_IN_SCREEN
+	 	SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION{
+
+		}
+	- 关联窗口，设置为关联窗口大小
+	- 其它窗口{
+		- TYPE_STATUS_BAR_PANEL
+		- TYPE_TOAST，TYPE_SYSTEM_ALERT，TYPE_VOLUME_OVERLAY
+		- 其它
+		}
+	}
+}
+
+============
+startActivityAsUser{
+- 判断isUserSetupComplete(Settings.Secure.USER_SETUP_COMPLETE不为0)
+- mContext.startActivityAsUser
+}@PhoneWindowManager.java

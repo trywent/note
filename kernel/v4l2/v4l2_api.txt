@@ -1,0 +1,100 @@
+
+======================================
+video_device:包含设备信息，设备操作函数（v4l2_file_operations，release,）
+注册相关：video_register_device，video_unregister_device
+
+——————————————————————————————————————
+设备操作：都是通过ioctl
+v4l2_ioctl_ops结构体@v4l2-ioctl.h
+——————————————————————————————————————
+输入输出：
+v4l2有三种输入和三种输出ioctl操作,VIDIOC_ENUMSTD,VIDIOC_G_STD,VIDIOC_S_STD
+--------------------------------------
+视频标准：NTSC,PAL,SECAM
+VIDIOC_ENUMSTD查询设备支持的标准
+VIDIOC_G_STD 设备上现在那种标准激活
+VIDIOC_S_STD 向设备请求一个标准
+int (*vidioc_s_std) (struct file *file, void *private_data, v4l2_std_id std)
+VIDIOC_QUERYSTD 设备看到的视频标准
+int (*vidioc_querystd) (struct file *file, void *private_data, v4l2_std_id *std);
+--------------------------------------
+驱动中处理函数：
+输入：（摄像头设备）
+VIDIOC_ENUMINPUT查询输入：
+int (*vidioc_enum_input)(struct file *file, void *fh, struct v4l2_input *inp);
+当前的输入配置：
+int (*vidioc_g_input)   (struct file *file, void *fh, unsigned int *i);
+设置输入：
+int (*vidioc_s_input)   (struct file *file, void *fh, unsigned int i);
+--------------------------------------
+输出：类似输入
+int (*vidioc_enum_output) (struct file *file, void *fh, struct v4l2_output *a);
+int (*vidioc_g_output)   (struct file *file, void *fh, unsigned int *i);
+int (*vidioc_s_output)   (struct file *file, void *fh, unsigned int i);
+——————————————————————————————————————
+颜色格式：
+象素可由颜色数组组成。图像的存储有两种方式 1）所有相同的单色存放在一起(一个象素的R) 2）以象素为单位存放
+编码：RGB，YUV只有红，蓝，透明度
+v4l2中描述颜色结构struct v4l2_pix_format
+
+——————————————————————————————————————
+格式协商：
+查询设备支持的格式，可以获取当前格式，设置格式
+
+——————————————————————————————————————
+基本的帧I/O：
+V4L2 API 定义了三种不同的传输视频帧的方法,现在有两种是可以实现的:
+1)read()和 write()系统调用可以在通常情况下使用。
+2)将帧数据以视频流的方法直接送到应用可以访问的缓冲区。
+3)Video4Linux2 API 规范提供一种异步 I/O 机制用于帧传输。
+——————————————————————————————————————
+流I/O：
+使用流不会出现read/write的内核和用户空间的数据拷贝，使用流直接交换缓冲取的指针（内核映射用户空间地址）。
+有两种流的实现：内存映射缓冲区，用户空间缓冲区
+--------------------------------------
+1. v4l2_buffer 结构体
+当使用流 I/O 时,帧以 v4l2_buffer 的格式在应用和驱动之间传输。
+缓冲区的状态：
+1，在驱动的传入队列中。
+2，在驱动的传出队列中。
+3，不在上述两个队列里。
+--------------------------------------
+缓冲区设定：
+VIDIOC_REQBUFS ioctl()来建立一组缓冲区。
+
+--------------------------------------
+将缓冲区映射到用户空间：
+内存映射缓冲区的设置首先会调用VIDIOC_QUERYBUF，在这之后或调用mmap将用户空间映射到内核
+--------------------------------------
+流IO处理：
+VIDIOC_REQBUFS 请求缓冲
+VIDIOC_QBUFS 将缓冲加入队列
+VIDIOC_DQBUF 应用获取缓冲
+——————————————————————————————————————
+控制：
+设置摄像头亮度，平衡等
+使用VIDIOC_QUERYCTRL查询可以控制的参数
+
+
+
+-----------------
+视频标准，分辨率，帧率等...
+ioctl命令VIDIOC_ENUMSTD，查询设备支持的标准。
+VIDIOC_G_STD，查询那些标准被激活
+VIDIOC_S_STD，申请一个标准
+
+输入：
+视频捕获的应用首先要通过 VIDIOC_ENUMINPUT 命令来枚举所有可用的输入
+vidioc_s_input()设置输入，vidioc_g_input()获取哪个输入激活的信息
+输出：与输入相似
+
+格式协商：
+struct v4l2_pix_format 描述视频格式
+命令VIDIOC_ENUM_FMT查询支持的格式
+VIDIOC_G_FMT获取现在硬件的格式
+VIDIOC_TRY_FMT，VIDIOC_S_FMT设置视频格式
+
+======================================
+vivi示例：drivers/media/video/vivi.c
+
+module_init(vivi_init)-->vivi_init-->(创建1个设备)vivi_create_instance

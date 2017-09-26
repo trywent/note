@@ -1,0 +1,5 @@
+updateLruProcessLocked-->updateLruProcessInternalLocked-->mLruProcesses(更新容器)@ActivityManagerService.java
+
+
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java

@@ -1,0 +1,136 @@
+FAT(file allocation table):
+分区表对应着簇，并标记簇(可用，已用，坏簇)
+
+FAT32中fat表项的大小是4byte(32bit)。表中从2号地址开始对应数据区簇。
+
+FAT12/16中根目录的位置(紧跟FAT表后)和大小是固定的。
+FAT32中根目录位置存储在BPB中BPB_RootClus域.
+
+
+短文件目录项(short file name)32byte:
+文件大小，时间等信息
+
+长文件目录项(long file name)32byte：
+文件名信息。第一个字节是长文件目录项的编号(最后一个值为0x40 |NUM)
+结构中的属性值必须为ATTR_LONG_NAME
+
+____________________________
+FAT文件系统由四部分组成：
+0 – Reserved Region
+1 – FAT Region
+2 – Root Directory Region (doesn’t exist on FAT32 volumes)
+3 – File and Directory Data Region  (从2号簇开始计算，根目录位置)
+
+
+BPB (BIOS Parameter Block)：(早期的msdos，这个结构不存在)
+启动扇区(boot sector)，位于保留区第一个扇区。是卷的第一个扇区。
+
+文件目录项(File dierectory entry):
+DIR_FstClusHI 簇号的高4位(FAT12/16中为0)
+DIR_FstClusLO 簇号的低4为
+______________________________
+readboot@boot.c：
+读取启动扇区信息(位于卷的第一个扇区)，
+
+bootblock域信息：
+FATs 		 //BPB_NumFATs  FAT表的个数，通常为2
+Sectors		 //BPB_TotSec16 FAT12/16中记录卷的扇区数
+HugeSectors  	 //BPB_TotSec32 FAT32中，记录卷的所有扇区数
+RootDirEnts      //BPB_RootEntCnt FAT12/16中表示根目录中目录项个数，FAT32中必须为0
+FATsecs  	 //BPB_FATSz16  FAT12/16一个FAT表中的扇区数。BPB_FATSz32 FAT32中
+Media            //BPB_Media 0xF8表示不可移除的介质，0xF0可移除介质。FAT[0]值相同
+RootCl           //BPB_RootClus 根目录的簇号，只存在FAT32中
+ValidFat         //BPB_ExtFlags FAT32中，记录fat表个数
+
+ClustMask        //文件系统类型FAT32/16/12
+NumSectors       //扇区的数目
+NumClusters      //簇的数目
+ClusterOffset    //起始簇(包括0和1簇号)的扇区位置。去除保留扇区，FAT表占用的扇区。
+
+FSInfo信息：
+
+---------phase1
+readfat@fat.c
+读取fat表信息，为所有的簇分配空间。FAT32从2号簇对应的位置开始检查簇。
+根据FAT表中的值，初始化每个fatEntry的next值。
+checkclnum：检查簇的状态(坏，可用)，是否超出簇范围
+
+FAT表中FAT[0],FAT[1]：
+FAT16-正常值0xXXffffff，启动后修改为0xXXffff7f
+FAT32-正常值0xXXffff0fffffff0f，启动后修改为0xXXffff0fffffff07
+根据这些可以判断文件系统是否是正常关闭。还是没有正常关闭(数据不完整)。
+FAT[0]中的第一个字节值与bpb.media值相同
+
+comparefat-->clustdiffer@fat.c：比较两个表，如果不同默认使用0号表修复1号表。
+
+readfat-->checkclnum@fat.c
+
+----------phase2
+checkfat@fat.c
+1，循环查看所有的簇(fat表中)，检查head值是否没有设置(并且不坏簇，可用簇。则是一个头簇)。
+   沿next查找所有的簇链，将所有的簇的head域设为头簇的编号。
+   FAT[head]->FAT[next].....->FAT[next]
+
+   ---扫描时有可能形成，不完整的链表(部分链表，头簇的位置在扫描的后面)，但扫描所有的磁盘后
+      链表会变成完整的。
+
+2，检查簇链是否正确。	
+	断链：tryclear删除链
+	超出范围：tryclear删除链
+	
+
+tryclear-->clearchain(boot, fat, head)(清除头链为head的簇链，簇赋值为free)@fat.c
+
+----------phase3
+目录项属性：
+DIR_Name      	//8字节文件名，3字节扩展名。0xE5目录项可用，0x00目录项及其后面的目录项都可用，0x05小日本
+DIR_Attr      	//文件属性，只读，应藏，文件夹...
+DIR_NTRes     	//windows NT使用
+DIR_CrtTimeTenth //文件创建时，十分之一秒  
+DIR_FstClusHI 	//该目录项的第一个簇的边号，高位。FAT12/16为0
+DIR_FstClusLO 	//该目录项的第一个簇的编号，低位
+DIR_FileSize  	//文件大小32bit，4G是这个原因？
+
+resetDosDirSection@dir.c //查找fat32中根目录簇号，设置rootDir
+
+handleDirTree-->readDosDirSection@dir.c
+readDosDirSection:读取目录项
+
+-读取一个簇：
+-处理一个簇中的所有目录项：
+
+
+----------phase4
+checklost@fat.c
+
+===============================
+** Phase 1 - Read FAT (compare skipped)                                         
+Attempting to allocate 5409 KB for FAT                                          
+** Phase 2 - Check Cluster Chains                                               
+** Phase 3 - Checking Directories                                               
+Invalid long filename entry for /.UTSystemConfig                                
+FIXED                                                                           
+Invalid long filename entry for /.estrongs/recomm                               
+FIXED                                                                           
+Invalid long filename entry for /Android/data/com.cerience.reader.app           
+FIXED                                                                           
+Invalid long filename entry at end of directory /wandoujia                      
+FIXED                                                                           
+Invalid long filename entry for /tencent/Tencentnews                            
+FIXED                                                                           
+** Phase 4 - Checking for Lost Files                                            
+550 files, 1111348 free (1326413 clusters)                                      
+                                                                                
+***** FILE SYSTEM WAS MODIFIED ***** 
+
+出错：                          
+FAT-fs (mmcblk0p9): Filesystem has been set read-only                           
+FAT-fs (mmcblk0p9): error, fat_get_cluster: invalid cluster chain (i_pos 0)     
+FAT-fs (mmcblk0p9): Filesystem has been set read-only                           
+binder: 1314:1327 transaction failed 29189, size 80-0                           
+FAT-fs (mmcblk0p9): error, fat_get_cluster: invalid cluster chain (i_pos 0)     
+FAT-fs (mmcblk0p9): Filesystem has been set read-only                           
+FAT-fs (mmcblk0p9): error, fat_get_cluster: invalid cluster chain (i_pos 0)     
+FAT-fs (mmcblk0p9): Filesystem has been set read-only 
+
+

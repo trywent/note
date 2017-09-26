@@ -1,0 +1,71 @@
+HUB:
+
+subsys_initcall(usb_init)-->usb_init{
+- 
+- usb_hub_init
+- 
+}@usb.c
+
+
+usb_hub_init{
+- 注册驱动，usb_register(&hub_driver)@usb.h-->usb_register_driver{
+		- 初始化驱动
+		- 注册驱动，driver_register
+		}@driver.c
+- 开始进程，kthread_run(hub_thread,..)-->hub_thread{
+	- 处理hub_event_list中事件，hub_events{
+		- 
+		}
+	- 等待事件，wait_event_freezable-->wait_event_interruptible	
+	- 线程能够执行，且hub_event_list不为空。循环执行
+	}
+}@hub.c
+
+加入hub设备：
+hub_probe-->hub_configure-->hub_activate-->kick_khubd
+
+___________________________
+等待事件：
+hub_irq-->kick_khubd{
+- 将事件加入队列，list_add_tail(&hub->event_list,&hub_event_list)
+- 唤醒等待线程，wake_up(&khubd_wait)
+}
+
+
+获取事件：
+usb_hub_init{
+- 注册驱动，usb_register(&hub_driver)
+- 开始进程，kthread_run(hub_thread,..)-->hub_thread{
+	- 处理hub_event_list中事件，hub_events{
+		- 
+		}
+	- 等待事件，wait_event_freezable(khubd_wait)-->wait_event_interruptible	
+	- 线程能够执行，且hub_event_list不为空。循环执行
+	}
+}@hub.c
+
+
+处理事件：加入usb设备
+hub_events{
+- 从hub_event_list中获取每个usb_hub，并获取该hub的设备，接口...
+- 遍历hub的所有端口{
+	- 获取端口的连接，事件状态
+	- 获取端口状态，hub_port_status
+	} 
+- hub状态变化
+}
+
+hub_port_connect_change{
+- 
+- usb_alloc_dev
+- 初始化，usb_new_device{
+	- 
+	- 枚举，usb_enumerate_device
+	- 加入设备，device_add
+	}
+}
+
+
+kernel/drivers/usb/core/usb.c
+kernel/drivers/usb/core/hub.c
+kernel/drivers/usb/core/driver.c

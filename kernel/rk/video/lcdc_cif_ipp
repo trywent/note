@@ -1,0 +1,43 @@
+LCDC:将内存的帧数据输出到屏幕(memory --> RGB)
+
+显示接口：
+并行/串行RGB，BT656，
+
+显示处理：
+- 背景层(24color)
+- win0层，数据格式RGB，YCbCr422。(所以显示数据的buffer有YRGB(0/1，for3D),Cbr(0/1，for3D)，RGB)
+- win1层，数据格式RGB，
+
+寄存器：
+LCDC_SYS_CTRL       //可以设置win0的buffer数据格式
+LCDC_DSP_CTRL0      //可设置输出数据格式
+
+LCDC_WIN0_YRGB_MST0 //YRGB数据内存地址
+LCDC_WIN0_CBR_MST0  //CBR数据地址
+LCDC_WIN1_MST       //win1的数据地址
+
+=============
+CIF(camera interface)：
+- 支持输入YCbCr422，BT656(PAL/NTSC)
+- 输出YCbCr422/420
+
+工作流程：输入(BT656)-->转换数据为YCbCr-->分别存储，Y数据UV数据(CIF_CIF_FRM0_ADDR_Y,CIF_CIF_FRM0_ADDR_UV)
+
+工作模式：
+- 单帧模式
+- ping-pong模式，两个buffer自动切换存储
+- 行循环模式
+
+寄存器：
+CIF_CIF_FRM0_ADDR_Y   //帧0的Y地址
+CIF_CIF_FRM0_ADDR_UV  //帧0的UV地址
+CIF_CIF_CUR_DST       //当前数据目标地址
+
+
+=============
+IPP(image post process)
+
+
+
+
+

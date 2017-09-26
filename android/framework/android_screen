@@ -1,0 +1,82 @@
+======================================
+屏幕大小是对角线的长度。
+屏幕密度单位长度内像素的个数（dpi，dots per inch）。
+Density-independent pixel (dp ==dip)，与160dpi相等。（android使用标准单位。主要目的是设置一个在固定清晰度，屏幕大小
+的值）
+
+px = dp * (dpi / 160)。（使用160dpi做为标准）
+
+dp=px*160/dpi,（normal）密度为160dpi屏幕要1个像素等于1dp，密度为240dpi的屏幕要1.5个像素等于1dp
+
+
+正常屏幕470dp x 320dp，
+160dpi：470px  * 320px
+	（470/160）^2+(320/160)^2 =8.62890625 +4=12.628  ==3.5寸屏@160dpi
+
+240dpi：470*1.5px *320*1.5px
+	(470*1.5/240)^2+(320*1.5/240)^2=3.5寸屏@240dpi
+
+不同密度的屏幕只要大小相同，以dp为单位的数也相同（470，320）
+
+xlarge screens are at least 960dp x 720dp    --- 7.5'
+large screens are at least 640dp x 480dp     --- 5'
+normal screens are at least 470dp x 320dp    --- 3.5'
+small screens are at least 426dp x 320dp     --- 3.3'
+
+根据不同密度要提供不同的资源：
+在相同大小的屏幕中，同一张图片在低密度的屏幕显示比较大，在高密度屏幕中显示比较小
+
+======================================
+获取屏幕大小：
+
+通过windowManager获取：
+getSizeInternal-->wm.getDisplaySize@Display.java
+
+windowManager还没有初始(启动过程)：
+getSizeInternal-->getRawWidth@Display.java-->getRawWidthNative-->android_view_Display_getRawWidthNative
+-->SurfaceComposerClient::getDisplayWidth@android_view_Display.cpp-->getDisplayWidth-->dcblk->w
+@SurfaceComposerClient.cpp
+____________________________
+
+获取windowManager服务：
+getService-->return WindowManagerImpl.getDefault@ContextImple.java
+
+(初始化屏幕)displayReady-->(设置高宽值)wm.getDefaultDisplay-->(获取屏幕高度)mDisplay.getRawWidth
+@WindowManagerService.java-->(最终都是通过该接口)getRawWidthNative@Display.java
+
+____________________________
+屏幕信息的初始化：
+get_cblk-->ComposerService::getControlBlock-->ComposerService::getInstance().mServerCblk
+-->Singleton-->(获取服务SurfaceFlinger)getService@SurfaceComposerClient.cpp
+
+Singleton-->mComposerService->getCblk@SurfaceComposerClient.cpp-->getCblk-->
+return mServerHeap@SurfaceFlinger.cpp
+
+
+readyToRun-->(分配内存储存屏幕信息)new(mServerCblk) surface_flinger_cblk_t-->(高宽)
+graphicPlane(dpy)@SurfaceFlinger.cpp
+
+
+获取Display中的域：
+new Display@Display.java-->nativeClassInit(获取Display中fieldID)@android_view_Display.cpp
+
+设置Display域的值：
+new Display-->init@Display.javaandroid_view_Display_init-->SurfaceComposerClient::getDisplayInfo
+(获取display信息)-->(设置域值)env->SetIntField@android_view_Display.cpp
+
+
+SurfaceComposerClient::getDisplayInfo-->get_cblk-->ComposerService::getControlBlock-->
+getInstance().mServerCblk-->ComposerService-->getService("SurfaceFlinger", &mComposerService)--mComposerService->getCblk(获取数据块)@SurfaceComposerClient.cpp-->getCblk(返回mServerHeap)@SurfaceFlinger.cpp
+
+服务端获取屏幕信息：
+SurfaceFlinger::readyToRun-->(分配内存，mServerCblk地址位于该分配内存的起始位)
+mServerHeap = new MemoryHeapBase--(设置屏信息的存放地址)dcblk = mServerCblk->displays + dpy--
+(设置屏信息)dcblk->xxxx= plane.getxxxx@SurfaceFlinger.cpp
+
+
+frameworks/base/core/java/android/view/Display.java
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/core/java/android/util/DisplayMetrics.java
+frameworks/base/core/jni/android_view_Display.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp

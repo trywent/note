@@ -1,0 +1,32 @@
+//
+panic{
+- atomic_notifier_call_chain-->(通知panic)__atomic_notifier_call_chain-->
+	notifier_call_chain-->notifier_call@notifier.c
+}
+
+
+
+kernel/kernel/panic.c
+==============
+//android panic
+apanic_init-->register_mtd_user-->mtd_panic_notifier.add-->mtd_panic_notify_add{
+- 若mtd名字和CONFIG_APANIC_PLABEL不匹配则return
+- 
+}@apanic.c
+
+
+panic_dbg_get-->apanic{
+- apanic_write_console{
+	- 拷贝log数据，log_buf_copy
+	- 写入flash，apanic_writeflashpage
+	}
+- 
+}@apanic.c
+
+//panic通知
+panic_notifier_list
+panic_blk.notifier_call-->apanic@apanic.c
+
+
+
+drivers/misc/apanic.c

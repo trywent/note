@@ -1,0 +1,286 @@
+======================
+kernel:
+
+MACHINE_START(RK30, "RK30board")@board-rkpx3-sdk.c-->MACHINE_START@arch.h-->
+__mach_desc_RK30{
+.nr= MACH_TYPE_##_type //MACH_TYPE_RK30 3066@mach-types.h
+.name= "RK30board"
+}
+
+
+KERNEL启动:
+start_kernel{
+- setup_arch
+- 
+}@main.c
+
+
+init/main.c
+kernel/arch/arm/include/asm/mach/arch.h
+kernel/arch/arm/mach-rkpx3/board-rkpx3-sdk.c
+kernel/include/generated/mach-types.h
+______________________
+TAG结构：
+
+ATAG_CORE:开始标识
+ATAG_NONE:结束标识
+
+	+-----------+
+base ->	| ATAG_CORE |  |
+	+-----------+  |
+	| ATAG_MEM  |  | increasing address
+	+-----------+  |
+	| ATAG_NONE |  |
+	+-----------+  v
+
+___________________________
+kernel解析tag：
+
+定义__tagtable：
+__tagtable(ATAG_SERIAL, parse_tag_serialnr)@setup.c
+
+
+解析tagged list：
+setup_arch{
+-setup_machine_tags{
+	- 处理板级配置，for_each_machine_desc@board-rkpx3-sdk.c
+	- 获取tag地址为，boot_params(6000000+800)@board-rkpx3-sdk.c
+	- tag头为ATAG_CORE{
+		- squash_sqlinfo_tags 
+		- 保存tag到atags_copy，save_atags@atags.c
+		- parse_tags-->parse_tag{
+			- 扫描所有符合表__tagtable中标记，并处理		
+			}
+		}
+	- 保存命令行boot_command_line，strlcpy(boot_command_line)
+	}
+- 保存命令行，strlcpy(cmd_line, boot_command_line)
+- 处理uboot传入cmd，parse_early_param-->parse_early_options(tmp_cmdline)@main.c
+	-->parse_args(do_early_param){
+		- 没有处理，执行do_early_param(遍历__setup_start到__setup_end)@-->mtdpart_setup@cmdlinepart.c
+		}@params.c
+}@setup.c
+
+处理内存标记：
+parse_tag_mem32-->arm_add_memory
+
+arch/arm/kernel/setup.c
+arch/arm/kernel/atags.c
+kernel/include/linux/sqlinfo.h
+init/main.c
+kernel/params.c
+______________________
+解析cmd：
+parse_tag_cmdline-->(保存命令行)strlcat(default_command_line, tag->u.cmdline.cmdline)
+
+
+
+======================
+UBOOT:
+//taggedlist 初始化
+boot_prep_linux{
+- setup_start_tag(gd->bd),设置tag的初始地址gd.bd->bi_boot_params  //PHYS_SDRAM_1(60000000) + 0x88000;@rk30xx.c
+- 设置命令行，setup_commandline_tag(gd->bd, commandline)
+- 设置bank内存地址，setup_memory_tags(gd->bd){
+	- params->u.mem.start = bd->bi_dram[i].start;
+	- params->u.mem.size = bd->bi_dram[i].size;
+	}
+- setup_board_tags
+- setup_end_tag,设置tag结束标识ATAG_NONE
+}bootm.c
+
+arch/arm/lib/bootm.c
+
+log:
+ramsize: 08000000                                                               
+TLB table from 67ff0000 to 67ff4000                                             
+Top of RAM usable for U-Boot at: 67ff0000                                       
+LCD panel info: 1024 x 600, 32 bit/pix                                          
+Reserving 4800k for LCD Framebuffer at: 67b40000                                
+Reserving 4800k for fb buffers at 67b40000                                      
+Reserving 4099k for usb fat buffers at 6773f400                                 
+Reserving 4099k for verify fat buffers at 6733e800                              
+Reserving 4096k for rk global buffers at 66f3e800                               
+Reserving 32768k for fastboot transfer buffer at 64f3e800                       
+Reserving 2048k for fastboot log buffer at 64d3e800                             
+Reserving 4832k for U-Boot at: 64886000                                         
+Reserving 1025k for malloc() at: 64785c00                                       
+Reserving 32 Bytes for Board Info at: 64785be0                                  
+Reserving 192 Bytes for Global Data at: 64785b20                                
+Reserving 69632 Bytes for IRQ stack at: 64774b20                                
+New Stack Pointer is: 64774b10                                                  
+total reserving memory(except stack) is :57m                                    
+RAM Configuration:                                                              
+Bank #0: 60000000 128 MiB   
+_____________________
+设置命令行并保存：
+cmdline：fb.addr=0x67b40000    
+setenv("bootargs", command_line)
+
+uboot/common/cmd_fastboot.c
+
+======================
+UBOOT:U-Boot启动的时候会传入启动参数，然后再启动内核
+
+设置启动函数：
+boot_os-->(CONFIG_BOOTM_LINUX)do_bootm_linux@cmd_bootm.c
+
+一般启动：
+do_bootm{
+- 执行子命令，do_bootm_subcommand
+- do_bootm_states{
+	- 	
+	- 根据镜像类型设置启动函数，boot_fn-->(linux系统)do_bootm_linux{
+		- 设置tagged list参数，boot_prep_linux-->(板级tag)setup_board_tags
+		}
+	- 
+	}
+}@bootm.c
+
+
+do_booti{
+- 设置命令行，fb.addr = gd->fb_base //设置显示地址
+}@cmd_fastboot.c
+_______________________
+rk启动：
+启动：
+//初始化gd，fb地址
+board_init_f{
+...
+- 初始地址addr = CONFIG_SYS_SDRAM_BASE + gd->ram_size// 0x60000000 + size(128M)
+- 执行初始化函数，循环执行init_fnc_ptr结构中所有的初始化函数
+- gd->fb_base = lcd_setmem(addr)  
+- dram_init_banksize-->{
+	- gd->bd->bi_dram[0].start = PHYS_SDRAM_1;//0x60000000
+	- gd->bd->bi_dram[0].size =  PHYS_SDRAM_1_SIZE; //128M 0x8000000
+	}@rk30xx //已经定义该函数
+}@board.c
+
+
+board_init_r{
+- env_relocate
+- 板级初始化，board_late_init-->fbt_preboot(判断是否进行升级，判断启动方式recovery,kernel)
+- 进入主循环，main_loop{
+		- 执行preboot中命令，
+		- 启动kernel，run_command_list(CONFIG_BOOTCOMMAND)-->执行命令"booti"-->do_booti
+		- 启动失败，进入usb启动，startRockusb
+	}@main.c
+}@board.c
+
+arch/arm/lib/board.c
+common/main.c
+
+board_late_init{
+- 探测sd卡设备，uboot_mmc_rescan
+- 列出sd卡中文件，uboot_fat_ls
+- 读取sd卡中升级文件，uboot_fat_fsload
+- fyt升级，rk616_init，uboot_SystemUpdate，showLogo
+- 判断启动方式，并启动，fbt_preboot
+}@rk30xx.c
+
+board_late_init-->fbt_preboot{
+- 获取设备信息是否解锁，fbt_fastboot_init
+- 获取按键状态，board_fbt_key_pressed
+- 显示初始化，drv_lcd_init
+- 设置lcd显示logo，lcd_enable_logo。打开背光，rk_backlight_ctrl
+- 检查misc中启动命令，board_fbt_check_misc@rk30xx.c-->checkMisc{
+	- 读取misc分区中偏移位置为MISC_COMMAND_OFFSET(32)中的启动命令
+	- 若命令是"boot-recovery"，则启动recovery。(misc镜像中初始是启动recovery)
+	- 若是"bootloader"，则
+	}@rkloader.c
+- 若启动命令是进入recovery，则fbt_run_recovery-->("recovery")do_booti
+}@cmd_fastboot.c
+
+
+do_booti{
+- 设置启动镜像源，默认"boot"
+- 查找源对应的分区，fastboot_find_ptn。找到分区{
+	- 读取镜像的头，StorageReadLba
+	- 检测镜像头是否是"Android"，加载镜像loadRkImage{
+		- 首先加载boot中镜像，若失败则加载kernel中镜像。loadImage
+		}else (头不是"android"){
+		- 根据头中地址信息加载kernel
+		}			
+	}else (没有找到对应分区){
+		- 从boot_source，查找镜像地址。然后从该镜像中重启
+		}
+- 检查镜像是否正确，board_fbt_boot_check
+- 设置传入到kernel的启动命令，board_fbt_finalize_bootargs@rk30xx.c
+- 若是充电，加入信息到启动参数中
+- 设置镜像地址，启动do_bootm_linux
+}cmd_fastboot.c
+
+uboot/common/main.c
+common/cmd_bootm.c
+arch/arm/lib/bootm.c
+common/cmd_fastboot.c
+board/rockchip/rk30xx/rk30xx.c
+board/rockchip/rk30xx/rkloader.c
+
+board_init_r@borad.c-->env_relocate@env_common.c-->env_relocate_spec@env_rk.c-->
+StorageInit{
+- 将卡信息SDCardInfoTag初始化为0，SdmmcSDMInit
+- 遍历可启动设备，顺序SDCARD，FLASH，SDMMC，SPI。Init(检测设备是否存在){
+	- 设备存在设置对应的标识
+	- 检测是否从sd卡启动，BootFromSdCard
+	}
+}@storage.c
+
+
+
+uboot/common/env_rk.c
+uboot/board/rockchip/common/common/storage.c
+_____________________
+rk启动命令设置：bootarg
+board_late_init@rk30xx.c-->getParameter{
+- 获取参数，GetParam{
+	- 读取，StorageReadLba(偏移地址，1024*n(n为备份的个数)
+	- 校验CheckParam，若不通过则继续读取备份
+	}@parameter.c
+- 解析参数，ParseParam@parameter.c
+}@rkloader.c
+
+
+uboot/board/rockchip/rk30xx/rkloader.c
+uboot/board/rockchip/common/armlinux/parameter.c
+_____________________
+从usb引导：
+bootm_linux{
+- 
+- 设置标记，setup_start_tag
+- theKernel
+}armlinux.c
+
+start_linux{
+- load_image-->kernel_load_check{
+	- 不是rk29系列且image头是"ANDROID"，bootKernelInBootImg-->bootm_linux
+	- bootm_linux
+	}
+- bootm_linux
+}@armlinux.c
+
+
+下载了镜像文件时执行：
+boot_run-->bootm_linux
+
+
+board/rockchip/common/armlinux/armlinux.c
+______________________
+重启进入fastboot：
+fbt_request_start_fastboot
+
+
+common/cmd_fastboot.c
+______________________
+do_basic_setup-->do_initcalls()-->__initdata
+
+init/main.c
+
+模块初始化函数：
+*_initcall functions of the same level will be called during boot in the order they are linked.
+
+______________________
+启动参数：
+
+
+include/asm-arm/setup.h

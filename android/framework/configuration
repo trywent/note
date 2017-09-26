@@ -1,0 +1,276 @@
+========================
+字体：
+systemReady-->retrieveSettings-->Settings.System.getConfiguration
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/core/java/android/content/res/Configuration.java
+========================
+默认语言设置：
+
+//电话网络设置语言
+setSystemLocale-->getLocaleForLanguageCountry@MccTable.java
+
+frameworks/opt/telephony/src/java/com/android/internal/telephony/MccTable.java
+________________________
+Makefile中设置默认语言：
+
+
+PRODUCT_PROPERTY_OVERRIDES：中设置要覆盖的系统属性
+
+
+
+#将1中第一个字串的"_"替换成空格
+define default-locale
+$(subst _, , $(firstword $(1)))
+endef
+
+# Whether there is default locale set in PRODUCT_PROPERTY_OVERRIDES
+product_property_override_locale_language := $(strip \
+    $(patsubst ro.product.locale.language=%,%,\
+    $(filter ro.product.locale.language=%,$(PRODUCT_PROPERTY_OVERRIDES))))
+product_property_overrides_locale_region := $(strip \
+    $(patsubst ro.product.locale.region=%,%,\
+    $(filter ro.product.locale.region=%,$(PRODUCT_PROPERTY_OVERRIDES))))
+
+
+#如果product_property_override_locale_language，不为空返回空字串，为空则返回参数“$1”中的第一个字串
+define default-locale-language
+$(if $(product_property_override_locale_language),,$(word 1, $(call default-locale, $(1))))
+endef
+define default-locale-region
+$(if $(product_property_overrides_locale_region),,$(word 2, $(call default-locale, $(1))))
+endef
+
+若属性中设置了默认语言，则PRODUCT_DEFAULT_LANGUAGE为空(即不是用这里的默认语言)
+PRODUCT_DEFAULT_LANGUAGE="$(call default-locale-language,$(PRODUCT_LOCALES))" 
+PRODUCT_DEFAULT_REGION="$(call default-locale-region,$(PRODUCT_LOCALES))" 
+
+____________________________
+buildinfo.sh生成属性文件：
+
+如果默认语言不为空，则使用默认语言
+if [ -n "$PRODUCT_DEFAULT_LANGUAGE" ] ; then
+  echo "ro.product.locale.language=$PRODUCT_DEFAULT_LANGUAGE"
+fi
+if [ -n "$PRODUCT_DEFAULT_REGION" ] ; then
+ echo "ro.product.locale.region=$PRODUCT_DEFAULT_REGION"
+fi
+
+
+system.prop被写入到属性文件中覆盖buildinfo.sh中的部分属性
+
+____________________________
+读取语言属性：
+AndroidRuntime::startVm-->readLocale-->property_get("persist.sys.language", propLang, "")--
+(前面没有获取到属性)property_get("ro.product.locale.language", propLang, "en")@AndroidRuntime.cpp
+
+
+frameworks/base/core/jni/AndroidRuntime.cpp
+
+_____________________________
+android_content_AssetManager_init-->new AssetManager
+
+getLocales@AssetManager.java-->android_content_AssetManager_getLocales{
+- 获取AssetManager，assetManagerForJavaObject
+- 获取语言数组，am->getLocales-->getLocales-->res->getLocales@AssetManager.cpp-->
+	ResTable::getLocales-->getConfigurations(&configs)@ResourceTypes.cpp-->
+	
+}@android_util_AssetManager.cpp
+
+frameworks/base/core/java/android/content/res/AssetManager.java
+frameworks/base/core/jni/android_util_AssetManager.cpp
+frameworks/base/libs/androidfw/AssetManager.cpp
+frameworks/base/libs/androidfw/ResourceTypes.cpp
+____________________________
+设置语言：
+onItemSelected{
+- 选择语言，new UserDictionaryLocalePicker{
+	- 设置选择监听器为UserDictionaryLocalePicker，setLocaleSelectionListener。
+	}
+	- 当选择语言，onListItemClick-->mListener.onLocaleSelected-->onLocaleSelected-->
+		mContents.updateLocale
+- 设置语言，mContents.updateLocale(locale.getLocaleString()
+}
+
+
+onLocaleSelected-->LocalePicker.updateLocale@LocalPicker.java-->updateLocale-->
+am.updateConfiguration@(内部)LocalePicker.java-->updateConfiguration-->
+updateConfigurationLocked(更新当前配置，是已经运行的activity运行在当前配置下)@ActivityManagerService.java
+
+改变数据库：
+updateLocale-->BackupManager.dataChanged@LocalPicker.java
+
+packages/apps/Settings/src/com/android/settings/LocalePicker.java
+frameworks/base/core/java/com/android/internal/app/LocalePicker.java
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+packages/apps/Settings/src/com/android/settings/inputmethod/UserDictionaryLocalePicker.java
+packages/apps/Settings/src/com/android/settings/inputmethod/UserDictionaryAddWordFragment.java
+
+
+ActivityManager( 1321): Config changed: {1.3 0mcc0mnc zh_TW sw600dp w1024dp h540dp lrg long land finger -keyb/v/h -nav/h s.4}
+_____________________________
+缅甸：
+value-my-MM
+=============================
+//获取时区信息
+pollStateDone-->@GsmServiceStateTracker.java
+
+//设置系统时区
+revertToNitzTimeZone-->setAndBroadcastNetworkSetTimeZone
+-->(设置时区，发送广播)@GsmServiceStateTracker.java
+
+frameworks/opt/telephony/src/java/com/android/internal/telephony/gsm/GsmServiceStateTracker.java
+
+//
+persist.sys.timezone Asia/shanghai
+=============================
+方位变化：
+
+屏幕尺寸原始值：
+mBaseDisplayHeight = mCurDisplayHeight = mAppDisplayHeight = mInitialDisplayHeight=mDisplay.getRawWidth
+
+
+rotationForOrientationLw(返回正确方位)
+
+onConfigurationChanged@Activity.java
+
+
+
+更新屏幕配置：
+computeScreenConfigurationLocked{
+- 若屏旋转了90或270则屏长宽值调换。若mAltOrientation为true，则将长宽最长的值除1.3，再赋值。
+	(使横竖进行转换，与mForcedAppOrientation一致)
+- 根据长宽设置配置的方位值
+- 计算应用能够使用的屏的长宽，并设置动画中的长宽值
+- 计算兼容模式下应用的长宽。computeCompatibleScaling{
+				- 系统默认屏最小长度320像素，长宽比例最大默认为(854f/480f)
+				- 获取最小的长宽值，原来的长宽和新长宽比值最小的为缩放比例
+				- 保存新的最小长宽值，返回缩放比例值
+			   }
+- 传入的config不为空，设置config中的值{
+		- 设置屏长宽
+		- 计算最小屏长，computeSizeRangesAndScreenLayout{
+			- 计算各个方位，屏最小，最大长度,adjustDisplaySizeRanges。最终获得最小长度值
+			- reduceConfigLayout{
+				- longSize < 470，小屏布局SCREENLAYOUT_SIZE_SMALL
+				- longSize >= 960 && shortSize >= 720，SCREENLAYOUT_SIZE_XLARGE
+				- longSize >= 640 && shortSize >= 480，SCREENLAYOUT_SIZE_LARGE
+				- 其他SCREENLAYOUT_SIZE_NORMAL
+				- shortSize > 321 || longSize > 570，兼容模式screenLayoutCompatNeeded	
+				- 返回布局值
+			}	
+			- 设置screenLayout
+		}
+		- 设置兼容模式屏长宽
+		- 设置兼容模式屏最小长度值，computeCompatSmallestWidth{
+			-
+		}
+		- 设置触摸屏，按键类型
+		- 	
+	}
+
+
+}@WindowManagerService.java
+
+
+getConfigDisplayWidth-->getNonDecorDisplayWidth(侧边是否有导航条，返回屏宽减去导航条)@PhoneWindowManager.java
+
+getConfigDisplayHeight-->getNonDecorDisplayHeight(返回高度，取出导航条，状态条)@PhoneWindowManager.java
+
+rotationHasCompatibleMetricsLw(需要的方位与返回的方位不一致)@PhoneWindowManager.java
+
+获取屏幕大小：
+getRealMetrics-->getRealSize-->wm.getRealDisplaySize@Display.java-->getRealDisplaySize
+(返回mCurDisplayWidth，mCurDisplayHeight)@WindowManagerService.java
+_____________________________________
+方向监听器：
+init-->mOrientationListener = new MyOrientationListener@phoneWidnowManager.java
+
+打开关闭：
+updateOrientationListenerLp(打开或关闭方向监听器){
+- 判断感应器是否有用(传感器是否存在，打开)，mOrientationListener.canDetectOrientation
+- 屏幕已经打开，需要打开监听，needSensorRunningLp(通常返回true,除非用户关闭){
+		- mOrientationListener.enable()
+	}
+- 需要关闭，mOrientationListener.disable()
+
+}@PhoneWindowManager.java
+
+发生改变：
+onSensorChanged-->onProposedRotationChanged-->updateRotation-->mWindowManager.updateRotation
+@PhoneWindowManager.java-->updateRotation-->updateRotationUnchecked(更新方位值)-->
+sendNewConfiguration(通知activityManager更新)-->mActivityManager.updateConfiguration@
+WindowMangerService.java
+
+
+=====================================
+传感器服务：
+获取服务：
+getServcie-->ServiceFetcher.createService-->new SystemSensorManager@ContextImpl.java
+
+初始化线程：
+SystemSensorManager-->sSensorThread = new SensorThread();
+
+registerListenerImpl(新建代理监听器ListenerDelegate，加入到监听器列表中)-->sSensorThread.startLocked()
+-->SensorThread.startLocked-->thread = new SensorThreadRunnable(SensorThreadRunnable)-->thread.start
+-->SensorThreadRunnable.run-->sensors_data_poll(获取传感器数据)-->listener.onSensorChangedLocked
+(监听器更新数据)-->(发送消息)mHandler.sendMessage-->mHandler.handleMessage-->
+mSensorEventListener.onSensorChanged@SystemSensorManager.java
+
+
+-------------------------------------
+new MyOrientationListener-->new WindowOrientationListener-->mSensorEventListener = 
+new SensorEventListenerImpl@WindowOrientationListener.java
+
+打开监听:
+enable-->mSensorManager.registerListener@WindowOrientationListener.java
+
+发生改变：
+onSensorChanged-->onProposedRotationChanged-->updateRotation-->mWindowManager.updateRotation
+@PhoneWindowManager.java-->updateRotation-->updateRotationUnchecked(更新方位值)-->
+sendNewConfiguration(通知activityManager更新)-->mActivityManager.updateConfiguration@
+WindowMangerService.java
+
+frameworks/base/core/java/android/view/WindowOrientationListener.java
+frameworks/base/core/java/android/hardware/SensorManager.java
+frameworks/base/core/java/android/hardware/SystemSensorManager.java
+frameworks/base/core/java/android/view/WindowOrientationListener.java
+fameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+================================
+服务端更新配置：
+(通常是方向改变)sendNewConfiguration@WindowManagerServcie.java-->updateConfiguration
+@ActivityManagerServcie.java
+
+
+updateConfiguration{
+- 窗口服务计算新配置，mWindowManager.computeNewConfiguration
+- 使用计算后的新配置，更新配置，updateConfigurationLocked{
+			- 更新最近的应用的配置，app.thread.scheduleConfigurationChanged 		
+			- 设置窗口端的新配置，mWindowManager.setNewConfiguration
+		}
+}
+
+================================
+activity更新配置：
+updateConfigurationLocked-->app.thread.scheduleConfigurationChanged@ActivityManagerService.java
+-->scheduleConfigurationChanged-->H.handleMessage(CONFIGURATION_CHANGED)-->
+handleConfigurationChanged-->performConfigurationChanged-->cb.onConfigurationChanged
+@ActivityThread.java-->onConfigurationChanged@Activity.java
+
+
+frameworks/base/core/java/android/app/ActivityThread.java
+
+
+=================================
+resource更新配置：
+updateConfiguration-->updateConfiguration@Resources.java
+
+设置：
+handleConfigurationChanged-->applyConfigurationToResourcesLocked(更新mResConfiguration)@ActivityThread.java
+
+更新resource:
+main-->thread.attach-->attach-->context.init(getSystemContext)-->
+getSystemContext-->context.getResources().updateConfiguration@ActivityThread.java
+
+frameworks/base/core/java/android/content/res/Resources.java
+

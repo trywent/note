@@ -1,0 +1,18 @@
+backup -> /dev/block/mmcblk0p6
+boot -> /dev/block/mmcblk0p4
+cache -> /dev/block/mmcblk0p7
+kernel -> /dev/block/mmcblk0p3
+kpanic -> /dev/block/mmcblk0p9
+metadata -> /dev/block/mmcblk0p8
+misc -> /dev/block/mmcblk0p2
+recovery -> /dev/block/mmcblk0p5
+system -> /dev/block/mmcblk0p10
+uboot -> /dev/block/mmcblk0p1
+userdata -> /dev/block/mmcblk0p11
+
+
+==================
+
+
+
+board/rockchip/rk30xx/rkloader.c

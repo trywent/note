@@ -1,0 +1,244 @@
+属性动画系统是个大的框架，能够以动画的方式驱动所有对象。可以用来执行，
+在一段时间内改变对象的属性值(改变的方式可以定义)，不管对象是否可以在屏幕上显示。
+
+Property Animation:能够定义动画以下特性
+
+Duration:动画操作的时长，默认是300ms。
+
+Time interpolation:动画的时间计算方法(渐变，跳跃...)
+
+Repeat count and behavior:定义动画执行时间结束后重复符动画的次数。定义动画是否顺序执行完后倒序执行。
+
+Animator sets:能够定义一组动画效果，一起执行或在一个延迟后顺序执行
+
+Frame refresh delay: 能够定义动画的帧刷新频率。默认是没10ms刷新一次，但是应用实际能够刷新
+		     的频率却是依赖系统的忙碌程度和系统的速度。
+
+工作原理：
+//定义所有与动画有关的时间,时长,当前属性的值,目的属性值...
+ValueAnimator{            
+//当动画执行一个小片段后(默认10ms执行一次)，
+TimeInterpolator	   //属性值改变的方式(线性改变，加速改变，降速改变)
+TypeEvaluator              //包含方法，用来计算属性值
+int duration		   //时长	
+int startPropertyValue	   //开始值
+int endPropertyValue 	   //结束值
+start()                    //调用后动画开始
+}
+
+1，设置属性初始值，结束值，动画时长。动画开始后ValueAnimator计算动画经过的片段值(0~1之间，百分比)。
+   
+2，ValueAnimator计算片段值后，会调用当前的TimeInterpolator用来计算插值片段
+(插值片段是TimeInterpolator中定义的动画变化片段)
+
+3，当插值片段计算好后，ValueAnimator调用TypeEvaluator计算属性这时应该对应的值。
+
+总结：对象的属性值随时间变化而改变，改变方式通过TimeInterpolator定义，改变的值通过TypeEvaluator计算。
+_______________________________
+动画过程：计算值，根据计算值设置对象的属性
+
+//事件接收
+ValueAnimator
+ObjectAnimator  //设置对象中的属性值
+AnimatorSet
+
+
+//根据时间数据计算动画的属性值
+IntEvaluator
+FloatEvaluator
+
+//根据时间变化值变化
+AccelerateDecelerateInterpolator //中间快，两边慢
+AccelerateInterpolator //一直加速
+
+___________
+setEvaluator(TypeEvaluator value)
+setInterpolator(TimeInterpolator value)
+
+===============================
+创建displayEvent接收器：
+new ViewRootImpl-->Choreographer.getInstance@ViewRootImpl.java-->new ThreadLocal-->
+new Choreographer-->new FrameDisplayEventReceiver@Choregrapher.java-->
+DisplayEventReceiver(Looper looper) {
+- 后去消息队列，mMessageQueue = looper.getQueue
+- 创建本地接收器，mMessageQueue用于事件读取。mReceiverPtr = nativeInit(this, mMessageQueue){
+	- 转换成本地消息队列，android_os_MessageQueue_getMessageQueue
+	- 创建消息接收器，new NativeDisplayEventReceiver
+	}
+}DisplayEventReceiver.java
+
+消息接收器：
+DisplayEventReceiver::DisplayEventReceiver() {
+- 获取服务，ComposerService::getComposerService()
+- 创建连接，sf->createDisplayEventConnection
+- 获取数据通道，mEventConnection->getDataChannel()
+}
+
+接收器本地初始化：
+nativeInit-->receiver->initialize-->NativeDisplayEventReceiver::initialize{
+- 想消息队列中加入事件读取文件，mMessageQueue->getLooper()->addFd(接收vsync的dataChanel,this)
+}@android_view_DisplayEventReceiver.cpp
+
+
+读取消息：
+scheduleVsync@DisplayEventReceiver.java-->nativeScheduleVsync-->receiver->scheduleVsync-->
+NativeDisplayEventReceiver::scheduleVsync-->readLastVsyncMessage-->mReceiver.getEvents
+@android_view_DisplayEventReceiver.cpp-->getEvents-->getEvents-->BitTube::recvObjects
+@DisplayEventReceiver.cpp-->tube->read@BitTube.cpp-->mDataChannel->read@DisplayEventReceiver.cpp
+
+//读取所有的未处理事件，然后开始同步
+NativeDisplayEventReceiver::scheduleVsync{
+- readLastVsyncMessage{
+	- 读取事件，mReceiver.getEvents
+	}
+- 请求同步，mReceiver.requestNextVsync
+}
+
+looper中读取到事件并回调处理：
+Looper::pollInner-->response.request.callback->handleEvent-->NativeDisplayEventReceiver::
+handleEvent-->env->CallVoidMethod(gDisplayEventReceiverClassInfo.dispatchVsync)
+@android_view_DisplayEventReceiver.cpp-->dispatchVsync-->onVsync@DisplayEventReceiver.java
+-->FrameDisplayEventReceiver.onVsync{
+- mHandler.sendMessageAtTime
+}@Choreographer.java
+
+
+frameworks/base/core/java/android/view/DisplayEventReceiver.java
+frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp
+frameworks/native/libs/gui/DisplayEventReceiver.cpp
+frameworks/base/core/java/android/view/Choreographer.java
+===============================================
+choreographer:
+
+mCallbackQueues //回调队列数组，三种类型CALLBACK_INPUT，CALLBACK_ANIMATION，CALLBACK_TRAVERSAL
+
+//可见性，动画，焦点变化都会重画
+performTraversals/draw/invalidateChildInParent/handleAppVisibility-->scheduleTraversals-->
+mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable, null)-->
+mTraversalRunnable.run-->doTraversal-->performTraversals@ViewRootImpl.java
+
+加入回调：
+postCallback-->postCallbackDelayed-->postCallbackDelayedInternal{
+- 加入回调容器中，mCallbackQueues[callbackType].addCallbackLocked
+- 发送同步信号{
+	- 立即发送，scheduleFrameLocked{
+		- 主线程，scheduleVsyncLocked-->scheduleVsyncLocked-->
+			mDisplayEventReceiver.scheduleVsync
+		- 其他线程，sendMessageAtFrontOfQueue(MSG_DO_SCHEDULE_VSYNC)-->
+			FrameHandler.handleMessage-->doScheduleVsync
+		}
+	- 特定时间发送，sendMessageAtTime(MSG_DO_SCHEDULE_CALLBACK)-->FrameHandler.handleMessage
+		-->doScheduleCallback-->scheduleFrameLocked
+	}
+}
+
+
+更新帧：
+FrameDisplayEventReceiver.onVsync-->mHandler.sendMessageAtTime(发送中有回调)-->
+FrameDisplayEventReceiver.run-->doFrame{
+- !mFrameScheduled,没有帧处理返回
+- 计算帧同步时间，到现在处理经过的时间。有遗漏帧(jitterNanos >= mFrameIntervalNanos){
+	- 则将帧同步时间修改为，frameTimeNanos = startNanos - lastFrameOffset
+	}
+- 若修改后时间小于最后一次时间，则处理下一次同步信号，scheduleVsyncLocked
+- 更新mLastFrameTimeNanos
+- doCallbacks(Choreographer.CALLBACK_INPUT, frameTimeNanos);
+- doCallbacks(Choreographer.CALLBACK_ANIMATION, frameTimeNanos);
+- doCallbacks(Choreographer.CALLBACK_TRAVERSAL, frameTimeNanos);
+}
+
+doCallbacks(int callbackType, long frameTimeNanos){
+- 获取当前时间，需要处理的该类型回调。mCallbackQueues[callbackType].extractDueCallbacksLocked(now)
+- 遍历容器中回调并执行，c.run(frameTimeNanos)
+- 回收所有回调，recycleCallbackLocked(callbacks)
+}
+
+
+doScheduleVsync-->scheduleVsyncLocked@Choreographer.java
+
+
+postFrameCallbackDelayed(下一帧要执行的回调)-->postCallbackDelayedInternal(CALLBACK_ANIMATION)-->
+scheduleFrameLocked-->scheduleVsyncLocked-->mDisplayEventReceiver.scheduleVsync
+
+frameworks/base/core/java/android/view/Choreographer.java
+===============================================
+
+
+_______________________________________________
+处理frame：
+scrollTo-->postInvalidateOnAnimation(下一个动画帧，调用invaliad)-->attachInfo.mViewRootImpl.
+(将要实现动画的View传入ViewRootImpl)dispatchInvalidateOnAnimation(view)@View.java-->
+mInvalidateOnAnimationRunnable.addView-->
+InvalidateOnAnimationRunnable{addView-->mViews.add(加入到mView)--postIfNeededLocked-->
+mChoreographer.postCallback}@ViewRootImpl.java-->postCallback-->postCallbackDelayed-->
+postCallbackDelayedInternal-->mHandler.sendMessageAtTime-->FrameHandler{handleMessage-->
+doScheduleCallback}-->scheduleFrameLocked-->(监听Vsycn)scheduleVsyncLocked-->
+mDisplayEventReceiver.scheduleVsync@Choreographer.java-->scheduleVsync-->nativeScheduleVsync(mReceiverPtr)@DisplayEventReceiver.java-->nativeScheduleVsync-->receiver->scheduleVsync-->
+NativeDisplayEventReceiver::scheduleVsync-->mReceiver.requestNextVsync@android_view_DisplayEventReceiver.cpp
+-->requestNextVsync-->mEventConnection->requestNextVsync@DisplayEventReceiver.cpp
+
+(添加回调)InvalidateOnAnimationRunnable.addView-->postIfNeededLocked-->
+mChoreographer.postCallback(CALLBACK_ANIMATION)@ViewRootImpl.java
+
+将回调加入队列：
+postCallback-->postCallbackDelayed-->postCallbackDelayedInternal-->mCallbackQueues[callbackType].
+addCallbackLocked-->(创建callback并加入队列)obtainCallbackLocked@Choreographer.java
+
+接收到Vsync，处理frame：
+NativeDisplayEventReceiver::handleEvent-->env->CallVoidMethod(dispatchVsync)@
+android_view_DisplayEventReceiver.cpp-->dispatchVsync-->onVsync@DisplayEventReceiver.java
+-->FrameDisplayEventReceiver.onVsync-->mHandler.sendMessageAtTime(按当前时间顺序，加入到消息队列)-->
+FrameDisplayEventReceiver.run-->doFrame-->doCallbacks(输出花费时间)-->c.run@Choreographer.java
+-->InvalidateOnAnimationRunnable.run-->(遍历所有的View)invalidate@ViewRootImpl.java
+
+
+getEvents-->getEvents-->BitTube::recvObjects@DisplayEventReceiver.cpp
+________________________________
+事件：
+(添加回调)scheduleTraversals-->scheduleConsumeBatchedInput-->mChoreographer.postCallback(CALLBACK_INPUT)@ViewRootImpl.java
+
+(处理pending event，添加回调)WindowInputEventReceiver{(当有未处理事件时)onBatchedInputEventPending-->
+scheduleConsumeBatchedInput}-->mChoreographer.postCallback(CALLBACK_INPUT)@ViewRootImpl.java
+
+NativeInputEventReceiver::handleEvent-->
+
+
+dispatchBatchedInputEventPending@InputEventReceiver.java
+(调用回调)doFrame-->doCallbacks(输出花费时间)-->c.run@Choreographer.java-->mConsumedBatchedInputRunnable
+.run-->doConsumeBatchedInput@ViewRootImpl.java
+
+处理inputEvent：
+doCallbacks(输出花费时间)-->c.run@Choreographer.java-->ConsumedBatchedInputRunnable.run-->
+doConsumeBatchedInput-->mInputEventReceiver.consumeBatchedInputEvents(等待Vsync，处理事件)--
+(处理该View上的事件)doProcessInputEvents@ViewRootImpl.java
+
+处理inputEvent：
+dispatchInputEvent-->onInputEvent@InputEventReceiver.java-->WindowInputEventReceiver.
+onInputEvent-->enqueueInputEvent-->enqueueInputEvent-->(若不是立即处理事件)
+scheduleProcessInputEvents-->ViewRootHandler.handleMessage-->doProcessInputEvents
+-->deliverInputEvent@ViewRootImpl.java
+
+________________________________
+处理Travel：
+(添加回调)scheduleTraversals-->mChoreographer.postCallback(CALLBACK_TRAVERSAL)--
+scheduleConsumeBatchedInput-->mChoreographer.postCallback(CALLBACK_INPUT)@ViewRootImpl.java
+
+
+doCallbacks(Choreographer.CALLBACK_TRAVERSAL)-->c.run@Choreographer.java-->TraversalRunnable.run
+-->doTraversal-->performTraversals
+
+display的刷新率60fps
+
+_________________________________
+事件对应着某一帧。帧上的时间处理方法，处理该帧存在时发生的事件。
+
+frameworks/base/core/java/android/view/View.java
+frameworks/base/core/java/android/view/ViewRootImpl.java
+frameworks/base/core/java/android/view/Choreographer.java
+frameworks/base/core/java/android/view/DisplayEventReceiver.java
+frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp
+frameworks/base/core/java/android/view/InputEventReceiver.java
+frameworks/native/libs/gui/DisplayEventReceiver.cpp
+
+
+

@@ -1,0 +1,11 @@
+makefile
+MAKECMDGOALS  //命令行传入的目标
+
+
+
+================
+panic-->emergency_restart@panic.c
+
+
+kernel/panic.c
+

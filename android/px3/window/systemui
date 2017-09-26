@@ -1,0 +1,148 @@
+//
+============================应用端：
+API接口隐藏状态条，导航条：
+updateSystemUiVisibilityLw{
+- 
+
+}
+mLastSystemUiFlags
+
+获取View的属性：
+performTraversals/setView-->collectViewAttributes@ViewRootImpl.java-->dispatchCollectViewAttributes
+-->performCollectViewAttributes@View.java
+____________________________
+应用端调用：
+状态条：
+View decorView = getWindow().getDecorView();
+// Hide the status bar.
+int uiOptions = View.SYSTEM_UI_FLAG_FULLSCREEN;
+decorView.setSystemUiVisibility(uiOptions);
+// Remember that you should never show the action bar if the
+// status bar is hidden, so hide that too if necessary.
+ActionBar actionBar = getActionBar();
+actionBar.hide();
+
+导航条：
+View decorView = getWindow().getDecorView();
+// Hide both the navigation bar and the status bar.
+// SYSTEM_UI_FLAG_FULLSCREEN is only available on Android 4.1 and higher, but as
+// a general rule, you should design your app to hide the status bar whenever you
+// hide the navigation bar.
+int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN;
+decorView.setSystemUiVisibility(uiOptions);
+
+
+
+
+===========================服务端：
+View.STATUS_BAR_TRANSIENT		    //切换
+View.STATUS_BAR_UNHIDE                      //隐藏标识
+View.STATUS_BAR_TRANSLUCENT                 //透明标识
+StatusBarManager.WINDOW_STATUS_BAR          //窗口标识
+WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS //透明标识
+
+
+//设置状态
+beginLayoutLw-->
+updateSystemUiVisibilityLw{
+- 若是锁屏窗口且即将隐藏则不操作
+- 获取窗口的标识位，getSystemUiVisibility
+-updateSystemBarsLw{
+	- 获取是否透明状态条和导航条的标记，applyTranslucentFlagLw
+	- 防止状态条窗口清除其它窗口的标记，statusBarHasFocus
+	- 是否允许透明，areTranslucentBarsAllowed
+	- 更新状态条mStatusBarController.updateVisibilityLw
+	- 更新导航条mNavigationBarController.updateVisibilityLw
+	}	
+- 设置systemui，mHandler.post-->statusbar.setSystemUiVisibility 
+	//设置到bar后，再回掉系统接口adjustSystemUiVisibilityLw
+}
+
+
+//设置可见/隐藏
+finishPostLayoutPolicyLw-->mStatusBarController.setBarShowingLw
+
+
+//policy中设置状态条，导航条设置隐藏/可见
+mClearHideNavigationFlag/HideNavInputEventReceiver@PhoneWindowManager.java
+reevaluateStatusBarVisibility@WindowManagerService.java-->adjustSystemUiVisibilityLw
+@PhoneWindowManager.java-->mStatusBarController.adjustSystemUiVisibilityLw@BarController.java
+
+
+//布局完成设置窗口
+finishPostLayoutPolicyLw-->setBarShowingLw
+
+___________________
+
+//手势可见
+SystemGesturesPointerEventListener.onSwipeFromTop-->requestTransientBars{
+- mStatusBarController.showTransient-->设置状态TRANSIENT_BAR_SHOW_REQUESTED
+- updateSystemUiVisibilityLw
+}
+
+//手势作用下。通过Statusbar服务接口设置隐藏/可见
+updateSystemUiVisibilityLw-->statusbar.setSystemUiVisibility@PhoneWindowManager.java-->
+setSystemUiVisibility-->mBar.setSystemUiVisibility@StatusBarManagerService.java-->
+setSystemUiVisibility-->notifyUiVisibilityChanged@PhoneStatusBar.java-->
+statusBarVisibilityChanged-->adjustSystemUiVisibilityLw@WindowManagerService.java-->
+adjustSystemUiVisibilityLw@PhoneWindowManager.java-->adjustSystemUiVisibilityLw{
+- setBarShowingLw-->mWin.showLw@BarController.java
+}@BarController.java
+
+
+setSystemUiVisibility{
+- 若是切换状态，设置显示并设置延时自动隐藏
+- notifyUiVisibilityChanged
+}@PhoneStatusBar.java
+
+//设置隐藏显示导航条，状态条
+beginLayoutLw--> mNavigationBarController.setBarShowingLw
+
+finishPostLayoutPolicyLw-->mStatusBarController.setBarShowingLw
+____________________________
+
+
+____________________________
+barcotorler:
+
+(更新状态值)updateVisibilityLw{
+- isTransientShowing
+- isTransientShowRequested
+- 设置状态setTransientBarState
+- 赋值vis
+}
+
+
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+frameworks/base/policy/src/com/android/internal/policy/impl/BarController.java
+
+============================systemUI:
+start{
+- 获取服务，mBarService
+- 创建mCommandQueue
+- 注册到服务mBarService.registerStatusBar(mCommandQueue)
+}
+
+
+//调用systemui接口
+(获取服务StatusBarManagerService)-->setIcon-->mBar.setIcon@StatusBarManagerService.java-->
+setIcon-->mHandler.obtainMessage(what, OP_SET_ICON)-->H.handleMessage-->mCallbacks.addIcon
+@CommandQueue.java-->addIcon@PhoneStatusBar.java
+
+
+//显示应用图标
+PhoneStatusBarPolicy(初始化图标)@PhoneStatusBarPolicy.java
+(更新图标)SyncHandler.handleMessage-->sendSyncStateIntent@SyncManager.java-->mIntentReceiver.onReceive
+(ACTION_SYNC_STATE_CHANGED)-->updateSyncState@
+
+//通知
+
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/BaseStatusBar.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+frameworks/base/services/java/com/android/server/StatusBarManagerService.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarPolicy.java
+frameworks/base/services/java/com/android/server/content/SyncManager.java
+

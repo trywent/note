@@ -1,0 +1,24 @@
+//
+
+main-->AudioFlinger::instantiate()@main_mediaserver.cpp-->
+AudioFlinger::AudioFlinger{
+- 是否打开MemoryDealer
+}-->onFirstRef(设置准备时间mStandbyTimeInNsecs)
+
+
+
+mpClientInterface->loadHwModule(primary/r_submix)@AudioPolicyManager.cpp-->loadHwModule
+-->loadHwModule_l{
+- load_audio_interface(audio_hw_device_t *dev){
+	- hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID)
+	- audio_hw_device_open	
+	}
+- mAudioHwDevs.add(handle, new AudioHwDevice)//保存hardware设备
+}
+
+
+
+
+
+
+frameworks/av/services/audioflinger/AudioFlinger.cpp

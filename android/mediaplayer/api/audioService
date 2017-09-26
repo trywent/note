@@ -1,0 +1,94 @@
+//应用接口
+AudioManager = Context.getSystemService("audio")
+
+
+==============
+AudioService{
+- 更新alias流，updateStreamVolumeAlias
+- 创建并初始化流状态，createStreamStates
+}
+
+getDeviceForStream-->AudioSystem.getDevicesForStream@AudioService.java-->
+getDevicesForStream@AudioSystem.java-->android_media_AudioSystem_getDevicesForStream
+AudioSystem::getDevicesForStream@android_media_AudioSystem.cpp-->getDevicesForStream
+@AudioSystem.cpp
+
+
+//服务设置流音量：
+//streamState保存音量在mIndex中，同时将音量设置到AudioSystem
+AudioManager.setStreamVolume-->AudioService.setStreamVolume{
+- 检查状态是否正确，ensureValidStreamType
+- 获取streamstate，streamState = mStreamStates[streamTypeAlias = mStreamVolumeAlias]
+- 获取流对应的设备，getDeviceForStream
+- syncronised{
+	- streamState.getIndex
+	- 将要设置的音量根据mIndex转换，rescaleIndex
+	- 若是a2dp，则设置setAvrcpAbsoluteVolume
+	- 音量超标checkSafeMediaVolume// 损害耳朵?
+	- - onSetStreamVolume-->setStreamVolumeInt{
+		- 设置流音量值，streamState.setIndex
+		- sendMsg(mAudioHandler,MSG_SET_DEVICE_VOLUME)-->setDeviceVolume{
+			- StreamStates.applyDeviceVolume //设置到audioSystem
+			- 保存音量，sendMsg(MSG_PERSIST_VOLUME)-->persistVolume
+			}
+		}
+	}
+
+- 音量变化UI和广播，sendVolumeUpdate
+}
+
+//设置音量到audioSystem
+VolumeStreamState.applyDeviceVolume-->AudioSystem.setStreamVolumeIndex@AudioSystem.java-->
+
+
+
+//设置流静音
+setStreamMute-->mStreamStates[streamType].mute(IBinder cb)-->VolumeStreamState.mute{
+- 获取binder客户端死亡处理类，getDeathHandler
+- handler.mute(state)-->VolumeDeathHandler.mute{
+	- 若设置静音，注册死亡处理(主要处理在客户端死亡后，取消它设置的静音)
+	- 若设置不静音，注销死亡处理
+	- 是否更新音量，sendMsg
+	}
+}@AudioService.java
+
+================
+流状态：
+createStreamStates-->
+VolumeStreamState{
+- 设置流类型，mStreamType
+- 最大音量，mIndexMax //*10
+- 初始化流，AudioSystem.initStreamVolume //保存到HAL层中
+- 创建mDeathHandlers
+- 读取设置中音量值，readSettings
+}
+
+
+设置:
+applyDeviceVolume//保存音量在mIndex
+
+
+mute//
+
+=====================
+ringerMode:
+setRingerModeExternal/setRingerModeInternal-->setRingerMode-->
+setRingerModeInt{
+- 判断流是否需要静音，isStreamAffectedByRingerMode
+- 设置流静音，mStreamStates[streamType].mute
+- 保存设置值，sendMsg(MSG_PERSIST_RINGER_MODE)-->persistRingerMode
+- 发送广播,broadcastRingerMode(INTERNAL_RINGER_MODE_CHANGED_ACTION)
+}
+
+
+
+
+
+
+frameworks/base/media/java/android/media/AudioService.java
+frameworks/base/media/java/android/media/AudioSystem.java
+frameworks/base/core/jni/android_media_AudioSystem.cpp
+frameworks/av/media/libmedia/AudioSystem.cpp
+
+
+

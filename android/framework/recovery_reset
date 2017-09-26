@@ -1,0 +1,105 @@
+busybox在system/core/toolbox
+
+<uses-permission android:name="android.permission.REBOOT" />
+<uses-permission android:name="android.permission.ACCESS_CACHE_FILESYSTEM" />
+<uses-permission android:name="android.permission.DELETE_CACHE_FILES" />
+==================================
+重启进入recovery：
+installPackage-->bootCommand-->pm.reboot@RecoverySystem.java-->reboot@PowerManagerService.java-->ShutdownThread.reboot-->shutdownInner-->beginShutdownSequence-->run-->rebootOrShutdown@ShutdowThread.java
+
+reboot@PowerManagerService.java-->ShutdownThread.reboot-->shutdownInner-->beginShutdownSequence
+-->run-->rebootOrShutdown@ShutdowThread.java-->PowerManagerService.lowLevelReboot-->nativeReboot@
+PowerManagerService.java-->nativeReboot@com_android_server_PowerManagerService.cpp-->android_reboot@
+android_reboot.c-->__reboot@__reboot.S-->sys_reboot(__NR_SYSCALL_BASE+ 88系统调用)-->SYSCALL_DEFINE4
+-->kernel_restart-->kernel_restart_prepare-->blocking_notifier_call_chain-->reboot_notifier_list@sys.c
+-->recovery_sys_notify_reboot(写字符串"boot-recovery")@cedric.c
+
+reboot的apk加入android.permission.REBOOT
+
+最终调用的函数__reboot由汇编组成。
+
+frameworks/base/core/java/android/os/RecoverySystem.java
+_________________________________
+uboot进入recovery:
+flag_update_recovery
+do_bootcheck（检查flag_update_recovery）-->get_boot_mode_from_mtd0(读misc 检测启动模式)@recovery.c-->run_commmand(cmd,0)-->BOOT_COMMAND "emmc read.p 0x45000000 recovery 0x00800000; bootm 0x45000000"
+
+退出recovery：
+main-->finish_recovery(结束recovery)-->set_bootloader_message(写misc分区，清除标识"boot-recovery")
+
+jb/frameworks/base/services/jni/com_android_server_PowerManagerService.cpp
+jb/system/core/libcutils/android_reboot.c
+kernel/sys.c
+arc/arm/match-cedric/cedric.c
+bionic/libc/arch-arm/syscalls/__reboot.S
+system/core/libcutils/android_reboot.c
+==================================
+recovery流程：
+main-->get_args(获取cache中的命令)@recovery.cpp-->install_package@install.cpp-->
+really_install_package(挂载文件，加载/res/keys,验证签名是否正确)-->try_update_binary
+-->到处zip中(META-INF/com/google/android/update-binary)，执行该文件@install.cpp-->
+updater@OTA-->main(执行升级脚本META-INF/com/google/android/updater-script)@updater.c
+-->Evaluate@expr.c
+
+执行binary:bootable/recovery/updater/updater.c
+查找updater：(META-INF/com/google/android/update-binary)
+$(PRODUCT_OUT)/obj/EXECUTABLES/updater
+
+升级脚本：(META-INF/com/google/android/updater-script)
+WriteFullOTAPackage(脚本的构建使用EdifyGenerator)@ota_from_target_files-->方法@EdifyGenerator.py
+
+recovery.img升级脚本：
+UpdateRecoveryImage(将recovery.img升级脚本写入recovery/etc/install-recovery.sh)
+recovery镜像的升级会在系统重新启动后，执行脚本system/etc/install-recovery.sh升级
+
+recovery.img被写入到system/目录下，并在启动时由install-recovery.sh写入到recovery分区。
+完成后从system/目录下删除recovery.img
+
+init.rc中写reovery的脚本：
+service flash_recovery /system/etc/install-recovery.sh
+
+挂载卷：
+really_install_package@reocvery.cpp-->ensure_path_mounted@roots.cpp
+load_volume_table
+
+挂载配置文件：
+recovery.fstab
+_________________________
+绘制图片流程：
+SetTipTitle-->update_screen_locked-->draw_screen_locked-->draw_tip_title_locked
+
+draw_screen_locked 会显示文字
+draw_tip_title_locked@screen_ui.cpp绘制tipTitle中的图片，根据currentTip决定绘制哪个图片
+SetTipTitle@screen_ui.cpp设置currentTip值
+
+draw_screen_locked-->draw_top_title_locked(绘制"no unplug"和"no poweroff"图片)
+
+update_screen_locked（）{
+    draw_screen_locked();//绘制图片，填充文字
+    gr_flip();//并显示
+}
+recovery日志保存位置/tmp/recovery.log
+
+bootable/recovery/install.cpp
+bootable/recovery/updater/updater.c
+bootable/recovery/edify/expr.c
+build/tools/releasetools/EdifyGenerator.py
+jb/bootable/recovery/roots.cpp
+
+==================================
+生成ota：
+make otapackage
+
+ota_from_target_files -i old.zip new.zip update.zip
+
+jb/build/tools/releasetools/ota_from_target_files
+
+增量升级使用该文件：
+jb/out/target/product/mstarcedric3/obj/PACKAGING/target_files_intermediates/*****.zip
+
+==================================
+reset:
+wipe data,cache
+
+main-->erase_volume@recovery.cpp
+

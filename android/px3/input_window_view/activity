@@ -1,0 +1,6 @@
+attach-->mWindow.setCallback(this)@Activity.java
+
+
+
+DecorView-->dispatchKeyEvent-->getCallback().dispatchKeyEvent@PhoneWindow.java-->
+dispatchKeyEvent@Activity.java

@@ -1,0 +1,10 @@
+commitTransaction{
+- mDrawingState= mCurrentState
+}@Layer.cpp
+
+handleMessageInvalidate-->handlePageFlip{
+- latchBuffer
+- invalidateLayerStack
+}
+
+frameworks/native/services/surfaceflinger/Layer.cpp

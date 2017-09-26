@@ -1,0 +1,15 @@
+usb_device设备创建：
+usb_add_hcd@hcd.c-->usb_alloc_dev(NULL, &hcd->self, 0){
+- 创建设备usb_device，kzalloc
+- 初始化设备，设置设备总线usb_bus_type...
+- 初始化端点0，
+}@usb.c
+
+
+hub_port_connect_change-->usb_alloc_dev
+
+
+kernel/drivers/usb/core/usb.c
+
+====================
+wifi:8188eus

@@ -1,0 +1,39 @@
+MTD(memory technology device内存技术设备)
+
+__setup("mtdparts=", mtdpart_setup);
+mtdpart_setup-->(保存分区命令)cmdline = s@cmdlinepart.c
+
+加入分区解析：
+cmdline_parser_init-->register_mtd_parser(&cmdline_parser)@cmdlinepart.c
+-->(将cmdline_parser加入part_parsers)list_add(&p->list, &part_parsers)@mtdpart.c
+
+解析分区：
+parse_mtd_partitions-->get_partition_parser-->parser->parse_fn@mtdpart.c
+-->parse_cmdline_partitions(将分区信息解析到partitions)@cmdlinepart.c
+
+kernel/drivers/mtd/cmdlinepart.c
+kernel/drivers/mtd/mtdpart.c
+_____________________
+rk解析分区：
+设备：
+rk30_init_devices-->platform_device_register(&device_nand)-->device_nand = {
+.name		= "rk29xxnand",
+}@devices.c
+
+驱动：
+module_init(rknand_init)-->rknand_init-->platform_driver_register(&rknand_driver)@rknand_base_ko.c
+
+探测：
+rknand_probe{
+- rknand_info_init
+- 设置加入nand函数，nand_info->add_rknand_device = add_rknand_device
+- nand_info->get_rknand_device = get_rknand_device
+- rknand_create_procfs
+}
+
+
+加入nand设备：
+add_rknand_device-->parse_mtd_partitions@rknand_base_ko.c
+
+
+kernel/drivers/mtd/rknand/rknand_base_ko.c

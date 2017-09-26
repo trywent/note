@@ -1,0 +1,93 @@
+输入事件的接收窗口：
+
+
+
+窗口设置触摸区域：
+performTraversals@ViewRootImpl.java-->setInsets@Session.java-->setInsetsWindow-->
+w.mGivenVisibleInsets.set(visibleInsets)@WindowManagerService.java
+
+
+___________________________
+//设置焦点应用
+resumeHomeStackTask/startActivityUncheckedLocked@ActivityStackSupervisor-->
+setFocusedActivityLocked@ActivityManagerService.java
+
+adjustFocusedActivityLocked@ActivityStack.java-->setFocusedActivityLocked
+@ActivityManagerService.java
+
+setFocusedStack-->setFocusedActivityLocked@ActivityManagerService.java
+
+
+setFocusedActivityLocked{
+- mStackSupervisor.setFocusedStack
+- mWindowManager.setFocusedApp
+}@ActivityManagerService.java
+___________________________
+//更新当前焦点窗口，查找mFocusedApp之上的窗口
+updateFocusedWindowLocked{
+- 查找焦点窗口(第一个能接收事件的窗口)，computeFocusedWindowLocked
+	-->findFocusedWindowLocked{
+	- 遍历windows
+	- 窗口是否能够接收按键事件，canReceiveKeys
+	- 查找mFocusedApp之上的所有应用窗口，返回能否接收事件的窗口
+	- 若mFocusedApp之上没有合适窗口，则返回空
+	}
+- 当前焦点发生改变，mCurrentFocus!= newFocus{	  
+	- 将输入法窗口移动到，目标窗口之上,moveInputMethodWindowsIfNeededLocked
+	- 移动了窗口重新查找焦点，computeFocusedWindowLocked
+	- nativeAuditContext
+	- mPolicy.focusChangedLw
+	} 
+- 更新输入法窗口，finishUpdateFocusedWindowAfterAssignLayersLocked
+}
+
+
+//设置输入法焦点窗口：
+finishUpdateFocusedWindowAfterAssignLayersLocked-->mInputMonitor.setInputFocusLw
+@WindowManagerService.java-->setInputFocusLw-->
+updateInputWindowsLw{
+- 加入drag窗口，addInputWindowHandleLw
+- 加入fake窗口，addInputWindowHandleLw
+- 加入其他窗口，addInputWindowHandleLw{
+	- 若是应用设置触摸区域为栈大小，touchableRegion.set(child.getStackBounds())
+	- 其它窗口设置为窗口指定大小，child.getTouchableRegion(inputWindowHandle.touchableRegion)
+	- 设置触摸窗口其他状态，inputWindowHandle
+	- 加入到容器，addInputWindowHandleLw
+	}
+}@InputMonitor.java
+
+
+
+
+查找焦点mCurrentFocus:
+updateFocusedWindowLocked-->computeFocusedWindowLocked-->
+findFocusedWindowLocked{
+
+}@WindowManagerService.java
+
+
+
+WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+
+
+frameworks/base/services/java/com/android/server/wm/InputMonitor.java
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/services/java/com/android/server/wm/WindowState.java
+
+
+
+===================
+setInputFocusLw-->updateInputWindowsLw@InputMonitor.java-->setInputWindows@InputManagerService.java
+-->nativeSetInputWindows-->NativeInputManager::setInputWindows
+@com_android_server_input_InputManagerService.cpp-->InputDispatcher::setInputWindows
+@InputDispatcher.cpp
+
+dump@InputManagerService.java-->nativeDump-->im->dump-->NativeInputManager::dump{
+- mInputManager->getReader()->dump
+- mInputManager->getDispatcher()->dump
+}
+
+
+frameworks/base/services/jni/com_android_server_input_InputManagerService.cpp
+frameworks/base/services/input/InputManager.cpp
+frameworks/base/services/input/InputDispatcher.cpp

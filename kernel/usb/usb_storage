@@ -1,0 +1,46 @@
+
+interface
+endpoint
+
+_____________________________________
+usb_storage:
+static struct us_unusual_dev us_unusual_dev_list[] = {
+#	include "unusual_devs.h" 
+	{ }		/* Terminating entry */
+};
+
+drivers/usb/storage/usb.c
+
+
+struct usb_device_id usb_storage_usb_ids[] = {
+#	include "unusual_devs.h"
+	{ }		/* Terminating entry */
+};
+
+-------------------------------------
+驱动注册：
+module_init(usb_stor_init)-->usb_stor_init-->usb_register(&usb_storage_driver)@usb.c-->
+usb_register_driver@usb.h-->usb_register_driver(设置总线类型usb_bus_type)-->driver_register
+@driver.c
+
+设备注册：
+hub_thread(开始线程处理事件)-->hub_events
+-->(连接状态改变)hub_port_connect_change@hub.c-->usb_alloc_dev@usb.c
+
+判断是否匹配：
+usb_bus_type.match-->usb_device_match(判断usb设备，usb接口是否与相应的驱动匹配)-->usb_match_id
+(查找驱动id_table)-->usb_match_one_id-->usb_match_device@driver.c
+
+匹配调用probe:
+new_driver->drvwrap.driver.probe-->usb_probe_interface@driver.c
+
+初始化：
+storage_probe-->usb_stor_probe2-->usb_stor_acquire_resources-->(调用自定义的初始函数)
+us->unusual_dev->initFunction@usb.c
+
+drivers/usb/storage/usb.c
+include/linux/usb.h
+drivers/usb/core/driver.c
+drivers/usb/core/usb.c
+drivers/usb/storage/usual-tables.c
+

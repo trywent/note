@@ -1,0 +1,38 @@
+//sepolicy
+ps -Z //查看进程
+ls -Z //查看文件
+
+
+//每个对象（进程和文件）被赋予安全属性(Security Context)
+u:r:type[:range]
+
+u:user
+r:role //角色 android中进程为r，文件为object_r
+type/domain://类型（主要描述文件）/标签（描述进程）
+s0:Multi-Level Security(MLS)//安全级别
+
+attribute: domain/type //类型集合
+
+//type拥有的权限 	
+type httpd_user_content_t, file_type, httpdcontent;
+声明一个httpd_user_content_t的类型，具有file_type和httpdcontent的属性
+
+allow：赋予某项权限
+- allow init unlabeled:filesystem mount;
+允许init类型对unlabeled类型的filesystem进行mount的操作
+
+- allow init fotad:unix_stream_socket { bind create };
+允许init类型对fotad类型的unix_stream_socket 进行bind和create的操作
+
+- neverallow { appdomain -unconfineddomain } self:capability2 *;
+绝对不允许除了unconfineddomain以外的app对self类型的capability2进行任何的操作
+
+//规则：
+rule_name source_type target_type : object_class perm_set;
+
+rule_name:allow,dontaudit,auditallow,neverallow
+其实neverallow的存在是在生成（编译）安全策略文件时检查allow语句是否违反了neverallow，防止由于开发人员的失误导致某些域权限过高
+
+
+object_class:定义某一类型可执行的操作
+

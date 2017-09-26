@@ -1,0 +1,63 @@
+RK3188:
+DWC(DesignWare USB Device Controller)
+HCD(host control devcie?)
+
+SIE logic(serial interface engine):包含usb PID，address的识别，usb数据包和数据传输的状态。
+Endpoint logic:端点个数识别，FIFO和FIFO控制
+channel logic:通道任务控制，FIFO控制
+DMA logic:控制数据在系统内存和USB FIFOs之间的传输
+
+数据传送：
+UTMI, USB 2.0 Transceiver Macrocell Interface
+
+发送:
+
+
+接收:
+
+==========================
+define RK3066B_OTG_DRV_VBUS  RK30_PIN3_PD5
+
+
+
+
+___________________
+OTG HOST:
+hcd_cil_callbacks.start-->dwc_otg_hcd_start_cb-->hcd_start_func-->
+dwc_otg_hcd_start-->hcd_reinit@dwc_otg_hcd.c-->dwc_otg_core_host_init-->pldata->power_enable@dwc_otg_cil.c
+
+
+dwc_otg_hc_driver.start-->dwc_otg_hcd_start
+
+
+
+kernel/drivers/usb/dwc_otg/usbdev_rk30.c
+kernel/drivers/usb/dwc_otg/dwc_otg_driver.c
+kernel/drivers/usb/dwc_otg/dwc_otg_hcd.c
+kernel/drivers/usb/dwc_otg/dwc_otg_cil.c
+kernel/drivers/usb/dwc_otg/dwc_otg_driver.c
+kernel/drivers/usb/dwc_otg/dwc_otg_cil_intr.c
+
+
+
+=======================
+
+_______________________
+外围控制驱动Peripheral Controller Driver (PCD)：
+
+dwc_otg_pcd_init{
+- 中断处理注册，request_irq(irq, dwc_otg_pcd_irq...)
+}
+dwc_otg_pcd_irq{
+- dwc_otg_pcd_handle_intr
+}
+
+kernel/drivers/usb/dwc_otg/dwc_otg_pcd.c
+kernel/drivers/usb/dwc_otg/dwc_otg_pcd_intr.c
+
+=======================
+请求：
+usb_fill_control_urb
+usb_fill_bulk_urb
+usb_fill_int_urb
+

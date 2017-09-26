@@ -1,0 +1,43 @@
+===================
+ringTone:
+{
+- 获取，RingtoneManager.getRingtone-->setUri(设置播放源)
+- 设置参数，setStreamType-->setAudioAttributes-->setUri
+- play-->mLocalPlayer.start
+- stop-->destroyLocalPlayer
+}
+
+//获取源uri
+RingtoneManager.getDefaultUri-->返回Settings.System.DEFAULT_RINGTONE_URI
+
+//默认铃声文件
+DEFAULT_RINGTONE_URI----------content://settings/system/ringtone
+DEFAULT_NOTIFICATION_URI------content://settings/system/notification_sound
+DEFAULT_ALARM_ALERT_URI-------content://settings/system/alarm_alert
+
+设置中数据库：
+ringtone|content://media/internal/audio/media/169
+alarm_alert|content://media/internal/audio/media/13
+notification_sound|content://media/internal/audio/media/91
+
+多媒体数据库：
+/system/media/audio/alarms/Alarm_Beep_01.ogg
+
+
+默认声音：
+    private void setDefaultRingtoneFileNames() {
+        mDefaultRingtoneFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                + Settings.System.RINGTONE);
+        mDefaultNotificationFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                + Settings.System.NOTIFICATION_SOUND);
+        mDefaultAlarmAlertFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                + Settings.System.ALARM_ALERT);
+    }
+
+doScanFile-->endFile(扫描文件夹/system/media/audio/alarms(notifiacations/ringtongs)设置第一个为默认)
+@frameworks/base/media/java/android/media/MediaScanner.java
+
+
+frameworks/base/media/java/android/media/Ringtone.java
+frameworks/base/media/java/android/media/RingtoneManager.java
+

@@ -1,0 +1,9 @@
+ToneGenerator-->native_setup@ToneGenerator.java-->android_meida_ToneGenerator_native_setup
+-->new ToneGenerator@android_meida_ToneGenerator.cpp
+
+
+startTone@ToneGenerator.java-->android_meida_ToneGenerator_stratTone@android_meida_ToneGenerator.cpp
+
+
+framework/base/media/java/android/media/ToneGenerator.java
+framework/base/core/jni/android_meida_ToneGenerator.cpp

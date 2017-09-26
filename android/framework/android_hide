@@ -1,0 +1,25 @@
+隐藏的方法还是可以访问:
+Android has two types of APIs that are not accessible via SDK.
+
+The first one is located in package com.android.internal. The second API type is collection of classes and methods that are marked with @hide javadoc attribute.
+
+The hidden methods can still be accessed via java reflection. The @hide attribute is just part of javadoc(droiddoc also), so the @hide just simply mean the method/class/field is excluded from the API docs.
+
+For example, the checkUidPermission method in ActivityManager.java is @hide.
+/** @hide */
+public static int checkUidPermission(String permission, int uid) {
+    try {
+        return AppGlobals.getPackageManager()
+                .checkUidPermission(permission, uid);
+    } catch (RemoteException e) {
+        // Should never happen, but if it does... deny!
+        Slog.e(TAG, "PackageManager is dead?!?", e);
+    }
+    return PackageManager.PERMISSION_DENIED;
+}
+However, we can call it by reflection.
+
+Class c;
+c = Class.forName("ActivityManager");
+Method m = c.getMethod("checkUidPermission", new Class[] {String.class, int.class});
+Object o = m.invoke(c, new Object[]{"android.permission.READ_CONTACTS", 10010});

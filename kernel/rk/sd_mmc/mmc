@@ -1,0 +1,92 @@
+
+io口设置：
+rk29_sdmmc_set_iomux-->rk29_sdmmc_set_iomux_mmc0(/1/2设置对应的mmc端口)
+
+
+@board-rk3188-sdk.c
+#ifdef CONFIG_SDMMC_RK29
+#include "../mach-rk30/board-rk3168-tb-sdmmc-conifg.c"
+#include "../plat-rk/rk-sdmmc-ops.c"
+#include "../plat-rk/rk-sdmmc-wifi.c"
+#endif //endif ---#ifdef CONFIG_SDMMC_RK29
+
+
+arch/arm/mach-rk3188/board-rk3188-sdk.c
+arch/arm/plat-rk/rk-sdmmc-ops.c
+
+===========================
+host:
+irq: 
+emmc:IRQ_EMMC    57
+sdmmc0:IRQ_SDMMC 55  
+sdmmc1:IRQ_SDIO  56
+sdmmc2:IRQ_EMMC	 57
+
+平台数据：
+static struct platform_device device_sdmmc1 = {
+	.name		= "rk29_sdmmc",
+	.dev 		= {
+		.platform_data = &default_sdmmc1_data,
+}
+
+设备注册：
+rk30_init_devices-->rk30_init_sdmmc-->platform_device_register(&device_sdmmc0/1/2/3)-->device_sdmmc1
+(设备中包含平台数据default_sdmmc0/1/2/3_data)@device.c
+
+驱动注册：
+rk29_sdmmc_init-->platform_driver_probe(&rk29_sdmmc_driver, rk29_sdmmc_probe)-->
+rk29_sdmmc_probe{
+- 获取平台资源，platform_get_resource
+- 分配host，rk29_sdmmc，mmc_alloc_host
+- 初始化rk29_sdmmc，mmc
+- 获取中断号，platform_get_irq(pdev, 0)，并注册中断函数，request_irq
+- 加入host设备，mmc_add_host(mmc)  //加入host后扫描host中的卡设备
+}@rk29_sdmmc.c
+
+arch/arm/mach-rk30/devices.c
+drivers/mmc/host/rk29_sdmmc.c
+------------------
+rk29_sdmmc_ops.enable_sdio_irq-->rk29_sdmmc_enable_sdio_irq@rk29_sdmmc.c
+------------------
+io初始化：
+rk29_sdmmc_hw_init
+
+default_sdmmc1_data{
+.io_init-->rk29_sdmmc1_cfg_gpio
+.set_iomux-->rk29_sdmmc_set_iomux_mmc1@rk-sdmmc-ops.c
+}@board-rkpx3-sdk.c
+
+kernel/arch/arm/plat-rk/rk-sdmmc-ops.c
+kernel/arch/arm/mach-rkpx3/board-rkpx3-sdk.c
+
+error:
+mmc_sd_get_cid@sd.c
+===============
+emmc设备：CONFIG_EMMC_RK
+
+emmc host设备：
+rk30_init_sdmmc-->platform_device_register(&device_emmc)@devices.c
+
+emmc host驱动：
+rk_mmc_init-->platform_driver_probe(&rk_mmc_driver, rk_mmc_probe)-->rk_mmc_probe@rkemmc.c
+
+探测卡：
+rk_mmc_probe-->mmc_add_host@host.c-->mmc_rescan@core.c-->emmc_rescan-->emmc_rescan_try_freq@core.c
+-->mmc_attach_mmc-->emmc_attach_mmc{
+- 
+- mmc_init_card
+}@mmc.c
+
+块设备：
+mmc_blk_probe-->mmc_add_disk@block.c-->add_disk@genhd.c
+
+drivers/mmc/host/rkemmc.c
+drivers/mmc/core/bus.c
+drivers/mmc/core/core.c
+drivers/mmc/core/mmc.c
+drivers/mmc/card/block.c
+
+================
+mmc_add_card@bus.c
+
+

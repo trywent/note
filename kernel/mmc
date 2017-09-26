@@ -1,0 +1,237 @@
+命令类型：
+-广播命令(broadcast command),没有回复。(bc)
+-广播命令有回复。(bcr)
+-带地址的命令(点对点),没有数据传输。(ac)
+-带地址命令，有数据传输。(adtc)
+
+命令格式
+Bit position    47          46              [45:40]        [39:8]    [7:1]    0
+Width(bits)     1           1                 6              32       7       1
+Value           ‘0’         ‘1’               x               x       x      ‘1’
+Description   start bit  transmission bit  command index  argument   CRC7   end bit
+
+__________________________________________
+SD 假定一个电压发送CMD0(复位，进入空状态)，
+然后在再送CMD8(包括电压参数)。如果回复了表示sd卡支持(Specification Version 2.00)
+发送ACMD41，参数包括VDD(OCR)(设置为零可进行查询sd卡支持的电压，不为零则是sd卡进行初始化)如果sd卡不支持进入inactive状态。返回sd卡OCR
+
+sdio:
+发送CMD5回复后，再发送CMD8，ACMD41
+
+卡寄存器：六个寄存器OCR, CID, CSD, RCA, DSR, SCR
+OCR, CID, CSD, RCA有卡的参数说明信息
+DSR, SCR用来设置卡的参数
+
+OCR(operation conditions) 	//工作电压...
+CID(Card IDentification)  	//厂家，产品名...
+CSD(Card-Specific Data)   	//数据格式，最大数据访问时间...
+RCA(relative card address)	//卡的相对地址
+DSR(driver stage)		//设置总线性能
+SCR(SD CARD Configuration)	//配置特殊功能
+
+======================================
+mmc总线：
+subsys_initcall(mmc_init)-->mmc_init@core.c-->mmc_register_bus@bus.c-->bus_register@device.h-->
+__bus_register@base/bus.c
+
+sdio总线
+subsys_initcall(mmc_init)-->mmc_init@core.c-->sdio_register_bus@sdio_bus.c
+
+
+
+======================================
+host:
+mmc_alloc_host-->mmc_host_clk_init@host.c
+
+mmc_add_host(该函数执行完成前，host准备好处理请求)-->
+______________________________________
+host：
+
+设置探测函数：mmc_alloc_host-->INIT_DELAYED_WORK(设置host—>detect函数为rescan)@host.c
+
+在host加入后探测卡：(mstar在文件中注册slot设备和驱动，在probe中调用mmc_add_host)
+mmc_add_host@host.c-->mmc_start_host-->mmc_detect_change-->mmc_schedule_delayed_work
+(&host->detect, delay)-->mmc_rescan-->mmc_rescan_try_freq(探测不同的卡sdio,sd,mmc)@core.c-->
+mmc_attach_sdio-->mmc_sdio_init_card@sdio.c-->
+
+
+中断探测卡：
+中断处理函数-->mmc_detect_change-->mmc_schedule_delayed_work(&host->detect, delay)@core.c
+
+ms_sdmmc_get_cd
+______________________________________
+sdio卡：sdio除了有sd卡的特性外，还可有最多7种功能。每个功能是一个I/O设备，这些功能由一组寄存器来设置。
+pin8(DAT[1]/IRQ)是中断线，在sd4bit模式下，DAT1与IRQ(在特定时期作为中断线)复用。
+(mmc_embedded_sdio)每个功能可能还有一个存储区(Code Storage Area (CSA))，用来存储这个功能所需的驱动。
+
+探测sdio：
+mmc_rescan-->mmc_rescan_try_freq@core.c-->mmc_attach_sdio(根据ocr，选择电压。初始化各个功能func)-->
+mmc_sdio_init_card(选择卡，设置卡)--mmc_add_card(添加卡)--sdio_add_func(加入功能)@sdio.c
+
+sdio中断处理：
+sdio_claim_irq(根据功能设置中断处理函数,func.irq_hanlder)-->sdio_card_irq_get(增加计数)-->
+(若是第一个，则开始中断处理线程)kthread_run(sdio_irq_thread..)-->process_sdio_pending_irqs-->
+func->irq_handler@sdio_irq.c
+
+捕获并设置中断：一般在host中设置
+ms_sdmmc_init_slot-->request_irq@ms_sdmmc_lnx.c-->Hal_CARD_INT_MIE@hal_card_intr.c-->（mstar代码）-->mmc_signal_sdio_irq-->sdio_irq_pending = true@host.h
+
+功能：
+mmc_attach_sdio-->sdio_init_func-->sdio_read_fbr
+
+--------------------------------
+驱动注册：
+sdio_register_driver(设置驱动bus为sdio_bus_type)@sdio_bus.c
+
+设备注册：
+(初始功能)mmc_attach_sdio-->sdio_init_func@sdio.c-->sdio_alloc_func(设置sdio的功能bus为sdio_bus_type)
+@sdio_bus.c
+(注册功能)mmc_attach_sdio@sdio.c-->sdio_add_func@sdio_bus.c
+
+读写：
+sdio_readb@sdio_io.c-->mmc_io_rw_direct(r/w)-->mmc_io_rw_direct_host@sdio_ops.c-->
+mmc_wait_for_cmd-->mmc_wait_for_req-->__mmc_start_req-->mmc_start_request--host->ops->request@core.c
+-->host操作
+
+sdio_reset(复位)@sdio_ops.c--mmc_attach_sdio-->(获取ocr信息)mmc_send_io_op_cond
+--mmc_sdio_init_card@sdio.c-->
+
+drivers/mmc/core/sdio_irq.c
+include/linux/mmc/host.h
+_______________________________________
+探测mmc:
+mmc_attach_mmc@mmc.c-->mmc_send_op_cond@mmc_ops.c--mmc_init_card@mmc.c-->mmc_send_ext_csd
+-->mmc_send_cxd_data(MMC_SEND_EXT_CSD)@mmc_ops.c
+
+_______________________________________
+探测sd:
+mmc_attach_sd
+
+发送命令：
+mmc_wait_for_cmd-->mmc_wait_for_req-->__mmc_start_req-->mmc_start_request-->
+host->ops->request@core.c-->执行host中mmc_host_ops实现的request函数
+
+_______________________________________
+block设备：
+mmc总线上驱动和设备匹配mmc_bus_probe--> drv->probe@bus.c--mmc_driver.probe-->mmc_blk_probe-->
+alloc_disk@block.c
+
+驱动注册：
+mmc_blk_init@block.c-->(将驱动的bus设置为mmc)mmc_register_driver@bus.c-->
+
+设备注册(探测到mmc卡)：
+mmc_attach_mmc-->mmc_init_card@mmc.c-->(将设备的bus设置为mmc)mmc_alloc_card--(注册设备)mmc_add_card
+@bus.c-->device_add
+
+驱动与设备匹配：
+device_add@core.c-->bus_probe_device@bus.c-->device_attach-->__device_attach(调用driver_match_device
+-->drv->bus->match判断驱动与设备是否匹配)-->driver_probe_device-->really_probe-->
+(bus存在probe函数则执行bus的probe,否则执行驱动的probe函数。传入的参数都是device *)dev->bus->probe@dd.c-->
+
+匹配成功：
+dev->bus->probe@dd.c-->mmc_bus_probe-->drv->probe@/mmc/bus.c-->mmc_blk_probe-->
+mmc_blk_alloc(分配块设备)--mmc_add_disk--(加入分区)list_for_each_entry(part_md, &md->part, part)
+@block.c-->
+
+======================================
+uevent通知：
+mmc_bus_type.uevent-->mmc_bus_uevent@bus.c
+
+
+kernel/drivers/mmc/core/bus.c
+======================================
+加入磁盘设备：
+mmc_blk_probe-->mmc_add_disk@block.c-->add_disk@genhd.c
+
+
+blkdev_get-->__blkdev_get@block_dev.c-->rescan_partitions(检查分区信息)@partition-generic.c
+-->check_partition-->check_part[i++](state)@check.c-->emmc_partition@emmc.c
+
+printk(">>>>>>>>>>>>disk1\n");
+
+drivers/mmc/card/block.c
+block/genhd.c
+fs/block_dev.c
+======================================
+mstar中mmc结构：
+host：设置host的回调函数(设置host的时钟，电压)，将host加入。
+(host的驱动和设备匹配)ms_sdmmc_probe-->(初始化host中的槽)ms_sdmmc_init_slot-->(加入host)
+mmc_add_host@ms_sdmmc_lnx.c-->mmc_add_host@host.c-->mmc_start_host--(初始化之前的清除)mmc_power_off
+-->(将要探测)mmc_detect_change-->queue_delayed_work-->(开始探测)mmc_rescan-->mmc_rescan_try_freq
+-->mmc_power_up(要扫描时打开供电，在host中分为两步，先设up-->供电稳定后设为on)@core.c
+
+card(sd卡为例):
+(探测)mmc_rescan_try_freq@core-->mmc_attach_sd--(先初始化，设置clk,bus)mmc_sd_init_card@sd.c--
+(加入卡)mmc_add_card@bus.c
+
+core:
+提供一些设置函数，Vcc,clk,bus，这些函数最终回调由host提供的函数。
+注册总线mmc,sdio
+
+drivers/mmc/core/host.c
+drivers/mmc/core/bus.c
+
+________________________
+卡操作：
+sdio_writesb-->(读写)sdio_io_rw_ext_helper-->mmc_io_rw_extended@sdio_ops.c-->mmc_wait_for_req
+-->__mmc_start_req-->mmc_start_request-->host->ops->request@core.c
+
+
+======================================
+定义检测函数数组：
+(*check_part[])(struct parsed_partitions *)@check.c
+
+blkdev_ioctl(BLKRRPART)-->blkdev_reread_part@ioctl.c-->rescan_partitions@partition-generic.c-->check_partition-->check_part[i++](state)@check.c-->emmc_partition@emmc.c
+
+compat_blkdev_ioctl@compat_ioctl.c-->blkdev_ioctl
+
+ioctl_by_bdev@block_dev.c-->blkdev_ioctl
+
+block_ioctl@block_dev.c-->blkdev_ioctl
+
+
+设置ioctl函数：@block_dev.c
+const struct file_operations def_blk_fops = {	
+	.unlocked_ioctl	= block_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= compat_blkdev_ioctl,
+#endif
+};
+
+读取分区信息：
+eMMC_ReadPartitionInfo-->eMMC_ReadPartitionInfo_Ex@eMMC_prg.c
+
+block/partitions/emmc.c
+block/partitions/check.c
+block/partition-generic.c
+block/ioctl.c
+block/compat_ioctl.c
+fs/block_dev.c
+drivers/mstar/mmc/host/eMMCDrv/src/api/eMMC_prg.c
+______________________________________
+MMC的物理分区包含2个启动分区，和4个一般分区，由EXT_CSD使能。
+MMC Physical partitions consist of two boot partitions and up to four general purpose partitions.
+
+读取mmc分区信息：
+mmc_init_card-->mmc_read_ext_csd@mmc.c-->mmc_part_add@card.h
+
+设置mmc分区：
+mmc_blk_probe-->mmc_blk_alloc_parts-->mmc_blk_alloc_part@block.c
+
+drivers/mmc/core/bus.c
+drivers/mmc/core/core.c
+drivers/mmc/core/mmc.c
+include/linux/mmc/card.h
+
+
+========================
+mstar唯一id：
+GetEMMC_CID-->memcpy(buf,g_eMMCDrv.au8_CID@eMMC_utl.c
+
+eMMC_CMD2-->eMMC_FCIE_GetCIFC@eMMC_hal.c
+
+drivers/mstar/mmc/host/eMMCDrv/src/common/eMMC_utl.c
+drivers/mstar/mmc/host/eMMCDrv/src/common/eMMC_hal.c
+
+
+

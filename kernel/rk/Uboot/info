@@ -1,0 +1,15 @@
+version
+U_BOOT_DATE@version.h
+
+uboot/include/version.h
+===============
+getvar_table
+
+
+do_fastboot-->fbt_handle_rx-->fbt_rx_process-->fbt_handle_getvar{
+
+}
+
+uboot/common/cmd_fastboot.c
+
+

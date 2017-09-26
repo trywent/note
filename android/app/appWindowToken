@@ -1,0 +1,71 @@
+作用应该是与ActivityManagerService中activityRecord桥梁
+
+====================
+mService.mWindowManager.addAppToken@ActivityStack.java-->
+addAppToken(int addPos, IApplicationToken token,
+            int groupId, int requestedOrientation, boolean fullscreen){
+- 若已经加入到mAppTokens中，则返回
+- 创建AppWindowToken wtoken = new AppWindowToken(this, token);
+- 设置初始状态，fullscreen，requestedOrientation
+- 加入到容器，mAppTokens.add
+- 加入到，mAnimatingAppTokens
+- 加入到，mTokenMap
+- 设置初始状态为隐藏，wtoken.hidden = true wtoken.hiddenRequested = true;
+}
+
+setAppStartingWindow{
+//从启动应用中，获取开始窗口和相关的状态
+}
+____________________
+加入AppWindowToken:
+addAppToken(加入到容器mAppTokens，这个对应ActivityStacke中位置)@WindowManagerService.java
+
+reAddAppWindowsLocked(遍历WindowToken中所有窗口)-->reAddWindowLocked(将窗口加入到对应的位置，返回窗口位置+1)
+
+移动AppWindowToken:
+moveAppToken(将WindowToken加入指定位置，并将windowToken中的窗口移动到相应位置)
+
+移除AppWindowToken:
+removeAppToken
+
+____________________
+setTokenVisibilityLocked{
+-如果可视性改变，设置应用端的可视性，遍历View树
+-设置token中所有窗口的状态
+-如果进行了窗口切换，则判断是否进行重新布局，更新输入法的焦点
+}
+
+setAppVisibility-->setTokenVisibilityLocked@WindowManagerService.java
+
+/*View会进行布局，*/
+设置View应用端可视：
+setTokenVisibilityLocked-->wtoken.sendAppVisibilityToClients@WindowManagerService.java-->
+sendAppVisibilityToClients{
+- 遍历该token中的所有窗口，且窗口不是staringWindow和隐藏窗口
+- 设置窗口客户端显示，win.mClient.dispatchAppVisibility-->W.dispatchAppVisibility-->
+	viewAncestor.dispatchAppVisibility-->dispatchAppVisibilitymHandler.
+	sendMessage(MSG_DISPATCH_APP_VISIBILITY)-->ViewRootHandler.handleMessage-->
+	handleAppVisibility(显示应用视图)-->scheduleTraversals@ViewRootImpl.java
+
+}
+
+更新activity状态：
+updateReportedVisibilityLocked{
+- 遍历apptoken的所有非开始，并且mViewVisibility != View.VISIBLE的窗口。记录已经绘制的窗口numDrawn，
+	可见的窗口numVisible。 只要存在一个窗口可见，则改app就是没有结束状态。
+- 窗口已经绘制，更新状态到activity端。service.mH.sendMessage(REPORT_APPLICATION_TOKEN_DRAWN)
+	-->handleMessage-->wtoken.appToken.windowsDrawn()@WindowManagerService.java-->
+	windowsDrawn-->activity.windowsDrawn-->windowsDrawn{
+	- 计算activity从启动到绘制的时间
+	- stack.reportActivityLaunchedLocked-->更新容器mWaitingActivityLaunched中waitResult
+	- 结束启动记录，finishLaunchTickingLocked
+	}@ActivityRecord.java
+	
+- 窗口已经显示，更新状态到activity。service.mH.sendMessage(REPORT_APPLICATION_TOKEN_WINDOWS)-->
+	windowsVisible(更新activityRecord的可视状态)@ActivityRecord.java
+}@AppWindowToken.java
+______________________________
+
+getTasks@ActivityManagerService.java
+
+We have pending thumbnails

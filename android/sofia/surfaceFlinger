@@ -1,0 +1,4 @@
+
+main-->sm->addService(SurfaceFlinger)
+
+frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp

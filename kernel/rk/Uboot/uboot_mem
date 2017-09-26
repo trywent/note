@@ -1,0 +1,14 @@
+#define RAM_PHY_START           0x60000000  //物理地址起始地址
+#define RAM_PHY_SIZE            0x08000000  //128M
+
+
+#define CONFIG_NR_DRAM_BANKS	1   //内存编号
+#define PHYS_SDRAM_1            CONFIG_SYS_SDRAM_BASE //
+
+#define CONFIG_SYS_SDRAM_BASE		RAM_PHY_START		/* Physical start address of SDRAM. */
+
+uboot/include/configs/rk30xx.h
+
+
+uboot传递参数到kernel：
+gd->bd->bi_boot_params = PHYS_SDRAM_1 + 0x88000;  //60000000 

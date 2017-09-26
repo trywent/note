@@ -1,0 +1,184 @@
+==================================
+uboot配置：
+"CONFIG_"表示用户可选的配置。"CONFIG_SYS_"硬件相关的配置(最好不要动)
+
+选择要编译的平台：
+make <board_name>_config
+
+配置依赖硬件板和cpu，在文件"include/configs/<board_name>.h"中。
+
+__________________________________
+Building the Software:
+
+设置交叉编译工具：
+$ CROSS_COMPILE=ppc_4xx-
+$ export CROSS_COMPILE
+配置：make NAME_config
+编译：make all
+
+
+两种方法改变编译所在的位置:
+1. Add O= to the make command line invocations:
+
+	make O=/tmp/build distclean
+	make O=/tmp/build NAME_config
+	make O=/tmp/build all
+
+2. Set environment variable BUILD_DIR to point to the desired location:
+
+	export BUILD_DIR=/tmp/build
+	make distclean
+	make NAME_config
+	make all
+__________________________________
+移植到新开发板上：
+1.  Add a new configuration option for your board to the toplevel
+    "boards.cfg" file, using the existing entries as examples.
+    Follow the instructions there to keep the boards in order.
+2.  Create a new directory to hold your board specific code. Add any
+    files you need. In your board directory, you will need at least
+    the "Makefile", a "<board>.c", "flash.c" and "u-boot.lds".
+3.  Create a new configuration file "include/configs/<board>.h" for
+    your board
+3.  If you're porting U-Boot to a new CPU, then also create a new
+    directory to hold your CPU specific code. Add any files you need.
+4.  Run "make <board>_config" with your new name.
+5.  Type "make", and you should get a working "u-boot.srec" file
+    to be installed on your target system.
+6.  Debug and solve any problems that might arise.
+    [Of course, this last step is much harder than it sounds.]
+
+__________________________________
+命令：help列出支持的命令
+
+环境变量：printenv，setenv，saveenv
+__________________________________
+uboot可以用来启动两种格式的镜像：
+FIT(Flattened Image Tree)：
+允许镜像有多个组成部分(多个kernel，ramdisk)
+参考doc/uImage.FIT
+
+老格式：
+在二进制码前加了一个头,用来说明二进制码的一些信息(目标系统，cpu，crc32等)
+
+__________________________________
+linux：
+保证liunx下机器的定义(include/asm-ppc/tqm8xx.h)包含uboot中开发板的信息(include/asm-<arch>/u-boot.h)。
+同时保证IMAP_ADDR与uboot中CONFIG_SYS_IMMR是相同的。
+
+要有root设备(根文件系统？？)
+
+编译镜像：
+* build a standard "vmlinux" kernel image (in ELF binary format):
+
+* convert the kernel into a raw binary image:
+
+	${CROSS_COMPILE}-objcopy -O binary \
+				 -R .note -R .comment \
+				 -S vmlinux linux.bin
+
+* compress the binary image:
+
+	gzip -9 linux.bin
+
+* package compressed binary image for U-Boot:
+
+	mkimage -A ppc -O linux -T kernel -C gzip \
+		-a 0 -e 0 -n "Linux Kernel Image" \
+		-d linux.bin.gz uImage
+
+mkimage可以用来制作ramdisk镜像，可以与kernel合并成一个文件也可分开。
+==================================
+uboot命令：(命令实现位置common/cmd_xxx.c)
+
+命令定义：
+#define U_BOOT_CMD(name,maxargs,rep,cmd,usage,help) \
+cmd_tbl_t __u_boot_cmd_##name Struct_Section = {#name, maxargs, rep/*自动重复执行？*/, cmd, usage, help}
+
+board/rockchip/common/armlinux/command.h
+
+执行命令：
+run_command_list-->builtin_run_command_list{
+- 循环取出命令
+- 执行，builtin_run_command{
+	- 命令为空或长度超出范围，返回。
+	- 处理命令串，查找“；”且该字符不在引号中。表示一个命令结束	
+	- 替换命令中的宏，process_macros
+	- 处理获取的命令，parse_line{//循环处理一行命令，取出其中的命令，参数
+		- 跳过空白字符
+		- 找到一个参数开始，argv[nargs++] = line
+		- 找到第一个空白字符，设置为"\0"
+		- 处理下个参数
+		}
+	- 执行命令，cmd_process{
+		- 命令表cmd_tbl_t中，查找命令，find_cmd-->find_cmd_tbl
+		- 判断命令参数个数是否正确。防止bootd命令递归
+		- 执行，cmd_call{
+			- (cmdtp->cmd)(cmdtp, flag, argc, argv)			
+			}
+		}@command.c
+	}
+}@main.c
+
+
+common/main.c
+common/command.c
+________________________
+输出函数：
+printf{
+- 解析参数，vscnprintf
+- 输出，puts{
+	- 若配置CONFIG_SILENT_CONSOLE，或CONFIG_DISABLE_CONSOLE，则检测是否不输出
+	- 没有控制台！gd->have_console，则输出到buffer中pre_console_puts
+	- 输出到标准输出，fputs-->stdio_devices[file]->puts
+	- 直接输出到串口，serial_puts
+	}
+
+}@console.c
+
+
+设置输入输出设备：
+console_setfile{
+- 设置设备，stdio_devices[file] = dev
+- 设置函数gd->jt[XF_getc]，gd->jt[XF_putc]
+}
+common/console.c
+
+注册输入输出设备：
+stdio_register (struct stdio_dev * dev)-->list_add_tail(&(_dev->list), &(devs.list)@stdio.c
+
+初始化：
+drv_system_init{
+- 初始化默认输出设备“serial”,dev.putc = serial_putc...
+- 注册stdio_register
+}
+
+serial_putc-->get_current()->putc(c)-->default_serial_console(获取到已经实现的串口设备)@serial.c
+drivers/serial/serial.c
+==================================
+获取kernel启动流程：
+main_loop@mian.c--getenv("bootcmd")--run_command-->do_bootm-->bootm_start-->boot_get_kernel
+-->image_get_kernel(校验头信息和数据)@cmd_bootm.c
+
+bootm_start{
+- 获取变量是否校验kernel,getenv_yesno
+- 获取内核，boot_get_kernel{
+		- 
+	}
+
+- 获取文件系统，boot_get_ramdisk@image.c
+}@cmd_boom.c-->
+
+
+
+启动流程：
+start.S-->board_init_f-->init_sequence(初始化)@lib/board.c
+
+common/main.c
+
+
+
+
+
+
+

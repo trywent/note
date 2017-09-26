@@ -1,0 +1,42 @@
+//
+WindowState{
+- 
+- mWinAnimator = new WindowStateAnimator
+}
+
+
+
+relayoutWindow-->(设置窗口的systemui)win.mSystemUiVisibility = systemUiVisibility
+
+//返回栈的边界
+getStackBounds{
+- getStack() //返回当前栈
+- getStackBounds//返回stack.mStackBox.mBounds或mFrame
+}
+
+/*
+parentFrame  //包含窗口的区域，可能比显示器大(壁纸？？？)
+displayFrame //显示窗口
+overlayFrame 
+contentFrame //希望被显示的区域，窗口会被调整符合该区域
+visibleFrame //实际显示区
+decorFrame
+*/
+computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overlayFrame,
+	 	Rect contentFrame, Rect visibleFrame, Rect decorFrame)) {
+- 获取当前栈getStack
+- 若有多个栈stack.hasSibling，则设置mContainingFrame.set //限定栈的显示区
+- 若没有多个栈，设置为mContainingFrame.set(pf)
+- 设置显示窗口，mDisplayFrame.set(df)
+- 根据布局请求设置高宽
+- Gravity.apply(mContainingFrame，mFrame) //设置mFrame坐标
+- Gravity.applyDisplay(df，mFrame)  //限制mFrame在显示器内
+
+- 设置mCompatFrame  //surface用这个设置surface大小
+}
+
+
+mRequestedWidth
+
+
+

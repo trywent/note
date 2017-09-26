@@ -1,0 +1,59 @@
+LayoutInflater inflater = getLayoutInflater();
+View layout = inflater.inflate(R.layout.custom_toast,
+                               (ViewGroup) findViewById(R.id.toast_layout_root));
+
+TextView text = (TextView) layout.findViewById(R.id.text);
+text.setText("This is a custom toast");
+
+Toast toast = new Toast(getApplicationContext());  //创建
+toast.setGravity(Gravity.CENTER_VERTICAL, 0, 0);   //设置位置
+toast.setDuration(Toast.LENGTH_LONG);              //设置显示时间
+toast.setView(layout);                             //设置View
+toast.show();					   //显示
+
+
+==================
+new Toast{
+- 创建TransientNotification，new TN
+}
+
+show{
+- 获取服务，getService-->ServiceManager.getService("notification")
+- 设置TN要显示的View
+- TN加入到服务队列，service.enqueueToast
+}
+
+
+__________________
+服务端：
+enqueueToast(callback){
+- 是否是系统toast，isSystemToast
+- synchronized (mToastQueue) {
+	- 队列中查找对应的ToastRecord，indexOfToastLocked
+	- 若已存在更新时间，record.update
+	- 不存在，若不是系统应用，限制同一包名应用toast的个数为50
+	- 创建ToastRecord，加入队列mToastQueue
+	- 保持进程运行keepProcessAliveLocked
+	- 若是队列中第一个，则显示showNextToastLocked
+	}
+}
+
+
+showNextToastLocked{
+- 取出第一个toast，mToastQueue.get(0)
+- 回调客户端显示，record.callback.show  //显示
+- 发送超时消息，scheduleTimeoutLocked{
+		- 移除消息队列中已有的消息，removeCallbacksAndMessages
+		- 发送新消息，sendMessageDelayed-->(处理)WorkerHandler.handleMessage-->
+		  handleTimeout{
+			- 获取toast索引，indexOfToastLocked		
+			- 清除，cancelToastLocked
+			}
+		}
+}
+
+cancelToastLocked{
+- 客户端隐藏，record.callback.hide
+- 移出队列，mToastQueue.remove
+- 队列不为空，显示下个showNextToastLocked
+}

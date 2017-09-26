@@ -1,0 +1,27 @@
+===========
+数据保存
+————————————
+shared preference保存少量数据使用
+-----SharedPreferences 用来存储数据，保存键值对。
+使用getSharedPreferences() 通过context调用获取，可获取多个SharedPreferences.
+使用getPreferences() 通过Activity调用获取。只取得默认的shared preference
+-----preference保存app的设置值（保存在默认的SharedPreferences中）
+有不同类型的preference，提供不同的视图（单选框，列表..）供设置使用。
+
+————————————
+Saving Files保存在文件中
+
+————————————
+Saving Data in SQL Databases保存在数据库中
+
+1,创建概要和contract类，contract类包含数据库的URIs，表，列等常量信息。
+2,使用SQL helper创建数据库
+  继承SQLiteOpenHelper类，实现onCreate(), onUpgrade()和onOpen()方法。
+3,插入数据db.insert
+  插入的数据先保存在ContentValues中，再调用insert
+4,查询数据db.querys
+5,删除数据db.delete
+6,更新数据db.update
+
+
+

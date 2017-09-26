@@ -1,0 +1,136 @@
+=================
+connector(连接)：
+kernel<-->用户空间
+
+kernel：驱动接收到特殊标记的消息，调用相应的回调函数
+
+struct cb_id
+{
+	__u32			idx; //连接标识
+	__u32			val;
+}
+
+连接接口：
+int cn_add_callback(struct cb_id *id, char *name,
+	 void (*callback) (struct cn_msg *, struct netlink_skb_parms *));//注册连接
+
+void cn_del_callback(struct cb_id *id);//注销
+
+void cn_netlink_send(struct cn_msg *msg, u32 __group, int gfp_mask);//发送消息
+
+
+
+__________________
+用户空间：
+socket();
+bind();
+send();
+recv();
+
+
+s = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_CONNECTOR);
+
+l_local.nl_family = AF_NETLINK;
+l_local.nl_groups = 12345;
+l_local.nl_pid = 0;
+
+if (bind(s, (struct sockaddr *)&l_local, sizeof(struct sockaddr_nl)) == -1) {
+	perror("bind");
+	close(s);
+	return -1;
+}
+
+{
+	int on = l_local.nl_groups;
+	setsockopt(s, 270, 1, &on, sizeof(on));
+}
+
+
+
+======================
+创建netlink：
+
+enum {
+DOC_EXMPL_A_UNSPEC,
+DOC_EXMPL_A_MSG,
+__DOC_EXMPL_A_MAX,
+};
+#define DOC_EXMPL_A_MAX (__DOC_EXMPL_A_MAX 1)
+/* attribute policy */
+static struct nla_policy doc_exmpl_genl_policy[DOC_EXMPL_A_MAX + 1] = {
+[DOC_EXMPL_A_MSG] = { .type = NLA_NUL_STRING },
+};
+/* family definition */
+static struct genl_family doc_exmpl_gnl_family = {
+.id = GENL_ID_GENERATE,
+.hdrsize = 0,
+.name = "DOC_EXMPL",
+.version = 1,
+.maxattr = DOC_EXMPL_A_MAX,
+};
+
+/* handler */
+static int doc_exmpl_echo(struct sk_buff *skb, struct genl_info *info)
+{
+/* message handling code goes here; return 0 on success, negative
+* values on failure */
+}
+/* commands */
+enum {
+DOC_EXMPL_C_UNSPEC,
+DOC_EXMPL_C_ECHO,
+__DOC_EXMPL_C_MAX,
+};
+#define DOC_EXMPL_C_MAX (__DOC_EXMPL_C_MAX 1)
+/* operation definition */
+static struct genl_ops doc_exmpl_gnl_ops_echo = {
+.cmd = DOC_EXMPL_C_ECHO,
+.flags = 0,
+.policy = doc_exmpl_genl_policy,
+.doit = doc_exmpl_echo,
+.dumpit = NULL,
+};
+
+
+int rc;
+rc = genl_register_family(&doc_exmpl_gnl_family);
+if (rc != 0)
+goto failure;
+
+int rc;
+rc = genl_register_ops(&doc_exmpl_gnl_family, &doc_exmpl_gnl_ops_echo);
+if (rc != 0)
+goto failure;
+
+
+
+=================
+发送消息的三步：分配消息空间，创建消息，发送消息
+
+struct sk_buff *skb;
+skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+if (skb == NULL)
+goto failure;
+
+
+//创建消息
+int rc;
+void *msg_head;
+/* create the message headers */
+msg_head = genlmsg_put(skb, pid, seq, type, 0, flags, DOC_EXMPL_C_ECHO, 1);
+if (msg_head == NULL) {
+rc = ENOMEM;
+goto failure;
+}
+/* add a DOC_EXMPL_A_MSG attribute */
+rc = nla_put_string(skb, DOC_EXMPL_A_MSG, "Generic Netlink Rocks");
+if (rc != 0)
+goto failure;
+/* finalize the message */
+genlmsg_end(skb, msg_head)
+
+//发送
+int rc;
+rc = genlmsg_unicast(skb, pid);
+if (rc != 0)
+goto failure;

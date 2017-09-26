@@ -1,0 +1,57 @@
+服务启动：
+main{
+- AudioFlinger::instantiate();
+- MediaPlayerService::instantiate();
+- CameraService::instantiate();
+- AudioPolicyService::instantiate();
+}
+frameworks/av/media/mediaserver/main_mediaserver.cpp
+
+
+===================
+AudioFlinger:
+
+AudioFlinger::instantiate-->publish{
+- 创建，new SERVICE
+- 加入，sm->addService
+}@BinderService.h
+
+onFirstRef-->(设置正常工作时间)mStandbyTimeInNsecs
+
+AudioFlinger::openOutput{
+- findSuitableHwDev_l
+- 创建线程thread，并加入mPlaybackThreads.add(id, thread)
+
+}
+
+frameworks/av/services/audioflinger/AudioFlinger.cpp
+
+===================
+audioSystem:
+
+//根据流获取设备
+getDevicesForStream-->android_media_AudioSystem_getDevicesForStream-->
+AudioSystem::getDevicesForStream-->aps->getDevicesForStream@AudioSystem.cpp
+-->mpAudioPolicy->get_devices_for_stream@AudioPolicyService.cpp-->(HAL)
+ap_get_devices_for_stream@audio_policy_hal.cpp-->getDevicesForStream{
+- 根据流类型获取策略，getStrategy(stream){
+	- SYSTEM和MUSIC都是获取STRATEGY_MEDIA
+	}
+- getDeviceForStrategy{
+	- 获取STRATEGY_MEDIA{
+		- 
+		}
+	}
+}@AudioPolicyManagerBase.cpp
+
+frameworks/base/media/java/android/media/AudioSystem.java
+frameworks/base/core/jni/android_media_AudioSystem.cpp
+frameworks/av/media/libmedia/AudioSystem.cpp
+
+____________________
+updateStreamVolumeAlias
+
+
+
+
+

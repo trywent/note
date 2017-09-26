@@ -1,0 +1,56 @@
+1. How To View Content Of initrd.img file?
+
+initrd.img is in gzip format.  So move initrd.img to initrd.gz as shown below.
+
+# cp /tftpboot/el5/initrd.img  .
+
+# ls
+cdrom   initrd.img
+
+# mv initrd.img initrd.gz
+Unzip the initrd.gz file as shown below.
+
+# gunzip initrd.gz
+
+# ls
+cdrom  initrd
+After unziping the initrd.gz file, the initrd is further in cpio ‘newc’ format. So extract the files from initrd using cpio ‘newc’ format as shown below.
+Note: info cpio will give more information about ‘newc’ format.
+
+# mkdir tmp2
+
+# cd tmp2/
+
+# cpio -id < ../initrd
+16524 blocks
+Now you can view the content of initrd.img file
+
+# ls
+bin  dev  etc  init  modules proc  sbin  selinux  sys  tmp  var
+2. How To Modify Content of Image and Recreate New Image?
+
+After extracting the file as shown below, make appropriate modification to any of those files. Then pack the files back into the archive using the following commands. Pack the modified files back to cpio ‘newc’ format.
+
+# find . | cpio --create --format='newc' > /tmp/newinitrd
+16524 blocks
+
+# ls /tmp/
+cdrom  initrd  newinitrd  tmp2
+
+# ls -l /tmp/newinitrd
+-rw-r--r-- 1 root root 8460288 Jul  2 14:50 /tmp/newinitrd
+Gzip the archive file.
+
+# gzip newinitrd
+
+# ls
+cdrom  initrd  newinitrd.gz  tmp2
+
+# ls -l newinitrd.gz
+-rw-r--r--  1 root root 6649867 Jul  2 14:50 newinitrd.gz
+Move file as an image file. You can use the newinitrd.img as your new boot image.
+
+# mv newinitrd.gz newinitrd.img
+
+# ls -l newinitrd.img
+-rw-r--r-- 1 root root 6649867 Jul  2 14:50 newinitrd.img

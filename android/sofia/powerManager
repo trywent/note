@@ -1,0 +1,17 @@
+
+interceptKeyBeforeQueueing-->gServiceClassInfo.interceptKeyBeforeQueueing
+@com_android_server_input_InputManagerService.cpp-->interceptKeyBeforeQueueing
+-->mWindowManagerCallbacks.interceptKeyBeforeQueueing@InputManagerService.java
+-->mService.mPolicy.interceptKeyBeforeQueueing@InputMonitor.java-->
+interceptKeyBeforeQueueing{
+- KEYCODE_POWER按键，interceptPowerKeyDown/interceptPowerKeyUp
+- KEYCODE_SLEEP按键，mPowerManager.goToSleep
+- KEYCODE_WAKEUP按键,设置isWakeKey = true;
+- 若isWakeKey为true,wakeup-->mPowerManager.wakeUp
+}
+
+
+frameworks/base/services/core/jni/com_android_server_input_InputManagerService.cpp
+frameworks/base/services/core/java/com/android/server/input/InputManagerService.java
+frameworks/base/services/core/java/com/android/server/wm/InputMonitor.java
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java

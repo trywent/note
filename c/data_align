@@ -1,0 +1,77 @@
+除了structures,unions和arrays，其他类型的数据的对齐模数是自身大小。
+structures,unions和arrays的对齐模数，是成员中占内存最大的那个数。
+
+满足规则：
+offset(变量的偏移地址) % alignment-requirement(变量自身大小) == 0
+
+
+The alignment required by the processor to access a particular object
+The alignment that the compiler actually uses to place objects in memory
+
+
+Structures are allowed to have padding between their members (and at the end)
+Arrays are not allowed to have padding between their elements
+
+
+==================
+内存读取的限制粒度和对齐的原因：
+
+SPEED(速度)：
+CPU按照自己的word大小读取数据(4-bytes on a 32-bit processor)。当读取没有对齐的数据时，数据可能位于
+多个words上，所以要多次读取(影响速度)。
+
+struct mystruct {
+    char c;  // one byte
+    int i;   // four bytes
+    short s; // two bytes
+}
+对齐的数据：
+=== c 0x0000
+===
+===
+===
+=== i 0x0004
+===
+===
+=== 
+=== s 0x0008
+===
+
+
+没有对齐：
+=== c 0x0000
+=== i 0x0001
+===
+===
+=== 
+=== s 0x0005
+===
+
+
+Atomicity(原子)：
+CPU能够原子操作已经对齐数据的内存。使一些没有锁的操作，执行正确。
+
+________________
+	struct test1{
+	 long long l;
+	 int i;
+	 short s;
+	};              //16  按8bytes对齐
+
+	struct test2{
+	 int i;
+	 long long l;
+	 short s;
+	};              //24
+
+
+	struct test3{
+	 int i;
+	 short s;
+	 char c;
+	};               //8
+	struct test4{
+	 char c;
+	 int i;
+	 short s;
+	};               //12

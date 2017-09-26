@@ -1,0 +1,71 @@
+jump_2_ram-->board_init_r@start.S
+
+
+board_init_r{
+- board_init
+- console_init_r
+- 判断是否正常启动，bootdelay >= 0 && s && !abortboot (bootdelay){
+	- 
+	}
+- 回车键放弃正常启动，进入控制台，解析收到的字符，parse_file_outer
+}
+
+
+进入控制台：
+#define CONFIG_AUTOBOOT_KEYED
+#define CONFIG_AUTOBOOT_DELAY_STR "\x0d" /* press ENTER to interrupt BOOT */
+@cedric.h
+
+
+
+arch/arm/cpu/armv7/start.S
+arch/arm/lib/board.c
+common/hush.c
+include/configs/cedric.h
+common/console.c
+________________________
+输出函数：
+printf{
+- 解析参数，vscnprintf
+- 输出，puts{
+	- 若配置CONFIG_SILENT_CONSOLE，或CONFIG_DISABLE_CONSOLE，则检测是否不输出
+	- 没有控制台！gd->have_console，则输出到buffer中pre_console_puts
+	- 输出到标准输出，fputs-->stdio_devices[file]->puts
+	- 直接输出到串口，serial_puts
+	}
+
+}@console.c
+
+________________________
+升级显示：
+进度条：
+DrawProgressBar
+
+文字：
+UPDPrintLineSize
+@common/cmd_osd.c
+
+显示logo：
+logo_display_main{
+- 根据屏类型初始化屏幕数据，MApi_PNL_Init
+- 加载logo文件，Logo_LoadBinFile{
+	- 读取分区文件，"emmc read.p dest_addr bootlogo logo_len"
+	}
+- 
+}
+
+@drivers/mstar/displaylogo/displaylogo.c
+
+=======================
+传递参数：
+do_setpanel-->读取配置到地址FYT_TOUCH_CFG_ADDR@cmd_fyt.c
+
+DEV_BUF_ADDR//uboot存储数据的内存地址 PHYS_SDRAM_1+0x3F800 0x40000000+0x3F800=0x4003F800
+
+common/cmd_fyt.c
+arch/arm/cpu/armv7/cedric/cedric.c
+
+kernel端：
+early_devinfo_config(获取地址DEVINFO_PHYS_ADDR(0x4003F800)中的信息)@cedric.c
+
+arch/arm/mach-cedric/cedric.c

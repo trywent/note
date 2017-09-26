@@ -1,0 +1,88 @@
+//bluetooth HAL
+bt_interface_t bluetoothInterface //蓝牙接口
+
+bt_stack_module_methods = {
+    .open = open_bluetooth_stack,
+}
+
+//协议栈中profile接口
+get_profile_interface{
+- BT_PROFILE_HANDSFREE_ID
+- BT_PROFILE_HANDSFREE_CLIENT_ID
+}
+
+
+system/bt/btif/src/bluetooth.c
+
+//bluetooth profile package/app/com.android.bluetooth
+classInitNative()@AdapterService.java-->classInitNative{
+- 设置并初始化回调函数，JniCallbacks
+- hw_get_module(BT_STACK_MODULE_ID),获取蓝牙模块
+- module->methods->open ，打开蓝牙设备//协议栈
+- sBluetoothInterface-->bluetoothInterface@bluetooth.c //蓝牙接口
+}@com_android_bluetooth_btservice_AdapterService.cpp
+
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
+============================
+HEADSET_CLIENT  ---- BluetoothHeadsetClient ---- HeadsetClientService
+AVRCP_CONTROLLER  ---- BluetoothAvrcpController ---- AvrcpControllerService
+A2DP_SINK  ---- BluetoothA2dpSink ---- A2dpSinkService
+
+
+###############
+headsetClient:
+
+-->(底层栈消息)@com_android_bluetooth_hfpclient.cpp
+-->创建栈事件sendMessage(STACK_EVENT, event)@HeadsetClientStateMachine.java
+
+
+HeadsetClientStateMachine{
+- RingtoneManager.getRingtone(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+- 
+}
+
+call栈命令:
+EVENT_TYPE_CALL
+EVENT_TYPE_CALLSETUP
+EVENT_TYPE_CALLHELD
+
+
+Connected.processMessage{
+- ACCEPT_CALL,acceptCall
+
+- STACK_EVENT
+	- EVENT_TYPE_CALL,updateCallIndicator
+	- EVENT_TYPE_CALLSETUP,updateCallSetupIndicator(CALLSETUP_INCOMING)-->
+		addCall{
+		- 创建BluetoothHeadsetClientCall(设置状态CALL_STATE_INCOMING)
+		- sendCallChangedIntent-->发送广播ACTION_CALL_CHANGED
+		}
+	- ACCEPT_CALL,acceptCall
+}
+
+
+
+onCallSetup
+
+updateClip-->addCall(BluetoothHeadsetClientCall.CALL_STATE_INCOMING)
+
+waitForIndicators-->addCall(BluetoothHeadsetClientCall.CALL_STATE_INCOMING)
+
+
+Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientService.java
+Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientStateMachine.java
+Bluetooth/jni/com_android_bluetooth_hfpclient.cpp
+
+====================
+music:
+Connected.processMessage{
+- CONNECT
+- STACK_EVENT
+	- EVENT_TYPE_CONNECTION_STATE_CHANGED
+	- EVENT_TYPE_AUDIO_STATE_CHANGED,processAudioStateEvent{
+		- AUDIO_STATE_STARTED,audioPlay-->PlayerThread().start()
+		- 
+		}
+}
+

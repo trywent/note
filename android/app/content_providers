@@ -1,0 +1,141 @@
+================================
+共享数据：
+ContentProvider：提供结构化的数据，封装数据，提供数据安全的机制。能够跨进程访问数据。
+只有在与其他应用分享数据情况下，才有实现自己的ContentProvider的必要。
+通过ContentResolver访问provider(contentProviders的实例)中数据。provider接收申请，执行申请，返回数据。
+
+获取数据流程：
+ContentResolver-->(系统调用相应的provider)contentProvider-->获取数据库或文件中数据
+________________________________
+Contentesolver提供与关系数据库中表一样的结构数据。
+
+1,访问provider
+通过ContentResolver类访问provider,ContentResolver提供CRUD(创建，获取，更新，删除)数据的接口。
+使用URI定义要访问的表(可以通过ContentUris.withAppendedId定义要访问的列)。
+
+2,从provider获取数据
+-申请访问权限。应用不能在运行时申请权限，只能在manifest中使用 <uses-permission>申请
+-定义查询语句。
+getContentResolver().query(
+    UserDictionary.Words.CONTENT_URI,  // 要查询的表
+    mProjection,                       // 要查询的列
+    mSelectionClause                   // 查询的条件语句
+    mSelectionArgs,                    // 条件语句使用的参数，可以是字串数组(条件语句中有"?"时使用)
+    mSortOrder);                       // 结果排列顺序
+类似数据库查询语言SELECT _ID, word, locale FROM words WHERE word = <userinput> ORDER BY word ASC
+
+---------------------------------
+监听数据库的变化：
+Observable类当发生改变时调用 notifyObservers()，会调用已经注册Observer的update方法
+Observer用来接收改变
+
+数据库中：
+registerContentObserver (ContentObserver observer)@Cursor.java监听该cursor所在数据库的内容是否改变
+registerContentObserver (Uri uri, boolean notifyForDescendents, ContentObserver observer)@ContentResolver.java
+监听URIs定义的某一项的改变。
+
+
+数据库sqlite：
+android提供数据库操作工具sqlite3
+________________________________
+创建数据provider：
+ContentProvider类是provider与应用程序间的接口
+
+创建provider的步骤：
+1，设计提供的数据存储类型，有两种文件数据(提供文件指针给其他应用)，结构化数据(数据库中)
+2，实现ContentProvider类
+3，定义provider中的字符串，URI，列名。intent，访问权限等
+4，其他方面，样例数据，或实现AbstractThreadSyncAdapter
+
+--------------------------------
+provider只是数据的接口，如何存储由自己定义(不一定是表类型的存储)，android中可用的数据存储：
+-使用SQLite数据库接口，虽然provider提供的数据像关系表结构，但数据实际存储不一定使用数据库
+-使用文件存储数据
+-用java.net和android.net中类处理网络数据，可以将网络数据先同步到本地，再将这些数据以表的形式提供出去
+
+--------------------------------
+URIs：contents://provider/database/tables/column_id
+URI是用来标识一个provider。URIs包含了provider的字符名，和数据表或文件的名字(指向行的id是可选的)。
+在ContentProvider中那些能够访问数据的方法，都要传入一个URI作为参数，以指定要访问的数据。
+
+为了更好处理传入的URI，系统提供UriMatcher类将URI转换成相应的数字。
+
+provider的uri(文件夹名)，使用互联网域名(com.example.provider)
+--------------------------------
+实现ContentProvider类：
+ContentProvider提供数据的方法，不过所有的访问都是通过ContentResolver来调用provider中的方法。
+
+实现onCreate函数：
+onCreate函数在系统启动provider时执行，一定要快速完成。
+如，使用数据库存放数据，一般在实现onCreate中实现一个SQLiteOpenHelper类。当调用
+SQLiteOpenHelper.getWritableDatabase()会返回数据库，这时会自动调用SQLiteOpenHelper.onCreate()创建表。
+
+SQLiteOpenHelper(传入数据库名称)-->getWritableDatabase(返回创建的数据库)-->onCreate(创建表)
+--------------------------------
+--------------------------------
+================================
+SettingProvider:系统设置中的值
+onCreate-->new DatabaseHelper@SettingsProvider.java-->第一次getWritableDatabase-->onCreate-->loadSettings-->loadSystemSettings@DatabaseHelper.java-->execute@SQLiteStatement.java
+
+
+update secure set value='210.72.145.44' where _id=31
+select * from secure
+INSERT INTO system VALUES (71,'user_rotation', 1);
+
+update system set value=-1 where _id=642
+update global set value=2 where _id=59
+update secure set value="gps,network" where _id=1
+update secure set value="138664b737fc3ded" where _id=28;
+
+
+frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/DatabaseHelper.java
+frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/SettingsProvider.java
+frameworks/base/core/java/android/database/sqlite/SQLiteStatement.java
+
+================================
+从应用中访问数据，一般不再主线程中访问，而是使用异步访问。
+loader:用来在activity和fragment中异步获取数据
+Loader特性：
+-任何Activity和Fragment都可使用
+-提供异步加载数据
+-监听数据，当数据发生变化时返回新结果
+-当配置改变导致重新创建时，自动与上一个loader的cursor重连
+
+使用loader使相关的类：
+LoaderManager	与activity或fragment相关联，用来管理loader。通常与CursorLoader一起使用。每个activity和
+		fragment只有一个LoaderManager，但一个LoaderManager可有多个loader
+LoaderManager.LoaderCallbacks	客户端与LoaderManager交互的回调接口。如使用onCreateLoader()回调创建loader。
+
+Loader	一个用来异步加载数据的抽象类。通常使用CursorLoader。loader监听数据源，返回内容变化后的结果。
+
+AsyncTaskLoader	使用AsyncTask工作的loader
+CursorLoader	AsyncTaskLoader的子类，查询ContentResolver并返回Cursor。为Cursor实现了
+		loader的标准协议，在后台线程上建立AsyncTaskLoader执行cursor查询，不会阻塞应用UI。
+_______________________________
+使用loader
+-一个Activity或Fragment.
+-LoaderManager的实例(getLoaderManager()).
+-CursorLoader加载ContentProvider数据.同样自己也可实现Loader或AsyncTaskLoader的子类，用来加载其他数据源数据。
+-实现LoaderManager.LoaderCallbacks.用来创建和管理loader的地方
+-显示loader数据的方法
+-数据源，如使用CursorLoader时，数据源是ContentProvider
+
+1，getLoaderManager().initLoader(id, null, LoaderManager.LoaderCallbacks)或
+   getLoaderManager().restartLoader不管loader是否存在都会重建
+2，实现onCreateLoader()返回一个loader(由initLoader自动调用)
+3，实现onLoadFinished(加载完数据后自动调用，在这个可以更新要显示的数据)
+
+
+############################################
+多媒体的扫描：
+开始扫描：
+onReceive(卷状态广播)-->scan@MediaScanReceiver.java-->startService-->onStartCommand(发送广播)-->
+(扫描volume)scan(directories, volume)(inernel:/system/media/,externel:/实际挂载位置)-->
+scanner.scanDirectories@MediaScannerService.java-->scanDirectories(根据volume,设置数据库的路径)
+-->prescan(清除表中不存在文件条目，但不删除文件)--processDirectory@MediaScanner.java
+
+(扫描文件或文件夹，初始化扫描的卷)initialize(获取mMediaProvider)@MeidaScanner.java
+
+
+插入数据：
+endFile-->mMediaProvider.insert

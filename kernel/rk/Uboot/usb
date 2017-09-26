@@ -1,0 +1,103 @@
+LUN(logical unit number)
+扫描usb存储设备:
+do_usb(start)-->usb_stor_scan{
+- 初始设置USB_MAX_STOR_DEV个数的usb设备，usb_dev_desc
+- 遍历usb设备(查找存储设备,将所有的usb设备加入到数组usb_dev_desc){
+	- 获取usb设备，usb_get_dev_index(i)
+	- 若是存储设备usb_storage_probe 
+	}
+}@usb_storage.c
+
+启动usb设备：
+uboot_usb_start-->do_usb(start){
+- ，usb_init{
+	- 初始usb设备数组，usb_dev[]
+	- 扫描所有usb主控设备{
+		- host初始化，usb_lowlevel_init{
+			- 
+			}
+		- usb设备，usb_alloc_new_device
+		- 创建设备usb_new_device{
+			- usb_get_descriptor
+			- 
+			- 探测hub设备,usb_hub_probe-->usb_hub_configure
+			}
+	}
+	}@usb.c
+}@cmd_usb.c
+
+usb_hub_configure{
+- 
+- 连接状态变化，usb_hub_port_connect_change{
+	- 获取状态,usb_get_port_status
+	- 清除状态,usb_clear_port_feature
+	- 重置该端口，hub_port_reset
+	- 获取新设备，usb_alloc_new_device
+	- 初始新设备，usb_new_device
+	}
+}@usb_hub.c
+
+
+___________________
+rk平台usb操作函数：
+usb_lowlevel_init{
+}
+
+
+submit_control_msg/submit_bulk_msg-->ehci_submit_async{
+
+}
+
+uboot/common/cmd_usb.c
+uboot/common/usb_storage.c
+uboot/common/usb.c
+uboot/common/usb_hub.c
+uboot/drivers/usb/host/dwc_hcd.c
+___________________
+获取usb设备：
+get_device_and_partition{
+- 获取对应设备，get_device
+- 获取对应分区，get_partition_info
+}@part.c
+
+//获取对应的存储设备
+get_device("mmc/usb/sisc",设备号0/*0:xx*/)-->get_dev{
+- 循环block_drvr中驱动，获取对应名字的块驱动.reloc_get_dev = drvr->get_dev
+- usb块驱动，reloc_get_dev-->usb_stor_get_dev@part.c
+}@part.c
+
+usb_stor_get_dev-->返回设备&usb_dev_desc[index]@usb_storage.c
+
+usb读写命令：
+disk_read-->cur_dev->block_read@fat.c-->usb_stor_read@usb_storage.c
+
+uboot/common/usb_storage.c
+uboot/disk/part.c
+uboot/common/cmd_usb.c
+
+
+===========================
+portstatus 501, change 0, 480 Mb/s                                              
+STAT_C_CONNECTION = 0 STAT_CONNECTION = 1  USB_PORT_STAT_ENABLE 0               
+Len is 0                                                                        
+portstatus 501, change 2, 480 Mb/s                                              
+STAT_C_CONNECTION = 0 STAT_CONNECTION = 1  USB_PORT_STAT_ENABLE 0               
+Len is 0                                                                        
+portstatus 501, change 2, 480 Mb/s                                              
+STAT_C_CONNECTION = 0 STAT_CONNECTION = 1  USB_PORT_STAT_ENABLE 0               
+Len is 0                                                                        
+portstatus 501, change 2, 480 Mb/s                                              
+STAT_C_CONNECTION = 0 STAT_CONNECTION = 1  USB_PORT_STAT_ENABLE 0               
+Len is 0                                                                        
+portstatus 501, change 2, 480 Mb/s                                              
+STAT_C_CONNECTION = 0 STAT_CONNECTION = 1  USB_PORT_STAT_ENABLE 0               
+Cannot enable port 1 after 5 retries, disabling port.                           
+Maybe the USB cable is bad?      
+
+
+
+ (Re)start USB...                                                               
+USB0:   scanning bus 0 for devices...                                           
+     Couldn't reset port 0                                                      
+1 USB Device(s) found                                                           
+       scanning usb for storage devices... 0 Storage Device(s) found 

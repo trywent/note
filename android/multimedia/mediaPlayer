@@ -1,0 +1,69 @@
+
+
+通知：
+
+MediaPlayer::notify-->listener->notify
+
+
+JNIMediaPlayerListener::notify-->env->CallStaticVoidMethod (fields.post_event)
+@android_media_MediaPlayer.cpppostEventFromNative-->EventHandler.handleMessage(MEDIA_INFO)
+-->mOnInfoListener.onInfo@MediaPlayer.java
+
+
+info/warning (706, 404)
+
+frameworks/base/media/java/android/media/MediaPlayer.java
+frameworks/base/media/jni/android_media_MediaPlayer.cpp
+
+====================
+video:
+-new MediaPlayer();
+-setAudioStreamType(AudioManager.STREAM_MUSIC)
+-setDataSource(getApplicationContext(), myUri)
+-prepare()//获取源，解码。导致耗时长，mediaPlayer使用另一线程执行
+-start()，pause，stop
+-release
+
+设置播放器surface：
+setSurface (Surface surface)@MediaPlayer.java
+setDisplay (SurfaceHolder sh)@MediaPlayer.java
+
+
+SurfaceView
+|
+VideoPlayView@device/mstar/common/app/LocalMM/src/com/jrm/localmm/business/video/VideoPlayView.java
+
+
+播放窗口信息：
+上窗口：
+  Window #4 Window{414e5a80 com.syu.video/com.syu.video.main.VideoPlayerActivity paused=false}:
+    mSession=Session{41602598 uid 10037} mClient=android.os.BinderProxy@4141fb78
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) sim=#120 ty=1 fl=#1810180 pfl=0x8 fmt=-3 wanim=0x1030001}
+    Requested w=720 h=494 mLayoutSeq=50
+    mHasSurface=true mShownFrame=[0.0,160.0][720.0,654.0]
+    Surface: shown=true layer=21020 alpha=1.0 rect=(0.0,160.0) 720.0 x 494.0
+  Window #3 Window{41532fe0 SurfaceView paused=false}:
+    mSession=Session{41602598 uid 10037} mClient=android.os.BinderProxy@41607008
+    mAttrs=WM.LayoutParams{(0,35)(720x459) gr=#33 ty=1001 fl=#4218 fmt=4}
+    Requested w=720 h=459 mLayoutSeq=50
+    mAttachedWindow=Window{414e5a80 com.syu.video/com.syu.video.main.VideoPlayerActivity paused=false} mLayoutAttached=true
+    mHasSurface=true mShownFrame=[0.0,195.0][720.0,654.0]
+    Surface: shown=true layer=21015 alpha=1.0 rect=(0.0,195.0) 720.0 x 459.0
+
+下窗口：
+  Window #4 Window{42191750 com.syu.video/com.syu.video.main.VideoPlayerActivity paused=false}:
+    mSession=Session{421358b0 uid 10037} mClient=android.os.BinderProxy@42135438
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) sim=#120 ty=1 fl=#1810180 pfl=0x8 fmt=-3 wanim=0x1030001}
+    Requested w=720 h=497 mLayoutSeq=139
+    mHasSurface=true mShownFrame=[0.0,654.0][720.0,1151.0]
+    Surface: shown=true layer=21015 alpha=1.0 rect=(0.0,654.0) 720.0 x 497.0
+  Window #3 Window{421f1540 SurfaceView paused=false}:
+    mSession=Session{421358b0 uid 10037} mClient=android.os.BinderProxy@420eab88
+    mAttrs=WM.LayoutParams{(0,35)(720x462) gr=#33 ty=1001 fl=#4218 fmt=4}
+    Requested w=720 h=462 mLayoutSeq=139
+    mAttachedWindow=Window{42191750 com.syu.video/com.syu.video.main.VideoPlayerActivity paused=false} mLayoutAttached=true
+    mHasSurface=true mShownFrame=[0.0,195.0][720.0,657.0]
+    Surface: shown=true layer=21010 alpha=1.0 rect=(0.0,195.0) 720.0 x 462.0
+
+
+

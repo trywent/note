@@ -1,0 +1,7 @@
+Linux Kernel Configuration
+   Kernel hacking  --->
+      [*] Early printk
+
+
+加入uboot启动命令：
+earlyprintk=serial,uart0,57600

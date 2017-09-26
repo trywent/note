@@ -1,0 +1,86 @@
+//init中
+service vold /system/bin/vold \
+        --blkid_context=u:r:blkid:s0 --blkid_untrusted_context=u:r:blkid_untrusted:s0 \
+        --fsck_context=u:r:fsck:s0 --fsck_untrusted_context=u:r:fsck_untrusted:s0
+
+//挂载系统分区
+mount_all@init.rc-->do_mount_all{
+- fs_mgr_read_fstab
+- fs_mgr_mount_all{ //不挂载vold处理的块
+	- mount_with_alternatives
+	- 挂载失败，检测是否加密	
+	}
+}@builtins.cpp
+
+system/core/init/builtins.cpp
+system/core/fs_mgr/fs_mgr.c
+==========
+main{
+- VolumeManager::Instance()
+- NetlinkManager::Instance()
+- new CommandListener()
+- new CryptCommandListener()
+- vm->setBroadcaster(cl)
+- nm->setBroadcaster(cl)
+- vm->start()
+- process_config{//  ：块设备  挂载点  文件类型  参数
+	- fs_mgr_read_fstab//解析fstab
+	- 若是VoldManager处理的块{
+		- vm->addDiskSource(DiskSource) //加入到mDiskSources
+		}
+	}
+- nm->start 		//开始监听kernel事件
+- coldboot("/sys/block") //在uevent中写add，触发事件
+- cl->startListener() //监听mounservice命令
+}
+
+
+
+NetlinkManager::start@NetlinkManager.cpp-->NetlinkHandler->start-->this->startListener
+-->onEvent{
+- vm->handleBlockEvent
+}@NetlinkHandler.cpp
+
+
+handleBlockEvent{
+- NetlinkEvent::Action::kAdd{
+	- new android::vold::Disk
+	- disk->create{
+		- readMetadata //读取文件系统类型，表签
+		- readPartitions{
+			- 
+			}
+		}
+	- mDisks.push_back(disk) //加入到mDisks
+	}
+}@VolumeManager.cpp
+
+
+runCommand(mount)@CommandListener.cpp-->mount@VolumeBase.cpp-->doMount@PublicVolume.cpp
+
+system/vold/main.cpp
+system/core/fs_mgr/fs_mgr_fstab.c
+system/vold/NetlinkManager.cpp
+system/vold/NetlinkHandler.cpp
+system/vold/VolumeManager.cpp
+system/vold/Disk.cpp
+system/vold/CommandListener.cpp
+system/vold/VolumeBase.cpp
+system/vold/PublicVolume.cpp
+
+
+===================
+onEvent-->onEventLocked{
+- VOLUME_CREATED{
+	- new VolumeInfo
+	- mVolumes.put
+	}	
+
+- VOLUME_STATE_CHANGED{
+	-onVolumeStateChangedLocked-->
+	}
+}
+
+
+
+frameworks/base/services/core/java/com/android/server/MountService.java

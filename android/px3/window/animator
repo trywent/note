@@ -1,0 +1,319 @@
+//activity设置当前应用切换类型(task切换，activity切换)，用于加载动画
+prepareAppTransition{
+- mAppTransition.setAppTransition-->赋值mNextAppTransition
+- mAppTransition.prepare -->设置mAppTransitionState= APP_STATE_IDLE
+}
+
+executeAppTransition-->performLayoutAndPlaceSurfacesLocked
+__________
+//activity设置缩略图动画
+makeThumbnailScaleUpAnimation-->makeThumbnailAnimation@ActivityOption.java-->
+
+applyOptionsLocked(ANIM_THUMBNAIL_SCALE_UP/ANIM_THUMBNAIL_SCALE_DOWN)@ActivityRecord.java-->
+service.mWindowManager.overridePendingAppTransitionThumb@WindowMnangerService.java-->
+overridePendingAppTransitionThumb@AppTransition.java
+
+
+==========
+//记录要打开/关闭的应用(应用切换动画需要)。设置窗口动画
+setAppVisibility{
+- 获取AppWindowToken，findAppWindowToken
+- 设置了动画则延迟显示，加入mOpeningApps/mClosingApps
+- 通知应用端，wtoken.sendAppVisibilityToClients-->dispatchAppVisibility@AppWindowToken.java
+	-->dispatchAppVisibility-->handleMessage(MSG_DISPATCH_APP_VISIBILITY)-->
+	handleAppVisibility@ViewRootImpl.java
+- setTokenVisibilityLocked(设置窗口动画)
+- wtoken.updateReportedVisibilityLocked
+}
+
+_________
+//设置切换动画(实际设置位置)
+performLayoutAndPlaceSurfacesLockedInner-->(执行应用切换)
+handleAppTransitionReadyLocked{
+- 若mOpeningApps中的窗口没有绘制完成，则不执行动画。退出
+
+//否则设置动画
+- 获取将要设置的动画，mAppTransition.getAppTransition()//resume时prepareAppTransition设置的值
+- 查找closing和opening应用中是否需要显示壁纸，查找最顶部窗口，设置为动画参数
+- 根据查找结果，设置动画类型transit
+- 遍历所有mOpeningApps{
+	- 设置切换动画类型，setTokenVisibilityLocked
+	
+	}
+- 遍历所有mClosingApps{
+	- 设置切换动画类型，setTokenVisibilityLocked
+	
+	}
+- 设置最顶部应用的Animator，topOpeningApp.mAppAnimator
+- 缩略图动画不为空mAppTransition.getNextAppTransitionThumbnail{
+	- 设置缩略图appAnimator.thumbnail = SurfaceControl
+	- 创建动画appAnimator.thumbnailAnimation，createThumbnailAnimationLocked
+	- 
+	}
+}
+
+//设置动画。应用切换动画 或 窗口动画
+setTokenVisibilityLocked(AppWindowToken){
+- 通知activity端，wtoken.sendAppVisibilityToClients
+- 应用切换动画不为空transit!=RANSIT_UNSET，{
+	- 设置换动画applyAnimationLocked(wtoken){
+		- 根据切换类型加载动画，mAppTransition.loadAnimation
+		- 设置，atoken.mAppAnimator.setAnimation@AppWindowAnimator.java
+		}
+	}//
+
+- 否则,设置当前token关联的窗口动画{
+	- 从unvisible到visible，win.mWinAnimator.applyAnimationLocked(TRANSIT_ENTER)
+	- 从visible到unvisible，win.mWinAnimator.applyAnimationLocked(TRANSIT_EXIT)
+	}
+}
+(应用切换动画)loadAnimation{
+
+}@AppTransition.java
+
+/*
+窗口动画,窗口加入到/移除于屏幕，窗口可见/隐藏
+TRANSIT_ENTER,TRANSIT_EXIT,TRANSIT_SHOW,TRANSIT_HIDE
+*/
+applyAnimationLocked@WindowState.java-->WindowStateAnimator.applyAnimationLocked{
+- 获取systemui窗口动画，mPolicy.selectAnimationLw
+- 没有获取到，设置窗口动画(不同的窗口不同动画)
+   WindowAnimation_windowEnterAnimation/windowExitAnimation
+- 根据动画资源加载动画，mAppTransition.loadAnimation()-->AnimationUtils.loadAnimation
+	@AppTransition.java-->createAnimationFromXml@AnimationUtils.java
+- 设置动画setAnimation
+}@WindowStateAnimator.java
+
+
+================
+/*
+- 1,stepAnimation 获取动画结果值
+	应用切换动画，AppWindowAnimator.transformation
+	窗口动画，WindowStateAnimator.mTransformation
+*/
+
+//执行动画
+scheduleAnimationLocked-->mChoreographer.postCallback
+(Choreographer.CALLBACK_ANIMATION,mAnimator.mAnimationRunnable)
+(收到帧脉冲doCallback-->c.run)-->mAnimationRunnable.run-->
+animateLocked{
+- SurfaceControl.openTransaction/setAnimationTransaction
+- 遍历display{
+	- 更新所有应用切换动画，updateAppWindowsLocked
+	- 更新旋转动画，screenRotationAnimation.stepAnimationLocked
+	- 执行窗口动画performAnimationsLocked{
+		- updateWindowsLocked
+		- updateWallpaperLocked	
+		}
+	- 设置surface，w.mWinAnimator.prepareSurfaceLocked //显示执行结果
+	}
+- 遍历display{
+	- screenRotationAnimation.updateSurfacesInTransaction
+	}
+- 动画没有完成继续执行，mService.scheduleAnimationLocked
+- SurfaceControl.closeTransaction
+- 判断是否需要重新布局，mService.requestTraversalLocked
+}@WindowAnimator.java
+
+
+updateWindowsLocked
+
+
+
+//执行应用切换动画，将应用切换动画结果保存在AppWindowAnimator.transformation
+animateLocked(遍历所有屏幕)-->
+updateAppWindowsLocked{
+- 遍历所有task{
+	- 获取appAnimator，tokens.get(tokenNdx).mAppAnimator
+	- 执行appAnimator.stepAnimationLocked-->finishExit-->hideWallpapersLocked
+		@WindowStateAnimator.java-->dispatchWallpaperVisibility@WindowManagerService.java
+	- 若执行完，setAppLayoutChanges
+	}
+- 遍历正在退出应用exitingAppTokens{
+	- 获取appAnimator，exitingAppTokens.get(i).mAppAnimator
+	- 执行appAnimator.stepAnimationLocked
+	- 若执行完，setAppLayoutChanges  //设置布局
+	}
+- 
+}@WindowAnimator.java
+
+//执行窗口动画
+animateLocked-->performAnimationsLocked-->
+updateWindowsLocked{
+- 遍历所有窗口
+- 执行动画，winAnimator.stepAnimationLocked
+- 若是锁屏窗口doesForceHide{
+	- 记录锁屏窗口当前状态，mForceHiding
+	}否则，若是非系统窗口canBeForceHidden(非systemui,锁屏,壁纸){
+	- 若锁屏窗口将要显示，则隐藏当前窗口win.hideLw
+	- 否则显示窗口，win.showLw
+	}
+
+}@WindowAnimator.java
+
+//根据animation结果设置窗口显示效果
+/*AppWindowAnimator和WindowStateAnimator都是在这里执行*/
+animateLocked{
+- 计算动画结果值，updateAppWindowsLocked
+- prepareSurfaceLocked{
+	- computeShownFrameLocked{
+		- 关联窗口动画，attachedTransformation
+		- 应用切换动画appTransformation = mAppAnimator.transformation
+		- mTransformation
+		- 
+		}
+	- 设置坐标，setSurfaceBoundariesLocked{
+		- 设置坐标，mSurfaceControl.setPosition
+		- 设置大小，mSurfaceControl.setSize
+		- 设置没有被遮挡大小，updateSurfaceWindowCrop
+		}
+	- mSurfaceControl.setAlpha
+	- mSurfaceControl.setLayer
+	- mSurfaceControl.setMatrix
+	}
+}@WindowAnimator.java
+
+_________________
+//动画执行后的结果值-->prepareSurfaceLocked(根据结果值设置显示效果)
+
+//切换动画 AppWindowAnimator
+stepAnimationLocked{
+- stepAnimation-->animation.getTransformation(transformation)
+- 执行，stepThumbnailAnimation
+}
+
+
+//窗口动画 WindowStateAnimator
+stepAnimationLocked{
+- 
+- stepAnimation-->(计算动画结果值)mAnimation.getTransformation(mTransformation)
+}
+
+
+frameworks/base/services/java/com/android/server/wm/AppWindowAnimator.java
+frameworks/base/services/java/com/android/server/wm/WindowStateAnimator.java
+frameworks/base/services/java/com/android/server/wm/WindowAnimator.java
+frameworks/base/services/java/com/android/server/wm/AppTransition.java
+frameworks/base/core/java/android/view/animation/AnimationUtils.java
+=================
+
+DimLayer:
+
+TaskStack-->new DimLayer@TaskStack.java-->DimLayer@DimLayer.java
+
+animateLocked-->performAnimationsLocked-->updateWallpaperLocked@WindowAnimator.java
+-->setAnimationBackground-->mAnimationBackgroundSurface.show@TaskStack.java
+
+animateLocked@WindowAnimator.java-->animateDimLayers@@StackBox.java-->animateDimLayers@TaskStack.java
+
+frameworks/base/services/java/com/android/server/wm/TaskStack.java
+frameworks/base/services/java/com/android/server/wm/StackBox.java
+frameworks/base/services/java/com/android/server/wm/WindowAnimator.java
+
+
+=================
+frameworks/base/core/res/res/anim/activity_open_enter.xml
+
+//窗口动画，不同类型窗口有不同动画
+com.android.internal.R.styleable.WindowAnimation_windowEnterAnimation;
+com.android.internal.R.styleable.WindowAnimation_windowExitAnimation; com.android.internal.R.styleable.WindowAnimation_windowShowAnimation; com.android.internal.R.styleable.WindowAnimation_windowHideAnimation;
+//systemui窗口动画
+R.anim.dock_top_enter
+R.anim.dock_top_exit
+R.anim.dock_bottom_enter
+R.anim.dock_bottom_exit
+R.anim.dock_right_enter
+R.anim.dock_right_exit
+
+//AppTransition应用动画
+com.android.internal.R.styleable.WindowAnimation_activityCloseEnterAnimation//6
+com.android.internal.R.styleable.WindowAnimation_activityCloseExitAnimation//7
+com.android.internal.R.styleable.WindowAnimation_taskOpenEnterAnimation//8
+com.android.internal.R.styleable.WindowAnimation_taskOpenExitAnimation//9
+com.android.internal.R.styleable.WindowAnimation_taskCloseEnterAnimation//10
+com.android.internal.R.styleable.WindowAnimation_taskCloseExitAnimation//11
+com.android.internal.R.styleable.WindowAnimation_taskToFrontEnterAnimation // 12
+com.android.internal.R.styleable.WindowAnimation_taskToFrontExitAnimation // 13
+com.android.internal.R.styleable.WindowAnimation_taskToBackEnterAnimation //14
+com.android.internal.R.styleable.WindowAnimation_taskToBackExitAnimation // 15
+com.android.internal.R.styleable.WindowAnimation_wallpaperOpenEnterAnimation//16
+com.android.internal.R.styleable.WindowAnimation_wallpaperOpenExitAnimation//17
+com.android.internal.R.styleable.WindowAnimation_wallpaperCloseEnterAnimation//18
+com.android.internal.R.styleable.WindowAnimation_wallpaperCloseExitAnimation//19
+
+____________________
+属性动画
+<set
+  android:ordering=["together" | "sequentially"]>
+
+    <objectAnimator
+        android:propertyName="string"
+        android:duration="int"
+        android:valueFrom="float | int | color"
+        android:valueTo="float | int | color"
+        android:startOffset="int"
+        android:repeatCount="int"
+        android:repeatMode=["repeat" | "reverse"]
+        android:valueType=["intType" | "floatType"]/>
+
+    <animator
+        android:duration="int"
+        android:valueFrom="float | int | color"
+        android:valueTo="float | int | color"
+        android:startOffset="int"
+        android:repeatCount="int"
+        android:repeatMode=["repeat" | "reverse"]
+        android:valueType=["intType" | "floatType"]/>
+
+    <set>
+        ...
+    </set>
+</set>
+
+
+View动画：
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@[package:]anim/interpolator_resource"
+    android:shareInterpolator=["true" | "false"] >
+    <alpha
+        android:fromAlpha="float"
+        android:toAlpha="float" />
+    <scale
+        android:fromXScale="float"
+        android:toXScale="float"
+        android:fromYScale="float"
+        android:toYScale="float"
+        android:pivotX="float"
+        android:pivotY="float" />
+    <translate
+        android:fromXDelta="float"
+        android:toXDelta="float"
+        android:fromYDelta="float"
+        android:toYDelta="float" />
+    <rotate
+        android:fromDegrees="float"
+        android:toDegrees="float"
+        android:pivotX="float"
+        android:pivotY="float" />
+    <set>
+        ...
+    </set>
+</set>
+
+打开radio
+animAttr=0x10 transit=4109 isEntrance=true
+animAttr=0x11 transit=4109 isEntrance=false
+
+打开easycon
+animAttr=0x12 transit=8204 isEntrance=true
+animAttr=0x13 transit=8204 isEntrance=false
+
+
+//启动应用动画
+resumeTopActivityInnerLocked@ActivityStack.java-->applyOptionsLocked@ActvityRecord.java-->
+service.mWindowManager.overridePendingAppTransitionScaleUp@WindowManagerService.java-->
+mAppTransition.overridePendingAppTransitionScaleUp@AppTransition.java
+
+
+overridePendingTransition //改变动画
+

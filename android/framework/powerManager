@@ -1,0 +1,114 @@
+=============================
+处理power键：
+dispatchUnhandledKey-->interceptFallback-->interceptKeyBeforeQueueing-->(power键按下)interceptPowerKeyDown--mPowerLongPress@PhoneWindowManager.java
+（这里处理长按）
+（power键释放）-->interceptPowerKeyUp（长按没有被处理的，这里将处理函数移除。不是长按事件返回结果）
+
+
+弹出关机框：
+interceptPowerKeyDown-->mPowerLongPress-->showGlobalActionsDialog@PhoneWindowManager.java
+-->GlobalActions-->(点击关机)onPress-->mWindowManagerFuncs.shutdown()@GlobalActions.java-->
+shutdown-->ShutdownThread.shutdown@WindowManagerService.java-->shutdown@ShutdownThread.java
+_____________________________
+进入休眠：
+interceptKeyBeforeQueueing-->handleInterceptActions@com_android_server_input_InputManagerService.cpp-->
+android_server_PowerManagerService_goToSleep@com_android_server_PowerManagerService.cpp-->
+goToSleep-->goToSleepWithReason-->goToSleepLocked-->setPowerState-->updateNativePowerStateLocked-->
+nativeSetPowerState@PowerManagerService.java-->nativeSetPowerState@android_server_PowerManagerService.cpp
+
+
+shutdown-->shutdownInner-->beginShutdownSequence--sInstance.start-->run-->
+rebootOrShutdown-->PowerManagerService.lowLevelShutdown@ShutdownThread.java-->
+lowLevelShutdown-->nativeShutdown@PowerManagerService.java-->nativeShutdown
+@com_android_server_PowerManagerService.cpp-->android_reboot@android_reboot.c
+_____________________________
+黑屏：
+SettingsObserver(监听设置改变)-->(更新黑屏时间)updata(mScreenOffTimeoutSetting = getInt(SCREEN_OFF_TIMEOUT))
+-->setScreenOffTimeoutsLocked(根据数据库值，更新变量的值.mScreenOffDelay)@PowerManagerServie.java
+
+setTimeoutLocked(更新屏幕状态)-->mHandler.postAtTime(mTimeoutTask, when)-->TimeoutTask.run(DIM)-->
+setTimeoutLocked-->
+
+userActivity-->setTimeoutLocked-->TimeoutTask.run-->setPowerState-->setPowerState-->
+sendNotificationLocked-->mNotificationTask.run(发送关屏广播)-->
+ActivityManagerNative.getDefault().goingToSleep
+@PowerManagerService.java-->goingToSleep@ActivityManagerService.java
+
+------------------------------
+发送通知：
+setPowerState
+
+screenOffFinishedAnimatingLocked
+
+sendNotificationLocked-->mHandler.post(mNotificationTask)@PowerManagerService.java
+
+
+锁屏出现：
+goToSleepWithReason-->goToSleepLocked(设置睡眠广播标识)@PowerManagerService.java
+
+setPowerState(判断是否要发送睡眠通知，应为刚睡时没有发送)-->(只有睡眠，开屏才发送广播)sendNotificationLocked
+-->
+
+mNotificationTask.run(发送关屏广播)-->ActivityManagerNative.getDefault().goingToSleep
+@PowerManagerService.java-->goingToSleep@ActivityManagerService.java
+
+
+system/core/libcutils/android_reboot.c
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+frameworks/base/services/jni/com_android_server_input_InputManagerService.cpp
+frameworks/base/services/jni/com_android_server_PowerManagerService.cpp
+frameworks/base/services/java/com/android/server/PowerManagerService.java
+=============================
+suspend:
+
+@BoardConfig.mk
+SUSPEND_DELAY := true
+SUSPEND_IMMDIATELY := true
+
+@system/core/libsuspend/Android.mk
+ifeq ($(SUSPEND_IMMDIATELY),true)
+LOCAL_CFLAGS += -DKERNEL_SUSPEND_WHENSCREENOFF_BECAUSEOFUSER
+endif
+
+ifeq ($(SUSPEND_DELAY),true)
+LOCAL_CFLAGS += -DDELAY_FOR_AWHILE
+endif
+
+
+设置睡眠状态：
+(mstar添加)setScreenStateLocked-->nativeSetScreenState@PowerManagerService.java-->
+nativeSetScreenState@com_android_server_PowerManagerService.cpp-->set_screenoff_reason@
+autosuspend_wakeup_count.c
+
+开始或停止睡眠：
+autosuspend_enable/autosuspend_disable-->autosuspend_init-->autosuspend_earlysuspend_init-->autosuspend_wakeup_count_init@autosuspend.c
+
+autosuspend_earlysuspend_init(返回enable/disable函数结构指针)-->@autosuspend_earlysuspend.c
+
+autosuspend_autosleep_init@
+
+autosuspend_wakeup_count_init(返回enable/disable函数结构指针)-->pthread_create(新建新线程)-->
+force_suspend_thread_func{
+- read(读取睡眠倒计时)
+- sem_wait(阻塞当前线程，等待条件满足)
+- (当is_because_of_user为1时)
+	- read(读取powerEventNum中事件，直到事件完成)
+	- write(向/sys/power/state写数据进入休眠)
+}-->sem_post(释放信号)@autosuspend_wakeup_count.c
+
+使能睡眠：
+autosuspend_wakeup_count_enable-->(使阻塞线程开始工作)sem_post(&suspend_lockout)@autosuspend_wakeup_count.c
+
+
+
+frameworks/base/services/jni/com_android_server_PowerManagerService.cpp
+system/core/libsuspend/autosuspend.c
+system/core/libsuspend/autosuspend_wakeup_count.c
+system/core/libsuspend/autosuspend_earlysuspend.c
+______________________________
+resume:
+
+
+
+
+

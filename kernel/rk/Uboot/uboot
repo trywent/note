@@ -1,0 +1,131 @@
+分区配置parameter：
+0x00006000@0x00004000(kernel)
+大小       地址        分区名
+
+大小*sector(512bytes) 
+
+typedef struct fbt_partition {
+    const char *name;
+    unsigned offset;
+    unsigned size_kb;  //单位为KB
+} fbt_partition_t;
+
+==========================
+全局数据：使用全局数据在文件中加：DECLARE_GLOBAL_DATA_PTR;
+#define DECLARE_GLOBAL_DATA_PTR		register volatile gd_t *gd asm ("r9")
+include/asm-generic/global_data.h
+arch/arm/include/asm/global_data.h
+
+
+common/cmd_fastboot.c
+_____________________
+usb启动：
+startRockusb{
+- 从USB引导,UsbBoot{
+		- usb复位，UsbPhyReset
+		- USB控制器寄存器初始化，UdcInit
+		- 中断寄存器初始化，EnableOtgIntr
+	}
+- UsbHook{
+	
+	}usbCtrl.c
+}@rk30xx.c
+
+board/rockchip/common/platform/rk30/Isr.c
+board/rockchip/common/common/rockusb/usbIsr.c
+board/rockchip/common/common/rockusb/usbCtrl.c
+
+===========================
+update:
+
+board_late_init{
+- 探测sd卡设备，uboot_mmc_rescan
+- 列出sd卡中文件，uboot_fat_ls
+- 读取sd卡中升级文件，uboot_fat_fsload
+- 判断启动方式，并启动，fbt_preboot
+}@rk30xx.c
+
+
+copyImagetoflash{
+- 设置fat读取命令，boot_fat_cmd
+- 根据文件大小，计算要读取的次数，carryCount=(size/FAT_MEMORY_SIZE)+1
+- 查找分区位置，fastboot_find_ptn
+- 
+}
+
+
+
+//读取磁盘数据
+int do_fat_fsload (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]):
+
+do_fat_fsload(设置文件系统类型，fs_set_blk_dev)@cmd_fat.c-->do_load{
+//读取到请求的个数小于等于0(出错)，返回1。否则返回0
+- 命令参数个数不小于2，不大于7
+- 第3个参数是写入地址，否则从getenv("loadaddr")获取写入地址
+- 第4个参数是文件名，否则从getenv("bootfile")
+- 第5个是操作文件字节数，否则为0
+- 第6个是操作文件的偏移位置，否则为0
+}@fs.c
+
+do_load-->fs_read{
+//若读取的个数与请求的个数不同则返回-1，并设置读取的个数到setenv_hex("filesize", ret)
+- 不同的文件系统获取不同的操作函数，fs_get_info
+- 读取不同文件系统，info->read-->(fat)fat_read_file-->file_fat_read_at-->do_fat_read_at{
+	//返回值像linux中read函数，返回实际读取个数，文件末尾返回0
+	}
+}@fs.c
+
+
+/*
+ *filename 读取的文件名
+ *pos 读取的文件偏移位置
+ *buffer 读取内容存放处
+ *maxsize 要求读取的文件大小
+ *dols 是否是列出文件夹下文件，(0是读取文件，1是列出)
+ */
+do_fat_read_at(const char *filename, unsigned long pos, void *buffer,
+	       unsigned long maxsize, int dols)
+{
+- 读取第一块的内容，获取文件系统信息(FAT32,FAT16..),read_bootsectandvi
+- 处理文件名{
+	- 移除开始的"\\""/"
+	- 若此时文件名结束，则操作是列出根目录文件
+	- 若是文件夹，保存文件夹名fnamecopy。移除"\"并保存剩余的文件名subname，
+	- 其它情况的操作是列出目录
+	}
+- 循环读取并查找要读取的文件disk_read，{
+	- 读取第一簇中的内容
+	- 查找循环获取簇中的direntry，名字匹配的,
+	- 若没有找到且文件系统是FAT32，则在下一簇中进行查找(FAT16和12只有一簇)		
+	}
+- 找到匹配的文件名且是文件夹{
+	- 从目录中获取要操作的dentry,get_dentfromdir	
+	}
+- 读取文件内容，get_contents
+}@fat.c
+
+//返回读出的实际个数，或0(偏移位置超出范围)，或-1(错误)
+get_contents{
+- 要移动到的读取位置超出文件大小，返回0
+- 定位到要读取的位置，actsize
+- 若位置没有对齐pos>0,进行对齐
+- 读取簇，get_cluster
+}
+
+_______________________
+设置要读取的磁盘设备：
+fs_set_blk_dev{
+- get_device_and_partition{
+
+	}@disk.c
+- 探测设备，确定文件系统。info->probe(
+}@fs.c
+
+
+arch/arm/lib/board.c
+board/rockchip/rk30xx/rk30xx.c
+include/configs/rk30xx.h
+common/cmd_fat.c
+fs/fs.c
+fs/fat/fat.c
+disk/part.c

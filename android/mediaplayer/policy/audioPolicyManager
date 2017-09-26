@@ -1,0 +1,105 @@
+//audioPolicyManager  audioSystem调用接口
+
+- 跟踪系统中设备状态
+- AudioTrack创建时通过getOutput创建output,AudioTrack释放时通过putOutput释放output
+- AudioRecord创建时通过getInput/putInput,进行创建或释放
+- 控制音量设置
+
+create_legacy_ap@audio_policy_hal.cpp-->createAudioPolicyManager@AudioPolicyManagerDefault.cpp
+->new AudioPolicyManagerDefault(new AudioPolicyCompatClient(aps_ops,audioPolicyService)){
+- 设置接口，mpClientInterface = clientInterface
+- 初始化mForceUse
+- 加载配置,loadAudioPolicyConfig(/system(vendor)/etc/audio_policy.conf){
+	- 加载全局配置，loadGlobalConfig{
+		- 获取mAttachedOutputDevices   //连接的输出设备
+		- 获取mDefaultOutputDevice	   //默认输出设备
+		- 获取mAvailableInputDevices   //默认输入设备
+		}
+	- 加载输入输出设备，loadHwModules-->loadHwModule{
+		- 创建模块new HwModule
+		- 输出配置，loadOutput
+		- 输入配置，loadInput		
+		- 将模块加入到，mHwModules
+		}
+	}
+- 若加载不成功则加载默认配置defaultAudioPolicyConfig
+- 初始化所有的模块（设置可用的设备），打开attach设备的输出流{
+	- 初始模块的mHandle，intentInterface->loadHwModule  //audioFlinger 对应的库的编号
+	- 打开模块中的输出流，若成功{
+		- 创建输出流的描述，AudioOutputDescriptor
+		- 打开输出流，mpClientInterface->openOutput
+		- 已经连接并支持的设备，mAvailableOutputDevices
+		- 加入输出流，addOutput
+		- 设置输出流，setOutputDevice
+		}
+	}
+- 更新策略对应的设备，updateDevicesAndOutputs
+}
+
+
+================
+//output
+output:
+AudioPolicyManagerBase::getOutput{
+- 根据流获取策略，getStrategy(stream)
+- 根据策略获取设备，getDeviceForStrategy
+- 创建设备支持参数profile，getProfileForDirectOutput
+- 若创建profile成功，则打开设备，mpClientInterface->openOutput-->
+	mServiceOps->open_output_on_module@AudioPolicyCompatClient.cpp-->
+	aps_open_output_on_module-->af->openOutput@AudioPolicyService.cpp-->
+	openOutput@AudioFlinger.cpp
+
+- 若创建不成功，则在mOutputs中查找所有支持的设备并选择最优的outputs
+}
+
+_____________________
+volume:
+ap_set_stream_volume_index_for_device@audio_policy_hal.cpp-->setStreamVolumeIndex{
+- 检查设置值和设备
+- 若流不能被静音，则设置为最大音量
+- 保存音量到mStreams
+- 设置音量到连接的设备，checkAndSetVolume{
+	- 连接蓝牙不设置
+	- 计算音量，computeVolume
+	- mpClientInterface->setStreamVolume-->set_stream_volume
+	}
+}
+
+setStreamVolume@AudioPolicyCompatClient.cpp-->set_stream_volume-->
+aps_set_stream_volume-->AudioPolicyService::setStreamVolume-->
+AudioCommandThread::volumeCommand-->insertCommand_l(插入命令，移除重复命令)
+@AudioPolicyService.cpp
+
+//执行命令
+AudioCommandThread::threadLoop(SET_VOLUME)-->AudioSystem::setStreamVolume-->
+setStreamVolume@AudioFlinger.cpp-->thread->setStreamVolume-->
+mStreamTypes[stream].volume = value@Threads.cpp
+
+PlaybackThread::threadLoop-->prepareTracks_l{
+- (设置音量)track->mCachedVolume
+- typeVolume = mStreamTypes[track->streamType()].volume
+}@Threads.cpp
+
+(猜测是在这里)mFastMixer->run-->FastMixer::threadLoop(fastTrack->mVolumeProvider->getVolumeLR)
+
+hardware/rk29/audio/audio_policy_hal.cpp
+hardware/libhardware_legacy/bak_audio/AudioPolicyManagerDefault.cpp
+hardware/libhardware_legacy/include/hardware_legacy/AudioPolicyInterface.h
+hardware/libhardware_legacy/include/hardware_legacy/AudioPolicyManagerBase.h
+hardware/rk29/audio/AudioPolicyManagerBase.cpp
+hardware/rk29/audio/AudioPolicyCompatClient.h
+hardware/rk29/audio/AudioPolicyCompatClient.cpp
+
+======================
+//input 
+
+AudioPolicyManager::getInputForAttr{
+- mInputs中查找可用的input，若找到直接返回（实现多应用同时录音）
+- mpClientInterface->openInput-->AudioFlinger::openInput-->openInput_l
+}
+
+
+
+
+
+frameworks/av/services/audiopolicy/managerdefault/AudioPolicyManager.cpp

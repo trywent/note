@@ -1,0 +1,368 @@
+make 
+
+build/core/dumpvar.mk
+__________
+config.mk:
+ANDROID_BUILDSPEC := $(TOPDIR)buildspec.mk 
+-include $(ANDROID_BUILDSPEC)                 //默认的编译配置，平台
+include $(BUILD_SYSTEM)/envsetup.mk //没有配置的默认平台
+====================================
+设置目标，编译环境(envsetup,lunch)：
+build/envsetup.sh(查找device目录下vendorsetup.sh文件，将其包含进来)
+|
+device/xxxx/vendorsetup.sh(mstar中有add_lunch_combo full_mstarcedric3-userdebug)
+
+add_lunch_combo(增加lunch可选项)@envsetup.sh
+
+lunch(选择要编译的项)-->set_stuff_for_environment(设置编译环境)-->setpaths(工具链路径等)@envsetup.sh
+____________________________________
+lunch项名字结构：xxxx-eng(userdebug)
+
+变量：
+selection=xxxx-userdebug //完整名
+product=xxxx             //截断“-*”字符
+
+export TARGET_PRODUCT=$product //@envsetup.sh设置环境变量
+product_goals := $(strip $(filter PRODUCT-%,$(MAKECMDGOALS)))
+TARGET_PRODUCT := $(word 1,$(product_goals)) //TARGET_PRODUCT没设置则TARGET_PRODUCT := full@envsetup.mk
+INTERNAL_PRODUCT := $(call resolve-short-product-name, $(TARGET_PRODUCT))
+
+如果TARGET_PRODUCT：=full_panda则INTERNAL_PRODUCT :=full_panda.mk
+
+INTERNAL_PRODUCT(决定编译目标)
+
+编译的过程：
+确定编译目标后，查找目标依赖的文件(在device中的设置PRODUCT_PACKAGES等)。如何生成依赖文件在Android.mk中定义。
+
+====================================
+build目录：
+Makefile
+|
+build/core/main.mk
+|
+build/core/config.mk
+|
+build/core/envsetup.mk
+|
+build/core/product_config.mk
+|
+build/core/product.mk
+
+相关文件：
+base_rules.mk：
+将模块加入到ALL_MODULES，记录模块路径，标签等信息。创建伪目标LOCAL_MODULE，用于编译(所有的编译的根本)。
+.PHONY: $(LOCAL_MODULE)
+$(LOCAL_MODULE): $(LOCAL_BUILT_MODULE) $(LOCAL_INSTALLED_MODULE)
+
+package.mk：
+编译应用
+BUILD_PACKAGE@package.mk-->(签名)sign-package@definitions.mk-->java -jar out/host/linux-x86/framework/signapk.jar
+
+executable.mk：
+编译可执行BUILD_EXECUTABLE = BUILD_SYSTEM/
+
+//包含device/*/$(TARGET_DEVICE)/BoardConfig.mk
+include $(board_config_mk)@config.mk
+_______________________________
+设置编译目标：
+make获取device中定义的变量:获取AndroidProducts.mk
+get-all-product-makefiles(获取PRODUCT_MAKEFILES)-->get-product-makefiles--_find-android-products-files
+(搜索device或vender目录下AndroidProducts.mk)@product.mk
+
+import-products(传入参数get-all-product-makefiles)@product_config.mk-->import-products(PRODUCT_MAKEFILES)
+@product.mk-->import-nodes(PRODUCTS,PRODUCT_MAKEFILES,$(_product_var_list))-->_import-nodes-inner-->import-node(PRODUCTS,配置文件，$(_product_var_list))@node_fns.mk
+最后获得变量PRODUCT.(PRODUCT_MAKEFILES)xxxx.mk.(PRODUCT_PACKAGE,PRODUCT_COPYFILE....)
+
+-------------------------------
+函数@node_fns.mk
+_import-nodes-inner //导入变量。判断文件是否存在，标记文件已处理。
+_import-node //构建PRODUCT.xxxx.mk._product_var_list(PRODUCT_PACKAGE,PRODUCT_COPYFILE....)
+	     //构建PRODUCTS变量	所有的xxxx.mk(full_panda.mk)
+get-inherited-nodes//$(1)中有前缀$(2)的变量包含有$(INHERIT_TAG)字符则返回该变量值
+
+clear-var-list //将$(1)中的变量清空
+copy-var-list  //将$(2)中变量拷贝到$(1)中
+move-var-list  //将$(1)中变量$(3),移到$(2)中
+__________________________________
+查找所有的Android.mk@main.mk
+如果不是mmm,mm编译形式则：查找系统中所有的Android.mk文件，并包含进来
+subdir_makefiles := \
+	$(shell build/tools/findleaves.py --prune=out --prune=.repo --prune=.git $(subdirs) Android.mk)
+include $(subdir_makefiles)
+
+----------------------------------
+要编译的模块(从device中的设置获取，从Android.mk获取user标签的模块)：
+Default_MODULES := $(sort $(ALL_DEFAULT_INSTALLED_MODULES) $(CUSTOM_MODULES))
+
+ALL_MODULE_NAME_TAGS.$(tag) += $(LOCAL_MODULE)//加入LOCAL_MODULE(Android.mk中定义)@base_rules.mk
+
+//BoardConifg.mk中定义，所有的要编译的目标文件由此配置决定。
+user_PACKAGES := $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_PACKAGES)
+
+//从ALL_MODULE_NAME_TAGS.user/debug中获取值
+user_MODULES := $(sort $(call get-tagged-modules,user shell_$(TARGET_SHELL)))
+user_MODULES := $(user_MODULES) $(user_PACKAGES)
+
+eng_MODULES := $(sort $(call get-tagged-modules,eng))
+debug_MODULES := $(sort $(call get-tagged-modules,debug))
+
+//从user/debug_MODULES获取值
+modules_to_install:= $(sort $(Default_MODULES) \
+          $(foreach tag,$(tags_to_install),$($(tag)_MODULES))
+//过滤被覆盖的模块
+modules_to_install := \
+      $(filter-out $(foreach p,$(overridden_packages),$(p) %/$(p).apk), \
+          $(modules_to_install))
+
+ALL_DEFAULT_INSTALLED_MODULES := $(modules_to_install) //是编译system等的依赖文件
+====================================
+device中定义要编译的模块，要拷贝的文件。
+用来赋值一些变量：
+PRODUCT_MAKEFILES，PRODUCT_PACKAGES，PRODUCT_COPY_FILES
+
+device中的makefile包含层次
+device/mstar/mstarcedric3/AndroidProducts.mk (赋值PRODUCT_MAKEFILES)
+|
+device/mstar/mstarcedric3/full_mstarcedric3.mk
+|
+device/mstar/common/full_base.mk
+|
+device/mstar/common/generic_no_telephony.mk
+|
+device/mstar/common/core.mk
+
+
+PRODUCT_MAKEFILES :=(配置文件的地址)@AndroidProduct.mk
+
+____________________________________
+Android.mk中定义模块如何编译：
+应该是设置一个变量被处理后的规则。
+
+====================================
+生成目标：systme，recovery，boot,OTA
+
+droid: droidcore dist_files
+
+droidcore: files \
+	systemimage \
+	$(INSTALLED_BOOTIMAGE_TARGET) \
+	$(INSTALLED_RECOVERYIMAGE_TARGET) \
+	$(INSTALLED_USERDATAIMAGE_TARGET) \
+	$(INSTALLED_CACHEIMAGE_TARGET) \
+	$(INSTALLED_FILES_FILE)
+
+files: prebuilt \
+        $(modules_to_install) \
+        $(modules_to_check) \
+        $(INSTALLED_ANDROID_INFO_TXT_TARGET)
+____________________________________
+编译system:
+@build/core/Makefile
+INSTALLED_SYSTEMIMAGE := $(PRODUCT_OUT)/system.img
+$(INSTALLED_SYSTEMIMAGE): $(BUILT_SYSTEMIMAGE) $(RECOVERY_FROM_BOOT_PATCH) | $(ACP)
+	@echo "Install system fs image: $@"
+	$(copy-file-to-target)
+	$(hide) $(ACP) -fp $<.lzo $@.lzo
+	$(hide) $(call assert-max-image-size,$@ $(RECOVERY_FROM_BOOT_PATCH),$(BOARD_SYSTEMIMAGE_PARTITION_SIZE),yaffs)
+
+systemimage: $(INSTALLED_SYSTEMIMAGE)
+|
+$(BUILT_SYSTEMIMAGE): $(FULL_SYSTEMIMAGE_DEPS) $(INSTALLED_FILES_FILE)
+|
+FULL_SYSTEMIMAGE_DEPS := $(INTERNAL_SYSTEMIMAGE_FILES) $(INTERNAL_USERIMAGES_DEPS) $(SELINUX_DEPENDS)
+
+
+INTERNAL_SYSTEMIMAGE_FILES := $(filter $(TARGET_OUT)/%, \
+    $(ALL_PREBUILT) \
+    $(ALL_COPIED_HEADERS) \
+    $(ALL_GENERATED_SOURCES) \
+    $(ALL_DEFAULT_INSTALLED_MODULES)\
+    $(ALL_PDK_FUSION_FILES))
+
+____________________________________
+recovery:
+@build/core/Makefile
+droidcore: INSTALLED_RECOVERYIMAGE_TARGET
+$(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKIMAGE) $(MINIGZIP) \
+		$(INSTALLED_RAMDISK_TARGET) \
+		$(INSTALLED_BOOTIMAGE_TARGET) \
+		$(recovery_binary) \
+		$(recovery_initrc) $(recovery_kernel) \
+		$(INSTALLED_2NDBOOTLOADER_TARGET) \
+		$(recovery_build_prop) $(recovery_resource_deps) \
+		$(recovery_fstab) \
+		$(busybox_binary) \
+		$(RECOVERY_INSTALL_OTA_KEYS)
+recoveryimage: $(INSTALLED_RECOVERYIMAGE_TARGET)
+------------------------------------
+签名密钥：
+@build/core/Makefile
+OTA_PUBLIC_KEYS := $(DEFAULT_SYSTEM_DEV_CERTIFICATE).x509.pem
+
+@build/core/config.mk
+ifdef PRODUCT_DEFAULT_DEV_CERTIFICATE
+  DEFAULT_SYSTEM_DEV_CERTIFICATE := $(PRODUCT_DEFAULT_DEV_CERTIFICATE)
+else
+  DEFAULT_SYSTEM_DEV_CERTIFICATE := build/target/product/security/testkey
+endif 
+
+@build/core/product_config.mk
+PRODUCT_DEFAULT_DEV_CERTIFICATE := \
+    $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_DEFAULT_DEV_CERTIFICATE))
+
+
+如果定义使用PRODUCT_EXTRA_RECOVERY_KEYS，会将该密钥的位置写入OTA升级包的/META/misc_info.txt文件中。
+____________________________________
+ramdisk.img:(root目录TARGET_ROOT_OUT)
+BUILT_RAMDISK_TARGET := $(PRODUCT_OUT)/ramdisk.img
+
+
+
+@@build/core/Makefile
+____________________________________
+boot.img:bootimage
+INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel
+INSTALLED_RAMDISK_TARGET := $(BUILT_RAMDISK_TARGET):=$(PRODUCT_OUT)/ramdisk.img
+
+INSTALLED_BOOTIMAGE_TARGET := $(PRODUCT_OUT)/boot.img
+bootimage:$(INSTALLED_BOOTIMAGE_TARGET)
+boot.img:kernel ramdisk.img
+____________________________________
+userdata:
+
+INSTALLED_USERDATAIMAGE_TARGET := $(BUILT_USERDATAIMAGE_TARGET)
+
+BUILT_USERDATAIMAGE_TARGET := $(PRODUCT_OUT)/userdata.img
+
+____________________________________
+OTA:make otapackage
+
+@build/core/Makefile
+.PHONY: otapackage
+otapackage: $(INTERNAL_OTA_PACKAGE_TARGET)
+$(INTERNAL_OTA_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS) $(SELINUX_DEPENDS)
+$(BUILT_TARGET_FILES_PACKAGE): \
+		$(INSTALLED_BOOTIMAGE_TARGET) \
+		$(INSTALLED_RADIOIMAGE_TARGET) \
+		$(INSTALLED_RECOVERYIMAGE_TARGET) \
+		$(INSTALLED_SYSTEMIMAGE) \
+		$(INSTALLED_USERDATAIMAGE_TARGET) \
+		$(INSTALLED_CACHEIMAGE_TARGET) \
+		$(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+@BoardConfig
+OTA_BOOTLOGO_IMAGE := $(TOP)/image/emmc/logo.bmp
+
+签名密钥：
+@build/core/Makefile
+DEFAULT_KEY_CERT_PAIR := $(DEFAULT_SYSTEM_DEV_CERTIFICATE)
+
+output_ota_package：
+默认使用META/misc_info.txt中 default_system_dev_certificate定义的密钥。如果没有设置，则使用
+build/target/product/security/testkey。
+
+密钥生成器：/development/tools/make_key
+
+
+recovery中调用的工具：
+$(PRODUCT_OUT)/obj/EXECUTABLES/updater
+
+------------------------------------
+updatepackage: $(INTERNAL_UPDATE_PACKAGE_TARGET)
+INTERNAL_UPDATE_PACKAGE_TARGET: BUILT_TARGET_FILES_PACKAGE
+
+___________________________________
+编译sdk：
+@main
+ALL_SDK_TARGETS := $(INTERNAL_SDK_TARGET)
+sdk: $(ALL_SDK_TARGETS)
+
+
+@Makefile
+INTERNAL_SDK_TARGET := $(sdk_dir)/$(sdk_name).zip
+
+
+
+__________________________________
+编译packages
+user_MODULES：=user_PACKAGES：=$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_PACKAGES)
+
+
+===================================
+生成密钥：
+development/tools/make_key testkey  '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
+
+
+查看密钥：
+openssl x509 -noout -subject -issuer -in media.x509.pem
+====================================
+属性文件生成：
+# default.prop
+一般在root/下，基本由build/core/main.mk设置ADDITIONAL_DEFAULT_PROPERTIES
+
+# build.prop
+- 由build/tools/buildinfo.sh 生成
+- (mstar中加入的system.prop)
+- ADDITIONAL_BUILD_PROPERTIES(core/main.mk设置)
+____________________________________
+默认语言设置：
+ro.product.locale.language@system.prop
+
+# Whether there is default locale set in PRODUCT_PROPERTY_OVERRIDES(build/target/product/基本都不设置)
+product_property_override_locale_language := $(strip \
+    $(patsubst ro.product.locale.language=%,%,\
+    $(filter ro.product.locale.language=%,$(PRODUCT_PROPERTY_OVERRIDES))))
+product_property_overrides_locale_region := $(strip \
+    $(patsubst ro.product.locale.region=%,%,\
+    $(filter ro.product.locale.region=%,$(PRODUCT_PROPERTY_OVERRIDES))))
+
+#将1中第一个字串的"_"替换成空格
+define default-locale
+$(subst _, , $(firstword $(1)))
+endef
+
+#如果product_property_override_locale_language为空则，返回参数“$1”中的第一个字串
+define default-locale-language
+$(if $(product_property_override_locale_language),,$(word 1, $(call default-locale, $(1))))
+endef
+define default-locale-region
+$(if $(product_property_overrides_locale_region),,$(word 2, $(call default-locale, $(1))))
+endef
+
+PRODUCT_DEFAULT_LANGUAGE="$(call default-locale-language,$(PRODUCT_LOCALES))" 
+PRODUCT_DEFAULT_REGION="$(call default-locale-region,$(PRODUCT_LOCALES))" 
+
+设置系统属性@/tools/buildinfo.sh:
+ echo "ro.product.locale.language=$PRODUCT_DEFAULT_LANGUA
+____________________________________
+可以自动创建对应目录：
+
+PRODUCT_COPY_FILES 
+____________________________________
+./java.mk:include $(BUILD_SYSTEM)/base_rules.mk
+./package.mk:include $(BUILD_SYSTEM)/java.mk
+./config.mk:BUILD_PACKAGE:= $(BUILD_SYSTEM)/package.mk
+
+====================================
+生成的jar包中间文件：
+
+out/target/common/obj/JAVA_LIBRARIES/framework_intermediates
+
+
+====================================
+Android.mk语法:
+
+源：LOCAL_SRC_FILES
+编译目标：include $(BUILD_STATIC_JAVA_LIBRARY)
+@build/core/config.mk
+
+解析：
+@build/core/base_rules.mk
+
+
+编译使用overlay：
+　　PRODUCT_PACKAGE_OVERLAYS: used by a particular product
+　　DEVICE_PACKAGE_OVERLAYS: used several products that share a common device model
+
+====================================
+编译sdk：
+make -j8 PRODUCT-sdk-sdk showcommands dist

@@ -1,0 +1,68 @@
+//通过HAL层进行操作
+AudioPolicyService::AudioPolicyService{
+- 创建线程，AudioCommandThread
+- audio模块，hw_get_module(AUDIO_POLICY_HARDWARE_MODULE_ID)
+- 打开设备，audio_policy_dev_open(module, &mpAudioPolicyDev)-->module->methods->open@audio_policy.h
+- 传递audioflinger到HAL层，创建policy，mpAudioPolicyDev->create_audio_policy(&aps_ops,&mpAudioPolicy)-->
+	create_legacy_ap@audio_policy_hal.cpp
+- 加载配置，loadPreProcessorConfig(/etc/audio_effects.config)
+}
+
+
+加载模块：
+load_hw_module-->aps_load_hw_module-->af->loadHwModule
+
+frameworks/av/services/audioflinger/AudioPolicyService.cpp
+
+//AudioPolicyService通过audio_policy_hal进行操作
+
+//加载模块
+aps_load_hw_module-->af->loadHwModule
+
+=================
+//output
+获取output：
+AudioPolicyService::getOutput-->mpAudioPolicy->get_output@AudioPolicyService.cpp
+-->lap->policy.get_output@audio_policy_hal.cpp
+
+回调getOutput：
+getOutput-->(HAL)aps_ops.open_output_on_module-->aps_open_output_on_module-->af->openOutput
+@AudioPolicyService.cpp
+
+开始output：
+AudioPolicyService::startOutput-->mpAudioPolicy->start_output-->ap_start_output
+@audio_policy_hal.cpp
+
+回调设置参数：
+setParameters-->mAudioCommandThread->parametersCommand-->threadLoop-->
+AudioSystem::setParameters@AudioPolicyService.cpp-->af->setParameters@AudioSystem.cpp-->
+
+
+
+//设置音量
+setStreamVolumeIndex@audioSystem.cpp-->setStreamVolumeIndex{
+- 有该函数则调用，mpAudioPolicy->set_stream_volume_index_for_device
+	-->ap_set_stream_volume_index_for_device@
+- 否则调用，set_stream_volume_index
+}
+
+//根据流获取设备
+getDevicesForStream-->mpAudioPolicy->get_devices_for_stream@AudioPolicyService.cpp
+-->get_devices_for_stream-->ap_get_devices_for_stream@audio_policy_hal.cpp
+
+
+
+set_stream_volume-->aps_set_stream_volume-->setStreamVolume-->mAudioCommandThread->volumeCommand-->
+AudioCommandThread::volumeCommand-->(执行命令)AudioCommandThread::threadLoop-->AudioSystem::setStreamVolume
+@AudioPolicyService.cpp
+
+=================
+//input 
+
+
+frameworks/av/services/audioflinger/AudioPolicyService.cpp
+hardware/rk29/audio/audio_policy_hal.cpp
+
+
+
+

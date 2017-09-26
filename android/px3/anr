@@ -1,0 +1,109 @@
+//No response to an input event (such as key press or screen touch events) within 5 seconds.
+//A BroadcastReceiver hasn't finished executing within 10 seconds.
+kill -3 <pid>  
+
+//按键5s
+handleTargetsNotReadyLocked-->onANRLocked-->doNotifyANRLockedInterruptible
+@InputDispatcher.cpp-->notifyANR@InputManagerService.java-->notifyANRf{
+- 应用不为空，appWindowToken.appToken.keyDispatchingTimedOut@InputMonitor.java-->
+	keyDispatchingTimedOut-->service.inputDispatchingTimedOut(app,process)@ActivtyRecord.java
+	-->appNotResponding@ActivityManagerService.java
+
+- 窗口不为空， ActivityManagerNative.getDefault().inputDispatchingTimedOut(mPid)@InputMonitor.java
+	-->appNotResponding@ActivityManagerService.java
+}
+
+frameworks/base/services/java/com/android/server/wm/InputMonitor.java
+frameworks/base/services/java/com/android/server/input/InputManagerService.java
+frameworks/base/services/input/InputDispatcher.cpp
+frameworks/base/services/java/com/android/server/am/ActivityRecord.java
+
+//广播10s
+processNextBroadcast{
+- mParallelBroadcasts{//处理Parallel广播
+	- deliverToRegisteredReceiverLocked
+	}
+- mOrderedBroadcasts{//只有这种类型广播才会超时
+	- cancelBroadcastTimeoutLocked //处理完时取消超时广播
+	}
+- setBroadcastTimeoutLocked //开始处理设置超时广播
+}
+
+处理超时：
+handleMessage(BROADCAST_TIMEOUT_MSG)-->broadcastTimeoutLocked{
+- 在这里重设超时时间(广播接受者finish后没有取消超时){
+	- mOrderedBroadcasts.get(0)
+	- setBroadcastTimeoutLocked
+	}
+- AppNotResponding.run@BroadcastQueue.java-->mService.appNotResponding(mApp)
+}BroadcastQueue.java
+
+广播结束：
+sendFinished-->am.finishReceiver@BroadcastReceiver.java-->finishReceiver{
+- r.queue.finishReceiverLocked-->finishReceiverLocked@BroadcastQueue.java//
+- r.queue.processNextBroadcast //处理下一个
+}@ActivityManagerService.java
+
+
+frameworks/base/services/java/com/android/server/am/BroadcastQueue.java
+
+//服务10s
+bumpServiceExecutingLocked(开始启动服务)-->
+scheduleServiceTimeoutLocked(ProcessRecord)-->serviceTimeout(SERVICE_TIMEOUT_MSG)@ActiveServices.java
+-->serviceTimeout@ActivityManagerService.java-->mAm.appNotResponding
+
+取消超时：
+serviceDoneExecutingLocked-->mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_TIMEOUT_MSG)
+
+
+start启动服务：
+startService@ActivityManagerService.java-->startServiceLocked-->startServiceInnerLocked-->
+bringUpServiceLocked-->sendServiceArgsLocked@ActivityService.java
+scheduleServiceArgs-->handleServiceArgs{
+- s.onStartCommand
+- serviceDoneExecuting-->mServices.serviceDoneExecutingLocked
+}@ActivityThread.java
+
+bind启动服务:
+bindService@ActivityManagerService.java-->bindServiceLocked-->requestServiceBindingLocked-->
+r.app.thread.scheduleBindService@ActivityService.java
+scheduleBindService{
+- s.onBind
+- handleBindService-->ActivityManagerNative.getDefault().publishService-->
+	mServices.publishServiceLocked-->serviceDoneExecutingLocked
+}@ActivityThread.java
+
+超时处理：
+MainHandler.handleMessage(SERVICE_TIMEOUT_MSG)-->mServices.serviceTimeout@ActivityManagerService.java
+
+
+
+
+frameworks/base/services/java/com/android/server/am/ActiveServices.java
+===================
+
+appNotRespondingViaProvider
+inputDispatchingTimedOut
+
+-->appNotResponding{
+- 
+- 保存anr/trace.txt,dumpStackTraces{
+	- 
+	}
+- 弹框，sendMessage(SHOW_NOT_RESPONDING_MSG)-->AppNotRespondingDialog
+}@ActivityManagerService.java
+
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+
+
+====================
+进程开始：
+AndroidRuntime::startVm{
+- opt.optionString= "-Xstacktracefile:"+ property_get("dalvik.vm.stack-trace-file");
+
+}
+
+
+
+frameworks/base/core/jni/AndroidRuntime.cpp

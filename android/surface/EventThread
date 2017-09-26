@@ -1,0 +1,78 @@
+//MessageQueue初始化
+//用来接受display的同步事件信息，分发同步信息
+//
+
+
+SurfaceFlinger::onFirstRef-->(MessageQueue)mEventQueue.init{
+- 保存surfaceFlinger，mFlinger
+- new Looper
+- new Handler
+}
+
+
+SurfaceFlinger::init{
+- setEventThread{
+	- 创建事件监听，mEvents = eventThread->createEventConnection-->new connetion//连接到EventThread
+	- createEventConnection
+	- looper开始监听，mLooper->addFd(cb_eventReceiver)
+	}
+- 
+}
+
+SurfaceFlinger::run-->MessageQueue::waitMessage{
+- IPCThreadState::self()->flushCommands //获取client操作？
+- 等待同步消息，mLooper->pollOnce-->cb_eventReceiver-->eventReceiver{//读取EventThread事件
+	- mHandler->dispatchInvalidate
+	}
+}
+
+//请求同步事件
+MessageQueue::invalidate-->mEvents->requestNextVsync
+
+MessageQueue::Handler::handleMessage-->mQueue.mFlinger->onMessageReceived
+
+frameworks/native/services/surfaceflinger/MessageQueue.cpp
+==========
+//EventThread
+
+//注册连接
+eventThread->createEventConnection-->
+Connection::onFirstRef-->registerDisplayEventConnection
+
+//使能，设置回调
+EventThread::enableVSyncLocked{
+- mVSyncSource->setCallback(this)
+- mVSyncSource->setVSyncEnabled
+}
+
+//接收到display的同步事件
+onVSyncEvent{
+- mVSyncEvent //设置事件
+- mCondition.broadcast ，通知等待进程
+}
+
+//等待事件
+EventThread::onFirstRef-->run-->
+threadLoop{
+- 等待事件，waitForEvent{
+	- 获取事件，mVSyncEvent
+	- 获取事件等待者，signalConnections
+	- 等待条件返回事件，mCondition.waitRelative //onVSyncEvent唤醒等待
+	}
+- 发送事件，conn->postEvent-->DisplayEventReceiver::sendEvents
+}
+
+//请求事件
+invalidate-->mEvents->requestNextVsync-->mEventThread->requestNextVsync
+-->mCondition.broadcast
+
+//发送模拟的屏同步事件(非硬件)
+DisplayEventReceiver::sendEvents(DISPLAY_EVENT_VSYNC)
+
+frameworks/native/services/surfaceflinger/EventThread.cpp
+
+===========
+looper
+
+
+system/core/libutils/Looper.cpp

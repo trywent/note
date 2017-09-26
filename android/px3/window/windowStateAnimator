@@ -1,0 +1,87 @@
+//更新AppWindowToken状态
+updateAllDrawnLocked
+
+
+updateWindowsLocked@WindowAnimator.java-->performShowLocked
+
+
+performLayoutAndPlaceSurfacesLockedInner@WindowManagerService.java-->
+commitFinishDrawingLocked{
+- 设置mDrawState = READY_TO_SHOW
+- 若可以显示atoken.allDrawn，performShowLocked{
+	- applyEnterAnimationLocked
+	- 开始动画，scheduleAnimationLocked
+	- 若是应用，设置应用端，Win.mAppToken.updateReportedVisibilityLocked
+	}
+}@WindowStateAnimator.java
+
+_______________
+//创建surface
+relayoutWindow-->createSurfaceLocked{
+- 设置状态，DRAW_PENDING
+}
+
+窗口变化：
+updateResizingWindows-->(窗口方向变化)DRAW_PENDING
+
+//绘制
+performDraw(报告绘制完成mReportNextDraw)@ViewRootImpl.java-->finishDrawing@Session.java-->
+finishDrawingWindow@WindowManagerService.java-->finishDrawingLocked{
+- 设置状态，COMMIT_DRAW_PENDING
+}@WindowStateAnimator.java
+
+performLayoutAndPlaceSurfacesLockedInner@WindowManangerService.java-->
+commitFinishDrawingLocked{
+- 若状态不为COMMIT_DRAW_PENDING，则返回
+- 设置状态，READY_TO_SHOW
+- 若绘制完成atoken.allDrawn，则显示performShowLocked{
+		- 若状态为READY_TO_SHOW，则显示mService.scheduleAnimationLocked
+		}
+}@WindowStateAnimator.java
+
+//准备显示
+animateLocked@WindowAnimator.java-->prepareSurfaceLocked{
+- computeShownFrameLocked
+- 设置位置，大小，setSurfaceBoundariesLocked{
+	- mSurfaceControl.setPosition
+	- mSurfaceControl.setSize
+	- updateSurfaceWindowCrop{
+		- 设置w.mSystemDecorRect
+		- mSurfaceControl.setWindowCrop	
+		}
+	}
+- mSurfaceControl.setAlpha/setLayer/setMatrix
+- 显示，showSurfaceRobustlyLocked
+}@WindowStateAnimator.java
+
+
+//显示
+showSurfaceRobustlyLocked-->mSurfaceControl.show
+
+//隐藏
+hide-->mSurfaceControl.hide
+
+//销毁
+stepAnimationLocked-->(动画执行完成)finishExit{
+- 不是窗口退出则返回
+- 若是窗口退出，mWin.mExiting
+	- 加入到销毁容器，mService.mDestroySurface.add
+	- 隐藏窗口，hide
+}
+
+
+
+/*销毁被泄漏的窗口(某种原因没有被跟踪了)*/
+reclaimSomeSurfaceMemoryLocked{
+- mSurfaceControl.destroy();
+- mSurfaceShown = false;
+- mSurfaceControl = null;
+- mHasSurface = false
+}@WindowManagerService.java
+_______________
+_______________
+
+
+
+frameworks/base/services/java/com/android/server/wm/WindowAnimator.java
+frameworks/base/services/java/com/android/server/wm/WindowStateAnimator.java

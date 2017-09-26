@@ -1,0 +1,44 @@
+import android.app.ActivityManager
+am = (ActivityManager)Context.getSystemService(Context.ACTIVITY_SERVICE)
+am.fytgetState()
+am.fytsetState(int)
+
+
+
+public int fytgetState()
+public int fytsetState()
+=================
+获取状态：
+
+state= am.fytgetState();
+
+窗口状态：state & 0xf
+state & 0xf == 0x0  //分屏状态
+state & 0xf == 0x1  //应用全屏
+state & 0xf == 0x2  //地图全屏
+
+是否可切换到半屏：state & 0x20
+
+(state &0x20)!=0  //窗口可切换到半屏
+
+
+
+
+=================
+方法调用，（标准api中没有的方法，需导入jar包）
+am.fytsetState(0/1)
+am.fytgetState()
+
+
+fytsetState(0)  //应用切换到半屏
+fytsetState(1)  //应用切换到全屏
+fytsetState(0x10)  //设置当前是音乐标记
+fytsetState(0x11)  //清除当前是音乐标记
+
+===========================
+moveTask  //焦点栈判断容易，全屏时只有应用栈有焦点。半屏都有能显示
+
+
+
+
+

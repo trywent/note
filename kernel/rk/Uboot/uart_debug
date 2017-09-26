@@ -1,0 +1,83 @@
+CONFIG_UART_NUM UART_CH1  @uboot/include/configs/rk30xx.h
+
+
+
+初始化：
+rk30_serial_init-->UARTInit(CONFIG_UART_NUM, CONFIG_BAUDRATE){
+
+}
+
+
+输入/输出：
+rk30_serial_putc-->UARTWriteByte(CONFIG_UART_NUM, c)
+
+rk30_serial_getc-->UARTReadByte(CONFIG_UART_NUM)
+
+
+uboot/drivers/serial/rk30_uart.c
+
+=========================
+内存中的串口输出函数(不通过printk函数)：
+
+_________________________
+CONFIG_RK_DEBUG_UART
+
+sram_printch
+kernel/arch/arm/mach-rk30/pm.c
+
+rk30_init_enable_clocks
+kernel/arch/arm/mach-rkpx3/clock_data_rkpx3.c
+
+_________________________
+原因：
+#ifdef DEBUG_UART_PHYS
+	.macro addruart, rp, rv
+		ldr	\rp, = DEBUG_UART_PHYS
+		ldr	\rv, = DEBUG_UART_BASE
+	.endm
+kernel/arch/arm/plat-rk/include/plat/debug-macro.S
+
+./arch/arm/kernel/head.S:	addruart r7, r3
+编译打开：obj-$(CONFIG_RK_EARLY_PRINTK) += early_printk.o ../kernel/debug.o
+
+
+设置波特率失败：
+(uboot中设置成功避免错误)UARTSetBaudRate(pUartReg, baudRate)@rk30_uart.c
+uboot/drivers/serial/rk30_uart.c
+
+
+	phwHead->UART_LCR = phwHead->UART_LCR | LCR_DLA_EN;
+	uartTemp = (1000 * 24000) / MODE_X_DIV / baudRate;
+	phwHead->UART_DLL = uartTemp & 0xff;
+	phwHead->UART_DLH = (uartTemp>>8) & 0xff;
+	phwHead->UART_LCR = phwHead->UART_LCR & (~LCR_DLA_EN);
+
+——————————————
+rk：
+serial_rk_set_termios
+UART_DLM
+
+void uartClear(){
+        pUART_REG phwHead = (pUART_REG)UART2_BASE_ADDR;
+
+        g_grfReg->GRF_GPIO_IOMUX[1].GPIOB_IOMUX = (((0x3<<2)|(0x3))<<16);   // sin,sout
+	g_grfReg->GRF_UOC0_CON[0] = (0x0000 | (0x0300 << 16));
+	g_grfReg->GRF_UOC0_CON[2] = (0x0000 | (0x0004 << 16));
+        //reset
+ 	phwHead->UART_SRR = 0;//UART_RESET | RCVR_FIFO_REST | XMIT_FIFO_RESET;
+	phwHead->UART_IER = 0;
+        //UARTSetIOP
+        phwHead->UART_MCR = 0;//useIrDA;
+        //UARTSetLcrReg
+        phwHead->UART_LCR = 0;//lcr;
+        //UARTSetBaudRate
+        phwHead->UART_LCR = 0;//phwHead->UART_LCR | LCR_DLA_EN;
+	phwHead->UART_DLL = 0;//uartTemp & 0xff;
+	phwHead->UART_DLH = 0;//(uartTemp>>8) & 0xff;
+	phwHead->UART_LCR = 0;//phwHead->UART_LCR & (~LCR_DLA_EN);
+        //UARTSetFifoEnabledNumb
+        phwHead->UART_SFE = 0;//SHADOW_FIFI_ENABLED;
+	phwHead->UART_SRT = 0;//RCVR_TRIGGER_TWO_LESS_FIFO;
+	phwHead->UART_STET = 0;//TX_TRIGGER_TWO_IN_FIFO;
+
+}

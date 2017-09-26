@@ -1,0 +1,43 @@
+//bluetooth stack
+
+//1.
+classInitNative{
+- hw_get_module(BT_STACK_MODULE_ID) //加载模块 bluetooth
+- module->methods->open(module, id, &abstraction) //获取接口
+}
+
+//2.
+initNative{
+- sBluetoothInterface->init(sBluetoothCallbacks)  //设置协议栈回调
+- sBluetoothInterface->set_os_callouts            //系统相关回调
+- sBluetoothInterface->get_profile_interface(BT_PROFILE_SOCKETS_ID)//获取socket接口
+- btStack = (bluetooth_module_t *)abstraction //协议栈
+- sBluetoothInterface = btStack->get_bluetooth_interface //协议栈接口
+}
+
+packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
+
+==============
+//bluetooth HAL
+hw_module_t HAL_MODULE_INFO_SYM = {
+    .id = BT_HARDWARE_MODULE_ID,
+    .methods = &bt_stack_module_methods
+}@bluetooth.c
+
+get_bluetooth_interface@com_android_bluetooth_btservice_AdapterService.cpp-->
+bluetooth__get_bluetooth_interface-->bluetoothInterface@bluetooth.c //接口
+
+//enable bluetooth
+interface.start_up_stack_async-->thread_post(management_thread, event_start_up_stack)-->
+event_start_up_stack@stack_manager.c-->bte_main_enable@bte_main.c-->BTU_StartUp@btu_init.c
+
+
+
+//JNI
+bluetoothInterface.init-->
+
+
+system/bt/btif/src/bluetooth.c
+system/bt/btif/src/stack_manager.c
+system/bt/main/bte_main.c
+system/bt/stack/btu/btu_init.c

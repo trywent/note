@@ -1,0 +1,345 @@
+======================================
+i2c用户空间API接口:
+适配器返回支持的i2c功能：
+  static u32 i2c_xxxx_functionality(struct i2c_adapter *adap)
+  {
+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL |....;
+  }
+
+I2C_FUNC_SMBUS_EMUL包含了smbus的所有功能。
+
+使用者检测适配器功能：
+  static int xxxx_detect(...)
+  {
+	(...)
+	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA |
+				     I2C_FUNC_SMBUS_WORD_DATA))
+		goto exit;
+	(...)
+  }
+
+通过设备文件检测：
+  int file;
+  if (file = open("/dev/i2c-0", O_RDWR) < 0) {
+	/* Some kind of error handling */
+	exit(1);
+  }
+  if (ioctl(file, I2C_FUNCS, &funcs) < 0) {
+	/* Some kind of error handling */
+	exit(1);
+  }
+  if (!(funcs & I2C_FUNC_SMBUS_QUICK)) {
+	/* Oops, the needed functionality (SMBus write_quick function) is
+           not available! */
+	exit(1);
+  }
+
+_____________________________
+驱动中读写实现：
+i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num){
+- 总线能够访问i2c，adap->algo->master_xfer{
+	- 锁定i2c_trylock_adapter
+	- adap->algo->master_xfer@i2c-core.c-->rk30_i2c_algorithm.master_xfer-->
+		rk30_i2c_xfer@i2c-rk30-adapter.c
+	- 释放锁i2c_unlock_adapter
+	}
+}@i2c-core.c
+
+平台实现：
+rk30_i2c_xfer{
+- 判断时钟是否正确
+- 设置频率rk30_i2c_set_clk
+- 传输，rk30_i2c_doxfer-->rk30_i2c_irq-->rk30_i2c_irq_nextblock{
+	- i2c处于写状态STATE_WRITE，{
+		- rk30_irq_write_prepare,读取msg中数据写入寄存器I2C_TXDATA_BASE
+		}
+	}
+- 关闭时钟
+}@i2c-rk30-adapter.c
+
+kernel/drivers/i2c/busses/i2c-rk30-adapter.c
+=============================
+总线设备(host)：
+
+注册i2c总线平台设备：
+rk30_init_devices-->rk30_init_i2c{
+- platform_device_register(&device_i2c0) //name	= "rk30_i2c",
+- ....
+}@devices.c
+
+注册i2c平台设备驱动：
+subsys_initcall(i2c_adap_init)-->i2c_adap_init-->platform_driver_register(&rk30_i2c_driver){
+.probe = rk30_i2c_probe,
+.driver	= {
+	.name	= "rk30_i2c",
+	}
+}@i2c-rk30.c
+
+生成i2c总线adpater：
+rk30_i2c_probe@i2c-rk30.c-->i2c_add_numbered_adapter{
+- 创建设备rk30_i2c，i2c
+- 生成adapter，i2c_add_rk30_adapter{
+	- 设置adapter的处理函数，adap->algo = &rk29_i2c_algorithm
+	- i2c_add_numbered_adapter{
+		- i2c_register_adapter-->device_register
+		- 探测总线上设备，i2c_scan_static_board_info
+		}@i2c-core.c
+	}
+- 初始化设备i2c
+- 设置平台设备的驱动数据为i2c
+}@i2c-rk30-adapter.c
+
+生成i2c_client(功能设备):
+i2c_add_numbered_adapter-->i2c_register_adapter-->i2c_scan_static_board_info-->i2c_new_device@i2c-core.c
+
+kernel/drivers/i2c/busses/i2c-rk30.c
+kernel/arch/arm/mach-rk30/devices.c
+kernel/drivers/i2c/busses/i2c-rk30-adapter.c
+=============================
+i2c总线上client：
+
+加入i2c_client设备：
+machine_rk30_board_init-->rk30_i2c_register_board_info{
+- i2c_register_board_info(0, i2c0_info, ARRAY_SIZE(i2c0_info)){
+	- 将总线上设备加入到链表，list_add_tail(&devinfo->list, &__i2c_board_list)
+	}
+- ....
+}@board-rk3188-tb.c
+
+
+创建i2c_client设备并注册：
+i2c_add_numbered_adapter-->i2c_register_adapter-->i2c_scan_static_board_info(struct i2c_adapter *adapter)
+{
+- 遍历链表中的设备list_for_each_entry(devinfo, &__i2c_board_list, list)
+	- 若设备编号与适配值编号一致，则创建i2c设备
+	  i2c_new_device(adapter,&devinfo->board_info){
+		- 创建i2c_client
+		- 注册设备device_register(&client->dev)
+	}
+}@i2c-core.c
+
+
+
+驱动注册(i2c设备的驱动)：
+postcore_initcall(i2c_init)/(各个功能设备的驱动)-->i2c_add_driver-->i2c_register_driver@i2c.h
+-->i2c_register_driver{
+- 设置驱动总线，driver->driver.bus = &i2c_bus_type
+- 注册驱动driver_register
+- 遍历总线上的设备执行，i2c_for_each_dev(driver, __process_new_driver){
+			- __process_new_driver-->i2c_do_add_adapter(探测适配器并加入)		
+	}
+}@i2c-core.c
+
+
+
+drivers/i2c/i2c-boardinfo.c
+drivers/i2c/i2c-core.c
+include/linux/i2c.h
+_____________________________________
+i2c字符设备：
+module_init(i2c_dev_init)-->i2c_dev_init-->register_chrdev(I2C_MAJOR, "i2c", &i2cdev_fops)@i2c-dev.c
+
+drivers/i2c/i2c-core.c
+drivers/i2c/busses/i2c-rk30.c
+drivers/i2c/busses/i2c-rk30-adapter.c
+arch/arm/mach-rk30/board-rk3168-tb.c
+arch/arm/mach-rk30/devices.c
+include/linux/i2c.h
+drivers/i2c/i2c-dev.c
+
+
+======================================
+UART_FCR(FIFO Control Register):
+
+UART:
+rk中只配置了：CONFIG_UART0_RK29，CONFIG_UART3_RK29
+debug串口：CONFIG_RK_DEBUG_UART=2
+2|| ARCH_RKPX3@px3/kernel/arch/arm/plat-rk/kconfig
+
+驱动注册：name	= "fiq_debugger"
+postcore_initcall(fiq_debugger_init)-->platform_driver_register(&fiq_debugger_driver)@fiq_debugger.c
+
+设备注册：name = "fiq_debugger"
+rk30_init_devices@devices.c-->rk_serial_debug_init(设备地址..)-->platform_device_register
+@rk_fiq_debugger.c
+
+探测：
+fiq_debugger_probe-->register_console--fiq_debugger_tty_init{
+- 创建驱动，alloc_tty_driver
+- 设置驱动配置，波特率...
+- 注册串口驱动，tty_register_driver(state->tty_driver)	
+}@fiq_debugger.c
+
+
+查看串口配置：
+stty -F /dev/ttySx
+
+arch/arm/common/fiq_debugger.c
+arch/arm/plat-rk/rk_fiq_debugger.c
+arch/arm/mach-rk30/devices.c
+________________________________________
+驱动注册：(name="rk_serial")
+serial_rk_init{
+- 注册串口驱动(所有的串口设备使用)，uart_register_driver(&serial_rk_reg/*串口设备信息*/){
+		- 创建tty_driver，并初始化设置驱动名为"ttyS"
+		- 根据端口个数，初始化drv->state中的port
+		- 注册tty_driver,tty_register_driver{
+			- 获取设备号,(使用默认设备号(4,64))
+			- 创建字符设备cdev_init,cdev_add。字符设备的个数有驱动driver.nr决定(rk是4路线)
+		}@tty_io.c
+	}
+- 注册平台驱动，platform_driver_register(&serial_rk_driver)
+- 
+}@rk_serial.c
+
+平台设备注册：(name="rk_serial")
+arch_initcall(rk30_init_devices)-->rk30_init_devices-->rk30_init_uart-->(根据定义的设备注册0,1,2,3)
+platform_device_register(&device_uart0)@devices.c
+
+平台设备驱动probe:
+serial_rk_driver.serial_rk_probe{
+- 获取平台设备资源，platform_get_resource
+- 获取平台中断号，platform_get_irq
+- 是否使能DMA访问
+- 分配uart_rk_port设备空间并初始化，初始端口操作函数，编号
+- 加入端口，uart_add_one_port
+}@rk_serial.c
+
+
+//注册sys中的节点，用于生成/dev下设备
+uart_add_one_port{
+- 配置串口，uart_configure_port
+- 注册串口设备，tty_register_device(注册了platform_device->dev){
+		- 获取设备号，创建设备名
+		- 创建sysfs文件，device_create.(用户可见的字符设备，通过此处的设备号创建)
+	}@tty_io.c
+}
+
+kernel/drivers/tty/serial/rk_serial.c
+kernel/arch/arm/mach-rk30/devices.c
+
+
+出错：
+debug> fiq debugger mode 
+
+serial_rk_interrupt-->serial_rk_handle_port-->(寄存器信息)rk29_uart_dump_register
+
+serial_rk_pops.set_termios-->serial_rk_set_termios-->serial_dl_write
+
+设置失败：
+serial_lcr_write(设置lcr超时)
+====================================
+serial core：
+uart_add_one_port{
+- 
+- tty_register_device{//创建设备"rk_serial"
+		- 根据tty_deriver中的主从设备号加上设备编号，创建设备号dev_t
+		- 根据驱动类型，设置驱动名pty_line_name/tty_line_name
+		- 创建设备，device_create()
+	}
+}@core.c
+
+
+uart_register_driver{ //注册驱动
+- 初始化驱动中的tty_driver normal，设置驱动名，波特率...
+- 注册串口驱动，tty_register_driver{
+		- 请求字符设备号alloc_chrdev_region(设备名“ttyS”)，
+		- 初始字符设备cdev_init设置操作函数为tty_fops，
+		- 将驱动加入到链表tty_drivers
+		- 加入字符设备cdev_add
+		- 注册proc信息，proc_tty_register_driver
+	}
+}@serial_core.c
+
+
+======================
+TTY设备：
+创建设备：
+uart_register_driver-->tty_register_driver{
+- 创建设备编号，MKDEV(driver->major, driver->minor_start)
+- 注册编号范围，register_chrdev_region
+- 初始化操作函数，cdev_init(, &tty_fops)
+- 注册字符设备，cdev_add
+}@tty_io.c
+
+
+打开：
+tty_fops.open-->tty_open{
+- 若设备是TTYAUX_MAJOR，TTYAUX_MAJOR。则获取对应的驱动
+- 获取设备对应的驱动，get_tty_driver{
+	- 遍历tty_drivers中的驱动，返回设备号相同的驱动
+	}
+- 查找是否存在一个tty设备，tty_driver_lookup_tty
+- 没有找到，初始化一个tty设备，tty_init_dev{
+		- 分配tty空间，alloc_tty_struct
+		- 初始化tty结构，设置驱动，initialize_tty_struct-->tty_ldisc_init{
+			- 设置tty设备的tty_ldisc，为tty_ldiscs[0]	
+			}@tty_ldisc
+		- 将tty设置到对应驱动中，tty_driver_install_tty-->(设置串口配置)tty_init_termios
+		- tty_ldisc_setup
+		}
+- 关联tty结构和被打开文件，tty_add_file
+}@tty_io.c
+
+tty设备操作：
+tty_fops.write-->tty_write{
+- 获取tty_ldisc设备，tty_ldisc_ref_wait(tty)
+- 通过tty_ldisc操作，do_tty_write-->ld->ops->write
+}@tty_io.c
+
+kernel/drivers/tty/tty_io.c
+____________________________________
+串口设置api的内核实现：
+
+console_init@tty_io.c-->tty_ldisc_begin-->tty_register_ldisc(N_TTY, &tty_ldisc_N_TTY){
+- 设置tty_ldiscs[N_TTY],(操作函数集合)tty_ldisc_N_TTY
+}@tty_ldisc.c
+
+
+tty_ldisc_N_TTY.ioctl-->n_tty_ioctl@n_tty.c-->n_tty_ioctl_helper-->tty_mode_ioctl-->set_termios@tty_ioctl.c
+
+平台相关操作：
+set_termios-->serial_rk_set_termios{
+- 获取波特率，uart_get_baud_rate
+- 
+}@rk_serial.c
+
+TCSETS2
+
+drivers/tty/serial/serial_core.c
+drivers/tty/tty_io.c
+drivers/tty/n_tty.c
+drivers/tty/tty_ioctl.c
+drivers/tty/tty_ldisc.c
+====================================
+tty_register_ldisc()
+tty_unregister_ldisc()
+
+____________________________________
+链路层？？？：
+line discipline (LDISC)是终端子系统中的一层。终端子系统有三层，最高层提供字符设备接口，中间层
+line discipline定义驱动的策略，底层驱动与硬件或虚拟终端通信。
+
+line discipline连接底层设备驱动和上层接口程序(read,write,ioctl)。和驱动程序的分离，可以使同一
+驱动在不同的数据请求下使用。
+
+
+如：标准的line discipline处理从硬件驱动和应用程序写入的数据。在输入时，处理特殊字符(中断control-C，删除backspace
+，delete，)。在输出时，将LF字符转换成CR/LF。
+
+如：使用串口上网，使用ppp line discipline协议将数据传入networking stack。
+
+====================
+/proc/irq/67 //uart1
+
+====================
+ERROR：
+
+lsr= 0xd9
+0000 0001：数据准备好
+0000 1000：帧错误，接收的数据没有STOP位
+0001 0000：接收的数据，顺序已乱
+0100 0000：FIFO已空
+1000 0000：数据错误标识
+
+

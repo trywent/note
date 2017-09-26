@@ -1,0 +1,145 @@
+根据Activity状态设置Activity的显示隐藏
+
+
+mResumedActivity   //已启动的activity
+
+
+_________________________________
+launch:
+scheduleLaunchActivity-->queueOrSendMessage(H.LAUNCH_ACTIVITY)-->handleMessage-->
+handleLaunchActivity-->performLaunchActivity(onCreate,start)--handleResumeActivity(onResume)@ActivityThread.java
+
+scheduleLaunchActivity(创建对象ActivityClientRecord)
+
+performLaunchActivity{
+- 创建 mInstrumentation.newActivity
+- 保存activity，r.activity = activity
+}
+_________________________________
+attach:
+
+
+attachApplication(记录下调用该方法的应用PID)-->attachApplicationLocked{
+- 获取pid对应的ProcessRecord， mPidsSelfLocked.get
+- 获取的ProcessRecord为空，则杀死该进程
+- ProcessRecord.thread不为空，handleAppDiedLocked
+- 当前线程关联killed处理，thread.asBinder().linkToDeath(new AppDeathRecipient)
+- 获取应用中providers，generateApplicationProvidersLocked{
+		- 获取apk中provider，AppGlobals.getPackageManager().queryContentProviders
+		- 从mProviderMap获取ContentProviderRecord，若没有则新建ContentProviderRecord并加入
+		- 将ContentProviderRecord加入app.pubProviders
+	}
+- 
+- 绑定应用，thread.bindApplication
+- 开始应用
+- 开始服务
+- 开始广播接收
+
+}@ActivityManagerService.java
+
+_________________________________
+pause:
+schedulePauseActivity-->queueOrSendMessage(PAUSE_ACTIVITY)-->handleMessage(PAUSE_ACTIVITY)-->handlePauseActivity{
+- 
+- performPauseActivity
+- 更新activityManager服务端状态，ActivityManagerNative.getDefault().activityPaused
+}
+_________________________________
+stop:
+handleStopActivity{
+- performStopActivityInner
+- 
+- mH.post(info)-->StopInfo.run-->ActivityManagerNative.getDefault().activityStopped
+}
+_________________________________
+resume:(已经在栈顶，还不可见)
+
+resumeTopActivityLocked-->next.app.thread.scheduleResumeActivity@ActivityStack.java-->
+(服务调用应用)scheduleResumeActivity-->handleMessage(RESUME_ACTIVITY)-->
+handleResumeActivity{
+- 执行performResumeActivity，onResume
+- 获取窗口配置r.window.getAttributes
+- 获取activity窗口，wm.addView加入窗口到WindowManager
+}@ActivityThread.java
+
+
+
+Looper.myQueue().addIdleHandler(new Idler())-->(进入空闲)Idler.queueIdle-->am.activityIdle
+@ActivityThread.java-->activityIdle-->mMainStack.activityIdleInternal@ActivityManagerService.java
+-->activityIdleInternal@ActivityStack.java
+
+_________________________________
+finish:
+scheduleDestroyActivity-->handleMessage(DESTROY_ACTIVITY)-->handleDestroyActivity{
+- 
+- 销毁activity,ActivityManagerNative.getDefault().activityDestroyed
+}
+_________________________________
+立即开始应用(LocalActivityManager)：
+startActivity-->mActivityThread.startActivityNow@LocalActivityManager.java-->startActivityNow
+-->performLaunchActivity@ActivityThread.java
+
+_________________________________
+显示：
+
+checkReadyForSleepLocked
+
+completeResumeLocked(启动应用后，确保应用的状态是正确的)
+
+resumeTopActivityLocked(应用进程已经开始，但配置发生变化，重新显示应用)
+
+activityIdleInternal
+
+
+ensureActivitiesVisibleLocked-->scheduleWindowVisibility-->H.handleMessage(SHOW_WINDOW/HIDE_WINDOW)
+-->handleWindowVisibility(设置隐藏或显示应用){
+- 设置不可见，performStopActivityInner{
+		- 已经是stopped状态且finished，返回
+		- 保存状态，callActivityOnSaveInstanceState
+		- r.activity.performStop
+	}
+- 设置可见，r.activity.performRestart
+- 更新activity中View的可见状态，updateVisibility
+}
+
+
+更新可视(设置View状态，activity)：
+updateVisibility{
+- 显示，在服务中状态不可视，r.activity.makeVisible{
+		- mDecor加入到windowManager
+		- 设置可视，mDecor.setVisibility(View.VISIBLE)
+	}
+- 显示，需要更新配置信息performConfigurationChanged
+- 隐藏若在服务中状态为可见(r.activity.mVisibleFromServer),则设置mDecor不可见，setVisibility
+}
+
+________________________________
+应用结束后返回结果：
+performResumeActivity(处理其它activity传来的未处理结果)-->deliverResults(pendingResults)
+
+返回启动结果()：
+sendActivityResultLocked{
+- (启动失败结果？)若接收结果的activity已经resumed，且进程不为空则分发结果r.app.thread.scheduleSendResult
+- (启动成功结果？)否则将要处理的结果加入results中(resume时再处理)，addResultLocked
+}-->r.app.thread.scheduleSendResult@ActivityStack.java-->(跨进程)
+ApplicationThread.scheduleSendResult-->queueOrSendMessage(H.SEND_RESULT)-->mH.sendMessage
+H.handleMessage(SEND_RESULT)-->handleSendResult(先将activity暂停，再发送结果)-->deliverResults
+
+
+resume时处理results：
+realStartActivityLocked{
+- 取得activityRecord中的results，results = r.results 
+- 将results传入线程，app.thread.scheduleLaunchActivity(results){
+		- 保存到本地ActivityClientRecord，r.pendingResults = pendingResults;
+	}
+}-->performResumeActivity{
+- r.pendingResults不为空，处理结果deliverResults
+}
+
+
+处理monitor监听启动activity的结果：
+startActivityForResult@Activity.java-->
+sendActivityResult-->ApplicationThread.scheduleSendResult-->queueOrSendMessage(H.SEND_RESULT)
+-->mH.handleMessage(SEND_RESULT)-->handleSendResult(先将activity暂停，再发送结果)-->
+deliverResults@ActivityThread.java
+-->r.activity.dispatchActivityResult@ActivityThread.java-->onActivityResult@Activity.java

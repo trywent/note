@@ -1,0 +1,89 @@
+创建文件夹补丁：
+diff -crB folder1 folder2 > Tb02.patch
+
+-c 输出设置, -r 递归, -B 忽略空白行.
+
+测试打补丁：
+patch --dry-run -p1 -i Tb02.patch
+
+打补丁：
+patch -p1 -i Tb02.patch
+
+-i //补丁文件
+-p //剔除路径前的斜杠个数
+
+撤销补丁：
+patch -R -p1 <patchfile
+
+
+First, how to create patch file?
+
+Patch file is a readable file that created by diff with -c (context output format). It doesn’t matter and if you wanna know more, man diff. To patch the entire folder of source codes(as usually people do)I do as bellow:
+Assume Original source code at folder Tb01, and latest source code at folder Tb02. And there have multiple sub directories at Tb01 and Tb02 too.
+
+       diff -crB Tb01 Tb02 > Tb02.patch
+
+-c context, -r recursive (multiple levels dir), -B is to ignore Blank Lines.
+I put -B because blank lines is really useless for patching, sometimes I need to manually read the patch file to track the changes, without -B is really headache.
+
+How to patch?
+
+First of all, please do a dry-run before really patch it. Bare in mind, patch will be working very specifically. Let say the version 3 Tb03.patch is use to patch from Tb02, if you apply patch on Tb01, sometimes it will corrupt your source code. So, to make sure it works, do a dry run. Dry-run means a fake-test, do it at the directory of the source code targeted to patch.
+Doing dry-run like this:
+
+	patch --dry-run -p1 -i Tb02.patch
+
+The success output looks like this:
+patching file TbApi.cpp
+patching file TbApi.h
+patching file TbCard.cpp
+...
+The failure ouptut looks like this:
+patching file TbCard.cpp
+Hunk #2 FAILED at 585.
+1 out of 2 hunks FAILED -- saving rejects to file TbCard.cpp.rej
+patching file TbCard.h
+Hunk #1 FAILED at 57.
+Hunk #2 FAILED at 77.
+Hunk #3 succeeded at 83 with fuzz 1 (offset -21 lines).
+....
+At last, if the dry-run is giving good result, do this and enjoy the compilation.
+
+	patch -p1 -i Tb02.patch
+
+
+
+
+
+
+============================
+
+Normal diffs: > , <:
+改变：
+A change looks like this:
+
+73
+<   red
+---
+>   blue
+
+增加：
+addition
+
+删除：
+deletion
+________________________
+diff -c:
+Context diffs: ***** , !, + , -:
+
+________________________
+diff -u
+unified diffs: @@s , + , -:
+
+
+
+
+
+
+
+

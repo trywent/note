@@ -1,0 +1,131 @@
+When soc_remap = 1, the bootrom is mapped to address 0x10100000 and internal memory 
+is mapped to address 0x0.
+
+DDR物理地址：
+bank0(1G):6000_0000 - A000_0000
+bank1(1G):A000_0000 - E000_0000
+
+PAGE_SHIFT 12
+PAGE_SIZE 4K
+
+cat /proc/clocks | grep ddr
+cat /sys/dvfs/dvfs_tree
+
+___________________________
+start_kernel{
+-
+- setup_arch@setup.c
+- 
+- mm_init@init.c
+- 
+}@main.c
+
+setup_arch{
+- 
+- 解析tags,setup_machine_tags
+- 解析命令行，parse_early_param-->(加入uboot使用的内存)early_mem{
+		- 获取内存地址，大小
+		- 加入arm_add_memory{
+			- meminfo中加入bank信息
+			}
+		}
+- 初始化内存，arm_memblock_init
+}@setup.c
+
+_________________________
+处理uboot传入tags：
+定义__tagtable：
+__tagtable(ATAG_SERIAL, parse_tag_serialnr)@setup.c
+
+setup_machine_tags{
+- 获机器取描述符，for_each_machine_desc(machine_arch_type){
+	/* kernel中类型定义：include/generated/mach-types.h:#define MACH_TYPE_RK30    3066
+	   #  define machine_arch_type	MACH_TYPE_RK30
+	   MACHINE_START(RK30, "RK30board")@board-rkpx3-sdk.c
+	*/
+	- 查找machine_desc中，MACH_TYPE_RK30对应类型的machine_arch_type //@board-rkpx3-sdk.c
+	}
+- 获取tags地址{
+	- 若uboot在寄存器R6中保存地址，通过__atags_pointer获取
+	- 若uboot没有传入，从boot_params获取。phys_to_virt(mdesc->boot_params)
+	}
+- 若tags开始不然诶CORE，则赋值tags = (struct tag *)&init_tags;
+- 设置内存地址和大小，mdesc->fixup-->rk30_fixup
+- 解析tags{
+	- meminfo.nr_banks不为0。去掉uboot传入的内存信息，squash_mem_tags
+	- 解析启动命令，parse_tag_cmdline。保存到default_command_line
+	}
+- 保存启动命令，boot_command_line
+}@setup.c
+_________________________
+处理命令：
+early_param("mem", early_mem);
+
+obs_kernel_param{
+__setup_str_early_mem,
+early_mem,
+1
+}
+
+parse_early_param{
+- 从boot_command_line拷贝命令
+- 解析parse_early_options-->parse_args(do_early_param){
+	- 取出字串next_arg
+	- parse_one{
+		- 
+		- handle_unknown-->do_early_param{
+			- 遍历__setup_start，
+			- 若字符匹配，执行p->setup_func
+			}
+		}
+	}@params.c
+}@mian.c
+
+
+kernel/kernel/params.c
+_________________________
+处理uboot传入参数：
+setup_arch-->setup_machine_tags-->_tagtable(ATAG_MEM, parse_tag_mem32)-->parse_tag_mem32
+-->arm_add_memory(设置meminfo)@setup.c
+
+rk内存：
+setup_arch-->arm_memblock_init{
+- 将内存bank按大小排序，sort
+- 初始，memblock_init
+- 加入bank，memblock_add
+- memblock_reserve
+- 预留phys_initrd_size{}
+- arm_mm_memblock_reserve
+- device tree,arm_dt_memblock_reserve
+- mdesc->reserve-->machine_desc.reserve-->rk30_reserve@board-rkpx3-sdk.c-->board_mem_reserve_add
+}@init.c
+
+
+/* 初始物理地址 A0000000
+ddr size = 1024 M, set ion_reserve_size size to 125829120
+(base:0x98800000 size:120M) reserved for <ion>
+(base:0x98000000 size:8M) reserved for <fb0 buf>
+(base:0x97c00000 size:4M) reserved for <reverse image buf>
+(base:0x97000000 size:12M) reserved for <camera_ipp_mem>
+(base:0x96800000 size:8M) reserved for <gps>
+*/
+
+
+arch/arm/mach-rkpx3/board-rkpx3-sdk.c
+arch/arm/plat-rk/mem_reserve.c
+
+___________________________
+start_kernel-->mm_init@mian.c-->mem_init@init.c
+
+arch/arm/mm/init.c
+init/main.c
+arch/arm/kernel/setup.c
+
+
+___________________________
+临时页表：
+
+
+===========================
+uboot中设置mem：
+

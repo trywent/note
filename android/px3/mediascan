@@ -1,0 +1,70 @@
+创建扫描类：{
+- new MediaScanner{
+	- native_setup-->android_media_MediaScanner_native_setup{
+		-MediaScanner mp= new StagefrightMediaScanner	
+		- 设置mNativeContext，为mp
+		}@android_media_MediaScanner.cpp
+	}
+- mClient = new MyMediaScannerClient
+}@MediaScanner.java
+
+
+开始扫描：
+MediaScannerReceiver.onReceive@MediaScanReceiver.java-->scan-->
+scanner.scanDirectories@MediaScannerService.java-->scanDirectories
+-->prescan--processDirectory()@MediaScanner.java-->
+android_media_MediaScanner_processDirectory{
+- 获取StagefrightMediaScanner mp
+- 获取路径
+- 根据传入的client创建，MyMediaScannerClient myClient(env, client)
+- 执行mp->processDirectory@MediaScanner.cpp
+}@android_media_MediaScanner.cpp
+
+
+processDirectory-->doProcessDirectory{
+- 是否跳过该文件夹，shouldSkipDirectory
+- 扫描文件夹，doProcessDirectoryEntry{
+	- 获取内容是文件夹，doProcessDirectory
+	- 是文件，client.scanFile-->MyMediaScannerClient.scanFile-->
+		mEnv->CallVoidMethod(mClient, mScanFileMethodID...)@android_media_MediaScanner.cpp
+		-->MyMediaScannerClient.scanFile-->doScanFile@MediaScanner.java
+	}
+}@MediaScanner.cpp
+
+doScanFile{
+- beginFile
+- processFile{}
+- endFile//插入数据库
+}@MediaScanner.java
+frameworks/base/media/java/android/media/MediaScanner.java
+frameworks/base/media/jni/android_media_MediaScanner.cpp
+frameworks/av/media/libmedia/MediaScanner.cpp
+
+===================
+mtpserver:
+android_mtp_MtpServer_send_object_added
+
+设置服务：
+native_setup-->android_mtp_MtpServer_setup{
+- server = new MtpServer
+- env->SetIntField(thiz, field_MtpServer_nativeContext)
+}
+
+frameworks/base/media/java/android/mtp/MtpServer.java
+frameworks/base/media/jni/android_mtp_MtpServer.cpp
+frameworks/av/media/mtp/MtpServer.cpp
+
+==================
+
+mUnmountReceiver.onReceive{
+- 发送扫描开始广播
+- db.delete
+- 发送扫描完成广播
+}
+
+D/MediaProvider(  541): deleting all entries for storage StorageVolume:
+D/MediaProvider(  541):     mStorageId=262145 mPath=/mnt/usb_storage1 mDescriptionId=17040668 
+D/MediaProvider(  541):     mPrimary=false mRemovable=true mEmulated=false mMtpReserveSpace=100 
+D/MediaProvider(  541):     mAllowMassStorage=false mMaxFileSize=0 mOwner=null mUuid=9801-F3DA 
+D/MediaProvider(  541):     mUserLabel=KINGSTON mState=mounted 
+

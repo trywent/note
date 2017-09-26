@@ -1,0 +1,78 @@
+_________________________
+赋值重载：
+className cl //默认构造
+c1 = c2      //赋值重载
+
+拷贝重载：
+className c1(c2);
+className c1 = c2 //调用复制构造函数,c1,c2可能指向同一个指针
+
+_________________________
+new operator和operator new：
+new operator   //用来调用operator new分配内存，并调用相应的构造方法
+operator new   //仅仅分配内存
+placement new  //在已经分配的内存上构造对象，new(p) xxx,在p指向的内存处构造对象xxx(*p赋值为xxx)
+
+_________________________
+//  #1      #2                #3      #4      #5
+int const * const Method3(int const * const&) const;
+then read it from right to left.
+
+#5 says that the entire function declaration to the left is const, which implies that this must be a member function rather than a free function.
+
+#4 says that the pointer to the left is const and may not be changed to point to a different location.
+
+#3 says that the int to the left is const.
+
+#2 says that the pointer to the left is const.
+
+#1 says that the int to the left is const.
+
+成员函数末尾加const表示，该函数不能改编类中的非mutable(易变)成员。如：
+FOO::fun(int arg)            //FOO::fun(FOO* this,int arg)
+FOO::fun(int arg) const      //FOO::fun(const FOO* this,int arg) 
+
+调用区分当类的对象是const使，调用fun是fun(const this,arg)。其他的是fun(this ,arg)
+__________________________
+引用和指针:
+1.A pointer can be re-assigned any number of times while a reference can not be re-seated after binding.
+2.Pointers can point nowhere (NULL), whereas reference always refer to an object.
+3.You can't take the address of a reference like you can with pointers.
+4.There's no "reference arithmetics" (but you can take the address of an object pointed by a reference and do pointer arithmetics on it as in &obj + 5).
+
+指针和引用占用相同大小的内存。
+引用和指针的使用：
+Use references in function parameters and return types to define useful and self-documenting interfaces.
+Use pointers to implement algorithms and data structures
+
+
+RAII("Resource Acquisition Is Initialization")。资源初始化后，能够保证资源不在使用时，内存被释放。
+{
+
+}
+
+smart pointer: shared_ptr（会对引用进行计数，当没有引用对象时对象被释放）
+
+____________________________
+成员初始化：
+除了显式的初始化还可默认初始化，成员的默认初始化和函数中变量初始化类似。
+对象类型数据会调用默认的构造方法，没有默认构造方法的会编译出错。
+原始类型数据不会被初始化。引用类型数据不初始化会出错。
+
+____________________________
+类中成员函数最后的const：
+表示该方法不能修改类中的成员(除了声明为mutable的成员)，实际上类中的方法声明包含了类的引用：
+如：Cal::test(int i),实际的结果是test(Cal * this,int i)
+    Cal::test(int i) const ，结果是test(const Cal * this,int i)
+
+___________
+重载操作符语法：
+operator +=
++ * / % ^ & | ~ ! = < > += = *= /= %= ^= &= |= << >> >>= <<= == != <=
+>= && || ++ >* , > [] () new new[] delete delete[]
+___________
+1、函数模板的格式：
+template <class 形参名，class 形参名，......> 返回类型 函数名(参数列表)
+{　
+函数体
+}

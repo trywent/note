@@ -1,0 +1,10 @@
+(ViewRoot中创建attachInfo并实现播放音效接口)-->host.dispatchAttachedToWindow@ViewRootImpl.java
+-->dispatchAttachedToWindow@ViewGroup.java-->dispatchAttachedToWindow(设置mAttachInfo)@View.java
+
+new view(FlagMasks |= SOUND_EFFECTS_ENABLED)
+
+playSoundEffect-->playSoundEffect-->mAttachInfo.mRootCallbacks.playSoundEffect@View.java-->
+playSoundEffect-->audioManager.playSoundEffect@ViewRootImpl.java
+
+
+frameworks/base/core/java/android/view/View.java

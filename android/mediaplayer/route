@@ -1,0 +1,47 @@
+//设置连接状态
+setDeviceStateLocked@WiredAccessoryManager.java-->setWiredDeviceConnectionState
+-->queueMsgUnderWakeLock(MSG_SET_WIRED_DEVICE_CONNECTION_STATE)-->onSetWiredDeviceConnectionState
+sendDeviceConnectionIntent-->sendMsg(MSG_REPORT_NEW_ROUTES)-->
+obs.dispatchAudioRoutesChanged@AudioService.java
+
+
+//注册route监听
+startMonitoringRoutes-->mAudioService.startWatchingRoutes(mAudioRoutesObserver)
+@MediaRouter.java-->mRoutesObservers.register@AudioService.java
+
+
+//更新route
+IAudioRoutesObserver.Stub.dispatchAudioRoutesChanged-->updateAudioRoutes
+-->dispatchRouteChanged-->cbi.cb.onRouteChanged@MediaRouter.java
+
+
+frameworks/base/media/java/android/media/MediaRouter.java
+frameworks/base/services/core/java/com/android/server/audio/AudioService.java
+frameworks/base/services/core/java/com/android/server/WiredAccessoryManager.java
+==================
+SPEAKER_NORMAL_ROUTE //0
+MAIN_MIC_CAPTURE_ROUTE //21
+PLAYBACK_OFF_ROUTE  // 24
+CAPTURE_OFF_ROUTE   //25
+
+
+route_set_controls
+
+//打开
+AudioStreamOutALSA::open_l-->openPcmOut_l@AudioHardware.cpp-->
+route_pcm_open(route){
+- 
+}
+
+//关闭播放
+AudioStreamOutALSA::close_l-->closePcmOut_l@AudioHardware.cpp-->
+route_pcm_close(route/PLAYBACK_OFF_ROUTE/){
+- pcm_open
+- mixer_open
+- 设置route，route_set_controls
+}@alsa_route.c
+
+
+hardware/rk29/audio/AudioHardware.cpp
+hardware/rk29/audio/alsa_route.c
+hardware/rk29/audio/alsa_mixer.c

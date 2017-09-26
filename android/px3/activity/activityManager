@@ -1,0 +1,110 @@
+//
+systemReady{
+- 是否有升级进行处理，mDidUpdate
+- 检测mPidsSelfLocked中不允许运行的进程，
+- 杀死procsToKill中进程，removeProcessLocked
+- 获取设置，retrieveSettings
+- 发送广播，ACTION_USER_STARTED/ACTION_USER_STARTING
+-  mStackSupervisor.resumeTopActivitiesLocked
+}
+
+启动launcher：
+resumeTopActivitiesLocked@ActivityStackSupervisor.java-->resumeTopActivityLocked
+@ActivityStack.java-->resumeHomeActivity@ActivityStackSupervisor.java
+-->
+startHomeActivityLocked{
+- getHomeIntent
+- 解析activityInfo，resolveActivityInfo
+- 获取进程getProcessRecordLocked，
+- 进程为空则启动，mStackSupervisor.startHomeActivity
+}
+
+
+finishBooting{
+
+- 设置系统属性，SystemProperties.set("sys.boot_completed", "1")
+- 发送启动完成广播broadcastIntentLocked(ACTION_BOOT_COMPLETED)
+}
+
+_______________
+mStackSupervisor.resumeTopActivitiesLocked
+
+
+启动activity：
+startActivity-->startActivityAsUser-->mStackSupervisor.startActivityMayWait@ActivityManagerService.java
+
+开始进程：
+/* 进程已经开始，但没有attach到activiy
+*  进程没有启动
+*/
+startProcessLocked(String ,ApplicationInfo , boolean ,int...){
+- 获取ProcessRecord，getProcessRecordLocked
+- 若有pid并且进程没有崩溃，则返回该ProcessRecord
+- 非独立进程{
+	- 是后台启动，且是坏进程mBadProcesses。返回null
+	- 用户手动启动，清除崩溃记录mProcessCrashTimes.remove，
+		清除坏进程mBadProcesses.remove
+	}
+- 创建ProcessReocrd，newProcessRecordLocked
+- 系统还么准备好，将ProcessRecord加入mProcessesOnHold
+- startProcessLocked(app, hostingType, hostingNameStr)-->Process.start("android.app.ActivityThread"
+}
+
+启动进程后：
+(应用端回调)-->attachApplication-->attachApplicationLocked{
+- app.makeActive(thread, mProcessStats)
+- 启动等待的actvitiy，mStackSupervisor.attachApplicationLocked
+- 启动服务，mServices.attachApplicationLocked
+}
+
+暂停：
+activityPaused-->stack.activityPausedLocked@ActivityManagerService.java-->
+activityPausedLocked-->completePauseLocked@ActivityStack.java
+
+
+_______________
+创建栈：
+createStack(int taskId, int relativeStackBoxId, int position, float weight){
+- 创建新栈，mStackSupervisor.createStack
+- 窗口服务端创建栈，mWindowManager.createStack
+- 任务id不为0，将对应的任务移动到新栈，moveTaskToStack
+}
+
+设置焦点：
+setFocusedStack-->setFocusedActivityLocked{
+- 设置焦点栈，mStackSupervisor.setFocusedStack
+- 设置焦点应用， mWindowManager.setFocusedApp
+}
+
+_______________
+最近任务：mRecentTasks
+systemReady{
+- 从data/system/recent_tasks,restoreTasksLocked
+- 从data/system/restored_recent_tasks,restoreTasksFromOtherDeviceLocked
+}@TaskPersister.java
+
+addRecentTaskLocked
+addAppTask
+
+frameworks/base/services/core/java/com/android/server/am/TaskPersister.java
+
+
+_______________
+应用崩溃：
+dvmDetachCurrentThread-->threadExitUncaughtException-->dvmCallMethod(..uncaughtHandler...)
+@Thread.cpp-->Thread.getDefaultUncaughtExceptionHandler().uncaughtException
+@RemoteViewsService.java-->uncaughtException@RuntimeInit.javahandleApplicationCrash-->
+handleApplicationCrashInner/handleApplicationWtf-->crashApplication{
+- 
+- 是否记录，makeAppCrashingLocked-->handleAppCrashLocked
+}@ActivityManagerService.java
+
+//应用die
+attachApplicationLocked-->thread.asBinder().linkToDeath(new AppDeathRecipient)
+AppDeathRecipient.binderDied-->appDiedLocked-->handleAppDiedLocked-->
+mStackSupervisor.resumeTopActivitiesLocked
+
+
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/core/java/com/android/internal/os/RuntimeInit.java

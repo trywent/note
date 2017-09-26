@@ -1,0 +1,172 @@
+
+================================
+水平后边缘: HBP(Horizontal Back Porch)
+水平前边缘： HFP(Horizontal Front Porch)
+水平暂停长度：HPW(Horizontal Pulse Width )
+水平有效长度： HVD(Horizontal Valid)
+
+垂直后边缘： VBP(Vertical Back Porch)
+垂直前边缘：VFP(Vertical Front Porch)
+垂直暂停长度： VPW(Vertical Pulse Width)
+垂直有效长度： VVD(Vertical Valid) 
+
+===============================
+0. Introduction
+---------------
+
+frame buffer用来抽象图像硬件。通常位于/dev/fb*
+
+1. User's View of /dev/fb*
+--------------------------
+
+如果有多个显卡就会有多个frame buffer
+
+2. Programmer's View of /dev/fb*
+--------------------------------
+
+/dev/fb*也可通过ioctl进行一些硬件信息查询和配置
+	-可以查询不可改变信息（比如名字，屏幕内存的组织，地址，长度）
+	-可以查询和改变硬件可变信息，
+	-获取或设置color map（通过16位的RGB透明）
+
+
+3. Frame Buffer Resolution Maintenance
+--------------------------------------
+
+分辨率设置通过工具fbset
+4. The X Server
+---------------
+
+
+5. Video Mode Timings
+---------------------
+
+电子束从上到下，再依次左到右画水平线（扫描线）。
+扫描完一行，电子束要重新移位到最左（horizontal retrace）。同样扫描完整个屏幕（一帧），电子束要移位到最上部
+（vertical retrace）。在移位过程中电子束要关闭
+
+电子束画象素的速度由dotclock决定，当dotclock为28.37516 MHz，每一个象素需要 35242 ps (picoseconds)
+
+    1/(28.37516E6 Hz) = 35.242E-9 s
+
+屏幕分辨率是 640x480, 将花费
+
+    640*35.242E-9 s = 22.555E-6 s
+
+来画640 (xres)个象素每行.但水平复位（ horizontal retrace）也要花费时间 (e.g. 272 `pixels')，所以
+一行总共花费的时间为：
+
+    (640+272)*35.242E-9 s = 32.141E-6 s
+
+所以水平扫描的频率大概为 31 kHz:
+
+    1/(32.141E-6 s) = 31.113E3 Hz
+
+一个屏幕有 480 (yres)行, 同样要考虑垂直复位（ vertical retrace ） (e.g. 49 `lines'). 所以整个屏幕
+要花费：
+
+    (480+49)*32.141E-6 s = 17.002E-3 s
+
+垂直扫描的频率大概为 59 Hz:
+
+    1/(17.002E-3 s) = 58.815 Hz
+
+屏幕数据的刷新频率大概为59次每秒。为了看不出闪烁VESA建议垂直扫描频率至少为72HZ
+
+水平和垂直扫描都会提供给显示器同步信号。
+
+The following picture summarizes all timings. The horizontal retrace time is
+the sum of the left margin, the right margin and the hsync length, while the
+vertical retrace time is the sum of the upper margin, the lower margin and the
+vsync length.
+
+  +----------+---------------------------------------------+----------+-------+
+  |          |                ↑                                         |          |       |
+  |          |                |upper_margin                |          |       |
+  |          |                ↓                                         |          |       |
+  +----------###############################################----------+-------+
+  |          #                ↑                                         #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |   left   #                |                            #  right   | hsync |
+  |  margin  #                |       xres                 #  margin  |  len  |
+  |<-------->#<---------------+--------------------------->#<-------->|<----->|
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |yres                        #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                |                            #          |       |
+  |          #                ↓                                         #          |       |
+  +----------###############################################----------+-------+
+  |          |                ↑                                         |          |       |
+  |          |                |lower_margin                |          |       |
+  |          |                ↓                                         |          |       |
+  +----------+---------------------------------------------+----------+-------+
+  |          |                ↑                                         |          |       |
+  |          |                |vsync_len                   |          |       |
+  |          |                ↓                                         |          |       |
+  +----------+---------------------------------------------+----------+-------+
+
+The frame buffer device expects all horizontal timings in number of dotclocks
+(in picoseconds, 1E-12 s), and vertical timings in number of scanlines.
+
+
+6. Converting XFree86 timing values info frame buffer device timings
+--------------------------------------------------------------------
+
+An XFree86 mode line consists of the following fields:
+ "800x600"     50      800  856  976 1040    600  637  643  666
+ < name >     DCF       HR  SH1  SH2  HFL     VR  SV1  SV2  VFL
+
+The frame buffer device uses the following fields:
+
+  - pixclock: pixel clock in ps (pico seconds)
+  - left_margin: time from sync to picture
+  - right_margin: time from picture to sync
+  - upper_margin: time from sync to picture
+  - lower_margin: time from picture to sync
+  - hsync_len: length of horizontal sync
+  - vsync_len: length of vertical sync
+
+1) Pixelclock:
+   xfree: in MHz
+   fb: in picoseconds (ps)
+
+   pixclock = 1000000 / DCF
+
+2) horizontal timings:
+   left_margin = HFL - SH2
+   right_margin = SH1 - HR
+   hsync_len = SH2 - SH1
+
+3) vertical timings:
+   upper_margin = VFL - SV2
+   lower_margin = SV1 - VR
+   vsync_len = SV2 - SV1
+
+Good examples for VESA timings can be found in the XFree86 source tree,
+under "xc/programs/Xserver/hw/xfree86/doc/modeDB.txt".
+
+============================================
+fb:
+
+module_init(fbmem_init)-->register_chrdev(FB_MAJOR,"fb",&fb_fops)@fbmem.c
+
+
+注册：
+register_framebuffer-->do_register_framebuffer@fbmem.c
+
+kernel/drivers/video/fbmem.c
+
+
+
+
+

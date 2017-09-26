@@ -1,0 +1,50 @@
+//repo脚本：
+
+需要在执行repo目录下，创建repo仓库。(若本地存在则本地克隆，或远程克隆)
+
+
+repo help [ command ] 
+repo init -u URL 
+//同步
+repo sync [project-list]
+//上传
+repo upload[ project-list ]
+
+//查看差异
+repo diff [ project-list ]
+//下载特定的修改版本到本地
+repo download  target revision
+//创建新的branch分支
+repo start newbranchname
+//删除已经merge 的 project
+repo prune [project list]
+//对每一个 project 运行 command 命令       
+repo foreach [ project-lists] -c command
+repo forall -c command，对所有项目执行一个command
+//查看状态
+repo status
+
+
+
+===========
+ssh:
+wb@192.168.1.131
+pw:wb
+
+
+===========
+//几种不同的访问服务器方式
+ssh://192.168.1.124/home/
+file://192.168.1.124/home/
+http://192.168.1.124/home/
+
+repo init --repo-url=git://192.168.1.124/home/disk1/px5/repo.git  --repo-branch=stable -u git://192.168.1.124/home/disk1/px5/manifests.git  --mirror
+//repo 建立仓库
+1)
+repo init --repo-url=192.168.1.124:/home/disk1/px5/repo.git --repo-branch=stable -u 192.168.1.124:/home/disk1/px5/manifests.git  --mirror
+
+//--repo-url repo.git仓库的路径
+//-u manifest.git 清单仓库(被管理的git仓库的清单)
+
+2)
+repo sync //

@@ -1,0 +1,77 @@
+初始化：
+
+
+
+读取：
+
+
+
+
+
+
+
+
+
+分发：
+threadLoop-->mDispatcher->dispatchOnce-->dispatchOnceInnerLocked{
+- 
+- EventEntry::TYPE_KEY{
+	- 
+	- 若有mNextUnblockedEvent，设置丢弃事件原因DROP_REASON_BLOCKED
+	- dispatchKeyLocked	
+	}
+- 
+}
+
+dispatchKeyLocked{
+- 事件没有分配，dispatchInProgress==false{
+	- 是否是重复事件
+	}
+- 
+- 若需要丢弃事件，则设置注入事件的丢弃原因setInjectionResultLocked
+- 查找事件目标窗口，findFocusedWindowTargetsLocked{
+	- 找到可接收事件的目标窗口,mFocusedWindowHandle
+	- ，加入到目标中addWindowTargetLocked(新加入一个目标到inputTargets)
+	}
+- 设置注入事件的结果返回目标，setInjectionResultLocked //设置出错状态
+- 加入检测事件的接收目标(不一定是窗口)
+- 分发事件到目标，dispatchEventLocked
+- 消耗事件，startDispatchCycleLocked
+}
+
+
+startDispatchCycleLocked-->prepareDispatchCycleLocked-->enqueueDispatchEntriesLocked{
+- 加入，enqueueDispatchEntryLocked
+- 处理，startDispatchCycleLocked-->connection->inputPublisher.publishKeyEvent
+}
+
+______________________
+目标窗口：
+finishUpdateFocusedWindowAfterAssignLayersLocked@WindowManagerService.java
+setInputFocusLw-->updateInputWindowsLw-->mService.mInputManager.setInputWindows@InputMonitor.java
+setInputWindows-->mInputManager->getDispatcher()->setInputWindows
+@com_android_server_input_InputManagerService.cpp-->setInputWindows(设置mFocusedWindowHandle)
+@InputDispatcher.cpp
+
+frameworks/base/services/input/InputDispatcher.cpp
+=====================
+findFocusedWindowTargetsLocked-->handleTargetsNotReadyLocked
+
+findTouchedWindowTargetsLocked
+
+
+mNextUnblockedEvent //用户触摸了另外一个窗口。触摸窗口与，等待输入的窗口不同
+
+DROP_REASON_BLOCKED
+
+
+
+=====================
+nativeInit-->InputQueue::createQueue-->new InputQueue@android_view_InputQueue.cpp
+
+
+nativeSendKeyEvent-->queue->enqueueEvent-->(加入容器)mPendingEvents.push
+
+
+frameworks/base/core/jni/android_view_InputQueue.cpp
+

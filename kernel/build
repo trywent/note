@@ -1,0 +1,11 @@
+//make menuconfig 提示undefined
+sudo apt-get install libncurses5  libncurses5-dev
+
+//编译配置
+KBUILD_CFLAGS   := 
+
+-Wall //开启警告
+-Werror  //它要求gcc将所有的警告当成错误进行处理
+
+
+

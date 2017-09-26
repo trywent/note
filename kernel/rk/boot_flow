@@ -1,0 +1,32 @@
+//
+start_kernel{
+
+
+- mm_init
+
+
+- rcu_init
+}@main.c
+
+
+start_kernel@main-->setup_arch@setup.c-->paging_init-->devicemaps_init-->mdesc->map_io@mmu.c-->
+
+arch_initcall(customize_machine)-->machine_desc->init_machine@setup.c
+
+
+kernel/init/main.c
+kernel/arch/arm/kernel/setup.c
+kernel/arch/arm/mm/mmu.c
+
+
+===============
+//restart
+kernel_restart@sys.c-->machine_restart@process.c
+
+
+emergency_restart@sys.c-->machine_emergency_restart@emergency-restart.h
+-->machine_restart@process.c
+
+
+arch/arm/kernel/process.c
+include/asm-generic/emergency-restart.h

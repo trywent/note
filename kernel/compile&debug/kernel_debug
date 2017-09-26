@@ -1,0 +1,98 @@
+//
+"7" > /proc/sys/kernel/printk
+
+#define KERN_EMERG "<0>" /* system is unusable*/
+#define KERN_ALERT "<1>" /* action must be taken immediately*/
+#define KERN_CRIT "<2>" /* critical conditions*/
+#define KERN_ERR "<3>" /* error conditions*/
+#define KERN_WARNING "<4>" /* warning conditions*/
+#define KERN_NOTICE "<5>" /* normal but significant condition*/
+#define KERN_INFO "<6>" /* informational*/
+#define KERN_DEBUG "<7>" /* debug-level messages*/
+
+int console_printk[4] = {
+	DEFAULT_CONSOLE_LOGLEVEL,	/* console_loglevel */
+	DEFAULT_MESSAGE_LOGLEVEL,	/* default_message_loglevel */
+	MINIMUM_CONSOLE_LOGLEVEL,	/* minimum_console_loglevel */
+	DEFAULT_CONSOLE_LOGLEVEL,	/* default_console_loglevel */
+}@printk.c
+
+输出级别默认是4，DEFAULT_MESSAGE_LOGLEVEL
+
+在uboot启动命令中加入日志级别。loglevel=
+
+
+kernel/printk/printk.c
+include/linux/printk.h
+_____________________
+printk-->vprintk-->log_prefix(处理消息级别)
+
+输出buffer：
+call_console_drivers-->_call_console_drivers{
+- 若消息的级别值小于控制台默认值(console_loglevel),则输出log。__call_console_drivers-->con->write
+	
+}
+
+
+
+kernel/kernel/printk.c
+_____________________________
+调试stack trace：
+
+objdump 将库文件中的函数输出地址
+addr2line 将地址转换为库中的函数
+
+
+
+kernel panic
+
+px3/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-objdump
+
+
+_____________________________
+http://elinux.org/Kernel_Debugging_Tips
+
+编译单个文件：
+make pathto/file.o
+
+生成预处理后的文件：
+make pathto/file.i
+
+生成汇编文件：
+make pathto/file.s
+
+
+____________________________
+cat /proc/sys/kernel/printk
+
+4      4       1       7
+
+所得到的信息是$Linux_SRC/include/linux/printk.h中定义的宏：
+
+#define console_loglevel (console_printk[0])
+
+#define default_message_loglevel (console_printk[1])
+
+#define minimum_console_loglevel (console_printk[2])
+
+#define default_console_loglevel (console_printk[3])
+
+依次分别为：
+
+控制台日志级别：优先级高于该值的消息将被打印至控制台
+
+缺省的消息日志级别：将用该优先级来打印没有优先级的消息
+
+最低的控制台日志级别：控制台日志级别可被设置的最小值（最高优先级）
+
+缺省的控制台日志级别：控制台日志级别的缺省值
+
+改变控制台输出级别：
+echo $level > /proc/sys/kernel/printk
+______________________________
+//打印栈
+
+dump_stack()
+
+
+

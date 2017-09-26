@@ -1,0 +1,55 @@
+/*
+- 分配使用的buffer
+- 所有的producer和cosumer的buffer都在这里分配
+- 两条线：
+	1,应用 surface--BufferQueue--Layer
+	2,系统 framebufferSurface--BufferQueue--display
+
+*/
+
+//获取buffer
+BufferQueue::dequeueBuffer{
+
+}
+
+//提交数据buffer
+BufferQueue::queueBuffer{
+- 解析参数input.deflate
+- 获取对应graphicBuffer，创建BufferItem
+- 加入mQueue{
+	- 若可替换则替换队列最前的项目，*front = item;
+	- mQueue.push_back(item)
+	- 设置listener为mConsumerListener
+	}
+
+- 监听不为空，listener->onFrameAvailable
+- 装入返回参数output->inflate
+}
+
+
+==============
+//consumer
+SurfaceFlinger::init-->(创建BufferQueue，创建FramebufferSurface)
+FramebufferSurface::FramebufferSurface(IGraphicBufferConsumer/*bufferQueue*/){
+- 继承ConsumerBase::ConsumerBase{
+	- listener = static_cast<ConsumerListener*>(this)
+	- 创建listener，new BufferQueue::ProxyConsumerListener(listener)
+	- 连接bufferQueue，mConsumer->consumerConnect-->(设置监听)consumerConnect@BufferQueue.cpp
+	}
+- 设置bufferQueue 
+}
+
+_______________
+ConsumerBase
+|
+GLConsumer   //GL_TEXTURE_EXTERNAL_OES 从bufferQueue中消耗数据
+|
+SurfaceFlingerConsumer //Layer使用
+
+
+
+ConsumerBase
+|
+FramebufferSurface
+
+

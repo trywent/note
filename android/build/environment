@@ -1,0 +1,48 @@
+//
+
+//工具包
+sudo apt-get install git-core gnupg flex bison gperf build-essential \
+zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 \
+lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache \
+libgl1-mesa-dev libxml2-utils xsltproc unzip
+
+
+
+//open jdk
+sudo add-apt-repository ppa:openjdk-r/ppa  
+sudo apt-get update   
+sudo apt-get install openjdk-7-jdk 
+
+如果安装成功之后还是不能用可能不有多个版本，选的不对
+
+sudo update-alternatives --config java
+sudo update-alternatives --config javac
+
+===============
+//ubuntu16.04 link error
+
+ifneq ($(WITHOUT_HOST_CLANG),true)  ==> ifeq ($(WITHOUT_HOST_CLANG),false)
+@art/build/Android.common_build.mk
+
+//can not start jack
+~/.jack 中SREVER=false
+
+//internal compiler error brest
+chmod 777 .jack
+
+//unsupported reloc 43 
+ln -s /usr/bin/ld.gold prebuilts/gcc/linux-x86/host/x86_64-linux-glibc/x86_64-linux/bin/ld
+
+
+//outofmemory
+增加swap
+
+
+//编译gcc4.6
+./gcc-4.6.4/contrib/download_prerequisites //安装GMP 4.2+, MPFR 2.3.1+ and MPC 0.8.0
+mkdir objdir  //创建obj目录
+./configure   //
+
+================
+关闭jack
+LOCAL_JACK_ENABLED = disabled

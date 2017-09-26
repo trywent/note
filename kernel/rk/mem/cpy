@@ -1,0 +1,13 @@
+extern phys_addr_t sql_fb_addr;
+void cpyUbootFb(phys_addr_t dst,phys_addr_t src,int sizse){
+   char * s = NULL;
+   char * d = NULL;
+   struct resource *mem= request_mem_region(dst, size,"uboot_fb");
+   if (mem!=NULL) {
+      s = phys_to_virt(s);
+      d = ioremap(dst, size);
+      memcpy(d,s,size);
+      iounmap(d);
+      release_mem_region(dst, size);
+   }
+}

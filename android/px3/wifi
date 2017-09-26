@@ -1,0 +1,35 @@
+realtek:
+
+加载驱动：
+wifi_load_driver-->load_driver-->rk_wifi_load_driver@wifi_realtek.c-->rk_wifi_load_driver{
+- 打开"/sys/class/rkwifi/driver"
+- 加载驱动写"1",卸载驱动写"0"
+}@rk_wifi_ctrl.c
+
+
+
+
+hardware/realtek/wlan/libhardware_legacy/wifi/wifi_realtek.c
+hardware/libhardware_legacy/wifi/rk_wifi_ctrl.c
+
+
+__________________
+驱动层：
+wifi_driver_write{
+- 加载驱动，rockchip_wifi_init_module-->dhd_module_init
+- 卸载驱动，rockchip_wifi_exit_module
+}@rkwifi_sys_iface.c
+
+
+kernel/drivers/net/wireless/wifi_sys/rkwifi_sys_iface.c
+kernel/drivers/net/wireless/rkwifi/bcmdhd/dhd_linux.c
+
+
+==================
+fyt：rtl8188eu
+睿林：rtl8192cu/rtl8188
+
+
+==================
+logcat -s WifiStateMachine wpa_supplicant
+

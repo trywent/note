@@ -1,0 +1,106 @@
+//
+AlarmManager这个类提供访问系统定时服务。使应用能够设置成在将来某个时刻运行。
+到达定时时间，系统会将已注册的intent广播出去，执行目标应用。注册的定时器在设
+备睡眠后也有效(能够设置成到时唤醒设备)，直到设备关闭或重启
+
+
+Alarm Manager 能够保持CPU是唤醒的状态，直到alarm receiver的onReceive()方法被执行.
+这种机制能够防止广播没有处理完，设备就进入睡眠。一旦onReceive()返回，Alarm Manager
+释放唤醒锁，这时设备可能会进入睡眠。 如果alarm receiver 调用Context.startService(),
+可能会发生服务还没启动，设备就进入睡眠了。为了防止这种情况BroadcastReceiver和Service 
+需要实现保持设备唤醒状态知道服务运行成功。
+
+Note:Alarm Manager 通常用作在将来某个时刻执行应用.更简单有效的延时操作(短时倒计时，超时)
+是使用hanlder
+
+通过方法Context.getSystemService(Context.ALARM_SERVICE)获取AlarmManager这个类。
+
+================
+//设置的时间类型
+//ELAPSED_REALTIME  启动时间，不会唤醒
+//ELAPSED_REALTIME_WAKEUP  启动时间，会唤醒
+//RTC  实时时间
+//RTC_WAKEUP   实时时间，唤醒设备
+
+
+AlarmManagerService{
+- init
+- 开始监听alarm，mWaitThread.start();
+}
+
+
+
+
+
+
+
+
+set/setRepeating/setWindow-->
+setImpl(int type, long triggerAtMillis, long windowMillis, long intervalMillis,
+            PendingIntent operation, WorkSource workSource){
+//typ 类型
+//triggerAtMillis 触发时间
+//windowMillis 触发窗口 WINDOW_HEURISTIC(启发式，灵活) WINDOW_EXACT(固定时间)
+//intervalMillis 间隔时间
+//PendingIntent  广播操作
+//workSource
+}-->mService.set{
+- 转换rtc时间为启动时间，triggerElapsed
+- 计算最大延迟时间，maxElapsed
+- setImplLocked{
+	- 创建alarm
+	- 是否合并到batch(一般都是合并)，addBatchLocked(mAlarmBatches)
+	- rescheduleKernelAlarmsLocked-->setLocked-->set@AlarmManagerService.java
+		-->ioctl(fd, ANDROID_ALARM_SET(type))
+	}
+}
+
+
+mWaitThread-->AlarmThread.run{
+- waitForAlarm(监听/dev/alarm)-->ioctl(fd, ANDROID_ALARM_WAIT)
+- 时间变化TIME_CHANGED_MASK{
+	- 重新设置batch，rebatchAllAlarms
+	}
+- triggerAlarmsLocked{
+	- 遍历mAlarmBatches中到期的batch
+	- 遍历到期的batch中的alarm，加入到triggerList
+	- 若alarm是重复的，则重新计算加入setImplLocked
+	}
+- 重新设置kernel的alarm，rescheduleKernelAlarmsLocked
+- 遍历triggerList{
+	- 发送广播,alarm.operation.send
+	- 创建InFlight，加入mInFlight
+	- 记录广播状态，InFlight.BroadcastStats
+	}
+}
+
+
+//收到广播结果
+ResultReceiver{
+- 从mInFlight中移除
+- 计数mBroadcastRefCount--
+}
+
+frameworks/base/services/java/com/android/server/AlarmManagerService.java
+frameworks/base/services/jni/com_android_server_AlarmManagerService.cpp
+===============
+android_server_AlarmManagerService_init{
+- init_alarm_driver{
+	- open("/dev/alarm")
+	- AlarmImplAlarmDriver
+	}
+- init_timerfd //定时器
+}
+
+
+frameworks/base/services/jni/com_android_server_AlarmManagerService.cpp
+
+
+
+=============
+alarm_set-->devalarm_start@alarm-dev.c-->alarm_start-->alarmtimer_enqueue@alarmtimer.c
+
+
+drivers/staging/android/alarm-dev.c
+kernel/time/alarmtimer.c
+

@@ -1,0 +1,9 @@
+setDeviceStateLocked@WiredAccessoryManager.java-->setWiredDeviceConnectionState
+-->queueMsgUnderWakeLock(MSG_SET_WIRED_DEVICE_CONNECTION_STATE)-->onSetWiredDeviceConnectionState
+@AudioService.java
+
+
+
+
+frameworks/base/services/core/java/com/android/server/WiredAccessoryManager.java
+frameworks/base/services/core/java/com/android/server/audio/AudioService.java

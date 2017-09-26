@@ -1,0 +1,5 @@
+//aidl
+object method(in int[] ints)
+
+
+object:

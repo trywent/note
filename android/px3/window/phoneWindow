@@ -1,0 +1,14 @@
+创建窗口：
+performLaunchActivity@ActivityThread.java-->attach{
+- mWindow = PolicyManager.makeNewWindow(this)
+- mWindow.setCallback(this)
+- mWindow.getLayoutInflater().setPrivateFactory(this)
+}@Activity.java
+
+
+
+handleResumeActivity-->r.window.getDecorView@ActivitThread.java-->getDecorView
+-->installDecor{
+- 创建DecorView，generateDecor--new DecorView(context,-1/*普通窗口类型*/)
+- 生成布局，generateLayout
+}

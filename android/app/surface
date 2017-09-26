@@ -1,0 +1,22 @@
+SurfaceTexture:
+从图像流中截取帧，像openGL ES texture。
+
+当定义了摄像头和播放器的输出流的目标后，SurfaceTexture可作用在SurfaceHolder中。
+这时所有的图像流被送到SurfaceTexture,而不是设备的显示屏。当updateTexImage被调用
+SurfaceTexture中的内容会被更新为最新图像流的帧。
+
+
+
+______________________________
+openTransaction@Surface.java-->Surface_openTransaction@android_view_Surface.cpp-->
+SurfaceComposerClient::openGlobalTransaction@
+
+
+closeTransaction@Surface.java-->Surface_closeTransaction@android_view_Surface.cpp-->SurfaceComposerClient::closeGlobalTransaction-->Composer::closeGlobalTransaction-->Composer::getInstance().closeGlobalTransactionImpl-->Composer::closeGlobalTransactionImpl-->(获取"SurfaceFlinger"服务,)sm->setTransactionState@SurfaceComposerClient.cpp-->SurfaceFlinger::setTransactionState@SurfaceFlinger.cpp
+
+
+
+frameworks/base/core/java/android/view/Surface.java
+frameworks/base/core/jni/android_view_Surface.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp

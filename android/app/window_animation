@@ -1,0 +1,198 @@
+WindowAnimator       //在windowManagerService中进行窗口切换的动画
+WindowStateAnimator  //在windowState中的动画效果
+AppWindowAnimator    //应用窗口动画
+
+窗口服务：
+WindowManagerService{
+WindowAnimator mAnimator = new WindowAnimator(this, context, mPolicy);
+}
+
+窗口：
+WindowState{
+ WindowStateAnimator mWinAnimator= new WindowStateAnimator(service, this, mAttachedWindow)
+}
+
+应用窗口：
+AppWindowToken{
+ AppWindowAnimator mAppAnimator = new AppWindowAnimator(_service, this);
+ WindowAnimator mAnimator = service.mAnimator;
+}
+
+
+frameworks/base/services/java/com/android/server/wm/WindowAnimator.java
+frameworks/base/services/java/com/android/server/wm/AppWindowAnimator.java
+frameworks/base/services/java/com/android/server/wm/WindowStateAnimator.java
+===================================
+创建动画：
+createScaleUpAnimationLocked
+
+
+createThumbnailAnimationLocked
+
+
+___________________________________
+设置动画：
+
+应用窗口动画(mWinAnimator):这里的动画基本都为null
+setTokenVisibilityLocked-->win.mWinAnimator.applyAnimationLocked@WindowManagerService.java-->
+applyAnimationLocked{
+- 特殊窗口动画(状态条，导航调)，mPolicy.selectAnimationLw
+- 普通窗口动画，mService.loadAnimation
+- 设置窗口动画，setAnimation(a)
+}@WindowStateAnimator.java
+
+
+设置要切换的，应用中的窗口动画(AppWindowAnimator)：
+Animation.Activity@framework/base/core/res/res/values/styles.xml
+com.android.internal.R.styleable.WindowAnimation_taskOpenEnterAnimation
+
+frameworks/base/core/res/res/anim/activity_open_enter.xml
+frameworks/base/core/res/res/anim-port/task_open_enter.xml
+
+setTokenVisibilityLocked-->applyAnimationLocked{
+- okToDisplay，根据下次应用动画类型mNextAppTransitionType，设置应用动画
+	- ANIM_CUSTOM，从下个应用中获取动画loadAnimation
+	- ANIM_SCALE_UP，createScaleUpAnimationLocked
+	- ANIM_THUMBNAIL，缩略图createThumbnailAnimationLocked
+	- 其他，从系统资源中获取loadAnimation
+	- 将获取到的动画设置到app，wtoken.mAppAnimator.setAnimation
+
+- okToDisplay =false,没有准备好显示，清除动画wtoken.mAppAnimator.clearAnimation
+
+}-->wtoken.mAppAnimator.setAnimation-->setAnimation{
+- 赋值动画animation，设置动画时长，缩放比例
+- 获取动画层次调整值
+- 调整层次,updateLayers{
+		- 遍历改应用标识中的所有窗口，调整winAnimator.mAnimLayer 
+		- 若窗口是输入法目标，调整输入法窗口setInputMethodAnimLayerAdjustment
+		- 若窗口是壁纸目标，调整壁纸窗口setWallpaperAnimLayerAdjustmentLocked	
+	}
+- 设置transformation初始值
+
+}@WindowManagerService.java
+
+设置窗口动画：
+removeWindowToken/setTokenVisibilityLocked/removeWindowLocked/relayoutWindow-->
+win.mWinAnimator.applyAnimationLocked
+
+
+设置窗口服务中动画器：
+
+______________________________
+执行：
+窗口服务中动画执行：
+performLayoutAndPlaceSurfacesLockedInner-->scheduleAnimationLocked-->mChoreographer.
+postCallback(mAnimationRunnable)-->AnimationRunnable.run-->mAnimator.animate@WindowManagerService.java
+--animate{
+- 开始操作surface，Surface.openTransaction()
+- 执行应用和方位动画，updateWindowsAppsAndRotationAnimationsLocked{
+		- 执行应用动画，WindowManagerService.mAnimatingAppTokens
+		- 执行退出应用动画，WindowManagerService.mExitingAppTokens
+		- 执行方位动画，mScreenRotationAnimation
+	}
+- performAnimationsLocked{
+		- 执行窗口和壁纸动画，updateWindowsAndWallpaperLocked{
+			- 循环处理WindowManagerService中所有surface不为空的窗口{
+
+			}
+		}
+		- testTokenMayBeDrawnLocked{
+
+		}
+	}
+- 
+}@WindowAnimator.java
+
+animate{
+- 开始处理surface，Surface.openTransaction(改函数没作用)
+- updateWindowsAppsAndRotationAnimationsLocked
+
+}
+updateWindowsAppsAndRotationAnimationsLocked{
+- 获取服务中的应用动画执行器，mService.mAnimatingAppTokens，并执行一步动画
+  appAnimator.stepAnimationLocked()
+- appAnimator.stepAnimationLocked
+}
+
+performAnimationsLocked{
+- updateWindowsAndWallpaperLocked-->winAnimator.stepAnimationLocked
+}
+
+执行一步：
+stepAnimationLocked{
+- 显示正常工作
+- 假动画sDummyAnimation，返回
+- stepAnimation(判断是否还有动画需要执行)--stepThumbnailAnimation
+}
+
+设置surface变化属性transformation：
+stepAnimation{
+- 获取动画改变的值transformation，animation.getTransformation
+- 动画执行完成，animation = null，清除动画图片clearThumbnail
+- 动画没有完成，返回true
+}
+
+frameworks/base/services/java/com/android/server/wm/WindowAnimator.java
+
+====================================
+窗口切换动画：
+
+设置要执行的动画类型：
+prepareAppTransition(int transit, boolean alwaysKeepCurrent){
+- 设置动画类型，mNextAppTransition = transit
+- 初始化状态，mAppTransitionReady = false....
+}
+
+设置可见性：
+setAppVisibility，将可见性发生变化的窗口加入到mOpeningApps,或mClosingApps容器中
+
+开始执行动画：
+executeAppTransition{
+- mAppTransitionReady = true;
+- performLayoutAndPlaceSurfacesLocked
+}
+
+====================================
+
+performLayoutAndPlaceSurfacesLockedInner{
+- mAppTransitionReady==true执行转换,handleAppTransitionReadyLocked{
+	- 获取正在打开的应用个数mOpeningApps.size
+	- !mDisplayFrozen && !mAppTransitionTimeout，检查所有正在打开的应用starting窗口是否已经显示
+	- goodToGo{
+		- 设置动画状态(mAppTransitionReady=false，mAppTransitionRunning...),移除超时消息
+		- 调整应用窗口层次，rebuildAppWindowListLocked{
+			- 将mWindow中所有的应用窗口移除，并加入到mRebuildTmp
+			- 跳过壁纸窗口的位置，壁纸窗口一直在最底层
+			- 重新加入mExitingAppTokens中的窗口到mWindows
+			- 再加入mAnimatingAppTokens中窗口,(z轴层次比退出窗口高)
+			- 若移除的窗口个数与加入的不等，打印log
+		}
+		- 调整壁纸窗口层次，adjustWallpaperWindowsLocked
+		- 遍历打开和关闭窗口。确定关闭，打开的窗口是否显示壁纸。设置动画属性为最高层窗口的属性
+		- 根据遍历结果设置动画，设置transit
+		- 若不允许动画mPolicy.allowAppAnimationsLw，设置动画属性animLp为空
+		- 遍历打开窗口，mOpeningApps{
+			- 设置窗口可见性和动画类型，setTokenVisibilityLocked
+			- 并找到最高层的打开应用窗口，topOpeningApp			
+			}
+		- 遍历关闭窗口，mClosingApps{
+			- 设置窗口可见性和动画类型，setTokenVisibilityLocked
+			}
+		}
+	}
+
+-应用切换动画执行完成，mAppTransitionRunning为true,handleAnimatingStoppedAndTransitionLocked{
+	- mAppTransitionRunning = false
+	- 设置所有的AppWindowToken的状态，(不将放到底部)sendingToBottom为false
+	- 将mAppTokens重新加入到容器mAnimatingAppTokens
+	- rebuildAppWindowListLocked{
+		- 将所有的应用窗口从mWindows移除，并加入到mRebuildTmp。查找最上的壁纸窗口
+		- 将已经退出的窗口mExitingAppTokens重新加入，reAddAppWindowsLocked
+		- 将可视的窗口mAnimatingAppTokens重新加入，reAddAppWindowsLocked
+		- 检查移除的窗口与加入的窗口数是否一致
+		}
+
+	}
+
+....
+}

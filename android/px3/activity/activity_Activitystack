@@ -1,0 +1,102 @@
+//
+mWaitingVisibleActivities  //等待activity可见后才执行操作的activities
+mWaitingActivityVisible    //等待activity启动可见结果的进程集合
+mWaitingActivityLaunched   //等待activity启动完成结果的进程集合
+mStoppingActivities      //将要执行stop的activity
+mFinishingActivities     //将要结束的activity
+
+
+
+onCreate - onDestroy //完整生命周期
+onStart - onStop   //可见
+onResume - onPause //用户可交互
+===========
+onCreate:
+scheduleLaunchActivity-->handleLaunchActivity-->performLaunchActivity@ActivityThread.java
+-->callActivityOnCreate@Instrumentation.java-->activity.performCreate-->onCreate@Activity.java
+
+
+onStart:
+performLaunchActivity@ActivityThread.java-->performStart-->
+mInstrumentation.callActivityOnStart-->activity.onStart@Activity.java
+
+
+onResume:
+scheduleResumeActivity-->handleResumeActivity-->performResumeActivity@ActivityThread.java
+-->performResume-->mInstrumentation.callActivityOnResume@Activity.java
+
+onPause:
+schedulePauseActivity-->handlePauseActivity-->performPauseActivity{
+- 保存状态，callActivityOnSaveInstanceState
+- mInstrumentation.callActivityOnPause-->performPause-->onPause
+}@ActivityThread.java
+
+onStop:
+scheduleStopActivity-->handleStopActivity{
+- performStopActivityInner-->r.activity.performStop@-->
+	mInstrumentation.callActivityOnStop-->activity.onStop@Activity.java
+- updateVisibility
+}@ActivityThread.java
+
+
+scheduleWindowVisibility
+
+
+=================
+服务端接口：
+__________
+launch:
+resumeTopActivityLocked@ActivityStack.java-->(进程没有启动)realStartActivityLocked-->
+scheduleLaunchActivity@ActivityStackSupervisor.java
+
+__________
+resuem:
+resumeTopActivityLocked-->(应用进程已经存在)scheduleResumeActivity@ActivitStack.java
+
+__________
+暂停：
+startPausingLocked{
+- 应用端暂停，prev.app.thread.schedulePauseActivity-->
+ (回调服务端)ActivityManagerNative.getDefault().activityPaused
+}
+
+//回调
+activityPaused-->stack.activityPausedLocked@ActivityManagerService.java-->
+activityPausedLocked-->completePauseLocked{
+- 正在执行结束activity，则直接结束finishCurrentActivityLocked
+- 配置变化执行销毁，destroyActivityLocked
+- {
+	- 其他情况加入mStoppingActivities，
+	- 空闲时执行清除,scheduleIdleLocked
+  }
+- mStackSupervisor.resumeTopActivitiesLocked
+
+}@ActivityStack.java
+
+___________
+finish:
+finish-->ActivityManagerNative.getDefault().finishActivity@Activity.java-->
+finishActivity@ActivityManagerService.java-->requestFinishActivityLocked-->
+finishActivityLocked{
+- 标记activity正在结束，makeFinishing
+- adjustFocusedActivityLocked
+- startPausingLocked
+- 若没有暂停，直接结束finishCurrentActivityLocked
+}@ActivityStack.java
+
+finishCurrentActivityLocked{
+- 当前结束activity是显示状态，加入mStoppingActivities推迟结束
+- 已经是stop状态，destroyActivityLocked
+- 非stop，{
+	- 加入mFinishingActivities
+	- getFocusedStack().resumeTopActivityLocked
+	}
+}@ActivityStack.java
+
+___________
+stop:
+activityIdleInternalLocked@ActivityStackSupervisor.java-->stopActivityLocked-->
+
+
+___________
+ensureActivitiesVisibleLocked

@@ -1,0 +1,12 @@
+//console
+kernel/drivers/stagins/android/fiq_debugger.c
+
+平台相关
+kernel/arch/x86/kernel/early_printk.c
+kernel/arch/x86/platform/xgold/early_printk_xgold.c
+
+
+
+
+//串口驱动
+kernel/drivers/tty/serial/xgold_serial.c

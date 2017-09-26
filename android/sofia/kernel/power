@@ -1,0 +1,35 @@
+//上层调用休眠
+state_store(mem/standby)-->pm_suspend@suspend.c
+
+
+//自动休眠
+autosleep_store@main.c-->pm_autosleep_set_state{
+- 使能/关闭自动睡眠，pm_wakep_autosleep_enabled@wakeup.c
+- queue_up_suspend_work-->suspend_work-->try_to_suspend{
+	- 获取需处理的锁个数不为0则重新开始队列，pm_get_wakeup_count
+	- 执行休眠，pm_suspend
+	- 重新开始任务队列，queue_up_suspend_work
+	}
+}@autosleep.c
+
+
+//休眠
+pm_suspend-->enter_state{
+- 同步文件系统，sys_sync
+- suspend_prepare
+- 挂起设备suspend_devices_and_enter{
+	- suspend_console
+	- 进入休眠，suspend_enter{
+		- disable_nonboot_cpus
+		- syscore_suspend
+		- 检测是否有锁，pm_wakeup_pending
+		- 可以进入，suspend_ops->enter@suspend.c-->xgold_suspend_enter@pm-suspend.c
+		}
+	}
+}suspend.c
+
+kernel/power/mian.c
+kernel/power/suspend.c
+kernel/power/autosleep.c
+drivers/base/power/wakeup.c
+arch/x86/platfrom/xgold/pm-suspend.c

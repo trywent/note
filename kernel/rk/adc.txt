@@ -1,0 +1,56 @@
+设备：
+rk30_init_devices-->platform_device_register(&device_adc)@device.c
+
+驱动：
+rk30_adc_init-->platform_driver_register(rk30_adc_driver)@rk30_adc.c
+
+porbe：
+
+
+
+drivers/adc/plat/rk30_adc.c
+arch/arm/mach-rk30/devices.c
+_________________________
+主要可以分层三个部分：
+core,host,client
+core:提供主要的操作函数框架，注册，读取数据，将host和client关联。管理host(可能多个host)
+host:adc的实际操作部分，读写寄存器，设置工作方式
+client:连接到host的器件，获取数据都是获取相应器件的数据。一般操作都是通过client(可以看作接口)
+
+core中提供callback函数，（sync和async读都会回调这个函数，通过add_req)
+
+struct adc_client *adc_register(int chn,void (*callback)(struct adc_client *, void *, int),
+ void *callback_param){
+- 找到对应通道的adchost，list_for_each_entry 
+- 新建client
+}@core.c 返回一个client。又被采集数据的设备驱动调用
+
+adc_alloc_host@core.c由@adb/plat/rk30_adc.c调用，初始化adc模块。
+
+core中维护static LIST_HEAD(adc_host_head);用来交互host，client
+
+__________________
+adc的数据返回：
+adc_sync_read/adc_async_read-->adc_host_read{
+- 加入请求，adc_request_add{
+	- 创建请求kzalloc(sizeof(struct adc_request)
+	- 加入到链表list_add_tail(&req->entry, &adc->req_head)
+	}
+
+}
+adc_core_irq_handle{
+- 读取数据，adc->ops->read(adc)
+- 处理数据adc_finished(adc, result){
+	- 停止转换，adc->ops->stop(adc)
+	- 遍历adc中的请求，list_for_each_entry_safe。找到对应的请求设置结果值，req->client->result。
+      	  加入到回调链表
+	- 若还有请求则开始下一轮采集，trigger_next_adc_job_if_any
+	- 回调，adc_callback{
+		- 遍历list_for_each_entry_safe(&adc->callback_head)
+		- 回调req->client->callback
+		}
+	}
+}
+
+kernel/drivers/adc/core.c
+

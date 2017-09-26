@@ -1,0 +1,15 @@
+uboot:
+backlight:
+rk_backlight_ctrl{
+-  SetPortOutput(0,29, pwm != total); //fyt RK30_PIN3_PD5
+}@rk30xx.c
+
+
+
+board/rockchip/rk30xx/rk30xx.c
+
+===============
+kernel:
+wifi:
+CONFIG_RTL8192CU=y
+CONFIG_CFG80211=y

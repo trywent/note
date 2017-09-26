@@ -1,0 +1,88 @@
+preference设置的值可以保存到SharedPreferences，也可从SharedPreferences读取设置值
+
+___________________________________
+保存数据：SharedPreferences
+
+获取：getSharedPreferences (String name, int mode)，getPreferences()(activity中唯一的preference)
+编辑数据：editor()-->putString()....-->commit()
+
+
+___________________________________
+preference用户设置接口：
+preference是用户界面的设置模块，显示在列表中的一个设置项(可以有不同的界面，选择框，列表选择等)。
+preference有相应的键值对(键值对是系统保存的设置值，保存在SharedPreferences)。
+
+显示：
+由于preference使用的Activity或Fregment的子类来显示设置项。
+在android3.0以下使用PreferenceActivity，以上推荐PreferenceFragment管理preference。
+
+xml布局：
+preference在xml中配置必须放入<PreferenceScreen>中进行组织。
+管理过多设置条目的两种方式：
+1.将设置按某种属性分类，xml中使用PreferenceCategory
+2.设置层次目录，xml中使用PreferenceScreen
+
+保存数据：
+
+
+____________________________________
+PreferenceScreen表示preference层次结构中的最高层。PreferenceActivity也指向了该类的实体。
+该类在两个地方使用：
+-PreferenceActivity指向该类，但并不显示(只有包含在其中的preferences显示)
+-在其他的preference层次中出现。PreferenceScreen的子项不在当前屏幕上显示，当点击该PreferenceScreen时子项显示。
+
+-----------------------------------
+PreferenceFragment:显示preference界面
+public static class SettingsFragment extends PreferenceFragment {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Load the preferences from an XML resource
+        addPreferencesFromResource(R.xml.preferences);
+    }
+    ...
+}
+
+将fragment加入activity：
+public class SettingsActivity extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Display the fragment as the main content.
+        getFragmentManager().beginTransaction().replace(android.R.id.content, new SettingsFragment())
+                .commit();
+    }
+}
+
+preference层次结构的设置方式
+-在XML文件中设置。 addPreferencesFromResource(int)
+-不同的Activities中，每个都有Activity元数据在XML中定义的preference。addPreferencesFromIntent(Intent)查询
+ activty是偶有preference	
+-PreferenceScreen为根的对象层次结构。setPreferenceScreen(PreferenceScreen).
+
+-----------------------------------
+PrefercenceActivity：显示preference界面
+public class SettingsActivity extends PreferenceActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        addPreferencesFromResource(R.xml.preferences);
+    }
+
+
+PrefercenceActivity包括一个或多个preference头，每个头与一个PreferenceFragment关联用来显示preference。
+这些关联的布局和显示有很多形式。主要两类：
+*小屏上只显示preference头。当选择某个显示头时才将PreferenceFragment显示出来。
+*大屏上都显示出来
+
+
+----------------------------------
+Preference Headers：
+当大屏时，设置项和子目录同时显示。小屏时，自动只显示子目录。
+实现header：
+1，将不同类型设置，分别放入PreferenceFragment中
+2，实现PreferenceActivity类，用来设置界面
+3，是想onBuildHeaders() 方法，处理headers文件
+

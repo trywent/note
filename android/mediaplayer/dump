@@ -1,0 +1,13 @@
+audioService
+dump{
+- 流状态dumpStreamStates{
+	- muteCount //被静音次数
+	- 
+	}
+- 响铃模式，dumpRingerMode{
+	- RINGER_MODE_NAMES,静音，震动，正常
+	- mRingerModeAffectedStreams //模式影响的流(设置静音时这些流也被静音)
+	- mRingerModeMutedStreams //被静音的流(静音，震动模式)
+	}
+- 
+}@AudioService.java

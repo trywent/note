@@ -1,0 +1,12 @@
+_____________________________________
+usb_serial:
+module_init(usb_serial_init)-->usb_serial_init@usb-serial.c-->usb_register(&usb_serial_driver)
+@usb.h-->usb_register_driver@driver.c
+
+驱动probe:
+usb_serial_driver-->usb_serial_probe(遍历usb串口驱动链表，interfcace的驱动)-->create_serial@usb-serial.c
+
+
+drivers/usb/serial/usb-serial.c
+include/linux/usb.h
+drivers/usb/core/driver.c

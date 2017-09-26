@@ -1,0 +1,111 @@
+//加载模块
+SurfaceFlinger::init-->HWComposer{
+- 初始化mCBContext
+- loadFbHalModule{
+	- 获取模块，hw_get_module(GRALLOC_HARDWARE_MODULE_ID) //获取gralloc模块
+	- 初始化mFbDev,framebuffer_open-->module->methods->open(GRALLOC_HARDWARE_FB0)@fb.h
+	}
+- loadHwcModule{
+	- hw_get_module(HWC_HARDWARE_MODULE_ID) //获取hwcomposer模块
+	- 初始化mHwc，hwc_open_1-->module->methods->open(HWC_HARDWARE_COMPOSER)@hwcomposer.h
+	}
+
+- mHwc不为空{
+	- 注册回调mHwc->registerProcs(&mCBContext->procs)
+	- eventControl
+	}
+- mFbDev不为空{
+	- 保存display信息到mDisplayData
+	}
+- 若没有硬件脉冲则需要模拟，new VSyncThread-->onFirstRef-->run-->threadLoop
+}
+
+//同步事件，hal回调
+注册回调mHwc->registerProcs-->(读取到同步信息)hook_vsync{
+- 将hwc_procs_t强制转换为cb_context //在结构体的第一个成员
+- cb_context->hwc->vsync-->HWComposer::vsync-->mEventHandler.onVSyncReceived@HWComposer.cpp
+	-->onVSyncReceived@SurfaceFlinger.cpp
+}
+
+
+
+//创建layer
+createWorkList{
+- 创建mDisplayData.list中hwc_layer_1_t
+- 记录个数disp.list->numHwLayers = numLayers
+}
+
+
+
+
+====================== HAL
+//================== gralloc
+gralloc_device_open{
+- 打开GRALLOC_HARDWARE_GPU0{
+	- 创建，gralloc_context_t
+	- 设置gralloc_context_t，dev->device.common
+	- 设置gralloc_context_t，gralloc_alloc和gralloc_free函数
+	}
+- fb_device_open{  //android打开的设备
+	- 创建fb_context_t，并初始化设置函数setSwapInterval，post
+	- 映射fb文件，mapFrameBuffer-->mapFrameBufferLocked{
+		- 打开fb0,获取显示屏信息保存到module中(module->info,finfo,fps,xdpi,ydpi)
+		- 映射fb0，保存地址到module->framebuffer->base
+		}
+	- 将获取的信息保存到fb_context_t中
+	}@framebuffer.cpp
+}@gralloc.cpp
+
+
+HWComposer::fbPost-->mFbDev->post(/*写入位置fb地址保存在module中*/, /*要写入的数据*/buffer->handle)
+@HWComposer.cpp-->fb_post@framebuffer.cpp
+//================== hwcomposer
+hwc_device_open{
+- 打开，HWC_HARDWARE_COMPOSER{
+	- 创建，hwc_context_t
+	- 初始化hwc_context_t，设置hwc_prepare，hw_set
+	}
+}
+
+
+//获取display信息
+queryDisplayProperties{
+- 获取config，默认为1个，mHwc->getDisplayConfigs
+- 获取属性，mHwc->getDisplayAttributes
+- 保存信息到mDisplayData
+}
+
+
+
+
+frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
+hardware/libhardware/include/hardware/fb.h
+/home/build/px3/hardware/libhardware/include/hardware/hwcomposer.h
+hardware/libhardware/modules/gralloc/gralloc.cpp
+hardware/libhardware/modules/gralloc/framebuffer.cpp
+hardware/libhardware/modules/hwcomposer/hwcomposer.cpp
+
+
+
+
+===============
+//qcom
+registerProcs{
+- 设置proc，hwc_context_t->proc
+- init_uevent_thread  //处理uevent,显示屏变化
+- init_vsync_thread(ctx)-->vsync_loop{
+	- 打开open("/sys/class/graphics/fb0/vsync_event")
+	- 读取数据中时间戳"VSYNC="，pread
+	- ctx->proc->vsync-->HWComposer::hook_vsync-->HWComposer::vsync
+	}@hwc_vsync.cpp
+}@hwc.cpp
+
+prepare@HWComposer.cpp-->hwc_prepare-->hwc_prepare_primary@hwc.cpp
+
+
+hardware/qcom/display/msm8960/libhwcomposer/hwc.cpp
+hardware/qcom/display/msm8960/libhwcomposer/hwc_uevents.cpp
+hardware/qcom/display/msm8960/libhwcomposer/hwc_vsync.cpp
+
+
+

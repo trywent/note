@@ -1,0 +1,57 @@
+//
+configure --enable-checking=release --enable-languages=c,c++ --disable-multilib  --prefix=install/dir
+
+
+//
+静态库(不能直接执行，经过链接后可以)：编译时将库嵌入到代码中，不用加载。编译后代码两增大。
+动态库(能够被加载到内存，供其他程序执行)：代码运行时打开加载库。运行速度较慢
+
+创建动态库：
+//base.cc
+g++ -c base_shared.cc
+g++ -shared base_shared.o -o libbase_shared.so  //创建共享库(动态库)
+
+//export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:`pwd`
+//g++ base.cc -L`pwd` -lbase_shared             //使用自己共享库，直接链接不用加载()
+//g++ base1.cc  -l ld                           //使用加载库的函数(dlopen)所在的库(ld)
+
+打开库：
+lib = dlopen("libshared.so",)
+查找库中函数：
+sym = dlsym(lib, "func")
+调用函数：
+(void (*)(void))sym;
+_____________________________
+创建静态库：
+gcc -c calc_mean.c -o calc_mean.o
+
+使用archiver(ar)创建静态库：
+ar  rcs libmean.a      calc_mean.o
+Note: 库名包括前会lib，后缀.a
+
+
+创建动态库：
+gcc -c -fPIC calc_mean.c -o calc_mean.o    
+
+gcc -shared -Wl,-soname,libmean.so.1 -o libmean.so.1.0.1  calc_mean.o
+Note: 库名以前缀lib开始
+
+使用库：
+int main(int argc, char* argv[]) {
+  //调用库函数
+}
+
+链接静态库：
+gcc -static main.c -L. -lmean -o statically_linked
+Note: 库名mean
+
+链接动态库：
+gcc main.c -o dynamically_linked -L. -lmean
+
+============================
+防止编译器重排序，优化代码：
+__asm__ __volatile__ ("" : : : "memory");
+
+
+gcc预处理输出：
+gcc -E -P source.c  //-P 消除行数

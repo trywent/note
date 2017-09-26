@@ -1,0 +1,111 @@
+通过网络更新时间(NTP服务)：
+
+注册重复设置时间(没有成功)：
+systemReady-->registerForAlarms-->(接收到ACTION_POLL)mHandler.obtainMessage(EVENT_POLL_NETWORK_TIME).sendToTarget
+MyHandler.handleMessage-->onPollNetworkTime@NetworkTimeUpdateService.java
+
+注册网络连接广播接收器：
+systemReday-->registerForConnectivityIntents(监听网络是否变化)-->registerReceiver
+(mConnectivityReceiver)-->(接收到广播)mHandler.obtainMessage(EVENT_NETWORK_CONNECTED).sendToTarget()
+-->MyHandler.handleMessage-->onPollNetworkTime(判断是否可以更新时间)@NetworkTimeUpdateService.java
+
+监听设置(立即更新时间)：
+systemReady-->mSettingsObserver.observe(mContext)-->(设置成自动更新时间)SettingsObserver.onChange
+-->mHandler.obtainMessage(mMsg).sendToTarget-->(处理广播消息)MyHandler.handleMessage
+-->onPollNetworkTime(判断是否可以更新时间)@NetworkTimeUpdateService.java
+
+设置没有成功：
+onPollNetworkTime-->resetAlarm
+
+
+监听NITZ是否已经更新时间(电话网络):
+systemReady-->registerForTelephonyIntents-->registerReceiver(mNitzReceiver)-->
+(监听到ACTION_NETWORK_SET_TIME或ACTION_NETWORK_SET_TIMEZONE)onReceive(设置更新发生的时间)
+_________________________
+获取NtpTrustedTime实例：
+NetworkTimeUpdateService-->NtpTrustedTime.getInstance(context)
+
+更新时间：
+onPollNetworkTime@NetworkTimeUpdateService.java-->forceRefresh-->client.requestTime()
+@NtpTrustedTime.java-->requestTime(连接到ntp服务器获取时间，服务器地址由Settings.Secure.NTP_SERVER定义)
+-->writeTimeStamp@SntpClient.java-->(时间可以更新)SystemClock.setCurrentTimeMillis(ntp)
+@NetworkTimeUpdateService.java
+
+
+currentTimeMillis(返回 mCachedNtpTime + getCacheAge()，从服务器取得的时间+过去的时间）
+mCachedNtpTime=client.getNtpTime
+
+默认ntp服务器：
+com.android.internal.R.string.config_ntpServer= "2.android.pool.ntp.org"
+
+frameworks/base/services/java/com/android/server/NetworkTimeUpdateService.java
+frameworks/base/core/java/android/util/NtpTrustedTime.java
+frameworks/base/core/java/android/net/SntpClient.java
+frameworks/base/services/java/com/android/server/NetworkTimeUpdateService.java
+
+===========================
+NITZ时间更新通过gsm，cdma网络：
+
+主动查询到时间状态：
+pollStateDone(查询状态完成)-->setAndBroadcastNetworkSetTime@GsmServiceStateTracker.java
+
+监听RIL上报的时间消息：
+new GsmServiceStateTracker-->setOnNITZTime-->mNITZTimeRegistrant = new Registrant
+(注册监听者)@BaseCommands.java===(收到上报时间事件)processUnsolicited(RIL_UNSOL_NITZ_TIME_RECEIVED)
+-->mNITZTimeRegistrant.notifyRegistrant(通知注册者)@RIL.java-->internalNotifyRegistrant-->
+h.sendMessage@Registrant.java-->handleMessage(处理消息EVENT_NITZ_TIME)-->setTimeFromNITZString-->setAndBroadcastNetworkSetTime
+
+
+监听设置自动更新时间：
+registerContentObserver(Settings.System.getUriFor(Settings.System.AUTO_TIME), mAutoTimeObserver)
+==(设置自动更新时间)mAutoTimeObserver.Handler.onChange-->revertToNitzTime-->setAndBroadcastNetworkSetTime
+(设置时间，发送广播ACTION_NETWORK_SET_TIME)@GsmServiceStateTracker.java
+
+监听自动更新时区：
+registerContentObserver(Settings.System.getUriFor(Settings.System.AUTO_TIME_ZONE),mAutoTimeZoneObserver)
+==revertToNitzTimeZone.Handler.onChange-->revertToNitzTimeZone-->setAndBroadcastNetworkSetTimeZone
+-->(设置时区，发送广播)@GsmServiceStateTracker.java
+
+
+
+frameworks/base/telephony/java/com/android/internal/telephony/gsm/GsmServiceStateTracker.java
+
+
+logcat -s NetworkTimeUpdateService
+
+===========
+ntpdate addr
+
+133.100.11.8 prefer
+210.72.145.44
+203.117.180.36
+131.107.1.10
+time.asia.apple.com
+64.236.96.53
+130.149.17.21
+66.92.68.246
+18.145.0.30
+clock.via.net
+137.92.140.80
+133.100.9.2
+128.118.46.3
+ntp.nasa.gov
+129.7.1.66ntp-sop.inria.frserver
+210.72.145.44(中国国家授时中心服务器IP地址)
+ntp.sjtu.edu.cn (上海交通大学网络中心NTP服务器地址）
+202.120.2.101 (上海交通大学网络中心NTP服务器地址）
+
+ntp.sjtu.edu.cn 202.120.2.101 (上海交通大学网络中心NTP服务器地址）
+1.cn.pool.ntp.org
+2.cn.pool.ntp.org
+3.cn.pool.ntp.org
+0.cn.pool.ntp.org
+cn.pool.ntp.org
+tw.pool.ntp.org
+0.tw.pool.ntp.org
+1.tw.pool.ntp.org
+2.tw.pool.ntp.org
+3.tw.pool.ntp.org
+
+cn.pool.ntp.org
+tw.pool.ntp.org

@@ -1,0 +1,17 @@
+Session:通常是每个进程有一个Session用来与WindowManager交互
+
+ViewRootImpl-->getWindowSession-->windowManager.openSession@ViewRootImpl.java-->openSession
+@WindowManagerService.java-->new Session()@Session.java
+
+
+==============================
+
+
+updateRotationUncheckedLocked-->computeScreenConfigurationLocked(根据屏的高宽，方位计算应用的高宽。
+计算兼容模式下的缩放比mCompatibleScreenScale)@WindowManagerService.java
+
+
+设置显示屏大小：
+setForcedDisplaySize-->setForcedDisplaySizeLocked-->computeScreenConfigurationLocked@WindowManagerService.java
+
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java

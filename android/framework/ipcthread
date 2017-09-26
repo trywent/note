@@ -1,0 +1,62 @@
+//进程的启动，监听driver响应ipc
+service zygote /system/bin/app_process@init.rc-->main-->runSelectLoop(监听socket)@ZygoteInit.java
+-->runOnce{
+- Zygote.forkAndSpecialize //fork新进程
+- handleChildProc{
+	- WrapperInit.execApplication //invoke 参数不为空
+	- RuntimeInit.zygoteInit
+	}
+}@ZygoteConnection.java
+
+//fork流程
+runOnce-->Zygote.forkAndSpecialize@ZygoteConnection.java-->nativeForkAndSpecialize
+@Zygote.java-->com_android_internal_os_Zygote_nativeForkAndSpecialize-->
+ForkAndSpecializeCommon-->fork@com_android_internal_os_Zygote.cpp
+
+_____________
+//进程的初始，IPC工作的主线程这里初始化
+RuntimeInit.zygoteInit{
+- nativeZygoteInit-->com_android_internal_os_RuntimeInit_nativeZygoteInit-->
+	gCurRuntime->onZygoteInit@AndroidRuntime.cpp-->
+	ProcessState::self()->startThreadPool(开始主线程)@app_main.cpp
+- applicationInit(targetSdkVersion, argv, classLoader)-->invokeStaticMain(调用main函数)
+	
+}@RuntimeIinit.java
+
+
+frameworks/base/core/java/com/android/internal/os/ZygoteInit.java
+frameworks/base/core/java/com/android/internal/os/ZygoteConnection.java
+frameworks/base/core/jni/com_android_internal_os_Zygote.cpp
+frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
+frameworks/base/core/jni/AndroidRuntime.cpp
+frameworks/base/cmds/app_process/app_main.cpp
+
+
+
+==================
+//binder工作
+//开始非主线程(新线程用于处理远程调用)
+executeCommand(BR_SPAWN_LOOPER)@IPCThreadState.cpp-->
+spawnPooledThread(isMain){
+- new PoolThread()
+- run-->PoolThread.threadLoop-->IPCThreadState::self()->joinThreadPool{
+	- getAndExecuteCommand{//循环执行
+		- talkWithDriver
+		- executeCommand
+		}
+	- mOut.writeInt32(BC_EXIT_LOOPER);
+	- talkWithDriver(false) //退出执行
+	}
+}@ProcessState.cpp
+
+
+
+Binder-->init@Binder.java-->android_os_Binder_init@android_util_Binder.cpp
+
+
+frameworks/base/core/java/android/os/Process.java
+frameworks/base/core/java/android/os/Binder.java
+frameworks/base/core/jni/android_util_Binder.cpp
+frameworks/native/libs/binder/IPCThreadState.cpp
+frameworks/native/include/binder/BinderService.h
+frameworks/native/libs/binder/ProcessState.cpp

@@ -1,0 +1,184 @@
+java：
+class_init_native@GpsLocationProvider.java-->android_location_GpsLocationProvider_class_init_native
+
+开始:
+applyRequirementsLocked-->p.setRequest@LocationManagerService.java
+setRequest-->handleMessage(SET_REQUEST)-->handleSetRequest-->startNavigating-->native_start@GpsLocationProvider.java-->android_location_GpsLocationProvider_start
+
+frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
+frameworks/base/services/java/com/android/server/LocationManagerService.java
+__________________________
+JNI接口：
+
+初始化：
+android_location_GpsLocationProvider_class_init_native{
+- 缓存java层接口
+- 获取HAL层设备，hw_get_module
+- 获取接口sGpsInterface = gps_device->get_gps_interface
+}
+
+开始：
+android_location_GpsLocationProvider_start-->sGpsInterface->start()
+
+
+定位模式：
+startNavigating-->native_set_position_mode@GpsLocationProvider.java-->
+android_location_GpsLocationProvider_set_position_mode-->sGpsInterface->set_position_mode
+
+frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
+_________________________
+获取HAL层接口：
+
+gps_module_methods.open-->open_gps-->dev->get_gps_interface-->gps__get_gps_interface@gps.c
+-->gps_get_hardware_interface@bd_gps.c
+
+hardware/rk29/gps/gps_uc221/gps.c
+hardware/rk29/gps/gps_uc221/bd_gps.c
+==========================
+HAL:
+
+//初始化，接收控制命令
+um220_gps_init-->gps_state_init-->gps_state_thread{
+- 创建gps定时进程gps_timer_thread，state->callbacks.create_thread_cb("um220_gps_tmr", gps_timer_thread)
+- 创建gps数据进程gps_nmea_thread，state->callbacks.create_thread_cb("um220_gps", gps_nmea_thread)
+- 接收处理事件{
+	- 等待控制事件control[1]，epoll_wait	
+	- 处理事件{
+		- CMD_QUIT,退出守护进程
+		- CMD_START，开始接收数据{
+			- nmea_reader_init	
+			- 设置开始状态started =1	
+			- 开始接收gps_wakeup 			
+			}
+		- CMD_STOP，结束
+		- CMD_MODE_GPS,CMD_MODE_BD,CMD_MODE_GN，定位模式
+		}
+	}
+}
+/*
+ 北斗存储在sv_status[RNSS_BDS]  //sv_status[1]
+ gps存储在sv_status[RNSS_GPS]     //sv_status[0]
+
+*/
+gps_timer_thread{
+- gps不是开始状态则睡眠
+- 获取锁，gps_state_lock_fix
+- 有经纬度信息GPS_LOCATION_HAS_LAT_LONG，上报state->callbacks.location_cb
+- 卫星信息sv_status_changed{
+	- 获取gps个数，sv_status[0].num_svs
+	- 获取北斗个数，sv_status[1].num_svs
+	- 将北斗和gps的数据合并，memcpy(sv_status[0].sv_list,sv_status[1].sv_list)
+	- state->callbacks.sv_status_cb
+	- 
+	}
+- 是否需要睡眠，sleep()。//设置更新位置信息的频率
+- um_send_ni_notification-->gps_state->ni_callbacks.notify_cb
+- 若有关闭命令CMD_STOP，关闭gps{
+	- gps_sleep	
+	}
+}
+
+//获取并解析gps串口数据
+gps_nmea_thread{
+- 若串口没有打开，打开串口gps_opentty(state)
+- 等待消息，select
+- 读取到数据,解析数据nmea_reader_addc-->
+	(读取到一行)nmea_reader_parse{
+		- 若哟nmea回调则调用，nmea_cb
+		- 获取字串中的有效符号，nmea_tokenizer_init
+		- 解析各个信息，填充到NmeaReader中
+		- “GSV”信号{
+			- 读取信息填充到，GpsSvStatus.sv_list
+			}
+	}
+}
+
+打开gps:
+um220GpsInterface.start-->um220_gps_start--Gps_state_start
+
+
+设置定位模式：
+um220GpsInterface.set_position_mode-->um220_gps_set_position_mode
+
+hardware/rk29/gps/gps_uc221/bd_gps.c
+
+=================
+上传位置信息：
+state->callbacks.sv_status_cb@bd_gps.c-->sv_status_callback-->memcpy(&sGpsSvStatus, sv_status)
+@com_android_server_location_GpsLocationProvider.cpp
+
+
+(由native代码调用)reportSvStatus{
+- 读取位置信息，native_read_sv_status-->android_location_GpsLocationProvider_read_sv_status{
+	- 获取个数，sGpsSvStatus.num_svs
+	- 填充数组
+	}
+- listener.mListener.onSvStatusChanged
+- updateStatus
+}@GpsLocationProvider.java
+
+listener.mListener.onSvStatusChanged@GpsLocationProvider.java
+onSvStatusChanged-->mGpsStatus.setStatus@LocationManager.java-->setStatus@GpsStatus.java
+
+
+
+frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
+frameworks/base/location/java/android/location/LocationManager.java
+frameworks/base/location/java/android/location/GpsStatus.java
+frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
+=================
+
+I/bd_gps  ( 1457):  
+I/bd_gps  ( 1457): gps_timer_thread 1417 0x0 0 0 0
+I/bd_gps  ( 1457): um220_gps_stop: called
+I/bd_gps  ( 1457): gps_state_stop
+I/bd_gps  ( 1457): try gps_state_stop
+I/bd_gps  ( 1457): Try to change state to init
+I/bd_gps  ( 1457): gps control fd event
+D/gps1    ( 1810): gpsProviderEnabled = false
+I/bd_gps  ( 1457): gps status callback: 0x2
+I/bd_gps  ( 1457): um220_gps_cleanup: called
+I/bd_gps  ( 1457): gps control fd event
+I/bd_gps  ( 1457): gps thread quitting on demand
+I/bd_gps  ( 1457): gps waiting for command thread to stop
+I/bd_gps  ( 1457): gps_closetty
+E/bd_gps  ( 1457): um220_run_hook: um220.gps.hookspath property is not set
+I/bd_gps  ( 1457): gps_closetty
+I/bd_gps  ( 1457): gps nmea thread destroyed
+D/gps1    ( 1810): gpsProviderEnabled = false
+D/gps1    ( 1810): gpsProviderEnabled = false
+
+
+
+I/bd_gps  ( 1457): Set as standalone mode currently! 
+I/bd_gps  ( 1457): gps fix frquency set to 1 sec
+I/bd_gps  ( 1457): RNSS mode um220_gps_set_position_mode 05
+I/bd_gps  ( 1457): um220_gps_start: called
+I/bd_gps  ( 1457): gps_state_start
+I/bd_gps  ( 1457): gps status callback: 0x1
+I/bd_gps  ( 1457): gps thread running
+I/bd_gps  ( 1457): gps control fd event
+I/bd_gps  ( 1457): gps thread starting  location_cb=0x671969c5
+I/bd_gps  ( 1457): gps_opentty
+I/bd_gps  ( 1457): gps entered timer thread
+I/bd_gps  ( 1457): gps will read from /dev/ttyS3
+I/bd_gps  ( 1457): set to 9600bps, 8-N-1
+E/bd_gps  ( 1457): um220_run_hook: um220.gps.hookspath property is not set
+I/bd_gps  ( 1457): Send WAKEUP command to GPS
+I/bd_gps  ( 1457): gps_timer_thread 1417 0x0 0 0 0
+I/bd_gps  ( 1457): gps entered nmea thread
+I/bd_gps  ( 1457): gps_nmea_thread 1326 200
+D/gps1    ( 1810): gpsProviderEnabled = true
+D/gps1    ( 1810): gpsEnabled = 1
+D/gps1    ( 1810): bdEnabled = 1
+D/gps1    ( 1810): gpsProviderEnabled = true
+D/gps1    ( 1810): gpsEnabled = 1
+D/gps1    ( 1810): bdEnabled = 1
+D/gps1    ( 1810): gpsProviderEnabled = true
+D/gps1    ( 1810): gpsEnabled = 1
+D/gps1    ( 1810): bdEnabled = 1
+E/BluetoothAdapter( 1810): Bluetooth binder is null
+D/gps1    ( 1810): gpsProviderEnabled = true
+D/gps1    ( 1810): gpsEnabled = 1
+D/gps1    ( 1810): bdEnabled = 1
+

@@ -1,0 +1,20 @@
+SCLK:时钟
+LRCLK:左右声道时钟
+SD:数据
+
+
+=================
+rk30_init_i2s-->platform_device_register(&device_iis1_2ch)@devices.c
+
+rockchip_i2s_init-->platform_driver_register(&rockchip_i2s_driver)@rk30_i2s.c
+
+
+rockchip_i2s_probe{
+- snd_soc_register_dai
+}
+
+
+dai->ops.set_fmt-->rockchip_i2s_dai_ops.set_fmt-->rockchip_i2s_set_fmt
+
+kernel/arch/arm/mach-rk30/devices.c
+kernel/sound/soc/rk29/rk30_i2s.c

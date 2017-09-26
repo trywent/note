@@ -1,0 +1,148 @@
+ 0x6773fe00
+===========================
+common：
+board_init_r@board.c-->stdio_init@stdio.c-->drv_lcd_init-->lcd_init{
+- 初始化，由平台实现函数，lcd_ctrl_init
+- lcd_clear()
+- lcd_enable()
+}@lcd.c
+
+
+lcd_sync-->flush_dcache_range
+
+arch/arm/lib/board.c
+common/lcd.c
+include/lcd.h
+__________________________
+#define VIDEO_FONT_WIDTH	8
+#define VIDEO_FONT_HEIGHT	16
+#define VIDEO_FONT_SIZE		(VIDEO_FONT_CHARS * VIDEO_FONT_HEIGHT) //128bytes
+
+输出字符：
+lcd_putc-->lcd_putc_xy(console_col * VIDEO_FONT_WIDTH,console_row * VIDEO_FONT_HEIGHT, c)
+-->lcd_drawchars(ushort x, ushort y, uchar *str, int count){
+- 根据x,y坐标计算buffer中对应的位置，(lcd_base + y * lcd_line_length + x * (1 << LCD_BPP) / 8)
+- 绘制一行像素，VIDEO_FONT_HEIGHT{
+	- 获取字符对应位置的数据，video_fontdata
+	- 绘制字符一行8个像素的数据，*d++ = (bits & 0x80) ?lcd_color_fg : lcd_color_bg;
+	}
+}
+
+
+lcd_color_fg //一个像素的颜色值，BPP不同而不同，位数不同
+
+_________________________
+显示logo:
+使能：
+lcd_enable_logo{
+- lcd_show_logo = enable
+- 设置源格式，anel_info.logo_rgb_mode =RGB565
+}
+
+
+显示：
+lcd_clear-->(lcd_show_logo==enable)lcd_logo{
+- 定义CONFIG_SPLASH_SCREEN，则显示内存中bmp数据bmp_display{
+	- 显示图像到lcd，lcd_display_bitmap@lcd.c
+	}@cmd_bmp.c
+- 绘制图片，bitmap_plot
+- lcd_show_board_info
+}
+
+bitmap_plot{
+- 获取每个像素的位数，bpix = NBITS(panel_info.vl_bpix)
+- 若是压缩图片，将数据从bmp_logo_rle，考入到bmp_logo_bitmap
+- 将图片数据写入fb，
+- 显示，lcd_pandispaly(设置显示屏参数)@rk_fb.c-->rk30_lcdc_set_par{
+	- 设置窗口WIN0/WIN1
+	- 设置缩放
+	- 设置图像格式 //设置窗口中原始数据格式，ARGB888
+	}@rk3188_lcdc.c
+}@lcd.c
+
+lcd_display_bitmap{
+- 将fb的地址移到，gd->base加上图片的大小。(rk的显示从高到底)
+- 将图片数据写入fb。将图片的开始出数据写入fb的高位地址，fb递减，图片位置递加
+}
+
+============================
+平台相关：
+#define CONFIG_RKCHIPTYPE           CONFIG_RK3188 //@include/configs/rkchip.h
+
+显示屏信息：
+vidinfo_t panel_info = {
+    .lcd_face    = OUT_P888,   //主控输出格式
+	.vl_freq	= 71,  
+	.vl_col		= 1280,
+	.vl_row		= 800,
+	.vl_width	= 1280,
+	.vl_height	= 800,
+	...
+	.screen_type  = SCREEN_LVDS, //数据传送到screen的方式
+	.lvds_format  = LVDS_8BIT_1, //数据传输的格式
+}@rk30xx.c
+
+void initRKfb()	{
+		struct fb_dsp_info fb_info;
+		fb_info.xpos = 0;
+		fb_info.ypos = 0;
+		fb_info.xact = (u16)panelLength();
+		fb_info.yact = (u16)panelHeight();
+		fb_info.xsize = fb_info.xact;
+		fb_info.ysize = fb_info.yact;
+		fb_info.xvir = fb_info.xact;
+		fb_info.layer_id = WIN1;
+		fb_info.format = RGB565;
+		fb_info.yaddr = (char *)gd->fb_base;
+		lcd_pandispaly(&fb_info);
+}
+
+
+
+lcd_ctrl_init{
+- 初始化lcd信息，init_panel_info{
+	- 设置背光处理函数，rk_backlight_ctrl
+	- 设置logo格式，RGB656
+	}@rk_fb.c
+- panel_info.enable_ldo-->rk_fb_init{
+		- 使能时钟，使能win0
+		- 初始化lcd相关gpio
+		}@rk30xx.c
+- 初始化rk显示控制寄存器，rk30_lcdc_init
+- 配置显示屏信息，rk30_load_screen(vidinfo_t){
+	- 设置屏接收的图像格式，OUT_P888//
+	- 设置屏对应的时钟，set_lcdc_dclk
+	}@rk3188_lcdc.c
+}@rk_fb.c
+
+lvds设置：
+rk616_init(0)@rk30xx.c-->rk616_init@rk616.c-->set_lvds_reg(获取lvds格式panel_info.lvds_format)
+-->rk616_lvds_cfg@rk616_lvds.c
+
+rk616_init{
+- 
+}@rk616.c
+
+common/lcd.c
+drivers/video/rk_fb.c
+drivers/video/rk3188_lcdc.c
+board/rockchip/rk30xx/rk30xx.c
+
+
+背光：
+fbt_preboot-->drv_lcd_init-->lcd_init@lcd.c-->lcd_enable-->lcd_panel_on-->vid->backlight_on@rk_fb.c
+-->rk_backlight_ctrl@rk30xx.c
+
+______________________
+g_cruReg->CRU_CLKSEL_CON[27] = (1<<16) | (0xff<<24) | (div<<8) | ((div==div1)?1:0);     //lcdc0_dclk
+g_cruReg->CRU_CLKSEL_CON[28] = (1<<16) | (0xff<<24) | (div<<8) | ((div==div1)?1:0);     //lcdc1_dclk
+
+======================
+TTL屏幕显示（RGB）:
+CRU_CLKSEL1_CON 5c -- 00000002  //10:select the clkin 12 clock
+CRU_CLKSEL2_CON 64 -- 000001c6
+CRU_PLL0_CON0   68 -- 00009028
+CRU_PLL0_CON1   6c -- 00000641
+CRU_PLL1_CON0   74 -- 00009028
+CRU_IO_CON0     88 -- 00003818  //设置这里变正常
+

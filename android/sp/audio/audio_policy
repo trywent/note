@@ -1,0 +1,50 @@
+//
+====================
+mediaserver:
+main{
+- 父进程{
+	- media.log
+	}
+- 子进程{
+	- AudioFlinger::instantiate()
+	- AudioPolicyService::instantiate()-->publish-->sm->addService@BinderService.h
+	}
+}
+
+AudioPolicyService::onFirstRef{
+- AudioPolicyClient@AudioPolicyClientImpl.cpp
+- createAudioPolicyManager-->new AudioPolicyManager@AudioPolicyFactory.cpp
+}
+
+frameworks/av/media/mediaserver/main_mediaserver.cpp
+frameworks/native/include/binder/BinderService.h
+frameworks/av/services/audiopolicy/service/AudioPolicyService.cpp
+frameworks/av/services/audiopolicy/manager/AudioPolicyFactory.cpp
+frameworks/av/services/audiopolicy/service/AudioPolicyClientImpl.cpp
+====================
+AudioPolicyManager:
+
+AudioPolicyManager{
+- EngineInstance
+  /* 加载配置，初始化mHwModules,mAvailableInputDevices, mAvailableOutputDevices
+     先/vendor/etc/audio_policy.conf然后"/system/etc/audio_policy.conf"
+  */
+- ConfigParsingUtils::loadAudioPolicyConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE)
+- mEngine->initializeVolumeCurves //音量表
+- 遍历加载配置中的模块，mHwModules{
+	- mpClientInterface->loadHwModule //加载hardware
+	- 
+	}
+}
+
+
+
+system/media/audio/include/system/audio.h
+
+
+====================
+checkAndSetVolume
+
+
+
+setOutputDevice-->checkDeviceMuteStrategies

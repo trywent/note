@@ -1,0 +1,147 @@
+//AudioFlinger: 关联到实际hw设备。写播放数据到hw设备。从hw设备读取数据。
+
+AudioFlinger::instantiate-->publish{
+- 创建，new SERVICE
+- 加入，sm->addService
+}@BinderService.h
+
+onFirstRef-->(设置正常工作时间)mStandbyTimeInNsecs
+
+
+mAudioHwDevs  //audio设备，与库对应
+
+===================
+//提供接口创建audioHardware
+
+//加载模块
+aps_load_hw_module@AudioPolicyService.cpp-->loadHwModule-->loadHwModule_l(加载库，libname){
+- 若mAudioHwDevs有对应名字的模块，返回该模块
+- 获取audio设备，load_audio_interface{
+	- 获取模块，hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID)
+	- 打开设备，audio_hw_device_open
+	}	
+- 获取能否设置主音量，主静音的标记(功能)
+- 生成设备的唯一标识，nextUniqueId //mNextUniqueId的递增，从1开始
+- 创建设备和标记加入容器，mAudioHwDevs.add(new AudioHwDevice)
+}
+
+
+//hal层回调，
+getOutput-->aps_open_output_on_module@AudioPolicyService.cpp-->
+AudioFlinger::openOutput{
+- findSuitableHwDev_l(module/*模块*/，dev/*设备*/){
+	- 若模块为0{
+		- 加载设备，loadHwModule_l
+		- 若模块层支持该dev，则返回。get_supported_devices
+		}
+	- 不为0，返回mAudioHwDevs.valueFor(module)
+	}
+- 获取设备，outHwDev->hwDevice
+- 打开流，(HAL层设备)hwDevHal->open_output_stream(&outStream)-->open_output_stream@audio_hw_hal.cpp
+- 流不为空{
+	- 创建new AudioStreamOut
+	- 创建线程thread，new MixerThread(this, output),并加入mPlaybackThreads.add(id, thread)
+	}
+}
+
+//回调设置参数
+setParameters-->thread->setParameters@AudioFlinger.cpp-->MixerThread::checkForNewParameters_l
+mOutput->stream->common.set_parameters@Threads.cpp-->out_set_parameters@audio_hw_hal.cpp-->
+setParameters@AudioHardware.cpp
+
+============
+//output
+
+//1,创建audioTrack  audioPolicy创建应用端的audioTrack
+AudioFlinger::createTrack(output){
+- 检查参数，检查格式audio_is_linear_pcm
+- 根据output获取playbackThread，checkPlaybackThread_l
+- 根据进程id，创建client。registerPid_l
+- 创建track，thread->createTrack_l-->AudioFlinger::PlaybackThread::createTrack_l
+- 创建TrackHandle，并返回
+}
+
+PlaybackThread::createTrack_l{
+- 创建，new Track(StreamType)
+- 加入容器，mTracks.add
+}@Threads.cpp
+
+
+
+//3,play
+start(跨进程)：
+AudioFlinger::TrackHandle::start-->mTrack->start-->AudioFlinger::PlaybackThread::Track::start{
+- mThread.promote
+- 更新状态mState
+- playbackThread->addTrack_l(this)@Tracks.cpp-->addTrack_l{
+	- 若mActiveTracks中没有加入
+	- AudioSystem::startOutput //开始播放？
+	- 加入mActiveTracks.add
+	}@Threads.cpp
+}@Tracks.cpp
+
+
+//设置音量
+setStreamVolume-->mPlaybackThreads.valueAt(i)->setStreamVolume@AudioFlinger.cpp-->
+AudioFlinger::PlaybackThread::setStreamVolume-->设置mStreamTypes[stream].volume@Threads.cpp
+
+PlaybackThread::threadLoop-->prepareTracks_l{
+- (设置音量)track->mCachedVolume
+- typeVolume = mStreamTypes[track->streamType()].volume
+}@Threads.cpp
+
+(猜测是在这里)mFastMixer->run-->FastMixer::threadLoop(fastTrack->mVolumeProvider->getVolumeLR)
+
+
+===============
+/*input
+* 保存input数据的buffer在audioflinger侧分配，client(AudioRecord端)获取这个buffer读取数据
+* IMemory 进程间拷贝数据。
+*/
+AudioFlinger::openInput-->openInput_l{
+- inHwHal->open_input_stream
+- new AudioStreamIn //创建流
+- new RecordThread  //创建线程
+- mRecordThreads.add(*input, thread) //加入容器
+}
+
+
+AudioFlinger::openRecord{
+- checkRecordThread_l //获取input对应的线程
+- client = registerPid(pid)//创建clinet 用于分配内存(4K大小)
+- thread->createRecordTrack_l-->RecordTrack@Thread.cpp-->
+	TrackBase::TrackBase{
+	- client->heap()->allocate@Tracks.cpp-->MemoryDealer->allocate//mBuffer
+	- 
+	}
+	RecordTrack{
+	- RecordBufferConverter 
+	- AudioRecordServerProxy(mCblk,mBuffer)
+	}@Tracks.cpp
+- recordTrack->getBuffers-->mBufferMemory(返回)@TrackBase.h //获取buffer
+}
+
+
+RecordThread::start-->AudioSystem::startInput@AudioFlinger.cpp
+
+//读取数据
+AudioFlinger::RecordThread::threadLoop{
+- 
+- activeTrack->getNextBuffer(&activeTrack->mSink){//获取buffer
+	- mServerProxy->obtainBuffer
+	- 
+	}@Tracks.cpp
+- mInput->stream->read(mInput->stream,mRsmpInBuffer) //读取数据
+- activeTrack->mRecordBufferConverter->convert //重采样,将数据拷贝到客户端buffer中
+}@Threads.cpp
+
+//重采样，拷贝hal层数据到client
+AudioFlinger::RecordThread::RecordBufferConverter::convert-->provider->getNextBuffer
+-->AudioFlinger::RecordThread::ResamplerBufferProvider::getNextBuffer
+
+
+frameworks/av/services/audioflinger/AudioFlinger.cpp
+frameworks/av/services/audioflinger/Threads.cpp
+frameworks/av/services/audioflinger/Tracks.cpp
+
+frameworks/native/libs/binder/IMemory.cpp

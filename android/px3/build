@@ -1,0 +1,69 @@
+kernel:
+make rkpx3_fyt_defconfig
+make rkpx3_sdk_android-4.4_defconfig
+make kernel.img
+
+android:
+make
+./makeimage.sh
+
+默认平台：
+__________
+config.mk:
+ANDROID_BUILDSPEC := $(TOPDIR)buildspec.mk 
+-include $(ANDROID_BUILDSPEC)                 //默认的编译配置，平台
+include $(BUILD_SYSTEM)/envsetup.mk //没有配置的默认平台
+
+____________________________
+配置：
+
+-> Networking support ：cfg80211
+
+
+____________________________
+prebuit files:
+
+
+apk中的库：
+include $(CLEAR_VARS)
+LOCAL_MODULE := libapkwithso
+LOCAL_SRC_FILES := lib/libapkwithso.so # or wherever your so is
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_SUFFIX := .so
+LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+include $(BUILD_PREBUILT)
+Then add:
+
+LOCAL_REQUIRED_MODULES := libapkwithso
+
+____________________________
+@init.rc
+import /init.${ro.hardware}.rc       //[ro.hardware]: [rk30board]
+
+____________________________
+include build/core/main.mk
+-include device/rockchip/rksdk/prebuild.mk
+@Makefile
+
+
+PRODUCT_MAKEFILES := \
+	$(LOCAL_DIR)/rkpx3.mk
+@device/rockchip/rkpx3/AndroidProducts.mk
+
+$(call inherit-product, $(SRC_TARGET_DIR)/product/full_base.mk)
+include device/rockchip/rkpx3/BoardConfig.mk
+$(call inherit-product, device/rockchip/rksdk/device.mk)
+@device/rockchip/rkpx3/rkpx3.mk
+
+
+include device/rockchip/rksdk/BoardConfig.mk
+@device/rockchip/rkpx3/BoardConfig.mk
+
+
+wifi相关配置：
+include device/rockchip/$(TARGET_PRODUCT)/wifi_bt.mk
+include device/rockchip/rksdk/wifi_bt_common.mk
+@device/rockchip/rksdk/BoardConfig.mk
+
+============================
+

@@ -1,0 +1,122 @@
+ 
+
+USB_ModeSwitch - Handling Mode-Switching USB Devices on Linux
+
+_________________________
+Introduction
+USB_ModeSwitch是一种模式转换工具，用来控制有多种模式的usb设备。
+USB_ModeSwitch is (surprise!) a mode switching tool for controlling 'multi-mode' USB devices.
+
+越来越多的USB设备(特别是基于手机芯片的无线网设备)，在内部存储了在MS windows上使用的驱动程序。
+当第一次插入电脑时，USB设备作为存储设备并安装存储其中的驱动程序。安装后驱动会将设备的模式进行
+转换。存储设备消失，新的设备出现。这种通常被称为“ZeroCD”技术，驱动和设备是在一起。
+
+起初，这种工作方式在linux上没有很好的支持。令人欣慰的是，不管是usb存储设备或其他可选设备(通常3G设备)
+都能够在liunx上正常工作。现在唯一的问题是设备的模式转换问题。
+
+幸运的是可以通过侦听windows下的驱动交互信息，将命令和操作分离出来。并且在linux上模拟在
+windows上的操作。
+
+USB_ModeSwitch使这些操作容易处理。它从一个配置文件中获取参数，然后进行初始化和命令交互。
+所有的操作都是自动进行(通过udev事件)，也可以通过手动进行配置
+
+这个工具通常和系统一起发布，不需要手动安装。
+
+_________________________
+How to use
+
+两种方法调试新设备:使用配置文件或者使用命令行
+
+运行"usb-modeswitch -h"列出命令行的参数。如果使用了任一参数(除了-W, -D, -I 和-q)，由-C提供的
+配置文件将不起作用，同时命令行必须包含所有的重要参数。
+
+
+使用在"/usr/share/usb_modeswitch"中的配置文件，或者自己创建一个。然后在运行usb_modeswitch -C
+时提供文件路径和文件名。
+
+重要：USB_ModeSwitch必须使用root权限运行
+
+自动操作由几个有序的步骤组成：
+
+/lib/udev/rules.d/40-usb_modeswitch.rules - 
+	udev规则，当有匹配的设备ID(vendor/product)时，开始处理程序。如果转换后
+	的设备提供了标准的串口，会有一条规则调用处理程序创建到正确端口的符号链接。
+/lib/udev/usb_modeswitch - 
+	一个脚本用开调用真正的处理模式转换的脚本。
+
+/usr/sbin/usb_modeswitch_dispatcher - 
+	执行设备的检测，使用合适的配置文件进行设备模式转换。如果设备在模式转换后
+	没有对应的驱动处理。dispatcher会加载可选的驱动程序来处理设备，使设备可用。
+
+/etc/usb_modeswitch.conf - 
+	一个全局的配置文件，用来在调试时增加日志。或者用来禁止模式转换
+
+/usr/share/usb_modeswitch - 
+	包含设备设置文件的文件夹，这些配置文件以设备ID或其它标识来命名。
+
+/usr/sbin/usb_modeswitch - 
+	执行模式转换的程序
+
+完成模式转换和驱动加载后，由系统来发现新设备(通常是串口设备)
+
+_________________________
+Troubleshooting
+
+Note: if you still need support after having followed the advice on this page, please use the forum!
+E-mail may be used for device/config contributions only - no support questions!
+Known issues:
+
+Automatic serial driver assignment will work with the 3G-optimized driver only for kernels from 2.6.27 and up. If you have an older kernel and your modem is not recognized by any driver after mode switching, then the generic "usbserial" driver is used as a fallback.
+There is a problematic handling of devices with ID 19d2:2000 in kernels 2.6.26 to 2.6.28. This affects mostly ZTE devices and makes the "usb-storage" driver ignore the ID. In turn this will prevent proper initialization and may cause switching to fail. There is no other way around this than compiling your own kernel with some tiny edits. See Kernel related issues below for details.
+For debugging of the automated system integration, edit (as root or su) /etc/usb_modeswitch.conf in a text editor and change the line
+
+ EnableLogging=0
+to
+ EnableLogging=1
+This gives you a verbose output of the hotplug activity to /var/log/usb_modeswitch_<device>.
+If you're next to certain that you have the right values for your device, followed all the hints (see Known working hardware), and USB_ModeSwitch seems to do something run after run but to no effect, there are most likely system issues involved.
+
+The first suspects are existing system rules for modems which handle things not quite correctly.
+If you own a device with the unswitched ID of 05c6:1000, it may get a wrong switching command in older systems. There are four different types of switching devices, all with that same ID; in the big distributions they were all treated alike as a model from "Option" (the manufacturer) which is wrong in four out of five cases. There are even cell phones with that ID which wrongly get the same treatment when connected to an USB port.
+
+To fix problems like that you can try to remove rules files from "/lib/udev/rules.d" which contain calls to "modem-modeswitch".
+USB_ModeSwitch will do additional checks beside the USB ID and treat all known ambiguous devices in the right way. For example, it will leave unknown devices with the 05c6:1000 ID alone.
+
+Annother notorious candidate is again 19d2:2000. It may be switched O.K. by an existing rule, but there is no driver loading if your model is new and its ID is not yet added to the "option" module.
+Disable the rule running "eject" and the ID will be handled by usb_modeswitch.
+
+Kernel related issues
+
+In some newer kernels, certain devices (some Option, some Huawei, some ZTE as mentioned above) get a special treatment in the usb-storage code to enable switching right away. You would not need USB_ModeSwitch anymore for these specific devices; on the other hand you have no choice of accessing the "CD-ROM" part of your device. Plus, there were cases when the special treatment brought no results and furthermore prevented USB_ModeSwitch to work properly afterwards (happened with ZTE devices, error "-2").
+In case of trouble, look into "unusual_devs.h" in the "drivers/usb/storage" folder of your kernel source. If your default ID (vendor and product ID of the storage part) can be found there and you get errors when running USB_ModeSwitch, try first to blacklist "usb-storage".
+If that helps, you should consider rebuilding your kernel with the entry in "unusual_devs.h" deactivated. The only thing that will happen is that usb-storage works in the default way afterwards.
+I found a tip in the Russian Gentoo wiki to do exactly what I just suggested for the ZTE MF626.
+By the way, at one point there was an agreement among USB developers to keep all future mode switching code out of the kernel drivers if the neccessary steps can be taken in "user space".
+
+Annother way of influencing the kernel behaviour is the parameter "delay_use" of "usb-storage" which sets the time in seconds after plugging when the storage device will actually be used (and probably automounted). The default value is 5; this might affect the switching result under certain conditions.
+To change the default add in /etc/modprobe.conf:
+
+ options usb-storage delay_use=1 (or 10, or other)
+Old systems (e.g. CentOS 5 or Xandros 6)
+
+If you are running a not-quite-fresh system (with a kernel below 2.6.27), you may run into incompatibilities between versions of "udev", the device manager. If you get no indication of the usb_modeswitch components doing anything at all (no log files), follow these steps:
+Check if there are other files alongside "40-usb_modeswitch.rules" in the folder "/lib/udev/rules.d".
+If this is not the case, move the file to the folder "/etc/udev/rules.d".
+If there is still no action, see if other files in "/etc/udev/rules.d" contain the string "ATTRS".
+If this is not the case, edit the file "40-usb_modeswitch.rules" and replace all occurences of "ATTR" and "ATTRS" with "SYSFS". Save the changes and see if something happens when you plug in again.
+In particularly tough cases of "non-action", it might be necessary to analyze udev's actions; this is done by editing "/etc/udev/udev.conf" and change the logging level to "debug".
+Contribute
+
+USB_ModeSwitch comes quite handy for experimenting with your own hardware if not supported yet.
+The first step would be to try widely used switching methods from known devices, like the "eject" sequence found in the BandLuxe configuration "1a8d:1000". If you have a hint that your device may be made by Huawei originally, try the sequence from "12d1:1446".
+Don't worry, it's almost impossible to break anything by experimenting with possibly wrong sequences. Just make sure you re-plug your device after each attempt!
+If all this has no effect you can try this approach:
+Note the device's Vendor and Product ID from /proc/bus/usb/devices (or from the output of "lsusb"); the assigned driver is usually "usb-storage". Then spy out the USB communication to the device with the same ID inside M$ Windoze, with the on-board driver installed. The device must be switched there too, and you want to log that moment.
+I recommend this tool: "SniffUSB" ( http://www.pcausa.com/Utilities/UsbSnoop/default.htm).
+This is the short version. There is a very good case example from Mark A. Ziesemer here:
+Alltel UM175AL USB EVDO under Ubuntu Hardy Heron
+Please post any improvements, new device information and/or bug reports to the ModeSwitchForum !
+If you don't need support you can also send me an old-fashioned - and at your demand confidential - e-mail (see below).
+
+
+

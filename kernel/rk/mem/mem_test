@@ -1,0 +1,1 @@
+./stressapptest  -s 72000  -i 4 -C 4 -W --stop_on_errors -M 600&

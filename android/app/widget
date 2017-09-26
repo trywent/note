@@ -1,0 +1,69 @@
+//
+host:包含widget
+widget：widget provider
+============================
+
+============================
+创建widget：
+AppWidgetProviderInfo ：xml文件提供信息，widget的布局，更新频率，AppWidgetProvider类
+AppWidgetProvider(继承广播接收器)：接收widget广播更新View，定义widget的交互函数，
+
+AppWidgetProvider：meta-data中说明AppWidgetProviderInfo
+<receiver android:name="ExampleAppWidgetProvider" >
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data android:name="android.appwidget.provider"
+               android:resource="@xml/example_appwidget_info" />
+</receiver>
+
+
+AppWidgetProviderInfo：
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="294dp"
+    android:minHeight="72dp"
+    android:updatePeriodMillis="86400000"
+    android:previewImage="@drawable/preview"
+    android:initialLayout="@layout/example_appwidget"
+    android:configure="com.example.android.ExampleAppWidgetConfigure" 
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen|keyguard"
+    android:initialKeyguardLayout="@layout/example_keyguard">
+</appwidget-provider>
+
+AppWidgetProvider{
+- onUpdate(){ //当加入到host，或定义的更新时间间隔到达，执行该方法
+	- 创建改widget的remoteView
+	}
+- onAppWidgetOptionsChanged() //第一次放置，或改变大小
+}
+
+==================
+providerService：
+
+查找并保存widgetprovider：
+ensureStateLoadedLocked-->loadAppWidgetListLocked-->addProviderLocked
+
+
+registerForBroadcastsLocked{
+- 若provider的广播p.broadcast没有设置，创建广播的Pendingintent
+- 加入定时， mAlarmManager.setInexactRepeating
+}@AppWidgetServiceImpl.java
+
+
+BroadcastReceiver.onReceive@AppWidgetService.java-->
+sendInitialBroadcasts{//遍历所有的widgetProvider
+- ensureStateLoadedLocked //查找并保存widget
+- sendEnableIntentLocked //使能广播
+- sendUpdateIntentLocked //发送更新广播
+- registerForBroadcastsLocked注册
+}@AppWidgetServiceImpl.java
+
+frameworks/base/services/java/com/android/server/AppWidgetService.java
+frameworks/base/services/java/com/android/server/AppWidgetServiceImpl.java
+
+
+
+
+==================
+AppWidgetHost:

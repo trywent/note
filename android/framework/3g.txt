@@ -1,0 +1,218 @@
+===========================================
+模式转换：
+init.rc中加入服务u3gmonitor，用来监听uevent是否3gUSB插入。运行usb_modeswitch.sh转换模式
+发送MessageContent进行模式转换，MessageContent通过查找
+
+service u3gmonitor@init.rc-->main@main.c-->uevent_next_event(on_uevent)-->recv(读取事件)--
+parse_event(解析字串)@UEventFramework.c-->on_uevent-->handleUsbEvent@main.c-->usb_modeswitch.sh(模式转换)
+
+hardware/mstar/3g/USB_3G_DONGLE/u3gmonitor_source/main.c
+hardware/mstar/3g/USB_3G_DONGLE/u3gmonitor_source/UEventFramework.c
+
+===========================================
+rild运行：
+service ril-daemon@init.rc-->main(打开libreference-ril.so,执行rilInit，RIL_register)@rild.c
+加载libreference-ril.so:
+main@rild.c中确定rilLibPath值。1.从init.rc中设置获取。没有2.systemproperty“rild.libpath”中获取。(加载libreference-ril.so).(主要的参数值在init.rc中)
+
+
+main中加载库reference-ril,执行RIL_startEventLoop，rilInit，RIL_register。
+框架：
+reference-ril中实现底层的串口数据操作。ril.c提供框架。
+_____________________________________
+执行RIL_startEventLoop：
+main@rild.cpp-->RIL_startEventLoop-->pthread_create(创建新进程s_tid_dispatch)-->eventLoop
+(创建管道。rilEventAddWakeup将s_wakeupfd_event,添加event到watch_table中监听，并向管道中写入数据触发event)
+@ril.cpp-->ril_event_loop@ril_event.cpp
+
+--------------------------------------
+工具函数：
+ril_event_add//添加普通事件，加入到watch_table数组中
+ril_timer_add//timer event，加入到timer_list链表中
+
+ril_event_loop(循环事件处理)--processTimeouts(从timer_list中移除到时事件，将事件加入到pending_list)--
+processReadReadies(将管道有数据到事件加入到pending_list，如果不是永久则从watch_table删除该事件)--
+firePending(处理pending_list)-->ev->func(调用事件回调函数)@ril_event.cpp
+_____________________________________
+执行rilInit，返回s_callbacks回调函数：
+main-->rilInit@rild.c-->RIL_Init(解析参数传入的要使用的串口设备)-->pthread_create(创建新进程)-->
+mainLoop-->(RIL_Init传入的函数)s_rilenv->RequestTimedCallback@reference-ril.c-->RIL_requestTimedCallback
+internalRequestTimedCallback(加入定时事件)-->(事件触发，回调函数)userTimerCallback-->p_info->p_callback@ril.c-->(初始化回调函数)initializeCallback@reference-ril.c
+
+读取处理串口消息：
+mainLoop@reference-ril.c-->at_open-->pthread_create(开始串口读取进程)-->readerLoop-->processLine
+-->(处理串口上传命令)handleUnsolicited@atchannel.c-->onUnsolicited-->s_rilenv->OnUnsolicitedResponse
+@reference-ril.c-->RIL_onUnsolicitedResponse@rild.c-->RIL_onUnsolicitedResponse-->sendResponse-->
+sendResponseRaw-->(向socket写数据)blockingWrite@ril.c
+
+RIL_Init中设置的函数：s_rilEnv@rild.c
+static struct RIL_Env s_rilEnv = {
+    RIL_onRequestComplete,
+    RIL_onUnsolicitedResponse,
+    RIL_requestTimedCallback
+};
+--------------------------------------
+工具函数：
+s_rilenv->RequestTimedCallback(callbackfunc)@reference-ril.c-->RIL_requestTimedCallback
+internalRequestTimedCallback(加入定时事件)-->userTimerCallback-->p_info->p_callback@ril.c
+-->(定时到调用callbackfunc)
+
+
+_____________________________________
+执行Ril_register：
+main@rild.c-->RIL_register(s_callbacks)-->(等待连接,rild)rilEventAddWakeup (&s_listen_event)
+-->(接受连接从socket中读取数据中命令)listenCallback-->(监听已连接的命令socket)
+rilEventAddWakeup (&s_commands_event)-->(处理socket传入的命令)processCommandsCallback
+-->processCommandBuffer-->pRI->pCI->dispatchFunction-->(根据命令获取相应的处理函数)s_commands[request])
+-->dispatchFunction@ril.cpp--->dispatchxxx@ril_commands.h-->s_callbacks.onRequest@ril.cpp-->onRequest@reference-ril.c
+
+SOCKET_NAME_RIL = "rild";socket的创建由init.rc中socket创建在create_socket@init.c
+
+上报或响应response：
+RIL_onRequestComplete，RIL_onUnsolicitedResponse
+-->sendResponse-->sendResponseRaw
+通过socket(s_fdCommand)传递数据到上层
+
+hardware/ril/reference-ril/reference-ril.c
+hardware/ril/reference-ril/atchannel.c
+hardware/ril/libril/ril_commands.h
+==============================================
+java层：
+
+工具类：frameworks/base/core/java/com/android/internal/util/AsyncChannel.java
+AsyncChannel.connect(Context srcContext, Handler srcHandler, Messenger dstMessenger)
+连接成功后，获得Asyschannel实例。再使用该Asychannel.sendMessage最终调用dstMessenger发送消息。
+MobileDataStateReceiver@MobileDataStateTracker.java(接收到消息ACTION_DATA_CONNECTION_TRACKER_MESSENGER)-->ac.connect
+-->connect@AsyncChannel.java-->replyHalfConnected--> mSrcHandler.sendMessage(连接成功)
+
+ACTION_DATA_CONNECTION_TRACKER_MESSENGER消息由DataConnectionTracker.java发送
+
+Gsm/CdmaDataConnectionTracker.broadcastMessenger调用后,MobileDataStateTracker与他连接。真正的数据连接还是由Gsm/CdmaDataConnectionTracker处理。
+
+DataConnectionTracker发送消息并将自己出递给消息接收者MobileDataStateTracker，接收者与发送过来的Mwsseger用Asynchannel
+连接，MobileDataStateTracker发送的消息通过Asynchannel发送，最终由DataConnectionTracker发送并由相应的Handler处理
+
+移动数据：
+onCheckedChanged@DataUsageSummary.java-->setMobileDataEnabled-->setMobileDataEnabled@ConnectivityManagery.java
+-->setMobileDataEnabled@ConnectivityService.java-->mHandler.sendMessage-->
+MyHandler.handleMessage-->handleSetMobileData-->[setUserDataEnable@NetworkStateTracker.java]-->
+setUserDataEnable@MobileDataStateTracker.java（发送CMD_SET_USER_DATA_ENABLE）-->
+onSetUserDataEnabled@DataConnectionTracker.java-->onTrySetupData
+/********************************************
+不是连接流程，普通流程
+notifyOffApnsOfAvailability-->notifyDataConnection@PhoneBase.java-->
+notifyDataConnection@PhoneNotifier.java-->
+doNotifyDataConnection@DefaultPhoneNotifier.java--> mRegistry.notifyDataConnection-->
+notifyDataConnection@TelephoneRegistry.java-->  r.callback.onDataConnectionState-->
+PhoneStateListeneron.DataConnectionState@NetworkStateService.java-->mHandler.sendMessageDelayed[MSG_UPDATE_IFACES]
+-->mHandlerCallback.handleMessage@NetworkStateService.java-->updateIfaces-->updateIfacesLocked
+*********************************************/
+trySetupData(ApnContext apnContext)-->setupData-->dc.bringUp@GsmDataConnectTracker.java-->
+bringUp--sendMessage(obtainMessage(EVENT_CONNECT, new ConnectionParams(apn, onCompletedMsg)))-->
+DcInactiveState.processMessage@DataConnection.java-->onConnect@GsmDataConnection.java-->
+setupDataCall@RIL.java
+
+jb/framwork/base/telephony/java/com/android/internal/telephony/
+
+setUserDataEnable发送消息CMD_SET_USER_DATA_ENABLE
+mNetTrackers初始化在ConnectivityService.java构造函数中
+
+DataConnection构造函数中加入state，设置初始state
+DataConnection@DataConnection.java-->addState@StateMachine.SmHandler.java-->mStateInfo.put(state, stateInfo)-->
+
+工具层次状态机StateMachine:处理消息流程
+stateMachine-->initStateMachine
+SmHandler.handleMessage-->processMsg-->curStateInfo.state.processMessage(msg)
+
+DataConnection(PhoneBase phone, String name, int id, RetryManager rm,DataConnectionTracker dct)
+|
+GsmDataConnection CdmaDataConnection
+
+trySetupData-->setupData-->createDataConnection@GSMDataConnectionTracker.java-->
+makeDataConnection@GSMDataConnection.java-->gsmDc.start()(开始状态机)
+
+初始化mRecords.phoneListener
+PhoneStateListener mPhoneListener = new PhoneStateListener()@NetworkStateService.java-->
+mTeleManager.listen(mPhoneListener, LISTEN_DATA_CONNECTION_STATE)-->listen@TelephonyManager.java
+-->listen@TelephonyRegistry.java
+
+public class ConnectivityService extends IConnectivityManager.Stub 
+
+加载spn：
+loadSpnOverrides()@SpnOverride.java
+
+phone设置:
+setRadio@PhoneInterfaceManager.java-->toggleRadioOnOff-->mPhone.setRadioPower-->
+
+/*************************************************
+phone实例实现：
+
+phone = PhoneFactory.getDefaultPhone();
+sProxyPhone = new PhoneProxy(new GSMPhone(context,sCommandsInterface, sPhoneNotifier));
+
+sCommandsInterface 在此sCommandsInterface = new RIL(context, networkMode, cdmaSubscription);
+sPhoneNotifier = new DefaultPhoneNotifier();
+
+frameworks/base/telephony/java/com/android/internal/telephony/DefaultPhoneNotifier.java
+frameworks/base/telephony/java/com/android/internal/telephony/PhoneFactory.java
+************************************************/
+
+mSST.setRadioPower@GSMPhone.java-->setPowerStateToDesired@ServiceStateTracker.java(由GSMServiceStateTracker.java实现)
+-->cm.setRadioPower(同样在GSMServiceStateTracker.java中实现)-->setRadioPower@RIL.java
+
+mphone在PhoneInterfaceManager的构造函数中初始化。PhoneApp.java中onCreate调用new PhoneInterfaceManager
+
+onCreate-->phone = PhoneFactory.getDefaultPhone();
+setRadioPower@android/frameworks/base/telephony/java/com/android/internal/telephony/gsm/GSMPhone.java
+
+
+**************************************************************************
+
+RIL.java
+数据连接通过RILSender
+
+类：RIL，RILRequest，RILSender，RILReceiver
+RILSender继承handler通过接收消息处理请求。处理EVENT_SEND消息时，通过mSocket发送数据
+RILReceiver初始化mSocket,并会一直尝试来建立连接（若没有成功前8次不会有错误输出）
+
+send@RIL.java-->mSender(RILSender)发送消息
+
+连接socket
+ LocalSocket()@localSocket.java-->connect()-->implCreateIfNeeded()-->localSocketImpl.create
+-->create_native@loclaSocketImpl-->socket_create@android_net_localSocketImpl.cpp(创建fd)
+
+connect()@LocalSocket.java--> connect@LocalSocketImpl.java-->connectLocal-->socket_connect_local@android_net_localSocketImp.cpp（UNIX中socket）-->socket_local_client_connect@socket_local_client.c
+
+**************************************************************************
+应用：网络连接：
+ConnectivityManager用来查询网络状态，或网络状态发生改变时通知应用
+NetworkInfo: 某种网络的状态 (currently either Mobile or Wi-Fi).
+例如：
+ConnectivityManager connMgr = (ConnectivityManager) 
+        getSystemService(Context.CONNECTIVITY_SERVICE);
+NetworkInfo networkInfo = connMgr.getNetworkInfo(ConnectivityManager.TYPE_WIFI); 
+
+获取网络信息流程:
+getNetworkInfo@ConnectivityManager.java-->getNetworkInfo-->getFilteredNetworkInfo(tracker, uid)
+@ConnectivityService.java-->getNetworkInfo@NetworkStateTracker.java-->
+
+src/jb/frameworks/base/core/java/android/net/ConnectivityManager.java
+src/jb/frameworks/base/services/java/com/android/server/ConnectivityService.java
+src/jb/libcore/luni/src/main/java/java/net/
+HttpHandler.java
+HttpURLConnectionImpl.java
+
+ping
+baidu:202.108.22.5
+
+速度：187kB/s
+
+socket实现相关头文件：
+jb/prebuilts/ndk/
+jb/prebuilts/ndk/android-ndk-r7/platforms/
+jb/prebuilts/ndk/android-ndk-r7/platforms/android-3/arch-arm/usr/include/linux/
+sourcefiles：
+jb/system/core/libcutils/socket_local_client.c
+jb/frameworks/base/core/java/android/net/LocalSocket.java
+jb/frameworks/base/core/jni/android_net_LocalSocketImpl.cpp
+

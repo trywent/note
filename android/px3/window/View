@@ -1,0 +1,25 @@
+//
+performTraversals(第一次布局)@ViewRootImpl.java-->dispatchAttachedToWindow{
+- 设置mAttachInfo
+- ViewRootimpl获取View的属性，performCollectViewAttributes
+}@View.java
+
+collectViewAttributes@ViewRootImpl.java-->mView.dispatchCollectViewAttributes-->
+performCollectViewAttributes@View.java
+
+
+
+//
+invalidate{
+- p.invalidateChild-->parent.invalidateChildInParent@ViewGroup.java
+	-->invalidateChildInParent@ViewRootImpl.java
+}@View.java
+
+
+=================
+//默认居中，可设置靠上下左右，w/h高宽， x/yAdj移动偏移位置
+Gravity.apply(int gravity, int w, int h, Rect container,
+            int xAdj, int yAdj, Rect outRect)
+
+
+

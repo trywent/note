@@ -1,0 +1,256 @@
+======================================
+vold处理底层和上层命令：
+
+SocketListener(startListener-->threadStart-->runListener-->onDataAvailable)
+↳FrameworkListener（dispatchCommand执行命令）
+  ↳CommandListener(实现各个VoldCommand命令，注册所有实现命令)
+
+FrameworkCommand (runCommand,getCommand)
+↳VoldCommand (调用父类构造方法赋值mCommand)
+
+SocketListener
+↳NetlinkListener(onDataAvailable-->onEvent)
+  ↳NetlinkHandler(监听内核事件)
+
+
+socketListener:
+
+SocketListener::startListener-->pthread_create
+
+______________________________________
+main{
+- VolumeManager->setBroadcaster(CommandListener) //设置命令监听器
+- NetlinkManager->setBroadcaster(CommandListener)
+- VolumeManager->start
+- 解析fstab创建Volume，process_config
+- NetlinkManager->start
+- 开始监听，CommandListener-->startListener
+}@main.cpp
+
+______________________________________
+CommandListener流程(接收framework命令)：
+main-->new CommandListener@main.cpp--cl->startListener()@main.cpp-->SocketListener::startListener
+-->pthread_create(threadStart)-->runListener(大循环)@SocketListener.cpp-->onDataAvailable-->
+dispatchCommand@FrameworkListener.cpp->VolumeCmd::runCommand@CommandListener.cpp
+-->(如挂载命令)mountVolume@VolumeManager.cpp--> v->mountVol()-->mountVol@Volume.cpp
+
+______________________________________
+NetlinkManager流程(监听内核发出的uevent):
+main-->nm->start()@main.cpp-->start@NetlinkManager.cpp-->mHandler->start()-->NetlinkHandler::start-->
+this->startListener()-->(创建新进程处理消息)pthread_create(threadStart)-->runListener-->
+(获取到内核信息)onDataAvailable-->onEvent@SocketListener.cpp-->onEvent-->vm->handleBlockEvent
+@NetlinkHandler.cpp-->handleBlockEvent(处理插入，移除事件mountVol--doMoveMount)@VolumeManager.cpp
+-->handleBlockEvent@DirectVolume.cpp-->setState-->mVm->getBroadcaster()->(在main中赋值)sendBroadcast
+-->sendBroadcast@SocketListener.cpp-->sendMsg(向mountService发数据)@SocketClient.cpp-->
+
+保存磁盘设备的uuid为Volume的label，再次插入时可直接使用前面保存的信息(挂载点...)。
+如果是sd卡设备，则uuid可能会在读卡器插入时被保存(挂在在usb下)，则此时的挂载点不正确。
+
+
+设置设备状态：mountService使用，第一次挂载
+VolumeManager::handleBlockEvent-->handleBlockEvent-->handlePartitionAdded-->setState(设置设备状态，
+初始为idle)@DirectVolume.cpp
+
+监听到磁盘插入，增加volume:
+handleBlockEvent-->addVolume--> mVolumes->push_back(v)@VolumeManager.cpp
+
+
+system/vold/NetlinkManager.cpp
+--------------------------------
+移除磁盘：
+1，设置状态State_Unmounting----ACTION_MEDIA_EJECT
+2，设置状态State_Idle------ACTION_MEDIA_UNMOUNTED
+3，
+执行卸载
+删除挂载点。
+4，VolumeDiskRemoved------ACTION_MEDIA_REMOVED
+
+
+handleBlockEvent-->handlePartitionRemoved-->(挂载状态，则卸载设备)Volume::unmountVol@DiretVolume.cpp
+-->unmountVol-->doUnmount{
+- 执行卸载若正常卸载则返回，umount
+- 没有成功再尝试一次umount，成功则返回
+- 没有成功杀死正在访问的进程Process::killProcessesWithOpenFiles{
+		- 读取所有进程，opendir("/proc")
+		- 获取进程名，getProcessName(pid, name, sizeof(name))
+		- 判断进程中是否打开过文件,checkFileDescriptorSymLinks{
+				- 读取"/proc/%d/fd"下所有文件
+				- 获取文件的实际路径(不管是符号链接还是直接指向),readSymLink
+				- 判断路径是否和挂在点匹配		
+			}		
+	}
+
+}-->@Volume.cpp
+
+杀死正在访问磁盘的进程：
+Volume::
+Kill all processes that have
+
+
+______________________________________
+volume状态：
+State_Init       = -1;
+State_NoMedia    = 0;
+State_Idle       = 1;
+State_Pending    = 2;
+State_Checking   = 3;
+State_Mounted    = 4;
+State_Unmounting = 5;
+State_Formatting = 6;
+State_Shared     = 7;
+State_SharedMnt  = 8;
+
+volume操作：
+VolumeStateChange = 605;
+VolumeUuidChange = 613;
+VolumeUserLabelChange = 614;
+VolumeDiskInserted= 630;
+VolumeDiskRemoved = 631;
+VolumeBadRemoval = 632;
+
+//根据mountService命令设置状态
+Volume->Volume::State_Init
+
+formatVol-->setState(Volume::State_Formatting)
+
+mountVol-->setState(Volume::State_Checking)-->setState(Volume::State_Mounted)
+
+unmountVol-->setState(Volume::State_Unmounting)-->setState(Volume::State_Idle)
+/(卸载失败)setState(Volume::State_NoMedia)
+
+
+//根据kernel中netlink事件设置状态
+DirectVolume-->setState(Volume::State_NoMedia)
+
+handleDiskAdded-->(无分区)setState(Volume::State_Idle)/(多分区)setState(Volume::State_Pending)
+
+handlePartitionAdded-->(处理完所有分区)setState(Volume::State_Idle)
+
+handleDiskChanged-->(无分区)setState(Volume::State_Idle)/(多分区)setState(Volume::State_Pending)
+
+handleVolumeShared-->setState(Volume::State_Idle)
+
+handleDiskRemoved-->(卸载umount)setState(Volume::State_NoMedia)
+
+______________________________________
+状态转变：
+
+//直接移除
+handlePartitionRemoved-->sendBroadcast(VolumeBadRemoval)@DirectVolume.cpp-->
+onEvent(VolumeBadRemoval)-->sendStorageIntent(ACTION_MEDIA_UNMOUNTED)-->
+notifyVolumeStateChange@MountSrevice.java
+
+handlePartitionRemoved-->Volume::unmountVol(State_Unmounting)
+
+
+服务根据状态变化发送广播：
+(VolumeStateChange卷状态)-->notifyVolumeStateChange{
+- Init
+- NoMedia
+- Idle,若不是bad_remove等..则发送umount
+- Pending
+- Checking，发送Checking
+- Mounted，发送Mounted
+- Unmounting，发送bad_remove（从底层发起的卸载应该是直接移除）
+- Formatting
+- Shared，发送Shared
+- SharedMnt
+}
+
+======================================
+上层服务mountService:
+
+接收Vold消息：
+sendBroadcast-->sendBroadcast@SocketListener.cpp-->sendMsg(向mountService发数据)
+@SocketClient.cpp-->listenToSocket-->(收到底层的事件或上层发送命令后的回复)mCallbackHandler.sendMessage
+-->handleMessage-->mCallbacks.onEvent@NativeDaemonConnector.java-->onEvent{
+- 若是卡插入或移除事件
+	- 插入则挂载，doMountVolume
+	- 移除则更新状态，updatePublicVolumeState
+}@MountService.java
+
+
+发送命令到vold：
+doMountVolume(path)-->mConnector.execute(mount)@MountService.java-->execute-->executeForList-->
+execute(int timeout, String cmd, Object... args)-->mOutputStream.write@NativeDaemonConnector.java
+-->mResponseQueue.remove-->remove(int cmdNum, int timeoutMs, String origCmd)
+@NativeDaemonConnector.ResponseQueue
+
+vold:
+(执行命令)vm->mountVolume(argv[2])@CommandListener.cpp-->VolumeManager::mountVolume(path){
+- lookupVolume(path)
+- v->mountVol();
+}@VolumeManager.cpp
+
+======================================
+挂载卷流程：
+mountVol-->doMount(/mnt/secure/staging)-->(如果是主外部卡)createBindMounts@Volume.cpp-->mount(MS_BIND)
+mountVol-->doMount(/mnt/secure/staging)-->doMoveMount(将卷挂载到自己的挂载点)-->mount(MS_MOVE)
+
+@mountVol：
+将卷挂载到/mnt/secure/staging/上        
+@createBindMounts：
+/mnt/secure/staging/android_secure重命名为/mnt/secure/staging/.android_secure
+/mnt/secure/staging/.android_secure挂载到/mnt/secure/asec。
+tmpfs挂载到/mnt/secure/staging/.android_secure
+
+最后通过/mnt/secure/asec能够访问sd卡中.android_secure文件夹内容。
+_______________________________
+
+
+mountVol@Volume.cpp-->updateDeviceInfo@DirectVolume.cpp
+
+
+unmountVol@Volume.cpp-->revertDeviceInfo@DirectVolume.cpp
+
+
+
+
+一个bug：mIsDecrypted@DirectVolume.cpp没有初始化。恢复出厂设置格式化sdcard失败
+
+system/vold/Volume.cpp
+system/vold/DirectVolume.cpp
+system/vold/Volume.cpp
+
+
+======================================
+kernel
+sd卡：
+add_host --> start_host --> detect_change() -->**mmc_schedule_delayed_work(&host->detect, delay);
+ **INIT_DELAYED_WORK(&host->detect, mmc_rescan);
+mmc_rescan --> attach_sd--> add_card --> device_add -->kobject_uevent -->kobject_uevent_env
+uevent_sock
+
+查找分区信息：
+eMMC_ReadPartitionInfo-->eMMC_ReadPartitionInfo_Ex@eMMC_prg.c
+
+eMMC_CheckIfReady-->eMMC_Init_Ex-->eMMC_Init_Device@eMMC_prg.c-->eMMC_PlatformInit-->eMMC_pads_switch
+@eMMc_platform.c
+
+block匹配过程
+mmc_blk_probe中调用mmc_blk_alloc(card);
+mmc_attach_sd(sd.c)调用mmc_sd_init_card(sd.c)和mmc_add_card
+在mmc_sd_init_card调用mmc_alloc_card该函数(bus.c)分配card空间并初始化card
+中mmc_add_card调用device_add(&card->dev)(bus.c)
+——————————————————————————————————————
+block的处理过程：
+mmc_blk_probe-->mmc_blk_alloc-->mmc_blk_alloc_req@block.c分配磁盘-->alloc_disk-->alloc_disk_node@genhd.c
+(设置的磁盘最小分区数，CONFIG_MMC_BLOCK_MINORS在config中设置为8)
+mmc_blk_probe-->mmc_blk_alloc_parts-->mmc_blk_alloc_part@block.c 查找分配分区
+mmc_blk_probe--list_for_each_entry(处理磁盘分区)--mmc_add_disk@block.c 遍历分区-->add_disk-->
+blk_alloc_devt（分配设备号）@genhd.c
+
+fs层：
+init_special_inode-->inode->i_fop@inode.c-->def_blk_fops@block_dev.c-->【compat_blkdev_ioctl(兼容)
+@compat_ioctl.c || block_ioctl@block_dev.c】-->blkdev_ioctl-->blkdev_reread_part@ioctl.c-->
+scan_partitions@partition-generic.c-->check_partition-->check_part@check.c-->根据存储卡类型emmc_partition
+======================================
+获取blockID.@/lib/blkid
+blkid_get_cache(从文件读取uuid)@cache.c，
+blkid_get_dev@devname.c-->blkid_verify(验证磁盘信息)-->get_buffer(读取磁盘开头的信息并比较，确定磁盘类型ext4，fat...)@probe.c
+UUID 配置文件/etc/blkid.tab
+
+不同的文件格式的分区的信息在不同位置(superblock)，读取superblock后根据其中信息可以判断分区的文件类型(FAT,ext4...)@probe.c
+
+——————————————————————————————————————
+

@@ -1,0 +1,69 @@
+onCreate, onStart, onRestart, onResume, onPause, onStop, onDestroy,
+
+______________________________
+start:
+
+startNextMatchingActivity
+
+______________________________
+改变配置：
+ensureActivityConfigurationLocked{
+- destroyActivityLocked
+}
+
+
+暂停：
+completePauseLocked{
+- destroyActivityLocked
+}
+
+停止：
+activityStoppedLocked{
+- destroyActivityLocked
+}
+
+stopActivityLocked{
+- 
+- sendMessageDelayed(STOP_TIMEOUT_MSG)-->activityStoppedLocked
+}
+
+
+
+结束：
+finishCurrentActivityLocked{
+-
+- destroyActivityLocked
+}
+
+destroyActivityLocked{
+- sendMessageDelayed(DESTROY_TIMEOUT_MSG)-->activityDestroyed
+}
+
+
+
+________________________
+resume：
+
+
+________________________
+pause:
+________________________
+stop：
+activityStopped{
+- 
+- r.stack.activityStoppedLocked
+}
+
+________________________
+destory:
+activityDestroyed-->mMainStack.activityDestroyed
+________________________
+应用进程killed：
+handleAppDiedLocked
+
+==================
+启动杀进程：
+systemReady{
+- 设置被杀进程，mPidsSelfLocked(当前所有进程)中不允许常驻的进程isAllowedWhileBooting
+- 获取procsToKill，杀进程removeProcessLocked
+}

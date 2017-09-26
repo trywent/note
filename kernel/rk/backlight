@@ -1,0 +1,52 @@
+backlight:
+背光基本配置信息：
+rk29_device_backlight{
+- rk29_bl_info
+}
+
+地址：
+base：RK30_PWM01_BASE + id * 0x10
+
+
+设备注册：
+machine_rk30_board_init-->rk_platform_add_display_devices{
+- __rk_platform_add_display_devices{
+		- 
+		- 注册背光，platform_device_register
+	}
+}@board-rkpx3-sdk.c
+
+驱动注册：
+rk29_backlight_init-->platform_driver_register-->(匹配)rk29_backlight_probe{
+
+}@rk29_backlight.c
+
+背光设置：
+backlight_store_brightness-->backlight_update_status-->bd->ops->update_status@backlight.c
+-->rk29_bl_ops.update_status-->rk29_bl_update_status{
+- 
+- 设置值0，关闭背光,{
+	- clk_disable(pwm_clk)
+	- rk29_bl_info->pwm_suspend
+	}
+- 设置背光，{
+	- rk29_bl_info->pwm_resume
+	- clk_enable
+	- 读取原来值，read_pwm_reg
+	- 设置新值，rk_pwm_setup
+	}
+}@rk29_backlight.c
+
+
+注册回调到fb：
+backlight_device_register-->backlight_register_fb@backlight.c-->fb_register_client
+-->blocking_notifier_chain_unregister@fb_notify.c
+
+调用回调：
+fb_notifier_call_chain-->blocking_notifier_call_chain@fb_notify.c
+
+kernel/arch/arm/mach-rkpx3/board-rkpx3-sdk.c
+kernel/drivers/video/backlight/rk29_backlight.c
+kernel/include/linux/backlight.h
+kernel/drivers/video/backlight/backlight.c
+kernel/drivers/video/fb_notify.c

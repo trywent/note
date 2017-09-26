@@ -1,0 +1,29 @@
+uboot_SystemUpdate{
+- 检测升级方式，UpdatePrepare{
+	- 判断sd卡是否存在
+	- 查找mcu升级文件(或新的mcu升级文件)，若找到则升级mcu_update
+	- 查找dvd升级文件，若找到则升级dvd_update
+	- 若找到文件UPD_SWITCHFILE，则返回0进行sd卡升级
+	
+	- 查找usb中的文件，返回1进行usb升级 
+	}
+- 升级，sql_update_files{
+	- 清空进度调
+	- 升级，sql_update_uboot{
+		- 升级uboot成功update_uboot，{
+			- 升级配置文件,sql_update_configs
+			- 重启设备，reset_cpu
+			}	
+		}
+	- 升级系统，sql_update_system
+	- 没有uboot文件时，进行配置文件升级。sql_update_configs{
+		
+		}
+	}
+}
+
+
+
+
+
+board/rockchip/rk30xx/fyt.c

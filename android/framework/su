@@ -1,0 +1,6 @@
+isAccessGiven@RootShell.java-->startRootShell(多次尝试)-->
+new Shell("su",shellType.ROOT,Shell.defaultContext(ShellContext.NORMAL)){
+- 创建进程Runtime.getRuntime().exec(cmd)
+- 获取进程输入输出流，
+- 开始worker
+}@shell.java

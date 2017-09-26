@@ -1,0 +1,198 @@
+//
+=========================
+存储信息：
+
+onCreate(取得当前的每个volume,创建preference)@Memory.java-->StorageVolumePreferenceCategory(要显示的信息)
+@StorageVolumePreferenceCategory-->StorageMeasurement.getInstance(获取对象实例。然后设置receiver)-->
+measure(探测已使用存储的大小)-->
+
+对话框：
+onPreferenceTreeClick-->unmount-->showDialogInner@Memory.java-->showDialog-->
+new SettingsDialogFragment-->SettingsDialogFragment.SettingsDialogFragment-->
+SettingsDialogFragment.onCreateDialog-->((DialogCreatable) mParentFragment)
+.onCreateDialog(mDialogId)-->onCreateDialog@SettingsPreferenceFragment.java-->
+onCreatDialog@Memory.java
+
+更新存储信息(大小，已使用)
+onStorageStateChanged@Memory.java-->onStorageStateChanged-->measure--> 
+mMeasurement.measure()@StorageVolumePreferenceCategory.java-->measure-->
+handleMessage(MSG_MEASURE)-->handleMessage(MSG_CONNECTED)-->
+measureApproximateStorage-->sendInternalApproximateUpdate-->
+receiver.updateApproximate(bundle)@StorageMeasurement.java-->
+updateApproximate-->handleMessage(MSG_UI_UPDATE_APPROXIMATE)-->
+updateApproximate-->updatePreferencesFromState@StorageVolumePreferenceCategory.java
+
+收到磁盘状态改变
+onStorageStateChanged-->onStorageStateChanged-->svpc.onStorageStateChanged@Memory.java
+-->measure@StorageVolumePreferenceCategory.java
+
+
+jb/packages/apps/Settings/src/com/android/settings/deviceinfo/Memory.java
+jb/packages/apps/Settings/src/com/android/settings/SettingsPreferenceFragment.java
+jb/packages/apps/Settings/src/com/android/settings/deviceinfo/StorageVolumePreferenceCategory.java
+
+
+=======================
+背光：
+onClick-->getContext().sendBroadcastAsUser(new Intent(ACTION_SHOW_BRIGHTNESS_DIALOG))//启动设置界面
+new QSPanel-->new BrightnessController(ToggleSlider)@QSPanel.java-->
+
+OnSeekBarChangeListener-->mListener.onChanged@ToggleSlider.java-->onChange-->setBrightness
+@BrightnessController.java-->setTemporaryScreenBrightnessSettingOverride@PowerManagerService.java
+
+mScreenUpdateRunnable-->mPhotonicModulator.setState-->PhotonicModulator.run-->
+setBrightness@DisplayPowerState.java-->setBrightness-->setLightLocked@LightsService.java-->
+setLight_native-->devices->lights[light]->set_light@com_android_server_lights_LightsService.cpp
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/settings/SettingUI.java
+Settings/src/com/android/settings/BrightnessPreference.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/settings/BrightnessDialog.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/settings/BrightnessController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/settings/ToggleSlider.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/BatteryController.java
+frameworks/base/services/core/java/com/android/server/display/DisplayPowerState.java
+frameworks/base/services/core/java/com/android/server/lights/LightsService.java
+frameworks/base/services/core/jni/com_android_server_lights_LightsService.cpp
+=======================
+字体：
+entries_font_size//字体字符
+
+onCreate{
+- 获取资源，addPreferencesFromResource(R.xml.display_settings)
+- 字体显示preference，mFontSizePref = (ListPreference) findPreference(KEY_FONT_SIZE);
+}
+
+onResume-->updateState{
+- 更新字体显示，readFontSizePreference(mFontSizePref)
+}
+
+onPreferenceChange-->writeFontSizePreference-->ActivityManagerNative.getDefault().updatePersistentConfiguration@DisplaySettings.java-->updatePersistentConfiguration
+-->updateConfigurationLocked(需保存更新值)-->mHandler.sendMessage(UPDATE_CONFIGURATION_MSG)
+-->mHandler.handleMessga-->Settings.System.putConfiguration@ActivityManagerService.java
+-->putConfiguration-->putConfigurationForUser-->Settings.System.putFloatForUser(FONT_SCALE)
+@Settings.java
+
+packages/apps/Settings/src/com/android/settings/DisplaySettings.java
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/core/java/android/provider/Settings.java
+
+=======================
+语言：
+
+
+
+保存：/data/property
+updateConfigurationLocked-->saveLocaleLocked@ActivityManagerService.java
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+=======================
+恢复出厂设置:reset
+
+
+mFinalClickListener{
+- 清除sd卡，startService(ExternalStorageFormatter)-->updateProgressState{
+	- 格式化卡， mountService.formatVolume(extStoragePath)
+	- 清除data，sendBroadcast(new Intent("android.intent.action.MASTER_CLEAR"))
+	}
+- 清除数据，sendBroadcast(new Intent("android.intent.action.MASTER_CLEAR"))
+}
+
+//广播接收端
+MasterClearReceiver.onReceive@MasterClearReceiver.java-->RecoverySystem.rebootWipeUserData
+-->rebootWipeUserData-->bootCommand(写入命令重启)@RecoverySystem.java
+
+packages/apps/Settings/src/com/android/settings/MasterClearConfirm.java
+frameworks/base/core/java/com/android/internal/os/storage/ExternalStorageFormatter.java
+frameworks/base/services/java/com/android/server/MasterClearReceiver.java
+frameworks/base/core/java/android/os/RecoverySystem.java
+
+=======================
+背光：
+onClick-->sendBroadcastAsUser(ACTION_SHOW_BRIGHTNESS_DIALOG)@BrightnessPreference.java-->
+onChanged(修改数据库中亮度)-->BrightnessObserver.onChange-->setBrightness-->
+mPower.setTemporaryScreenBrightnessSettingOverride@BrightnessController.java-->
+
+窗口设置背光：
+lp.screenBrightness
+
+packages/apps/Settings/src/com/android/settings/BrightnessPreference.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/settings/BrightnessDialog.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/settings/BrightnessController.java
+
+=======================
+wifi:
+打开wifi：
+onCheckedChanged-->mWifiManager.setWifiEnabled@WifiEnabler.java-->setWifiEnabled-->
+mWifiStateMachine.setWifiEnabled@WifiService.java-->setWifiEnabled-->
+sendMessage(CMD_LOAD_DRIVER,WIFI_STATE_ENABLING)-->mSmHandler.sendMessage@WifiStateMachine.java-->
+SmHandler.handleMessage-->SmHandler.processMsg-->curStateInfo.state.processMessage@StateMachine.java
+-->DriverLoadingState.enter-->mWifiNative.loadDriver()@WifiStateMachine.java-->
+android_net_wifi_loadDriver@android_net_wifi_Wifi.cpp-->wifi_load_driver@wifi.c
+
+状态变化：
+InitialState-->DriverUnloadedState-->DriverLoadingState.enter-->mWifiNative.loadDriver()
+
+
+设置界面变化：
+mReceiver.onReceive-->handleWifiStateChanged--> mSwitch.setEnabled-->switch状态变
+化onCheckedChanged@WifiEnabler.java
+
+
+连接wifi:
+onCreateDialog-->new WifiDialog@WifiSetting.java-->onCreate(设置listener为WifiSetting)-->
+new WifiConfigController@WifiDialog.java-->WifiConfigController(设置提交密码按钮)@WifiConfigController.java
+
+提交密码：
+onClick-->submit-->mWifiManager.connect@WifiSetting.java-->connect@WifiManager.java
+
+
+==================
+加密sd卡：
+
+
+//加密
+CryptKeeperSettings-->mInitiateListener.onClick-->
+runKeyguardConfirmation-->showFinalConfirmation@CryptKeeperSettings.java-->
+mFinalClickListener.onClick-->startActivity(Blank.class)-->Blank.onCreate-->
+mountService.encryptStorage@CryptKeeperConfirm.java
+
+CryptfsCmd::runCommand@CommandListener.cpp-->cryptfs_enable@cryptfs.c
+
+//检测是否加密
+onStart-->setupUi-->ValidationTask.doInBackground@CryptKeeper.java
+
+____________
+mount_all@init.rc-->do_mount_all{
+- fork子进程进行挂载{
+	- fs_mgr_mount_all{
+		- 挂载设备，__mount
+		- 挂载失败，接测MF_CRYPT(fstab设置了加密，encryptable){
+			- encrypted = 1 //设置加密标识
+			}		
+		}@fs_mgr.c	
+	}
+- 若返回值为1,则已经加密{
+	- property_set("ro.crypto.state", "encrypted")
+        - property_set("vold.decrypt", "1")
+	}
+}@builtins.c
+
+
+//检测
+service defaultcrypto /system/bin/vdc --wait cryptfs mountdefaultencrypted@init.rc
+-->main(连接socket Vold)@vdc.c-->cryptfs_mount_default_encrypted@crypts.c-->
+
+
+
+//
+mke2fs -t ext4 /dev/block/platform/soc0/e0000000.noc/by-name/ImcPartID069 -b 4096 2883584
+
+[vold.decrypt]: [trigger_restart_min_framework]
+
+Settings/src/com/android/settings/CryptKeeperSettings.java
+Settings/src/com/android/settings/CryptKeeper.java
+Settings/src/com/android/settings/CryptKeeperConfirm.java
+system/vold/cryptfs.c
+system/vold/vdc.c
+system/core/init/builtins.c
+

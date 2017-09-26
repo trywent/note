@@ -1,0 +1,43 @@
+service sdcard /system/bin/sdcard -u 1023 -g 1023 -l /data/media /mnt/shell/emulated
+    class main
+@init.rk30board.rc
+
+
+=====================
+
+main{
+- 解析参数
+- 执行，run{
+	- 
+	- mount("/dev/fuse", "/mnt/shell/emulated")
+	- ignite_fuse
+	}
+}
+
+ignite_fuse-->pthread_create(&thread,,start_handler,)-->start_handler-->
+handle_fuse_requests{
+- 读取请求，read(fuse->fd,,)
+- 处理请求，handle_fuse_request
+}
+
+创建：
+handle_fuse_request-->handle_mknod/handle_mkdir-->fuse_reply_entry-->acquire_or_create_child_locked
+-->create_node_locked{
+- 设置要创建文件的权限，derive_permissions_locked
+- 增加引用计数，acquire_node_locked
+- 设置父节点，add_node_to_parent_locked
+}
+
+/home/w/px3/system/core/sdcard/sdcard.c
+
+============
+权限报错：
+libcore.io.Posix.open(libcore.io.ErrnoException:)
+
+Posix_open-->throwIfMinusOne(env, "open", TEMP_FAILURE_RETRY(open(path.c_str(), flags, mode)))
+-->open
+
+//抛出异常
+static rc_t throwIfMinusOne
+
+libcore/luni/src/main/native/libcore_io_Posix.cpp

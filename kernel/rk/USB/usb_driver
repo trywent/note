@@ -1,0 +1,41 @@
+//USB device driver
+usb_register_device_driver{
+- 设置类型usb_bus_type，探测函数usb_probe_device
+- 注册驱动driver_register
+}@driver.c
+
+//
+usb_register-->usb_register_driver@usb.h
+
+_________________________
+//USB interface driver
+usb_register_driver(struct usb_driver *new_driver, struct module *owner,const char *mod_name)
+{
+- 设置类型usb_bus_type，探测函数usb_probe_interface
+- 注册驱动driver_register
+
+}@driver.c
+
+
+
+==========================
+设备驱动匹配：
+struct bus_type usb_bus_type = {
+	.name =		"usb",
+	.match =	usb_device_match,
+	.uevent =	usb_uevent,
+};
+
+usb_device_match(dev,drv){
+- 若是usb设备则，判断驱动是否是usb驱动。usb驱动和设备都匹配
+- 若是usb接口{
+	- 若驱动不是接口驱动，则返回
+	- 将设备和驱动转换成usb设备和usb驱动
+	- 判断id是否匹配，usb_match_id
+	- 
+	}
+}
+
+
+kernel/drivers/usb/core/driver.c
+kernel/include/linux/usb.h

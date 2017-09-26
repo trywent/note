@@ -1,0 +1,189 @@
+//
+
+//获取surfaceflinger服务接口mClient
+SurfaceComposerClient(创建Composer)-->onFirstRef{
+- ComposerService::getComposerService-->ComposerService::connectLocked{
+	- getService("SurfaceFlinger")
+	}
+- 创建mClient(服务端接口)，sm->createConnection-->(服务端)new Client@SurfaceFlinger
+}
+
+//创建SurfaceComposerClient
+addWindow@WindowManagerService.java-->attach@WindowState.java-->windowAddedLocked
+-->new SurfaceSession@Session.java-->nativeCreate@SurfaceSession.java-->
+new SurfaceComposerClient@android_view_SurfaceSession.cpp
+
+
+/*
+ * 应用端创建surfaceControl
+ * 1，绘制数据 lockCanvas-->
+ * 2，提交数据 unlockCanvasAndPost-->
+ */
+relayoutWindow{
+- createSurfaceLocked@WindowStateAnimator.java-->new SurfaceControl
+	-->nativeCreate@SurfaceControl.java-->client->createSurface
+	@android_view_SurfaceControl.cpp-->{
+	- (SurfaceComposerClient)mClient->createSurface //获取bufferQueue
+	- new SurfaceControl(bufferQueue)-->new Surface(mGraphicBufferProducer)//传入bufferQueue
+	- 返回SurfaceControl
+	}@SurfaceComposerClient.cpp
+- outSurface.copyFrom(surfaceControl) //返回到ViewRootImpl，供绘制使用
+}@WindowManagerService.java
+
+//surfaceFlinger创建对应的layer，用来获取bufferQueue
+Client::createSurface-->flinger->createLayer@client.cpp-->createLayer-->
+createNormalLayer(或者createDimLayer){
+- 创建outLayer，new Layer(设置当前状态mCurrentState)-->onFirstRef{
+	- mBufferQueue = new SurfaceTextureLayer //用于创建surface，mGraphicBufferProducer
+	- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(mBufferQueue)
+	- mSurfaceFlingerConsumer.setFrameAvailableListener(this)
+	}
+- 设置handle,(*outLayer)->getHandle
+- 设置bufferQueue,(*outLayer)->getBufferQueue  //mBufferQueue 
+}@SurfaceFlinger.cpp
+
+______________
+//Composer:用于记录本地设置值
+//本地实现接口，设置layer（surface）的位置大小...
+setPosition
+setSize    
+status_t setLayer
+openGlobalTransaction
+closeGlobalTransaction
+
+//开始
+nativeOpenTransaction-->SurfaceComposerClient::openGlobalTransaction-->
+Composer::openGlobalTransaction-->Composer::getInstance().openGlobalTransactionImpl
+-->mTransactionNestCount += 1@SurfaceComposerClient.cpp
+
+
+setSize@SurfaceControl.java-->ctrl->setSize@android_view_SurfaceControl.cpp-->
+setSize-->client->setSize@SurfaceControl.cpp-->setSize-->Composer::setSize{
+- 将状态加入mComposerStates，getLayerStateLocked{
+	- 创建ComposerState，并保存
+	- 返回ComposerState
+	}
+- 将要设置的值保存到，ComposerState
+}@SurfaceComposerClient.cpp
+
+//提交
+closeGlobalTransactionImpl{
+- 保存mComposerStates,mDisplayStates
+- 设置flag，eSynchronous/eAnimation
+- sm->setTransactionState-->setTransactionState@SrufaceFlinger.cpp
+}
+
+
+
+
+//提交设置
+setTransactionState{
+- 设置display，setDisplayStateLocked
+- 设置layer状态，setClientStateLocked{
+	- layer->setPosition
+	- layer->setSize{
+		- 设置请求高宽，mCurrentState.requested.w = w
+		- 设置更新标识，setTransactionFlags
+		}
+	}
+}@SurfaceControl.java
+
+
+
+frameworks/native/services/surfaceflinger/Client.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/Layer.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
+frameworks/native/libs/gui/SurfaceControl.cpp
+frameworks/base/core/jni/android_view_SurfaceControl.cpp
+frameworks/base/core/java/android/view/SurfaceControl.java
+=============
+//应用端绘制和提交数据
+
+//lockCanvas 返回一个canvas用于绘制，传入inOutDirty指定绘制大小(可能会被改变)
+lockCanvas@Surface.java-->nativeLockCanvas{
+- 计算脏区域大小，surface->lock(&outBuffer, dirtyRectPtr)
+- 创建canvas，SkNEW_ARGS(SkCanvas, (bitmap))
+- 关联canvas到java层，swapCanvasPtr
+- 创建lockedSurface
+}@surface.cpp
+
+Surface::lock(outBuffer,dirtyRectPtr){	
+- dequeueBuffer{ //获取一个buffer
+	- mGraphicBufferProducer->dequeueBuffer(buf中)//返回一个可用的buffer编号
+		dequeueBuffer@BufferQueue.cpp
+	- 获取返回的编号buffer，gbuf(mSlots[buf].buffer)
+	- 若返回BUFFER_NEEDS_REALLOCATION，重新分配mGraphicBufferProducer->requestBuffer
+	- 设置fenceFd
+	- 设置buffer为gbuf.get
+	}
+- 将buffer指针转换成，<GraphicBuffer> backBuffer
+- fence->waitForever("Surface::lock")
+- 设置新脏区域为大小newDirtyRegion，设置为指定大小否则设置为buffer大小
+- 是否能服用前一个buffer的数据mPostedBuffer(绘制部分脏区域时可用){
+	- 若可复用，则拷贝数据copyBlt
+	- 不能复用，设置脏区域为整个buffer，newDirtyRegion.set(bounds)
+	}
+- backBuffer->lock
+- mLockedBuffer = backBuffer
+}@surface.cpp
+
+
+//提交绘制。将一个填充了绘制数据的buffer，传送给bufferQueue
+unlockCanvasAndPost-->nativeUnlockCanvasAndPost@Surface.java-->nativeUnlockCanvasAndPost{
+- 设置新canvas并关联到java层，swapCanvasPtr
+- surface->unlockAndPost
+}
+
+
+surface->unlockAndPost{
+- mLockedBuffer->unlock
+- queueBuffer{
+	- 获取buffer编号，getSlotFromBufferLocked
+	- mGraphicBufferProducer->queueBuffer@IGraphicBufferProducer.cpp
+	}
+}@Surface.cpp
+
+
+________________
+//layer提交数据到flinger
+queueBuffer@BufferQueue.cpp-->Layer::onFrameAvailable@Layer.cpp-->
+mFlinger->signalLayerUpdate@Layer.cpp-->mEventQueue.invalidate@SurfaceFlinger
+
+
+
+handleMessageRefresh-->setUpHWComposer-->setGeometry
+
+================
+//提交数据到显示buffer
+
+//初始化
+SurfaceFlinger::init-->new DisplayDevice{
+- mNativeWindow = new Surface(producer, false) //传入BufferQueue
+- window = mNativeWindow.get()
+- surface = eglCreateWindowSurface(display, config, window)
+	-->createWindowSurface-->new egl_window_surface_v2_t(window)@egl.cpp
+- 创建mDisplay，mSurface
+}
+
+//准备数据
+doComposition-->doDisplayComposition{
+- doComposeSurfaces
+- SurfaceFlinger::doDisplayComposition-->hw->swapBuffers
+}
+//提交数据
+swapBuffers@DisplayDevice.cpp-->eglSwapBuffers-->(获取nativeWindow，提交数据)
+d->swapBuffers-->egl_window_surface_v2_t::swapBuffers-->nativeWindow->
+queueBuffer@egl.cpp-->queueBuffer-->mGraphicBufferProducer->queueBuffer@Surface.cpp
+
+frameworks/base/core/java/android/view/Surface.java
+frameworks/base/core/jni/android_view_Surface.cpp
+frameworks/native/libs/gui/Surface.cpp
+frameworks/native/services/surfaceflinger/Layer.cpp
+frameworks/native/libs/gui/IGraphicBufferProducer.cpp
+frameworks/native/libs/gui/BufferQueue.cpp
+frameworks/native/libs/gui/IGraphicBufferConsumer.cpp
+frameworks/native/libs/gui/ConsumerBase.cpp
+frameworks/native/libs/ui/GraphicBuffer.cpp
+frameworks/native/libs/ui/GraphicBufferMapper.cpp
+frameworks/native/opengl/libagl/egl.cpp

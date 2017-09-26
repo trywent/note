@@ -1,0 +1,41 @@
+//新模式,不使用加载库的方式
+AudioPolicyService::onFirstRef{
+- AudioPolicyClient(this);
+- createAudioPolicyManager(mAudioPolicyClient)@AudioPolicyFactory.cpp
+	-->AudioPolicyManager@AudioPolicyManager.cpp
+}@AudioPolicyService.cpp
+
+
+//设置音量
+setStreamVolumeIndex-->(获取IAudioPolicyService)aps->setStreamVolumeIndex
+@AudioSystem.cppsetStreamVolumeIndex@IAudioPolicyService.cpp-->setStreamVolumeIndex
+(实现函数)-->mAudioPolicyManager->setStreamVolumeIndex@AudioPolicyInterfaceImpl.cpp
+-->setStreamVolumeIndex{
+- 获取设备，getDeviceForStrategy
+- 设置checkAndSetVolume-->computeVolume-->
+}@AudioPolicyManager.cpp
+
+
+
+
+frameworks/av/services/audiopolicy/AudioPolicyService.cpp
+frameworks/av/services/audiopolicy/AudioPolicyFactory.cpp
+frameworks/av/services/audiopolicy/AudioPolicyManager.cpp
+frameworks/av/media/libmedia/IAudioPolicyService.cpp
+frameworks/av/services/audiopolicy/AudioPolicyInterfaceImpl.cpp
+==============
+//audioRecord
+AudioRecord::set{
+- mAttributes  //保存属性mAttributes
+- openRecord_l{
+	//获取设备编号AUDIO_SOURCE_BLUETOOTH_A2DP 11
+	- AudioSystem::getInputForAttr-->aps->getInputForAttr(attr){
+		- AudioPolicyManager::getInputForAttr-->getDeviceAndMixForInputSource-->
+			getDeviceForInputSource
+		- getInputProfile //若有已经存在的profile则直接使用
+		- mpClientInterface->openInput-->AudioPolicyService::AudioPolicyClient::openInput
+			-->af->openInput-->
+		}
+	- 
+	}
+}

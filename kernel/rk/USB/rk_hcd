@@ -1,0 +1,71 @@
+
+host驱动注册:
+dwc_otg_driver_init{
+- platform_driver_register(&dwc_otg_driver)
+- 若是2.0，platform_driver_register(&host20_driver)
+- 若是1.1，platform_driver_register(&host11_driver)
+}@dwc_otg_driver.c
+
+host设备注册：
+arch_initcall(usbdev_init_devices){
+- platform_device_register(&device_hsusb_host)
+- platform_device_register(&device_usb20_otg)
+- platform_device_register(&device_usb20_host)
+}@usbdev_rk30.c
+
+otghost设备探测：
+dwc_otg_driver_probe{
+- 设备数据初始化，pldata->hw_init()@dwc_otg_driver.c-->usb20otg_pdata.hw_init
+	usb20otg_hw_init-->gpio_direction_output(RK3066B_OTG_DRV_VBUS)@usbdev_rk30.c
+- 注册中断处理，request_irq(irq, dwc_otg_common_irq... )
+- 初始化host，dwc_otg_hcd_init
+- 初始化外围控制器，dwc_otg_pcd_init
+}@dwc_otg_driver.c
+
+
+host20设备探测：
+host20_driver.probe-->host20_driver_probe{
+- 获取平台数据并进行设置，
+- 注册中断处理，request_irq(irq, dwc_otg_common_irq)
+- 初始化host，host20_hcd_init
+}@dwc_otg_driver.c
+
+
+中断处理：
+dwc_otg_common_irq{
+- 处理函数，dwc_otg_handle_common_intr{
+	
+	}@dwc_otg_cil_intr.c
+}@dwc_otg_driver.c
+
+___________________
+加入设备：
+OTG HOST:
+dwc_otg_hcd_init{
+- 创建hcd设备，usb_create_hcd(&dwc_otg_hc_driver...)-->usb_create_shared_hcd
+- 创建设备dwc_otg_hcd，hcd_to_dwc_otg_hcd
+- 加入设备，usb_add_hcd(hcd)
+}@dwc_otg_hcd.c
+
+HOST2.0:
+host20_hcd_init{
+- 创建hcd设备，usb_create_hcd(&dwc_otg_hc_driver...)-->usb_create_shared_hcd
+- 创建设备dwc_otg_hcd，hcd_to_dwc_otg_hcd
+- 加入设备，usb_add_hcd(hcd)
+}@dwc_otg_hcd.c
+
+usb_add_hcd{
+- 注册总线，usb_register_bus
+- 分配创建usb设备(根hub)，usb_alloc_dev@usb.c
+- 注册根hub,register_root_hub{
+	- 设置usb设备状态，usb_set_device_state
+	- 初始化并加入设备，usb_new_device
+	}
+}@hcd.c
+
+kernel/drivers/usb/dwc_otg/usbdev_rk30.c
+kernel/drivers/usb/dwc_otg/dwc_otg_hcd.c
+kernel/drivers/usb/dwc_otg/dwc_otg_driver.c
+kernel/drivers/usb/core/hcd.c
+kernel/drivers/usb/core/usb.c
+

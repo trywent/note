@@ -1,0 +1,16 @@
+//调整cpufreq
+rk3188_cpufreq_driver_init-->cpufreq_register_driver(&rk3188_cpufreq_driver)
+
+
+
+
+==========
+//cpu变频时调整电压
+rk3188_cpufreq_temp_limit_init-->cpufreq_register_notifier(&notifier_policy_block)
+
+
+notifier_policy_block.notifier_call-->rk3188_cpufreq_notifier_policy-->queue_delayed_work_on/cancel_delayed_work_sync(rk3188_cpufreq_temp_limit_work)-->rk3188_cpufreq_temp_limit_work_func
+
+
+
+kernel/arch/arm/mach-rkpx3/cpufreq.c

@@ -1,0 +1,21 @@
+解析xml中View：
+LayoutInflater inflater = (LayoutInflater)context.getSystemService
+      (Context.LAYOUT_INFLATER_SERVICE)
+
+inflater
+
+frameworks/base/core/java/android/view/LayoutInflater.java
+________________________
+TextView:
+TextView{
+- 获取textView属性，a = theme.obtainStyledAttributes(com.android.internal.R.styleable.TextView)
+- 获取文本大小,a.getDimensionPixelSize(attr, textSize)
+}@TextView.java
+
+
+obtainStyledAttributes(AttributeSet set,int[] attrs, int defStyleAttr, int defStyleRes){
+- 
+
+}
+
+frameworks/base/core/java/android/content/res/Resources.java

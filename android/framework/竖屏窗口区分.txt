@@ -1,0 +1,46 @@
+//4种大小：456 ， 682 ， 744， 675
+第一种：1280x800
+-----182   //statusBar
+-----456   //手机互联窗口
+-----	   //其他应用
+-----160   //NavigationBar
+
+
+第二种：1024x768
+-----181   //statusBar             
+-----682   //手机互联窗口        
+-----160   //NavigationBar
+
+第三种：1024x768
+-----136   //statusBar
+-----744   //手机互联窗口         上半254
+-----144   //NavigationBar
+
+
+第四种：1024x768             
+-----136   //statusBar 这里读取是136实际大小是205
+-----675   //手机互联窗口   上半187
+-----144   //NavigationBar
+第四种可通过读取SystemProperties.getInt("ro.build.fytThirdUI",0)==1来区分
+
+//获取statusBar高度
+public int getStatusBarHeight() { 
+      int result = 0;
+      int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+      if (resourceId > 0) {
+          result = getResources().getDimensionPixelSize(resourceId);
+      } 
+      return result;
+} 
+
+//获取NavigationBar高度
+public int getNavigationBarHeight() {
+	Resources resources = context.getResources();
+	int resourceId = resources.getIdentifier("navigation_bar_height", "dimen", "android");
+	if (resourceId > 0) {
+	    return resources.getDimensionPixelSize(resourceId);
+	}
+	return 0;
+}
+
+

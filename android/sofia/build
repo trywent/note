@@ -1,0 +1,102 @@
+repo init --repo-url ssh://git@www.rockchip.com.cn:2222/sofia3gr-car/tools/repo.git -u
+ssh://git@www.rockchip.com.cn:2222/sofia3gr-car/rk/platform/manifest.git
+
+
+
+1. make i386_sofia_defconfig (SOFIA3GR SVB 或 SOFIA3GR Tablet 或 SOFIA3GR Phone 或
+SOFIA3GR Car)
+2. make SF_3GR-svb.dtb(SOFIA3GR SVB)
+make SF_3GR-tablet.dtb(SOFIA3GR Tablet)
+make SF_3GR-phone.dtb(SOFIA3GR Phone)
+make SF_3GR-car.dtb(SOFIA3GR Car)
+make SF_3GR-car-fyt2009.dtb(2009)
+make SF_3GR-car-fyt2009-mipi.dtb
+make SF_3GR-car-fyt5009.dtb
+make SF_3GR-car-fyt5009-wifi.dtb
+make SF_3GR-car-fyt2009-mipi.fls
+
+
+3.
+make bzImage
+
+
+
+android:
+source build/envsetup.sh && setpaths
+lunch sofia3gr_car-userdebug
+# 根据不同产品选择
+2. 编译完成后,执行 SDK 根目录下的 mkimage.sh 脚本打包生成固件,执行:
+./mkimage.sh SF_3GR-svb.dtb
+或./mkimage.sh SF_3GR-tablet.dtb
+或./mkimage.sh SF_3GR-phone.dtb
+或./mkimage.sh SF_3GR-car.dtb
+备注:如果提示 convert 命令找不到
+
+./mkimage.sh SF_3GR-car-fyt2009.dtb(SOFIA3GR Car)
+./mkimage.sh SF_3GR-car-fyt2009-mipi.dtb
+
+===============
+ota:
+
+./mkimage.sh SF_3GR-car-fyt5009.dtb ota
+./mkimage.sh SF_3GR-car-fyt5009-wifi.dtb ota
+./mkimage.sh SF_3GR-car-fyt2009.dtb ota
+./mkimage.sh SF_3GR-car-fyt2009-mipi.dtb ota
+
+./mkall.sh SF_3GR-car-fyt5009-wifi.dtb  fytver=y ota -j8
+./mkall.sh SF_3GR-car-fyt5009-wifi.dtb  fytpp=y
+./mkall.sh SF_3GR-car-fyt5009-eng-wifi.dtb  fytver=y ota
+===============
+打开dex：
+WITH_DEXPREOPT@BoardConfig.mk
+
+LOCAL_DEX_PREOPT@build/core/dex_preopt_odex_install.mk
+
+frameworks/base/services$ mm WITH_DEXPREOPT=false
+================
+版本号：
+ro.fyt.sys.version
+
+make fytver=y
+
+================
+("boot.img", "/dev/block/platform/soc0/e0000000.noc/by-name/ImcPartID071")
+
+dd if=sdcard/boot.img of=/dev/block/platform/soc0/e0000000.noc/by-name/ImcPartID071 bs=1024 count=13332
+
+dd if=/sdcard/boot.img of=/dev/block/platform/soc0/e0000000.noc/by-name/ImcPartID071 bs=1024 count=13092
+
+
+
+kernel:
+ImcPartID001
+ImcPartID010
+ImcPartID013
+ImcPartID022
+ImcPartID023
+ImcPartID024
+ImcPartID033
+ImcPartID068
+ImcPartID069
+ImcPartID070
+ImcPartID071
+ImcPartID074
+ImcPartID076
+ImcPartID115
+ImcPartID118
+ImcPartID121
+ImcPartID122
+
+
+recovery:
+
+
+reboot ptest
+reboot ptest_clear
+reboot recovery_clear
+
+===============
+android6.0
+
+ .repo/repo/repo sync -c --no-tags -j4
+

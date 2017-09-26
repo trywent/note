@@ -1,0 +1,36 @@
+modify(修改)-->stage(暂存)-->commit(提交)
+
+========
+查看：
+git log     	//查看日志
+git log -p  	//查看提交内容
+git log --stat  //显示修改的大概
+git log --before="Fri Mar 24"
+查看修改地方：
+git diff
+
+
+取消提交：
+git commit --amend
+
+取消暂存：
+git reset HEAD file
+
+远程分支：
+git remote add name git:xxxxxx //添加
+git fetch name                 //获取
+git pull                       //获取并合并到当前分支
+git push remote-name  remote-branch //推送
+
+
+标签：
+git tag -l xxx            //查看某个标签
+git tag show xxx          //查看
+git tag -a xxx -m "xxxx"  //带附注标签
+git tag xxx               //轻量级标签
+
+====================
+分支：HEAD指向当前工作的分支
+
+分支合并：
+git merge xxx //将xxx合并到当前分支

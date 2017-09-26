@@ -1,0 +1,26 @@
+//kernel
+dump_stack()
+
+
+//c printStack.cpp
+
+dumping_callstack
+
+
+
+//c++
+LOCAL_SHARED_LIBRARIES += libutils
+
+#include <utils/CallStack.h>
+ 
+CallStack stack;
+stack.update();
+stack.log("TAGNAME");
+
+
+//java
+try {
+    throw new Exception("Call Stack Trace");
+} catch (Exception e) {
+    Log.i("TAGNAME", "xxx", e);
+}

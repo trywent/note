@@ -1,0 +1,14 @@
+am stack create 8 0 3
+
+
+am stack create: create a new stack relative to an existing one.
+   <TASK_ID>: the task to populate the new stack with. Must exist.
+   <RELATIVE_STACK_BOX_ID>: existing stack box's id.
+   <POSITION>: 0: before <RELATIVE_STACK_BOX_ID>, per RTL/LTR configuration,
+               1: after <RELATIVE_STACK_BOX_ID>, per RTL/LTR configuration,
+               2: to left of <RELATIVE_STACK_BOX_ID>,
+               3: to right of <RELATIVE_STACK_BOX_ID>, 
+	       4: above <RELATIVE_STACK_BOX_ID>,
+	       5: below <RELATIVE_STACK_BOX_ID>
+   <WEIGHT>: float between 0.2 and 0.8 inclusive.
+

@@ -1,0 +1,56 @@
+通用字符集（Universal Character Set, UCS）。usc-2使用2字节。usc-4使用4字节
+UTF是"UCS Transformation Format"
+
+
+Unicode编码(十六进制)　UTF-8 字节流(二进制)
+000000 - 00007F		0xxxxxxx
+000080 - 0007FF		110xxxxx 10xxxxxx
+000800 - 00FFFF		1110xxxx 10xxxxxx 10xxxxxx
+010000 - 10FFFF		11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+
+如果U<0x10000，U的UTF-16编码就是U对应的16位无符号整数（为书写简便，下文将16位无符号整数记作WORD）。
+如果U≥0x10000，我们先计算U'=U-0x10000，然后将U'写成二进制形式：yyyy yyyy yyxx xxxx xxxx，U的UTF-16编码（二进制）就是：110110yyyyyyyyyy 110111xxxxxxxxxx。
+__________________________
+java中：
+
+Character:
+字符表示一个char。在java中一个char表示一个unicode中的BMP字符，或者是某些字符的一部分(surrogate).
+
+Charset：
+表示unicode字符映射字节流的名字(即编码格式UTF-8,UTF-16)。
+
+String:
+java中字符串的编码方式是UTF-16
+
+00 BB C6 D0 A1 E7 FA
+
+GBK
+黄BBC6	9EC4   1001 1110 1100 0100
+小D0A1	5C0F
+琥E7FA	7425
+
+
+To expand on the answers others have given:
+
+We've got lots of languages with lots of characters that computers should ideally display. Unicode assigns each character a unique number, or code point.
+
+Computers deal with such numbers as bytes... skipping a bit of history here and ignoring memory addressing issues, 8-bit computers would treat an 8-bit byte as the largest numerical unit easily represented on the hardware, 16-bit computers would expand that to two bytes, and so forth.
+
+Old character encodings such as ASCII are from the (pre-) 8-bit era, and try to cram the dominant language in computing at the time, i.e. English, into numbers ranging from 0 to 127 (7 bits). With 26 letters in the alphabet, both in capital and non-capital form, numbers and punctuation signs, that worked pretty well. ASCII got extended by an 8th bit for other, non-English languages, but the additional 128 numbers/code points made available by this expansion would be mapped to different characters depending on the language being displayed. The ISO-8859 standards are the most common forms of this mapping; ISO-8859-1 and ISO-8859-15 (also known as ISO-Latin-1, latin1, and yes there are two different versions of the 8859 ISO standard as well).
+
+But that's not enough when you want to represent characters from more than one language, so cramming all available characters into a single byte just won't work.
+
+There are essentially two different types of encodings: one expands the value range by adding more bits. Examples of these encodings would be UCS2 (2 bytes = 16 bits) and UCS4 (4 bytes = 32 bits). They suffer from inherently the same problem as ASCII and ISO-8859 standars, as their value range is still limited, even if the limit is vastly higher.
+
+The other type of encoding uses a variable number of bytes per character, and the most commonly known encodings for this are the UTF encodings. All UTF encodings work in roughly the same manner: you choose a unit size, which for UTF-8 is 8 bits, for UTF-16 is 16 bits, and for UTF-32 is 32 bits. The standard then defines a few of these bits as flags: if they're set, then the next unit in a sequence of units is to be considered part of the same character. If they're not set, this unit represents one character fully. Thus the most common (English) characters only occupy one byte in UTF-8 (two in UTF-16, 4 in UTF-32), but other language characters can occupy six bytes or more.
+
+Multi-byte encodings (I should say multi-unit after the above explanation) have the advantage that they are relatively space-efficient, but the downside that operations such as finding substrings, comparisons, etc. all have to decode the characters to unicode code points before such operations can be performed (there are some shortcuts, though).
+
+Both the UCS standards and the UTF standards encode the code points as defined in Unicode. In theory, those encodings could be used to encode any number (within the range the encoding supports) - but of course these encodings were made to encode Unicode code points. And that's your relationship between them.
+
+Windows handles so-called "Unicode" strings as UTF-16 strings, while most UNIXes default to UTF-8 these days. Communications protocols such as HTTP tend to work best with UTF-8, as the unit size in UTF-8 is the same as in ASCII, and most such protocols were designed in the ASCII era. On the other hand, UTF-16 gives the best average space/processing performance when representing all living languages.
+
+The Unicode standard defines fewer code points than can be represented in 32 bits. Thus for all practical purposes, UTF-32 and UCS4 became the same encoding, as you're unlikely to have to deal with multi-unit characters in UTF-32.
+
+Hope that fills in some details.
+

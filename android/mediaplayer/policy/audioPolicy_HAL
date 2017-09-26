@@ -1,0 +1,227 @@
+//策略，会回调audioflnger的函数
+策略设备:AUDIO_POLICY_HARDWARE_MODULE_ID
+
+创建策略函数：
+method.open-->legacy_ap_dev_open{
+    dev->device.create_audio_policy = create_legacy_ap;
+    dev->device.destroy_audio_policy = destroy_legacy_ap;
+}
+
+创建策略：
+create_legacy_ap{
+- 初始化策略的操作函数，lap->policy
+- 保存回调函数lap->aps_ops = aps_ops 
+- 客户端，lap->service_client = new AudioPolicyCompatClient(aps_ops, service)//封装的audioflinger的操作
+- 服务端，lap->apm = createAudioPolicyManager(lap->service_client)
+- 设置*ap = &lap->policy,并返回
+}
+
+HwModule{
+- handle
+- 输出配置
+- 输入配置
+}
+==========================
+//传入android层ops和服务
+AudioPolicyCompatClient((aps_ops, service)){
+- mServiceOps(serviceOps) , mService(service
+}
+
+
+=================
+创建策略：
+createAudioPolicyManager-->new AudioPolicyManagerDefault-->new AudioPolicyManagerBase-->
+AudioPolicyManagerBase::AudioPolicyManagerBase{
+- 设置接口，mpClientInterface = clientInterface
+- 初始化mForceUse
+- 加载配置,loadAudioPolicyConfig(/system(vendor)/etc/audio_policy.conf){
+	- 加载全局配置，loadGlobalConfig{
+		- 获取mAttachedOutputDevices   //连接的输出设备
+		- 获取mDefaultOutputDevice	   //默认输出设备
+		- 获取mAvailableInputDevices   //默认输入设备
+		}
+	- 加载输入输出设备，loadHwModules-->loadHwModule{
+		- 创建模块new HwModule
+		- 输出配置，loadOutput
+		- 输入配置，loadInput		
+		- 讲模块加入到，mHwModules
+		}
+	}
+- 若加载不成功则加载默认配置defaultAudioPolicyConfig
+- 初始化音量数组，initializeVolumeCurves
+- 初始化所有的模块（设置可用的设备），打开attach设备的输出流{
+	- 初始模块的mHandle，intentInterface->loadHwModule  //audioFlinger 对应的库的编号
+	- 打开模块中的输出流，若成功{
+		- 创建输出流的描述，AudioOutputDescriptor
+		- 打开输出流，mpClientInterface->openOutput
+		- 已经连接并支持的设备，mAvailableOutputDevices
+		- 加入输出流，addOutput
+		- 设置输出流，setOutputDevice
+		}
+	}
+- 更新策略对应的设备，updateDevicesAndOutputs
+}
+
+setForceUse
+
+//获取策略
+getDeviceForStrategy{
+- SONIFICATION_RESPECTFUL策略，{
+	- 若是在电话状态，获取策略SONIFICATION
+	- 在远程设备播放，获取策略SONIFICATION
+	- 本机正在播放，获取MEDIA
+	- 其他获取策略，SONIFICATION
+	}
+- DTMF策略，若是电话状态，获取MEDIA。其它走PHONE流程
+- PHONE策略，{
+	- 强制使用，mForceUse[FOR_COMMUNICATION]{
+		- 强制蓝牙FORCE_BT_SCO，{
+			- 不在电话状态或不是DTMF，选择设备BLUETOOTH_SCO_CARKIT	
+			- BLUETOOTH_SCO_HEADSET
+			- BLUETOOTH_SCO
+			}
+		- default{
+			- 不在电话状态，首先路由到a2dp设备
+			- 路由到有线耳机
+			- 不在电话状态，路由到usb，aux
+			- 路由到耳机听筒，EARPIECE
+			- 路由到默认设备
+			}
+		- 强制扬声器{
+			- 不在电话状态，首先路由到a2dp设备
+			- 路由到扬声器
+			- 路由到默认设备
+			}
+	  }
+	}
+- SONIFICATION策略，电话状态获取PHONE策略。否则顺延到ENFORCED_AUDIBLE
+- ENFORCED_AUDIBLE策略，若是强制开声策略选择扬声器。否则顺延STRATEGY_MEDIA
+- STRATEGY_MEDIA策略，{
+	- 不是SONIFICATION策略，选择EMOTE_SUBMIX
+	- a2dp设备
+	- 有线耳机
+	- usb设备
+	- aux
+	- 扬声器
+	}
+}
+
+//相当hal层的audioPolicyService的封装
+AudioPolicyCompatClient(aps_ops/*audiopolicyservice中aps_ops*/, service/*audiopolicyservice实例*/){
+- 设置mServiceOps
+- 设置mService
+}
+
+______________________
+
+//初始化流
+StreamDescriptor{
+int mIndexMin;      // min volume index
+int mIndexMax;      // max volume index
+KeyedVector<audio_devices_t, int> mIndexCur;   // current volume index per device
+bool mCanBeMuted;   // true is the stream can be muted
+const VolumeCurvePoint *mVolumeCurve[DEVICE_CATEGORY_CNT];
+}
+
+//根据流获取设备,供AudioManager接口
+getDevicesForStream{
+- 获取策略，getStrategy(stream)
+- 根据策略获取设备，getDeviceForStrategy
+}
+
+//初始化音量范围，与andorid上层一致
+VolumeStreamState@AudioService.java-->initStreamVolume@AudioSystem.java-->initStreamVolume
+@AudioSystem.cpp-->initStreamVolume-->mpAudioPolicy->init_stream_volume@AudioPolicyService.cpp
+-->ap_init_stream_volume@audio_policy_hal.cpp-->initStreamVolume@AudioPolicyManagerBase.cpp
+
+setStreamVolumeIndex{
+- mStreams[stream].mIndexCur.add(device, index);
+
+}
+//设置音量
+ap_set_stream_volume_index_for_device@audio_policy_hal.cpp-->setStreamVolumeIndex{
+- 检查设置值和设备
+- 若流不能被静音，则设置为最大音量
+- 保存音量到mStreams
+- 设置音量到连接的设备，checkAndSetVolume{
+	- 连接蓝牙不设置
+	- 计算音量，computeVolume-->volIndexToAmpl{
+		- 音量小于最小返回0，大于最大返回1.0f
+		- 其他计算
+		}
+	- mpClientInterface->setStreamVolume
+	}
+}
+
+_________________
+操作：
+legacy_audio_policy@audio_policy_hal.cpp-->AudioPolicyInterface(AudioPolicyManagerBase)
+-->mpClientInterface->xxxx@AudioPolicyManagerBase.cpp-->xxx@AudioPolicyCompatClient.cpp
+-->xxx@AudioFlinger.cpp
+
+(获取流程)get_output-->ap_get_output-->lap->apm->getOutput@audio_policy_hal.cpp
+-->getOutput-->mpClientInterface->openOutput@AudioPolicyManagerBase.cpp
+-->openOutput-->mServiceOps->open_output_on_module@AudioPolicyCompatClient.cpp
+-->mServiceOps->open_output_on_module-->aps_open_output_on_module@AudioPolicyService.cpp
+-->af->openOutput-->openOutput@AudioFlinger.cpp
+
+output:
+get_output = ap_get_output;
+start_output = ap_start_output
+stop_output = ap_stop_output;
+release_output = ap_release_output;
+
+intput:
+get_input = ap_get_input;
+start_input = ap_start_input;
+stop_input = ap_stop_input;
+release_input = ap_release_input;
+
+hardware/rk29/audio/audio_policy_hal.cpp
+hardware/rk29/audio/AudioPolicyManagerBase.cpp
+hardware/rk29/audio/AudioPolicyCompatClient.cpp
+hardware/rk29/audio/AudioPolicyManagerDefault.cpp
+hardware/rk29/audio/AudioPolicyManagerDefault.h
+
+====================
+//创建audioTrack
+AudioPolicyManagerBase::getOutput(传入参数){
+- 根据流获取策略，getStrategy(stream)
+- 根据策略获取设备，getDeviceForStrategy
+- 创建设备支持参数profile，getProfileForDirectOutput
+- 创建AudioOutputDescriptor
+- 若创建profile成功，则打开设备，mpClientInterface->openOutput
+	-->mServiceOps->open_output_on_module
+- 若创建不成功，则在mOutputs中查找所有支持的设备并选择最优的outputs
+}
+
+
+//开始播放，设置参数音量
+ap_start_output-->AudioPolicyManagerBase::startOutput{
+- 增加引用计数，outputDesc->changeRefCount
+- 流的引用为1时才执行播放，(同一时间同一流只有一种声音){
+	- 获取设备，getNewDevice
+	- 获取策略，getStrategy
+	- 查看当前输出，是否要改变当前模块中的输出设备
+	- 设置输出设备，setOutputDevice-->mpClientInterface->setParameters
+	- 设置音量，checkAndSetVolume
+}
+}
+
+____________________
+//录音
+startInput{
+- 获取并设置采样率{
+	- 获取mpClientInterface->getParameters(keySamplingRate)
+	- 若获取采样率和默认不一致，则使用默认采样率
+	- 保存param.addInt
+	}
+- 获取并这只channel{
+	- 获取mpClientInterface->getParameters(keyChannels)
+	}
+- 设置mpClientInterface->setParameters
+}
+
+
+
+

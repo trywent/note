@@ -1,0 +1,130 @@
+
+errorcode 522  SQLITE_IOERR_READ 
+
+
+init-->new ApplicationContentResolver@ContextImpl.java
+
+获取contentResolver：
+getContentResolver-->mContentResolver-->ApplicationContentResolver@ContextImpl.java
+
+获取provider：
+acquireUnstableProvider(uri)@ContentResolver.java-->acquireUnstableProvider(Context c, String name)
+-->mMainThread.acquireProvider@ContextImpl.java-->acquireProvider-->(获取服务端provider代理)
+ActivityManagerNative.getDefault().getContentProvider(返回holder中provider)@ActivityThread.java
+-->getContentProvider-->ContentProviderHolder.CREATOR.createFromParcel@ActivityManagerNative.java
+
+
+客户端：
+getContentProvider-->ContentProviderHolder.CREATOR.createFromParcel@ActivityManagerNative.java
+-->createFromParcel-->new ContentProviderHolder-->ContentProviderHolder(获取provider代理)
+-->provider = ContentProviderNative.asInterface@IActivityManager.java
+
+服务端：
+getContentProvider-->getContentProviderImpl{
+- 记录请求数据的ActviityRecord
+- 获取provider，mProviderMap.getProviderByName
+- 获取provider不为空，
+	- 调用者不为空，且改provider能够在调用者中运行，则直接创建holder并返回。
+	- 
+
+- 为空，没有获取到provider
+	- 获取provider信息，AppGlobals.getPackageManager().resolveContentProvider
+	- 获取ContentProviderRecord，mProviderMap.getProviderByClass
+		- 没有获取到，新建ContentProviderRecord
+- 获取的provider不能在调用者进程中运行，则开始provider进程startProcessLocked，并加入容器mLaunchingProviders
+- 加入到映射表，mProviderMap.putProviderByName
+- 等待provider设置完成(cpr.provider不为空)
+- 返回cpr.newHolder
+
+}@ActivityManagerService.java
+
+
+provider准备好：
+main-->thread.attach-->attach-->mgr.attachApplication@ActivityTHread.java-->attachApplication
+-->attachApplicationLocked-->thread.bindApplication@ActivityManagerService.java-->
+ApplicationThread.bindApplication-->handleMessage(BIND_APPLICATION)-->handleBindApplication
+-->installContentProviders-->ActivityManagerNative.getDefault().publishContentProviders
+@ActivityThread.java-->publishContentProviders@ActivityManagerService.java
+
+
+attach{
+- 
+
+}@ActivityThread.java
+
+
+通过contentResolver查询：
+getContentResolver().query@Activity-->ApplicationContentResolver.query@ContextImpl.java-->
+(通过provider代理)querty@ContentProviderNative-->
+
+
+
+
+客户端查询:
+ContentProviderProxy.query-->DatabaseUtils.readExceptionFromParcel@ContentProviderNative.java
+readExceptionFromParcel-->readExceptionFromParcel(根据传入的消息类别抛出对应的异常)@DatabaseUtils.java
+
+
+服务端查询(另一程序中提供provider):
+(若是通过数据库实现)xxxProvider.query-->query@SQLiteDatabase
+
+
+
+frameworks/base/core/java/android/content/ContentResolver.java
+frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/core/java/android/content/ContentProviderClient.java
+frameworks/base/core/java/android/app/IActivityManager.java
+frameworks/base/core/java/android/app/ActivityManagerNative.java
+frameworks/base/core/java/android/database/DatabaseUtils.java
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+________________________________
+
+
+
+
+
+________________________________
+创建数据库：
+getWritableDatabase-->getDatabaseLocked-->(创建)mContext.openOrCreateDatabase--onCreate@SQLiteOpenHelper.java
+
+
+抛出异常1：
+ContentProviderNative.onTransact-->adaptor.getBulkCursorDescriptor@CursorToBulkCursorAdaptor.java-->
+getCount@SQLiteCursor.java-->fillWindow-->fillWindow@SQLiteCursor.java-->executeForCursorWindow
+@SQLiteSession.java-->executeForCursorWindow-->nativeExecuteForCursorWindow@SQLiteConnection.java
+-->nativeExecuteForCursorWindow-->throw_sqlite3_exception(抛出异常)@android_database_SQLiteConnectionl.cpp
+
+出错：
+sqlite3_step@android_database_SQLiteConnectionl.cpp
+
+
+抛出异常2：
+nativePrepareStatement@SQLiteConnection.java-->nativePrepareStatement-->throw_sqlite3_exception
+@android_database_SQLiteConnection.cpp
+
+出错：
+nativePrepareStatement-->sqlite3_prepare16_v2@android_database_SQLiteConnection.cpp
+
+
+
+解析错误码：
+
+throw_sqlite3_exception-->sqlite3_extended_errcode(handle)@android_database_SQLiteCommon.cpp
+sqlite3_api->extended_errcode@
+
+error code：code 522
+
+________________________________
+sqlite跨进程异常：
+服务端捕获异常，并写入到parcel传给客户端。输出异常信息
+
+客户端从parcel读出异常。
+
+
+frameworks/base/core/java/android/database/sqlite/SQLiteOpenHelper.java
+frameworks/base/core/java/android/database/sqlite/SQLiteDatabase.java
+frameworks/base/core/java/android/database/sqlite/SQLiteConnection.java
+frameworks/base/core/jni/android_database_SQLiteConnection.cpp
+frameworks/base/core/jni/android_database_SQLiteCommon.cpp
+
+

@@ -1,0 +1,54 @@
+//
+computeOomAdjLocked
+
+//设置优先级
+applyOomAdjLocked
+
+killPids{
+- 要杀的进程最低优先级值worstType
+- 大于worstType的进程杀掉，proc.kill
+}
+
+===================
+mOomAdj{
+FOREGROUND_APP_ADJ,
+VISIBLE_APP_ADJ, 
+PERCEPTIBLE_APP_ADJ,
+BACKUP_APP_ADJ, 
+CACHED_APP_MIN_ADJ, 
+CACHED_APP_MAX_ADJ
+}
+updateOomLevels{
+- 根据实际内存计算比例scaleMem
+- 根据屏幕尺寸计算比例scaleDisp
+
+- mOomMinFree //lmk根据这个值判断是否杀进程
+- 写入(内存最低值，对应的内存类型)
+}
+
+
+
+writeLmkd{
+- openLmkdSocket{
+	- LocalSocket(LocalSocket.SOCKET_SEQPACKET)
+	- 连接，connect(new LocalSocketAddress("lmkd"))
+	- 返回流，sLmkdSocket.getOutputStream(
+	}
+- 写数据，sLmkdOutputStream.write
+}
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/java/com/android/server/am/ProcessList.java
+
+
+__________________
+lowmemorykiller:
+
+//android5.1
+
+
+
+system/core/lmkd/lmkd.c
+//android4.4.4 写文件
+/sys/module/lowmemorykiller/parameters/adj
+/sys/module/lowmemorykiller/parameters/minfree

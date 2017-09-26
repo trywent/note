@@ -1,0 +1,67 @@
+===============================
+Network Service Discovery (NSD)：
+在本地网络中发现支持自己设备所要求服务的设备。可用于文件共享等。
+*注册服务（可选的，向其他设备提供服务）
+1）创建NsdServiceInfo（android会自动使服务名唯一，如：NsdChat ，NsdChat (1)），
+2）实现RegistrationListener接口。
+3）最后注册服务 registerService().
+
+*查找网络上的服务
+1）实现监听器NsdManager.DiscoveryListener和其中的回调函数
+2）调用mNsdManager.discoverServices传入参数要查找的服务类型，使用的协议
+
+*连接网络上的服务
+1）获取服务信息使用 resolveService() 。
+2）实现 NsdManager.ResolveListener 传入resolveService()。
+3）在NsdManager.ResolveListener.onServiceResolved的回调函数会得到NsdServiceInfo。NsdServiceInfo包含了
+网络连接的信息（地址，端口）
+==============================
+wifi peer-to-peer：设备直连，不经过网络或者AP
+______________________________
+实现广播接收器，处理系统wifi p2p的广播：
+
+
+
+______________________________
+创建wifip2p程序：
+*在要是用该功能APP的manifest中加入权限 CHANGE_WIFI_STATE, ACCESS_WIFI_STATE, 和 INTERNET 
+    <uses-permission
+        android:required="true"
+        android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission
+        android:required="true"
+        android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <uses-permission
+        android:required="true"
+        android:name="android.permission.INTERNET"/>
+
+*创建一个 Broadcast Receiver 和 Peer-to-Peer Manager
+1）创建广播接收器（ 在APP的onResume() 和 onPause()进行注册和注销），过滤和处理的消息：
+WIFI_P2P_STATE_CHANGED_ACTION
+WIFI_P2P_PEERS_CHANGED_ACTION
+WIFI_P2P_CONNECTION_CHANGED_ACTION
+WIFI_P2P_THIS_DEVICE_CHANGED_ACTION
+2） 创建WifiP2pManager，调用initialize()会返回WifiP2pManager.Channel对象
+
+*初始化端点查找
+mManager.discoverPeers(mChannel, new WifiP2pManager.ActionListener()
+
+*获取端点列表
+1）实现WifiP2pManager.PeerListListener。获取peer list
+2）在广播的onReceive方法收到WIFI_P2P_PEERS_CHANGED_ACTION广播调用requestPeers()。
+mManager.requestPeers(mChannel, peerListListener);
+
+*连接到端点
+1）调用 mManager.connect(mChannel, config,  ActionListener）
+创建 WifiP2pConfig ，从WifiP2pDevice获取所需的信息。ActionListener只是通知初始化是否成功。
+2）获得连接是否成功。实现WifiP2pManager.ConnectionInfoListener，它的方法onConnectionInfoAvailable() 会在
+连接状态改变时通知你。
+    在广播onReceive() 收到WIFI_P2P_CONNECTION_CHANGED_ACTION消息调用 requestConnectionInfo()。这里传入
+ConnectionInfoListener
+
+
+=================================
+通过p2p查找附近服务：
+
+
+

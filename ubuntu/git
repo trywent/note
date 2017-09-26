@@ -1,0 +1,251 @@
+//
+git4种协议：本地(/path/to/dir/)，ssh，Git，HTTP
+服务器端：
+$ cd /srv/git
+$ mkdir project.git
+$ cd project.git
+$ git init --bare //--bare 无工作目录
+Initialized empty Git repository in /srv/git/project.git/
+
+
+用户端：
+# on John's computer
+$ cd myproject
+$ git init
+$ git add .
+$ git commit -m 'initial commit'
+$ git remote add origin git@gitserver:/srv/git/project.git
+$ git push origin master
+
+_________________________
+git clone git@192.168.1.126:/fytfile/mstarkernel   pw:git
+git clone bsp@192.168.1.126:/home/bsp/mstar/jb.git   pw:bsp
+git clone bsp@192.168.1.126:/home/bsp/mstar/jb.git   pw:bsp
+git clone git@192.168.1.126:fytfile/newjb 
+
+git config --global user.name "Your Name"
+git config --global user.email you@example.com
+
+git remote set-url origin git_wb@192.168.1.95:/volume2/git/rockchip/rkpx3/android
+
+rotate:
+bsp@192.168.1.126:/gitrep/jb2s
+____________________________________
+bsp@192.168.1.126:/gitrep/rep/rkpx3
+
+git push  <REMOTENAME> <BRANCHNAME> :
+git push bsp@192.168.1.126:/gitrep/rk3188 master
+
+start time 2：56
+
+三种状态：
+committed，modified，staged
+_____________________
+获得git仓库：
+-自己新建
+git init          //初始化
+git add filename  //加入文件 ,添加所有文件(add .)
+git commit -m “”
+
+git remote add origin xxx@example.com:2227/git //加入远程仓库
+git push origin master//提交到远程
+
+-拷贝已有的仓库
+git clone git:地址  mProject
+
+---------------------
+文件管理：
+git status            //文件状态
+git add <file>          //跟踪新文件
+git add <modifiedfile>  //暂存文件
+git diff              //查看未暂存的被修改文件
+git diff --cached     //查看已暂存的被修改文件
+git diff --name-only  //只查看名字
+git diff hash1 hash1 --stat  //查看两个提交间的差异
+git commit            //提交文件  可以加-m “说明” 。加 -a 跳过暂存直接提交
+
+git rm   <file>            //移除文件，
+git rm --cached  <file>    //只从仓库中移除文件，不跟踪。不删除文件     
+
+git mv  <filesrc>  <filedst> //移动文件
+
+git log               //查看提交历史
+git log -p  -num      //-p查看提交的差异，-num查看最近几次的差异
+git log --pretty=oneline  file  //列出文件的修改
+git log --stat         //列出修改的文件名
+git log -p filename   //内容
+git log --all --grep="xxx" //查看修改的标记
+
+撤销修改：
+git reset --hard commit_id //撤销提交
+git commit --amend    //修改最后一次的提交，(前面的提交，不需要再取出来)
+git reset HEAD <file>  //取消对文件的暂存
+git checkout -- <file> //撤销对文件的修改(返回到原来的版本)
+git reset xxxxxxxxxxx <file> //恢复到特定版本
+git checkout xxxhashnum  file
+
+//合并冲突
+git checkout --ours   //保留本地的
+git checkout --theirs //保留远程的
+______________________________
+远程仓库：
+git remote     //查看远程仓库名
+git remote -v  //查看远程仓库名子，地址
+
+git remote add [shortname] [url] //添加远程仓库
+
+git fetch [remote-name]  //从远程仓库获取本地没有的数据(更新)
+
+git push [remote-name] [branch-name] //推送数据到远程仓库
+
+git remote show [remote-name] //查看远程仓库信息
+
+git remote rename <name> <toname>  //重命名
+
+git remote rm <file> //删除仓库
+
+git ls-remote --heads <remote-name>  //列出远程分支
+
+git branch -r  //列出远程分支
+
+获取分支：
+git checkout --track  origin/branch_name
+
+git checkout -b test origin/test
+
+获取所有：
+git fetch origin
+_____________________________
+分支：
+git branch testing           //创建分支
+git checkout testing         //切换分支
+git checkout --track origin/barnch
+
+git branch -d xxx            //删除local分支
+git push origin --delete <branch_name>  //删除remote分支
+
+git branch -a                //列出所有分支
+
+master是空时，没有代码取出。可以切换到其他分支
+
+
+______________________________
+标签：(可以定位，某一时间的代码版本。管理多次修改的代码)
+git tag              //列出标签
+git tag -l "pattern" //列出指定(pattern)的标签
+
+git tag -a v1.4 -m 'my version 1.4' //打包含附注的标签
+git tag v1.4-lw           //打轻量级标签
+
+git show <tag>          //列出指定标签的版本信息
+
+______________________________
+git pull         //获取
+
+'git push' [--all | --mirror | --tags] [--follow-tags] [-n | --dry-run] [--receive-pack=<git-receive-pack>]
+	   [--repo=<repository>] [-f | --force] [--prune] [-v | --verbose]
+	   [-u | --set-upstream] [--signed]
+	   [--force-with-lease[=<refname>[:<expect>]]]
+	   [--no-verify] [<repository> [<refspec>...]]
+
+git push <远程仓库，>   +源分支：目标分支
+
+
+强制获取远端仓库版本：
+git fetch --all
+git reset --hard origin/master
+
+
+git pull --all  //更新所有分支
+______________________________
+合并：
+How I would do this
+
+git checkout master
+git pull origin master
+git merge test
+git push origin master
+
+合并部分文件：
+git checkout B_branch
+git checkout A_branch files
+git add files
+______________________________
+git补丁：
+git diff > xx.patch
+
+git apply xx.patch
+
+git apply --whiteSpace=fix xx.patch
+
+______________________________
+mstar代码
+119.145.230.212 
+用户名：mstarsz 密码：mstaroffice
+
+==============================
+创建：
+
+
+修改remote的地址：
+git remote set-url origin git://new.url.here
+
+==============================
+git多个远程仓库：
+This something I’ve been using for quite a while without bad consequences and suggested by Linus Torvalds on the git mailing list.
+
+araqnid’s solution is the proper one for bringing code into your repository… but when you, like me, have multiple equivalent authoritative upstreams (I keep some of my more critical projects cloned to both a private upstream, GitHub, and Codaset), it can be a pain to push changes to each one, every day.
+
+Long story short, git remote add all of your remotes individually… and then git config -e and add a merged‐remote. Assuming you have this repository config:
+
+[remote "GitHub"]
+    url = git@github.com:elliottcable/Paws.o.git
+    fetch = +refs/heads/*:refs/remotes/GitHub/*
+[branch "Master"]
+    remote = GitHub
+    merge = refs/heads/Master
+[remote "Codaset"]
+    url = git@codaset.com:elliottcable/paws-o.git
+    fetch = +refs/heads/*:refs/remotes/Codaset/*
+[remote "Paws"]
+    url = git@github.com:Paws/Paws.o.git
+    fetch = +refs/heads/*:refs/remotes/Paws/*
+… to create a merged‐remote for "Paws" and "Codaset", I can add the following after all of those:
+
+[remote "Origin"]
+    url = git@github.com:Paws/Paws.o.git
+    url = git@codaset.com:elliottcable/paws-o.git
+Once I’ve done this, when I git push Origin Master, it will push to both Paws/Master and Codaset/Master sequentially, making life a little easier.
+
+
+=====================
+
+git remote add origin bsp@192.168.1.126:/gitrep/rep/rkpx3
+
+
+*（no branch）时解决方法：
+1：git checkout -b 分支名；此时新创建的分支与*（no branch）软件一样
+2:合并分支
+# if you have already checked out to master,
+
+# you won't know the commit-ish of your "no branch":
+
+git fsck --lost-found # (to find your <commit-ish>)
+
+git merge <commit-ish>
+
+# if you are still on your "no branch" commit:
+
+git log # (the commit-ish will be on the first line)
+
+git checkout master
+
+git merge <commit-ish># or
+
+git log | head -n 1 | cut -d ' ' -f 2 | pbcopy
+
+git checkout master
+
+git merge <commit-ish>
+
+======================

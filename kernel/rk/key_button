@@ -1,0 +1,23 @@
+
+rk29_keys_pdata@board-rkpx3-sdk.c
+
+设备：
+rk30_init_devices-->platform_device_register(&device_keys)@mach-rk30/devices.c
+
+驱动：
+keys_init-->platform_driver_register(&keys_device_driver)
+
+keys_probe{
+- 获取平台数据dev_get_platdata(dev)
+- 
+- 遍历所有buttons，设置gpio{
+	- gpio_request
+	- 设置输入gpio_direction_input
+	}
+}
+
+suspend：
+keys_suspend-->(若是powerkey，使能唤醒)enable_irq_wake@rk29_keys.c
+
+
+kernel/drivers/input/keyboard/rk29_keys.c

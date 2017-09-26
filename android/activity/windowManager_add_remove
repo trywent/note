@@ -1,0 +1,137 @@
+mWindows //Z轴上排序的窗口，序号为0的项为最底层
+
+应用等加入窗口：
+addWindow{
+- 若是子窗口，获取关联窗口attachedWindow = windowForClientLocked
+- 从mTokenMap获取token没有获取到,则根据attr.token创建一个WindowToken，加入到容器。
+  若token已经加入，判断加入类型是否合法。
+- 创建新窗口，new WindowState。
+- 需要输入，设置输入通道win.setInputChannel
+- 加入窗口{
+	- TYPE_INPUT_METHOD,addInputMethodWindowToListLocked
+	- TYPE_INPUT_METHOD_DIALOG，addWindowToListInOrderLocked,调整窗口adjustInputMethodDialogsLocked
+	- 其他类型，addWindowToListInOrderLocked
+	}
+- 更新焦点窗口，updateFocusedWindowLocked
+- 设置窗口的inset，mPolicy.getContentInsetHintLw
+- 设置层次值，assignLayersLocked
+- 更新输入接收窗口，mInputMonitor.updateInputWindowsLw
+- 是否更新配置，sendNewConfiguration
+}@WindowManagerService.java
+
+
+
+输入法窗口：
+addInputMethodWindowToListLocked{
+- findDesiredInputMethodWindowIndexLocked(true)
+- 若查找到{
+	- 加入mWindows.add
+	- 移动moveInputMethodDialogsLocked
+	}
+- 没有找到{
+	- addWindowToListInOrderLocked
+	- 移动输入法窗口，moveInputMethodDialogsLocked
+	}
+}
+
+
+按顺序加入窗口：
+addWindowToListInOrderLocked{
+-没有关联到其他窗口{
+	-是应用窗口{
+		-应用有其他窗口{
+			将新窗口加入到最上层，但必须在应用的开始窗口startingWindow之下
+		}
+		-应用没有其他窗口{
+			查找mAnimatingAppTokens(和mAppTokens一致的容器，是AppWindowToken的排序后的容器)中
+			该windowState对应的应用标记AppWindowToken的位置，将windowState加入到该位置之前窗口
+			之后。若该位置之前没有窗口，则继续查找该位置之后窗口将windowState加入到找到的窗口之前
+			。若没有找到任何窗口，则根据windowState.mBaseLayer值将窗口直接加入到mWindows
+		}
+	}
+	-不是应用窗口{
+		根据层次值mBaseLayer将窗口直接加入到mWindows
+	}
+
+}
+-关联到其他窗口{
+	根据子层次mSubLayer值加入到相应的位置。遍历该窗口所在的WindowToken中所有窗口，
+	若WindowState的mSubLayer为负数，则将窗口放到相同层次窗口之下。若为正数，则放到
+	相同层次窗口之上。若没有窗口比windowState的层次高，则将窗口
+	}
+}
+
+placeWindowAfter(加到某项之后)-->mWindows.add
+placeWindowBefore(加到某项之前)-->mWindows.add
+_______________________________
+输入法窗口：
+
+//查找输入法的目标窗口的位置
+findDesiredInputMethodWindowIndexLocked(true){
+- 遍历mWindows中所有窗口找到第一个canBeImeTarget窗口。若目标窗口是开始窗口，则目标窗口为开始窗口之下
+- 若前个目标窗口在退出动画，且比现在的目标窗口位置高。则保持目标窗口为前个目标窗口
+- 等待动画？？？
+- 找到目标窗口并移动，调整输入法层次setInputMethodAnimLayerAdjustment
+- 没有找到窗口并移动，调整曾为setInputMethodAnimLayerAdjustment(0) 
+}
+_______________________________
+重新加入窗口：
+reAddWindowLocked(将窗口和窗口的子窗口加入到指定位置){
+- 将窗口win，和它的子窗口加入到mWindows，子窗口中mSubLayer小于0的窗口放在win窗口之下，大于0放在win之上
+- 设置标识mWindowsChanged = true
+
+}
+
+重加入应用窗口：
+reAddAppWindowsLocked(int index, WindowToken token){
+- 循环加入token中窗口，reAddWindowLocked(将窗口和窗口的子窗口加入到指定位置){
+	- 将窗口win，和它的子窗口加入到mWindows，子窗口中mSubLayer小于0的窗口放在win窗口之下，
+	   大于0放在win之上
+	- 设置标识mWindowsChanged = true
+	}
+}
+
+___________________________________
+移除窗口：
+stepAnimationLocked-->finishExit-->mService.mPendingRemove.add@WdinowStateAnimator.java
+
+//从容器mWindows中移除一个窗口，并调整返回传入的位置(若传入的位置在要移除的个体之上，则该位置减一)
+tmpRemoveWindowLocked(int interestingPos, WindowState win)@WindowManagerService.java
+
+
+
+
+
+===========================
+加入应用标记：
+startActivityLocked-->mService.mWindowManager.addAppToken(r.appToken=new Token(this))@ActivityStack.java
+-->addAppToken(判断是否已经加入)-->new AppWindowToken(创建)--(加入到mAppTokens，mTokenMap，加入动画)
+addAppTokenToAnimating@WindowManagerService.java
+
+移除应用标记：
+destroyActivityLocked-->
+handleDestroyActivity-->ActivityManagerNative.getDefault().activityDestroyed@ActivityThread.java-->
+activityDestroyed-->removeActivityFromHistoryLocked
+
+removeActivityFromHistoryLocked{
+- 
+- mService.mWindowManager.removeAppToken
+}@ActivityStack.java
+
+移动apptoken：
+moveAppTokensToBottom{
+- 根据Token，从mAppTokens中移除AppWindowToken。removeAppTokensLocked
+- 将移除的AppWindowToken从0位置开始重新加入。mAppTokens.add
+- 移动AppWindowToken对应的窗口到mWindows底部,。moveAppWindowsLocked
+}
+
+moveAppTokensToTop{
+- 根据Token，从mAppTokens中移除AppWindowToken。removeAppTokensLocked
+- 将移除的AppWindowToken从0位置开始重新加入。mAppTokens.add
+- 移动窗口到mWindows顶部，moveAppWindowsLocked
+-
+}
+
+ActivityStack移动应用标记：
+moveTaskToFrontLocked-->mService.mWindowManager.moveAppTokensToTop@ActivityStack.java
+moveTaskToBackLocked-->mService.mWindowManager.moveAppTokensToBottom@ActivityStack.javas

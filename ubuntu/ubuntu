@@ -1,0 +1,42 @@
+//
+gedit /etc/passwd
+gedit  /etc/shadow
+
+//查看用户
+cat /etc/passwd
+
+more /etc/passwd
+
+//增加用户
+sudo adduser username
+
+sudo adduser username sudo //设置超级用户权限
+
+//======================
+//install downgrade
+apt-cache showpkg packagename
+
+sudo apt-get install packagename=version
+
+sudo echo “package hold” | sudo dpkg –set-selections //no update
+
+
+//
+sudo apt-get install <package-name>=<package-version-number> OR
+
+sudo apt-get -t=<target release> install <package-name>
+
+apt-cache showpkg <package-name> //lists all available version
+apt-mark hold <package-name>
+
+update-alternatives --config package
+
+
+//install deb
+dpkg -i package-name-here.deb
+dpkg --install package-name-here.deb
+dpkg -i -R /path/to/dir/name/with/lots/of/dot-deb-files/
+dpkg -i --recursive /path/to/dir/name/with/lots/of/dot-deb-files/
+
+//磁盘uuid
+ ls -l /dev/disk/by-uuid

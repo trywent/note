@@ -1,0 +1,273 @@
+make oldconfig 根据已经存在的.config文件配置内核(就是在原来的配置基础上)
+
+It reads the existing .config file and prompts the user for options in the current kernel source that are not found in the file. This is useful when taking an existing configuration and moving it to a new kernel.
+
+=======================================================================
+kconfig语言
+每项都有自己的依赖关系，依赖关系决定某项是否可见。只有父项可见时，子项才可见
+_______________________________________________________________________
+配置项
+
+大部分项都是配置项，其他项用来组织它们。一个配置选项如下：
+config MODVERSIONS
+	bool "Set version information on all module symbols"
+	depends on MODULES
+	help
+	  Usually, modules have to be recompiled whenever you switch to a new
+	  kernel.  ...
+
+
+配置项属性
+---------------
+
+- 类型type definition: "bool"/"tristate"/"string"/"hex"/"int"
+  Every config option must have a type. There are only two basic types:
+  基本类型（tristate and string）其他类型都是以它们为基础
+  类型可以后接一个提示信息如：
+
+	bool "Networking support"
+  and
+	bool
+	prompt "Networking support"
+
+- 输入提示input prompt: "prompt" <prompt> ["if" <expr>]
+ 
+
+- 默认值default value: "default" <expr> ["if" <expr>]
+  
+
+- 类型定义type definition + default value:
+	"def_bool"/"def_tristate" <expr> ["if" <expr>]
+  
+
+- 依赖dependencies: "depends on" <expr>
+    多个依赖用&&连接。以下两个例子相同：
+	bool "foo" if BAR
+	default y if BAR
+  and
+	depends on BAR
+	bool "foo"
+	default y
+
+- 反依赖（不是依赖别人，而是其他必须被选择）reverse dependencies: "select" <symbol> ["if" <expr>]
+  强制某个菜单项是选择的（使能）
+  反依赖只能使用 boolean 或者 tristate
+  Note:
+	select会不顾依赖关系，强制赋值。通常只在不可见符号上使用
+	
+
+- 菜单显示可选limiting menu display: "visible if" <expr>
+  只在菜单语句块中有效。默认显示该项
+
+- 大小范围numerical ranges: "range" <symbol> <symbol> ["if" <expr>]
+	限制int和hex输入值
+
+- 帮助help text: "help" or "---help---"
+  
+
+- 杂选项misc options: "option" <symbol>[=<value>]
+  非主流配置
+
+依赖
+-----------------
+
+依赖表达式语法:
+
+<expr> ::= <symbol>                             (1)
+           <symbol> '=' <symbol>                (2)
+           <symbol> '!=' <symbol>               (3)
+           '(' <expr> ')'                       (4)
+           '!' <expr>                           (5)
+           <expr> '&&' <expr>                   (6)
+           <expr> '||' <expr>                   (7)
+
+Expressions are listed in decreasing order of precedence. 
+
+(1) Convert the symbol into an expression. Boolean and tristate symbols
+    are simply converted into the respective expression values. All
+    other symbol types result in 'n'.
+(2) If the values of both symbols are equal, it returns 'y',
+    otherwise 'n'.
+(3) If the values of both symbols are equal, it returns 'n',
+    otherwise 'y'.
+(4) Returns the value of the expression. Used to override precedence.
+(5) Returns the result of (2-/expr/).
+(6) Returns the result of min(/expr/, /expr/).
+(7) Returns the result of max(/expr/, /expr/).
+
+表达式的值可为'n', 'm' or 'y' (or 0, 1, 2). 菜单项只在表达式值为 'm' 或 'y'时可见
+
+
+结构
+--------------
+目录项的位置有两种方法决定，第一种明确定义：
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	...
+
+endmenu
+
+所有的项在 "menu" ... "endmenu" 中成为"Network device support"子目录项.
+
+第二种通过分析依赖关系：
+config MODULES
+	bool "Enable loadable module support"
+
+config MODVERSIONS
+	bool "Set version information on all module symbols"
+	depends on MODULES
+
+comment "module support disabled"
+	depends on !MODULES
+
+MODVERSIONS 直接依赖 MODULES, 它只有在MODULES不为'n'时才可见. The comment on the other hand is always
+visible when MODULES is visible (the (empty) dependency of MODULES is
+also part of the comment dependencies).
+
+
+Kconfig 语法
+--------------
+配置文件描述了一系列的配置项。每一行都以关键字开始。以下是定义配置项的关键字：
+- config
+- menuconfig
+- choice/endchoice
+- comment
+- menu/endmenu
+- if/endif
+- source
+前五个同样也是开始定义一个菜单项的关键字
+The first five also start the definition of a menu entry.
+
+config:
+
+	"config" <symbol>
+	<config options>
+
+This defines a config symbol <symbol> and accepts any of above
+attributes as options.
+
+menuconfig:
+	"menuconfig" <symbol>
+	<config options>
+
+This is similar to the simple config entry above, but it also gives a
+hint to front ends, that all suboptions should be displayed as a
+separate list of options.所有的子选项在另一个列表中显示
+
+choices:
+
+	"choice" [symbol]
+	<choice options>
+	<choice block>
+	"endchoice"
+
+可包含以上说明的所有属性.choice只能是bool或trisate类型 
+
+
+comment:
+
+	"comment" <prompt>
+	<comment options>
+
+This defines a comment which is displayed to the user during the
+configuration process and is also echoed to the output files. The only
+possible options are dependencies.
+
+menu:
+
+	"menu" <prompt>
+	<menu options>
+	<menu block>
+	"endmenu"
+
+This defines a menu block, see "Menu structure" above for more
+information. The only possible options are dependencies and "visible"
+attributes.
+
+if:
+
+	"if" <expr>
+	<if block>
+	"endif"
+
+This defines an if block. The dependency expression <expr> is appended
+to all enclosed menu entries.
+
+source:
+
+	"source" <prompt>
+
+This reads the specified configuration file. This file is always parsed.
+
+mainmenu:
+
+	"mainmenu" <prompt>
+
+This sets the config program's title bar if the config program chooses
+to use it. It should be placed at the top of the configuration, before any
+other statement.
+
+
+Kconfig hints
+-------------
+
+Adding common features and make the usage configurable
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+实现功能与架构相关时的习惯
+
+An example is the generic IOMAP functionality.
+
+We would in lib/Kconfig see:
+
+# Generic IOMAP is used to ...
+config HAVE_GENERIC_IOMAP
+
+config GENERIC_IOMAP
+	depends on HAVE_GENERIC_IOMAP && FOO
+
+And in lib/Makefile we would see:
+obj-$(CONFIG_GENERIC_IOMAP) += iomap.o
+
+For each architecture using the generic IOMAP functionality we would see:
+
+config X86
+	select ...
+	select HAVE_GENERIC_IOMAP
+	select ...
+
+
+
+Build as module only
+~~~~~~~~~~~~~~~~~~~~
+To restrict a component build to module-only, qualify its config symbol
+with "depends on m".  E.g.:
+
+config FOO
+	depends on BAR && m
+
+limits FOO to module (=m) or disabled (=n).
+
+Kconfig symbol existence
+~~~~~~~~~~~~~~~~~~~~~~~~
+符号会不会显示在配置文件中
+
+case 1:
+
+config FOO
+	tristate "about foo"
+	depends on BAR
+
+vs. case 2:
+
+if BAR
+config FOO
+	tristate "about foo"
+endif
+
+In case 1, the symbol FOO will always exist in the config file (given
+no other dependencies).  In case 2, the symbol FOO will only exist in
+the config file if BAR is enabled.
+

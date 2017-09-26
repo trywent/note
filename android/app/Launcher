@@ -1,0 +1,175 @@
+=============================================
+开始launcher:
+ActivityManagerService.self().systemReady@SystemServer.java-->systemReady-->
+mMainStack.resumeTopActivityLocked@ActivityManagerService.java-->resumeTopActivityLocked-->
+resumeTopActivityLocked(null,null)没有其他的activity，所以启动launcher-->
+mService.startHomeActivityLocked@ActivityStack.java-->
+startHomeActivityLocked@ActivityManagerService.java-->mMainStack.startActivityLocked(都是从
+ActivityStack开始)-->startActivityLocked(IApplicationThread,
+            Intent, String, ActivityInfo, IBinder, String, int,
+            int, int, int, Bundle, boolean, ActivityRecord[])-->startActivityUncheckedLocked-->
+startActivityLocked(r, newTask, doResume, keepCurTransition, options)-->
+
+重复了...resumeTopActivityLocked(ActivityRecord)--> resumeTopActivityLocked(ActivityRecord, Bundle)
+@ActivityStack.java-->setAppStartingWindow@WindowManagerService.java
+
+============================================
+启动launcher的intent：
+Intent.ACTION_MAIN;
+Intent.CATEGORY_HOME;
+com.android.launcher2.Launcher(category.HOME对应的Activity)
+
+onCreate@Launcher.java
+
+
+LoaderTask.run-->loadAndBindWorkspace-->loadWorkspace@LauncherModel.java
+
+packages/apps/Launcher2/src/com/android/launcher2/Launcher.java
+=============================================
+处理启动图标：
+processShortcut-->(选择能够接收CATEGORY_LAUNCHER的activity)startActivityForResult-->
+
+onReceive(接收app变化信息)-->enqueuePackageUpdated--sWorker.post(runable)-->
+PackageUpdatedTask.run(加入新app)@LauncherModel.java-->addPackage-->findActivitiesForPackage
+(查找能够Launcer的activity)--add
+_____________________________________________
+应用图片初始化(与ApplicationInfo一起初始化)：
+
+总流程：通过queryIntentActivities@PackageManager.java查询应用信息,再通过应用信息获取图片资源。
+
+onCreate-->mModel.startLoader@Launcher.java-->
+startLoader-->sWorker.post(mLoaderTask)@LauncherModel.java(handler运行runnable)-->
+run-->loadAndBindAllApps-->loadAllAppsByBatch(查询所有的LAUNCHER的app)@LoaderTask@LauncherModel.java
+-->mAllAppsList.add(new ApplicationInfo(packageManager, apps.get(i), mIconCache, mLabelCache))
+-->ApplicationInfo@ApplicationInfo.java(构造函数中获取app信息包括Icon，tittle)--getTitleAndIcon
+@IconCache.java-->cacheLocked(获取缓存的icon。如果没有则根据传入的info生成icon放入缓存中(HashMap))
+-->Utilities.createIconBitmap@@IconCahe.java-->getFullResIcon-->getFullResIcon(resources, iconId) [getFullResDefaultActivityIcon(获取默认图片，机器人)]@IconCache.java--> getDrawableForDensity-->
+loadDrawable@Resource.java
+
+获取图标：
+getDrawableForDensity@Resource.java-->getValueForDensity-->getResourceValue@AssetManager.java-->
+loadResourceValue@android_uitl_AssetManager.cpp-->android_content_AssetManager_loadResourceValue-->
+
+createIconBitmap@Utilities.java会将图片设置合适大小
+
+—————————————————————————————————————————————
+使用获取的图标：
+createShortcut@Launcher.java-->applyFromShortcutInfo@BubbleTextView.java-->getIcon
+-->updateIcon@ShortcutInfo.java
+
+获取想要的大图片：
+getFullResIcon@IconCache.java
+resources.getDrawableForDensity(iconId, 240，360图片);
+---修改最小的canvas(画图所用),修改app_icon_size
+createIconBitmap@Utilies.java
+sIconWidth = sIconHeight = (int) resources.getDimension(R.dimen.app_icon_size)
+
+
+loadIcon@PackageItemIfo.java-->getDrawable(PackageManger.java在comtextimpl中。
+这里获取appinfo，其中有资源路径信息)-->getResourcesForApplication(appinfo)
+@contextImpl.java-->getTopLevelResources@ActivityThread.java-->
+
+
+getApplicationInfo@ContextImpl.ApplicationPackageManager.java-->mPM.getApplicationInfo
+@PackageManagerService.java-->
+
+=============================================
+视图layout：
+dragLayer{
+	workspace extends SmoothPagedView{//所有的桌面
+			CellLayout{}//桌面中的一页
+	}
+}
+
+
+addResizeFrame.run-->dragLayer.addResizeFrame@Workspace.java-->addResizeFrame(创建对象AppWidgetResizeFrame)-->mResizeFrames.add@DragLayer.java
+
+onTouchEvent(滑动)-->pageBeginMoving-->onPageBeginMoving@PagedView.java
+
+drag操作：
+onLongClick(长按事件开始拖拽)-->mWorkspace.startDrag@Launcher.java-->startDrag-->beginDragShared-->mDragController.startDrag@Workspace.java-->startDrag-->startDrag@DragController.java
+_____________________________________________
+事件处理：DragLayer-->DragController-->Workspace
+
+处理ACTION_DOWN:
+onInterceptTouchEvent(判断是否拦截事件)-->handleTouchDown(处理应用文件夹)-->onTouchEvent@DragLayer.java
+
+处理其他动作：
+onInterceptTouchEvent(判断是否拦截事件)-->mDragController.onInterceptTouchEvent@DragLayer.java-->
+onInterceptTouchEvent(只拦截拖拽事件)@DragController.java-->onTouchEvent@DragLayer.java-->onTouchEvent
+-->handleMoveEvent@DragController.java
+
+pageView处理事件(处理滚动事件)：Workspace
+onInterceptTouchEvent-->super.onInterceptTouchEvent@Workspace.java-->onInterceptTouchEvent
+(判断是否拦截事件)-->(拦截事件)onTouchEvent-->(ACTION_MOVE)scrollBy-->scrollTo@PagedView.java
+
+onInterceptTouchEvent-->mInterceptTouchListener.onTouch@CellLayout.java-->onTouch
+(返回true，则所有的后续MontionEent被ViewGroup(CellLayout)处理)@Workspace.java
+
+---------------------------------------------
+事件分发(若拦截则在当前onTouchEvent处理，否则将事件传到目标View)：
+dispatchTouchEvent-->onInterceptTouchEvent(判断是否拦截事件)-->(拦截事件)
+dispatchTransformedTouchEvent(ev, canceled, null,TouchTarget.ALL_POINTER_IDS)@ViewGroup.java
+-->(子View为空，事件在当前View中处理)dispatchTouchEvent-->onTouchEvent@View.java
+
+packages/apps/Launcher2/src/com/android/launcher2/CellLayout.java
+packages/apps/Launcher2/src/com/android/launcher2/Workspace.java
+packages/apps/Launcher2/src/com/android/launcher2/DragController.java
+packages/apps/Launcher2/src/com/android/launcher2/DragLayer.java
+packages/apps/Launcher2/src/com/android/launcher2/PagedView.java
+packages/apps/Launcher2/src/com/android/launcher2/LauncherModel.java
+
+____________________________________________
+第一次使用：
+first_run_cling_title
+
+src/com/android/launcher3/LauncherClings.java
+=============================================
+packageManager管理包信息:
+packageInfo ,applicationInfo ,activityInfo ,serviceInfo 获取的实现在PackageManagerService.java
+getPackageInfo@PackageManagerService.java-->generatePackageInfo@PackageManagerService.java-->generatePackageInfo@PackageParser.java
+
+IconCache的保存hashmap结构中HashMap<ComponentName, CacheEntry> mCache
+private static class CacheEntry {
+        public Bitmap icon;
+        public String title;
+        public Bitmap titleBitmap;
+    }
+
+PackageManager在comtextimpl中初始化为ApplicationPackageManager(context也是)
+
+jb/frameworks/base/core/java/android/app/ApplicationPackageManager.java
+jb/frameworks/base/core/java/android/app/ContextImpl.java
+jb/frameworks/base/core/java/android/content/pm/PackageManager.java
+
+
+AssetManager：提供原始未处理的资源(提供API读取原始文件的数据流)
+resource：处于Assrt的上层(可以通过getAsset获取Asset)。SDK工具将应用资源编译到应用的二进制文件中。
+context返回的Asset是根据调用resource的方法返回。而返回的resource是自己的成员，resource初始化在init函数中。resource最终获取的还是在
+getTopLevelResources@ActivityThread.java中。
+
+createPackageContext@contextImpl.java-->init@contextImpl.java
+
+HashMap<ResourcesKey, WeakReference<Resources> > mActiveResources@ActivityThread.java保存资源
+
+weakreference初始化一个weakreference关联一个对象，当对象被GC清除后。weakreference.get()就为空。如果不为空则可直接使用对象，不用再生成。
+
+addPackage@AllApplist.java-->findActivitiesForPackage@AllApplist.java-->queryIntentActivities@ContextImpl.ApplicationPackageManager.java
+(PackageManager)-->queryIntentActivities@PackageManagerService.java
+
+packageManagerService中有ActivityIntentResolver，ServiceIntentResolver。extends IntentResolver
+
+
+mIconDpi
+E/iconCache( 1437): ---->>>>>>>>>>>>160
+
+变换用户(多用户设置)：
+switchUser@ActivityManagerService.java
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+
+
+
+================================
+设置壁纸：
+setup-->setWallpaperDimension-->mWallpaperManager.suggestDesiredDimensions@Workspace.java

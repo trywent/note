@@ -1,0 +1,84 @@
+surface: 代表一个被屏幕合成器操作的原始数据
+_________________________
+SurfaceHolder:
+用来显示surface的抽象接口。允许控制surface的大小，格式，编辑surface中像素，监控surface的改变。
+该接口通常通过SurfaceView调用。
+_________________________
+SurfaceTexture:用来作为surface构造方法的参数
+获取图像流中的帧(OpenGL ES 中texture)
+
+图像流可以来自相机预览或视频解码。SurfaceTexture可使用在一个SurfaceHolder中，来定义
+Camera和MediaPlayer的输出目标。这样会使图像流被传到SurfaceTexture而不是设备的显示器上。
+当调用updateTexImage()方法，SurfaceTexture中textrure的内容会被更新为从图像流获取的最新
+数据。可能导致帧遗失。
+
+
+当从texture中取样时，应通过getTransformMatrix(float[])获得矩阵，再通过矩阵转换texture的坐标。
+在updateTexImage()被调用是转换矩阵可能会改变，所以有时需重新查询。矩阵将2D OpenGlES中texture
+坐标向量(s, t, 0, 1)(s和t的取值范围[0,1])转换成texture流中合适的取样位置。
+
+
+texture对象使用由GL_OES_EGL_image_external OpenGL ES扩展定义的GL_TEXTURE_EXTERNAL_OES 纹理目标。
+这限制了纹理如何被使用，每次绑定纹理时都要绑定到GL_TEXTURE_EXTERNAL_OES，而不是GL_TEXTURE_2D
+
+SurfaceTexture 对象可在任意的线程中创建。updateTexImage()只能在包含该texture线程中调用。
+__________________________
+SurfaceView:
+提供一个嵌入到view结构中的surface。可以控制surface的格式，大小。SurfaceView控制surface在屏幕上
+的位置。
+
+surface是在Z方位排序的，所以它位于包含它的SurfaceView的窗口的后面。SurfaceView使窗口有个洞使
+surface显示出来。View结构组织surface和在SurfaceView上层的其他视图，使surface能够正确显示。
+这样就能够放置按钮在Surface上了，当然这样会有效率问题，当surface改变时在它之上的组件会重新渲染。
+
+
+使surface显示出来的透明区域，是根据view结构中的布局计算出来的。在SurfaceView上的其他视图
+的布局属性，可能会使surface不能很好的显示。
+操作底层的surface通过SurfaceHolder接口，调用getHolder()获取该接口。
+
+Surface在SurfaceView的窗口可视时被创建。可以实现surfaceCreated(SurfaceHolder) 和
+surfaceDestroyed(SurfaceHolder)来判断窗口销毁创建时，Surface所处的状态。
+
+这个类的另一目的是提供一个surface，从其他线程可以渲染该surface：
+
+    所有SurfaceView和SurfaceHolder.Callback 方法都必须在运行SurfaceView的窗口的线程
+(通常是程序主线程)中调用.
+操作底层Surface必须在它的有效期间，在SurfaceHolder.Callback.surfaceCreated()和
+SurfaceHolder.Callback.surfaceDestroyed()之间
+===============================
+openTransaction@Surface.java-->Surface_openTransaction-->SurfaceComposerClient::openGlobalTransaction
+@android_view_Surface.cpp
+
+
+
+
+frameworks/base/core/java/android/view/Surface.java
+frameworks/base/core/jni/android_view_Surface.cpp
+
+================================
+//通过SurfaceHolder来操作Surface
+
+SurfaceView{
+ getHolder()//获取 SurfaceHolder 
+}
+
+SurfaceHolder{
+/*操作surface*/
+SurfaceHolder.addCallback() //加入回调函数
+}
+
+
+SurfaceHolder.Callback{
+/*surface 变化的回调函数*/
+surfaceChanged(SurfaceHolder holder, int format, int width, int height)
+surfaceCreated(SurfaceHolder holder)
+surfaceDestroyed(SurfaceHolder holder)
+}
+
+加入到窗口管理器(创建surface)：
+updateWindow{
+- 
+- 加入到窗口服务，mSession.addToDisplayWithoutInputChannel
+- mSession.relayout(mNewSurface)-->relayoutWindow-->winAnimator.createSurfaceLocked
+	@WindowManagerService.java
+}@SurfaceView.java

@@ -1,0 +1,65 @@
+//
+AudioRecord::getMinFrameCount{
+- AudioSystem::getInputBufferSize //获取失败
+}
+
+AudioSystem::getInputBufferSize-->af->getInputBufferSize-->AudioFlinger::getInputBufferSize{
+- 获取设备，mPrimaryHardwareDev->hwDevice
+- dev->get_input_buffer_size
+}
+
+frameworks/av/media/libmedia/AudioRecord.cpp
+frameworks/av/media/libmedia/AudioSystem.cpp
+frameworks/av/services/audioflinger/AudioFlinger.cpp
+
+============
+StagefrightRecorder::createAudioSource{
+- new AudioSource
+}
+
+AudioSource::AudioSource{
+- new AudioRecord
+}
+
+AudioRecord::AudioRecord-->set(audio_source_t inputSource,
+        uint32_t sampleRate,
+        audio_format_t format,
+        audio_channel_mask_t channelMask){
+- 
+- openRecord_l{
+	- AudioSystem::getInputForAttr(根据采样率等参数，创建属性)-->aps->getInputForAttr{//获取流
+		- config //设置config 采样率，格式，通道
+		- mInputs中查找可用的input，若找到直接返回（实现多应用同时录音）
+		- mpClientInterface->openInput(config)
+		-
+		}
+	- audioFlinger->openRecord(input,mSampleRate,mChannelMask,iMem,bufferMem){
+		- iMem  //cblk
+		- bufferMem //flinger端mBuffer地址
+		} //
+	- buffers //设置buffer地址
+	- new AudioRecordClientProxy(buffer) //创建proxy，用来读取数据	
+	}
+}@AudioRecord.cpp
+
+
+//read数据
+read@AudioRecord.java-->native_read_in_byte_array-->android_media_AudioRecord_readInArray
+lpRecorder->read@android_media_AudioRecord.cpp-->read{
+  //获取数据
+- obtainBuffer-->obtainBuffer-->proxy->obtainBuffer-->
+	obtainBuffer(判断是读取还是写入，将mBuffers返回)@AudioTrackShared.cpp
+- memcpy(buffer, audioBuffer.i8)//拷贝到用户buffer中
+}@AudioRecord.cpp
+
+
+
+frameworks/base/media/java/android/media/AudioRecord.java
+frameworks/base/core/jni/android_media_AudioRecord.cpp
+frameworks/av/media/libmedia/AudioRecord.cpp
+frameworks/av/media/libmedia/AudioTrackShared.cpp
+frameworks/av/media/libmedia/AudioSystem.cpp
+frameworks/av/media/libstagefright/AudioSource.cpp
+frameworks/av/media/libmediaplayerservice/StagefrightRecorder.cpp
+
+frameworks/native/libs/binder/IMemory.cpp

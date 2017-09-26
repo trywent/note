@@ -1,0 +1,21 @@
+default   : 12MB/s --- clock 
+high speed: 25MB/s --- clock 50 MHz
+
+
+命令类型：
+• Broadcast commands (bc), 广播命令没有回复。
+• Broadcast commands with response (bcr)，广播命令有回复(卡必须是单独连接)。
+• Addressed (point-to-point) commands (ac)，no data transfer on DAT
+• Addressed (point-to-point) data transfer commands (adtc)，data transfer on DAT
+
+
+
+命令格式
+Bit position    47          46              [45:40]        [39:8]    [7:1]    0
+Width(bits)     1           1                 6              32       7       1
+Value           ‘0’         ‘1’               x               x       x      ‘1’
+Description   start bit  transmission bit  command index  argument   CRC7   end bit
+
+SD 假定一个电压发送CMD0，
+然后在再送CMD8(包括电压参数)。如果回复了表示sd卡支持(Specification Version 2.00)
+发送ACMD41，参数包括VDD(OCR)(设置为零可进行查询sd卡支持的电压，不为零则是sd卡进行初始化)如果sd卡不支持进入inactive状态。返回sd卡OCR

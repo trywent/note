@@ -1,0 +1,18 @@
+//
+route_set_controls-->set_controls@alsa_route.c-->mixer_ctl_select@alsa_mixer.c
+
+
+===========
+snd_ctl_elem_write_user-->snd_ctl_elem_write
+rk616_snd_path_controls.rk616_playback_path_put{
+- rk616_codec_power_up
+- rk616_set_gpio
+}
+
+//kernel
+rk616_codec_set_spk
+
+
+
+
+sound/soc/codecs/rk616_codec.c

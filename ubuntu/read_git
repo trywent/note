@@ -1,0 +1,18 @@
+branch.<name>.remote：
+当在branch<name>上时，执行git fetch和git push操作时的远程目标仓库。
+push操作的目标远程仓库可被remote.pushdefault(所有的分支)，branch.<name>.pushremote(当前分支)覆盖。
+如果远程分支没有定义，或当前不在任何分支上则，orgin作为fetching操作的远程，remote.pushdefault作为
+pushing操作的远程。
+
+branch.<name>.pushremote：
+push操作的远程仓库
+
+branch.<name>.merge：
+和branch.<name>.remote一起使用。定义 git fetch/git pull/git rebase操作的远程分支，同时也会影响
+git push操作
+
+
+remote.<name>.url：
+远程仓库的路径
+
+

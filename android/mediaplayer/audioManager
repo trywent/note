@@ -1,0 +1,6 @@
+isMusicActive@AudioManager.java-->AudioSystem.isStreamActive(STREAM_MUSIC)-->
+isStreamActive@AudioSystem.java-->isStreamActive@AudioSystem.cpp-->
+aps->isStreamActive-->isStreamActive@AudioPolicyService.cpp-->mpAudioPolicy->is_stream_active
+-->ap_is_stream_active-->lap->apm->isStreamActive@audio_policy_hal.cpp-->
+isStreamActive
+

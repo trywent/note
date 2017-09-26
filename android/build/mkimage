@@ -1,0 +1,21 @@
+//创建rootfs
+mkbootfs dir/root | minigzip > dir/ramdisk.img
+
+@system/core/cpio/mkbootfs.c
+
+//创建bootimg
+mkbootimg --kernel dir/kernel --ramdisk dir/ramdisk.img --output dir/boot.img 
+
+@system/core/mkbootimg/mkbootimg.c
+
+//=================解压ramdisk
+#那么先解压，因为后缀不是.gz，所以用-s 选项
+gunzip -S .img ramdisk.img
+#查看是什么格式
+# file ramdisk
+ramdisk: ASCII cpio archive (SVR4 with no CRC)
+
+# cpio -i -F ../ramdisk
+__________________
+mkdir temp_directory && cd temp_directory
+gunzip -c ../ramdisk.img | cpio -idm

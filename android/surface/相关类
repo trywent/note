@@ -1,0 +1,20 @@
+java.lang.Object
+   ↳android.view.View
+  	   ↳android.view.ViewGroup
+
+ViewGroup是一种能够包含其他View的特殊View。是布局和View容器的基础类。
+该类中定义了ViewGroup.LayoutParams类，是基本的布局参数
+
+________________________________
+
+java.lang.Object
+   ↳android.view.View
+  	   ↳android.view.ViewGroup
+  	  	   ↳android.widget.FrameLayout
+
+FrameLayout用来在屏幕的一个区域单独显示一个项目。通常FrameLayout只包含一个View
+(多个View在FrameLayout中很难布局)。可以使用android:layout_gravity属性来控制
+Framlayout中多个View的位置
+
+子view被绘制在一个栈中，最近绘制的View在最上部。FrameLayout的大小由最大的子View决定，
+当setConsiderGoneChildrenWhenMeasuring()为true时，GONE类型View将被在设置大小中使用

@@ -1,0 +1,10 @@
+//
+DisplayDevice::DisplayDevice{
+- mDisplaySurface       //FramebufferSurface，显示到屏幕上
+- mNativeWindow=new Surface(producer/*BufferQueue*/) //所有应用的surface最终应该合并到这里
+}
+
+
+
+
+frameworks/native/services/surfaceflinger/DisplayDevice.cpp

@@ -1,0 +1,175 @@
+//加入到窗口服务：
+handleResumeActivity{
+- 从窗口中获取View，r.window.getDecorView
+- 加入View，wm.addView@WindowManagerImpl.java--addView@WindowManagerGlobal.java
+		-->ViewRootImpl.setView(加入到根View)-->mWindowSession.addToDisplay
+
+}@ActivityThread.java
+
+
+setView(View,WindowManager.LayoutParams){
+- 判断surfaceHolder是由应用自己提供，还是使用系统
+- 使用系统的surfaceHolder，打开硬件加速enableHardwareAcceleration{
+	- 判断应用是否开启硬件加速，FLAG_HARDWARE_ACCELERATED
+	- 创建HardwareRenderer.createGlRenderer
+	}
+- 获取View设置的属性，collectViewAttributes
+- 加入到窗口服务，mWindowSession.addToDisplay(window,inputChannel)
+- 输入事件是否有回调(一般没有)，willYouTakeTheInputQueue，有则{
+	- 设置mInputQueueCallback
+	- 设置mInputQueue
+	}
+- 若需要接收事件，创建事件接收器。WindowInputEventReceiver
+}
+
+
+//移除
+handleDestroyActivity@ActivityThread.java-->closeAll-->removeViewLocked
+@WindowManagerGlobal.java
+
+
+
+_________________
+遍历：
+//surface变化，handleGetNewSurface
+//焦点变化，
+//systemui变化，handleDispatchSystemUiVisibilityChanged
+//窗口变化，MSG_RESIZED
+//隐藏，显示应用，handleAppVisibility
+scheduleTraversals-->TraversalRunnable.run-->doTraversal
+performTraversals{
+- mFirst{
+	- 设置desiredWindowWidth/height为屏幕大小
+	- 设置attachInfo，并dispatchAttachedToWindow(attachInfo)
+	}
+- 非第一次，设置desiredWindowWidth/height为帧大小
+- 需要布局，layoutRequested{
+	- 测量设置子View大小，measureHierarchy
+	
+	}
+- performLayout
+- 执行绘制，performDraw
+}
+
+
+
+=====================
+measure:
+
+performTraversals-->measureHierarchy{
+- 若是对话框窗口限制对话框布局成全屏，{
+	- com.android.internal.R.dimen.config_prefDialogWidth
+	- 将值和模式值合并在一个变量中，getRootMeasureSpec
+	- performMeasure
+	}
+
+- 普通窗口{
+	- 将值和模式值合并在一个变量中，getRootMeasureSpec	
+	- performMeasure(childWidthMeasureSpec, childHeightMeasureSpec)-->
+	performMeasure-->measure{
+		- 创建缓存，LongSparseLongArray
+		- 没有缓存，onMeasure-->setMeasuredDimension
+		- 存在缓存，setMeasuredDimension
+		- 测量值存入缓存，mMeasureCache.put
+		}@View.java
+	}
+}@ViewRootImpl.java
+
+
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindow.java
+frameworks/base/core/java/android/widget/FrameLayout.java
+
+=====================
+layout:
+performLayout
+
+//###################
+=============
+//窗口端发起：窗口大小变化，窗口移除
+服务端窗口变化：
+updateResizingWindows
+
+通知client窗口大小：
+performLayoutAndPlaceSurfacesLockedInner-->win.mClient.resized@WindowManagerService.java
+-->W.resized-->dispatchResized-->mHandler.sendMessage-->handleMessage(MSG_RESIZED_REPORT)
+(更新大小)@ViewRootImpl.java
+
+W.resized(传入大小参数)-->dispatchResized-->viewAncestor.dispatchResized-->
+dispatchResized{
+- mPendingOverscanInsets发生改变
+- sendMessage(MSG_RESIZED)-->requestLayout{
+	- 请求布局，mLayoutRequested
+	- scheduleTraversals
+	}
+	
+}
+
+
+
+scheduleTraversals-->TraversalRunnable.run-->doTraversal-->performTraversals{
+- 
+- 第一次布局或窗口大小,可见变化，relayoutWindow{	
+	- 获取帧大小并设置surface，mWindowSession.relayout(requestedWidth,requestedHeight,mSurface)
+	- 通知绘制完成，mWindowSession.finishDrawing
+	}
+}@ViewRootImpl.java
+
+
+
+performTraversals-->performDraw-->draw
+
+
+frameworks/base/core/java/android/view/WindowManagerImpl.java
+frameworks/base/core/java/android/view/WindowManagerGlobal.java
+frameworks/base/core/java/android/view/ViewRootImpl.java
+frameworks/base/services/java/com/android/server/wm/Session.java
+
+=====================
+绘制：
+
+setAppVisibility-->wtoken.sendAppVisibilityToClients@WindowManagerService.java-->
+sendAppVisibilityToClients@AppWindowToken.java-->win.mClient.dispatchAppVisibility
+-->dispatchAppVisibility-->mHandler.sendMessage(MSG_DISPATCH_APP_VISIBILITY)-->
+handleAppVisibility{
+- mAppVisible
+- scheduleTraversals
+}@ViewRootImpl.java
+
+
+performTraversals-->performDraw--draw{
+- mHardwareRenderer没有创建则{
+	ttachInfo.mHardwareRenderer.initializeIfNeeded
+	}
+- 硬件attachInfo.mHardwareRenderer.draw(mView, attachInfo){
+	- buildDisplayList-->(View进行绘制)view.getDisplayList
+	- drawDisplayList
+	- onHardwarePostDraw@ViewRootImpl.java
+	- swapBuffers
+	}@HardwareRenderer.java
+- 软件drawSoftware(surface){
+	- canvas = mSurface.lockCanvas
+	- mView.draw{
+		- 绘制自己onDraw
+		- 绘制子View，dispatchDraw-->drawChild-->child.draw
+		}
+	- surface.unlockCanvasAndPost
+	}
+}
+
+getDisplayList{
+- 
+- 创建，mAttachInfo.mHardwareRenderer.createDisplayList
+- LAYER_TYPE_HARDWARE{
+	- 
+	- canvas.drawHardwareLayer
+ }LAYER_TYPE_SOFTWARE{
+	- buildDrawingCache
+	- 
+ }没有设置layer的情况{
+	- 跳过绘制，dispatchDraw
+	- draw
+ }
+- 
+}
+
+frameworks/base/core/java/android/view/HardwareRenderer.java

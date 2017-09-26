@@ -1,0 +1,31 @@
+mmc在识别过程中，发送CMD2获取CID用以识别设备。
+
+==============
+getvar_serialno-->priv.serial_no
+
+
+snprintf(command_line + amt, sizeof(command_line) - amt,
+" %s=%s", FASTBOOT_SERIALNO_BOOTARG,priv.serial_no);
+______________
+创建id：
+board_late_init{
+- 设置读取地址，setup_space(gd->arch.rk_extra_buf_addr)
+- 读取，getSn(tmp_buf){
+	- 
+	}@rkloader.c
+- setenv("fbt_sn#", tmp_buf)
+}@rk30xx.c
+
+fbt_fastboot_init-->create_serial_number{
+- getenv("fbt_sn#")
+- set_serial_number
+}
+
+uboot/common/cmd_fastboot.c
+uboot/board/rockchip/rk30xx/rk30xx.c
+uboot/board/rockchip/rk30xx/rkloader.c
+================
+GetParam{
+- 读取，StorageReadLba(偏移地址，1024*n(n为备份的个数)-->gpMemFun->ReadLba@storage.c
+- 校验CheckParam，若不通过则继续读取备份
+}@parameter.c

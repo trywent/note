@@ -1,0 +1,9 @@
+设备：
+devices-->rk30_device_modem@board-rkpx3-sdk.c
+
+
+驱动：
+
+
+kernel/arch/arm/mach-rkpx3/board-rkpx3-sdk.c
+kernel/drivers/misc/rk29_modem/rk29_modem.c

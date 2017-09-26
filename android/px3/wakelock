@@ -1,0 +1,67 @@
+example:
+PowerManager pm = (PowerManager)mContext.getSystemService(Context.POWER_SERVICE);
+ PowerManager.WakeLock wl = pm.newWakeLock(
+                                      PowerManager.SCREEN_DIM_WAKE_LOCK
+                                      | PowerManager.ON_AFTER_RELEASE,
+                                      TAG);
+ wl.acquire();
+ // ... do work...
+ wl.release();
+________________________
+public PowerManager.WakeLock newWakeLock (int levelAndFlags, String tag)
+
+唤醒锁层次：
+PARTIAL_WAKE_LOCK: 关闭屏幕键盘背光，cpu保持运行。(按power键后也需等该锁释放后cpu才会睡眠)
+
+(以下3个层次被废弃，建议使用窗口标记FLAG_KEEP_SCREEN_ON )
+FULL_WAKE_LOCK: 使屏幕和键盘都打开。按下power键系统自动释放该锁，使屏幕和cpu关闭
+
+SCREEN_DIM_WAKE_LOCK: 保持屏幕打开(可变暗),键盘背光可关闭。按下power键会释放该锁使屏幕和cpu关闭
+
+SCREEN_BRIGHT_WAKE_LOCK: 使屏幕一直打开，键盘背光可关闭。按下power键会是屏幕和cpu关闭
+
+唤醒锁标识(不能和PARTIAL_WAKE_LOCK一起使用)：
+ACQUIRE_CAUSES_WAKEUP: 获得锁后使屏幕打开，如通知，短信...
+
+ON_AFTER_RELEASE: 释放锁后使屏幕保持打开一段时间
+________________________
+获取锁：
+acquire-->acquireLocked@PowerManager.java-->acquireWakeLock{
+- 检测参数和权限
+- 获取锁的实现，acquireWakeLockInternal{
+	- 查找该wakelock是否已经获取，若是先释放再获取notifyWakeLockReleasedLocked{
+			- mNotifier.onWakeLockReleased
+		}	
+	- 创建WakeLock，并通知获取notifyWakeLockAcquiredLocked{
+			- mNotifier.onWakeLockAcquired		
+		}
+	- 加入容器中，mWakeLocks.add
+	- applyWakeLockFlagsOnAcquireLocked-->(若获取锁后要打开背光，且屏幕已锁屏)wakeUpNoUpdateLocked{
+		- 更新已经变化的状态
+		- userActivityNoUpdateLocked
+		}
+	- 标记锁更新，mDirty |= DIRTY_WAKE_LOCKS
+	- 更新状态，updatePowerStateLocked
+	}
+}
+
+释放锁：
+release-->release(0)-->(若计数为0是则进行释放)mService.releaseWakeLock@PowerManager.java->
+releaseWakeLock-->releaseWakeLockInternal-->mWakeLocks.remove@PowerManagerService.java
+
+锁状态(mWakeLockSummary)：
+updateWakeLockSummaryLocked{
+- PARTIAL_WAKE_LOCK类型锁可防止cpu睡眠，设置WAKE_LOCK_CPU
+- 其他锁标识，在WAKEFULNESS_ASLEEP(power键睡眠),下不能防止cpu睡眠
+}@PowerManagerService.java
+
+
+frameworks/base/core/java/android/os/PowerManager.java
+frameworks/base/services/java/com/android/server/power/PowerManagerService.java
+
+=================
+AudioOutLock:
+
+acquire_wake_lock (PARTIAL_WAKE_LOCK, "AudioOutLock");
+hardware/xxxx/audio/AudioHardware.cpp
+

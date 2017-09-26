@@ -1,0 +1,4 @@
+config文件：
+uboot/include/configs/xxx.h
+uboot/include/autoconf.mk
+uboot/include/config.h

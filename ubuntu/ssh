@@ -1,0 +1,23 @@
+//
+sudo apt-get install openssh-server //安装ssh服务
+//共用服务器
+git_wb@192.168.1.95
+pw:12342234
+
+//android自己服务器
+ssh wb@192.168.1.131   
+pw:wb
+
+
+======
+1）将本地文件拷贝到远程
+  scp 文件名用户名@计算机IP或者计算机名称:远程路径  
+  本地192.168.1.8客户端
+  scp /root/install.* root@192.168.1.12:/usr/local/src
+
+2）从远程将文件拷回本地
+  scp 用户名@计算机IP或者计算机名称:文件名本地路径 
+  本地192.168.1.8客户端取远程服务器12、11上的文件
+scp root@192.168.1.12:/usr/local/src/ *.log /root/
+scp root@192.168.1.11:/usr/local/src/ *.log /root/
+

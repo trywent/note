@@ -1,0 +1,20 @@
+debuggerd_signal_handler-->(发送到debuggerd)send_debuggerd_packet
+
+dump_tombstone-->dump_tombstone_timeout@debugger.c
+do_server-->handle_request@debuggerd.cpp-->(SIGSTOP)engrave_tombstone{
+- 连接到actviityManagerService,activity_manager_connect
+- dump_crash
+}@tombstone.cpp
+
+
+//通知到activityManager
+consumeNativeCrashData-->NativeCrashReporter.start()-->mAm.handleApplicationCrashInner
+@NativeCrashListener.java
+
+
+
+bionic/linker/debugger.cppa
+system/core/libcutils/debugger.c
+system/core/debuggerd/debuggerd.cpp
+system/core/debuggerd/tombstone.cpp
+frameworks/base/services/core/java/com/android/server/am/NativeCrashListener.java

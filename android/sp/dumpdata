@@ -1,0 +1,14 @@
+//dumpdata
+
+dump_data{
+
+}
+
+
+
+//录音
+in_read{
+- 
+- dump_info.dump_switch_info =  DUMP_RECORD_HWL_AFTER_EXPRESS
+- dump_data  //写数据到文件
+}

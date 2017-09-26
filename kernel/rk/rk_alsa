@@ -1,0 +1,166 @@
+//注册card
+i2s0(px3)-->i2s_sdi0(3166)
+
+
+rk616声卡设备:
+snd_soc_card_rk{
+	.name = "RK_RK616",
+	.dai_link = rk_dai,
+	.num_links = 2,    //两个ADI，i2s1/2
+}
+
+soc声卡设备注册：
+audio_card_init{
+- 创建设备rk_snd_device,platform_device_alloc("soc-audio", -1)
+- 初始化，platform_set_drvdata(snd_soc_card_rk) //snd_soc_card设备
+- 注册platform_device_add
+}@rk_rk616.c
+
+soc声卡驱动(alsa框架)：
+module_init(snd_soc_init)-->snd_soc_init-->platform_driver_register(&soc_driver)-->static struct platform_driver soc_driver = {
+	.driver		= {
+		.name		= "soc-audio",
+	},
+	.probe		= soc_probe,
+}@soc-core.c
+
+探测设备(snd_soc_card)：
+soc_probe-->snd_soc_register_card{
+- 初始设备中的所有链表，snd_soc_initialize_card_lists
+- 加入到card_list,list_add(&card->list, &card_list);
+- 设置设备，snd_soc_instantiate_cards(遍历card_list中设备，并设置)-->snd_soc_instantiate_card
+}@soc-core.c
+
+snd_soc_instantiate_card{
+- 连接dai，soc_bind_dai_link{//设置snd_soc_pcm_runtime
+	- 设备中cpu_dai是否已经连接。若没有，从已注册的cpu_dai查找相同名字的dai，并赋值。	
+		list_for_each_entry(cpu_dai, &dai_list, list)
+	- 查找并设置codec，list_for_each_entry(codec, &codec_list
+	- 查找并设置codec_dai，list_for_each_entry(codec_dai, &dai_list
+	}
+}
+==============
+//注册platform
+rockchip_soc_platform_init-->snd_soc_register_platform
+
+sound/soc/rk29/rk29_pcm.c
+==============
+///codec：
+
+设备注册：
+rk616-core中多功能设备统一注册方式。
+@kernel/drivers/mfd/rk616-core.c
+
+驱动注册：
+rk616_modinit-->platform_driver_register(&rk616_codec_driver)-->rk616_codec_driver = {
+.driver = {
+	   .name = "rk616-codec",
+	}
+.probe = rk616_platform_probe,
+}@rk616_codec.c
+
+探测：
+rk616_platform_probe-->(注册声卡解码设备)snd_soc_register_codec(&soc_codec_dev_rk616)@rk616_codec.c
+
+
+soc处理codec：
+soc_probe_codec-->driver->probe
+
+
+rk616_get_parameter
+kernel/sound/soc/soc-core.c
+kernel/sound/soc/rk29/rk_rk616.c
+kernel/sound/soc/codecs/rk616_codec.c
+
+__________________
+输出寄存器：
+soc_codec_reg_show@soc-core.cs
+
+
+==================
+//注册dai
+//device
+rk30_init_i2s-->platform_device_register(&device_iis_ch)@device.c
+
+//driver
+rockchip_i2s_init-->platform_driver_register(&rockchip_i2s_driver)
+
+
+rockchip_i2s_probe{
+- 创建snd_soc_dai_driver
+- 设置i2s，rk29_i2s_probe
+- 注册dai，snd_soc_register_dai
+}
+
+
+arch/arm/mach-rk30/devices.c
+sound/soc/rk29/rk30_i2s.c
+==================
+
+rk616_dai.ops-->rk616_dai_ops.hw_params-->rk616_hw_params
+
+
+播放：
+rk616_playback_path_put
+rk616_voice_call_path_put
+rk616_capture_path_put
+
+rk616_codec_power_down
+
+
+rk616_hifi_ops.hw_params-->k_hifi_hw_params@rk_rk616.c
+==================
+rk616:
+
+输入：
+
+microphone输入：
+BST_L：MICIN 和 MICIP  //单输入模式下，接MICIN     输出BST_R
+BST_R：MIC2N 和 MIC2P  //输出BST_R
+
+line输入：IN1P, IN1N, IN3L, 和 IN3R  //输出脚为DIFFIN
+
+两组输入混合器：
+MIXIN_L：混合IN3L，IN1P 和microphone输入
+
+MIXIN_R：混合IN3R, IN1P, IN1N,和microphone的MIC2N输入
+
+
+打印log：
+/sys/kernel/debug/asoc/RK_RK616_TINY/rk616-codec.0/codec_reg
+________________
+board上只使用MIC1N(io口C9)
+
+{0x848, 0x06} //
+
+设置顺序：
+RK616_SINGNAL_ZC_CTL1  //ac 0x3f   hiden
+RK616_SINGNAL_ZC_CTL2  //b0 0xff   
+RK616_PWR_ADD1         //3c 0x3c   REG15	
+RK616_PWR_ADD1         //3c 0x24   REG15
+RK616_BST_CTL          //40 0x59   REG16
+RK616_MIXINL_CTL       //48 0x0e   REG18
+RK616_MIXINL_VOL1      //4c        REG19 
+RK616_PGAL_CTL         //60 0x4c   REG24
+RK616_ADC_CTL          //a8 0x16   REG42 
+RK616_ADC_CTL          //a8 0x06   REG42
+RK616_BST_CTL          //40 0x49   REG16
+RK616_MIXINL_CTL       //48 0x06   REG18
+RK616_PGAL_CTL         //60 0x0c   REG24
+
+
+(1)write 0x3f at offset address 0xac and write 0xff at offset address 
+0xb0.(hidden register,no register description) 
+(2)write 0x3c to REG15 to set the reference current of ADC channel 
+(3)write 0x24 to REG15 to set the reference voltage of ADCL channel 
+(4)write 0x59 to REG16 to start BST_L 
+(5)write 0x0e to REG 18 to start MININ_L, select muted BST_L connect to MIXIN_L . 
+(6)write REG19 to set gain value of MIXIN_L
+(7)write 0x4c to REG24 to start muted PGA_L, and set PGA_L to 0dB. 
+(8)write 0x16 to REG42 to start ADCL clock module 
+(9)write 0x06 to REG42 to start ADCL module 
+(10)write 0x49 to REG16 to stop BST_L mute 
+(11)write 0x06 to REG18 to stop MIXIN_L mute 
+(12)write 0x0c to REG24 to stop PGA_L mute 
+
+

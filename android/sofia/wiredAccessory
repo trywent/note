@@ -1,0 +1,15 @@
+
+WiredAccessoryManager-->WiredAccessoryObserver{
+- 监听列表，makeObservedUEventList(h2w,usb,hdmi)
+- 
+}
+
+systemReady-->mHandler.handleMessage(MSG_SYSTEM_READY)-->
+onSystemReady{
+- 获取状态mInputManager.getSwitchState，更新状态notifyWiredAccessoryChanged
+- 开始监听，mObserver.init-->startObserving-->onUEvent-->updateStateLocked-->
+	updateLocked-->mHandler.handleMessage(MSG_NEW_DEVICE_STATE)-->
+	setDevicesState-->setDeviceStateLocked
+}
+
+frameworks/base/services/core/java/com/android/server/WiredAccessoryManager.java

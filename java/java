@@ -1,0 +1,29 @@
+两种层次的访问控制：
+- (类)At the top level—public, or package-private (no explicit modifier).
+- (成员)At the member level—public, private, protected, or package-private (no explicit modifier).
+
+类：public 所有其它类可以访问。默认只有同一包内可访问
+
+成员：
+Modifier	Class	Package	Subclass World
+public		Y	Y	Y	 Y
+protected	Y	Y	Y	 N
+no modifier	Y	Y	N	 N
+private		Y	N	N	 N
+
+__________
+接口中成员的访问权限修饰可不说明。也可说明
+
+==========
+同步数据：
+flush()仅将数据写入到操作系统缓存的文件流中，并不确保写到磁盘上。可以使用FileDescriptor.sync()
+来将数据同步到磁盘上。
+如：
+FileOutputStream out = new FileOutputStream(filename);
+[...]
+out.flush();
+out.getFD().sync();
+
+
+==========
+final域必须在构造方法执行后完成初始化

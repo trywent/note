@@ -1,0 +1,113 @@
+ensureActivitiesVisibleLocked:
+	显示一个activity，如果已经是当前显示的则不做处理。如果该activity进程还没启动，
+则启动进程。
+
+startActivityLocked@ActivityStack.java
+	根据intent，进程等信息。封装ActivityRecord后调用startActivityUncheckedLocked
+	ProcessRecord   进程记录，记录在mLruProcesses中@ActivityManagerService.java
+	ActivityRecord  记录在mHistory中@ActivityStack.java
+
+
+startActivityUncheckedLocked@ActivityStack.java
+	查找activity的位置。将ActiviyRecord加入到mHistory
+
+resumeTopActivityLocked@ActivityStack.java
+	将mHistory中第一个activity的状态转为resumed(设置成用户可见)
+
+
+
+mActivityLifecycleCallbacks
+
+___________________________________
+显示activity的函数：
+ensureActivitiesVisibleLocked@ActivityStack.java
+
+调用：
+activityIdleInternal
+
+resumeTopActivityLocked
+
+checkReadyForSleepLocked
+
+completeResumeLocked
+
+
+————————————————————————————————————
+sleep：
+activityIdleInternal-->stopActivityLocked-->setSleeping@ActivityStack.java-->setSleeping-->stack.mGoingToSleepActivities.add@ActivityRecord.java
+
+
+
+____________________________________
+PhoneWindowManager调整窗口位置
+
+wm.displayReady@SystemServer.java-->displayReady-->mPolicy.setInitialDisplaySize@WindowManagerService.java
+
+layoutWindowLw
+
+
+addWindow@WindowManagerService.java-->prepareAddWindowLw@PolicyWindowManagerService.java
+
+performLayoutAndPlaceSurfacesLocked-->performLayoutAndPlaceSurfacesLockedInner-->performLayoutLockedInner@WindowManagerService.java-->beginLayoutLw(设置导航栏，状态栏的位置)
+--layoutWindowLw-->
+
+
+beginLayout(判断是否是导航栏，状态栏并设置位置)@PhoneWindowManagerService.java-->(计算窗口位置)
+computeFrameLw@WindowState.java
+
+(发送消息)REPORT_WINDOWS_CHANGE-->notifyWindowsChanged-->windowChangeListeners[i].windowsChanged
+@WindowManagerService.java-->windowChanged-->windowManagerAutolistLoop-->out.write("LIST UPDATE\n")
+@ViewServer.java-->
+
+
+导航栏的高度：
+        mNavigationBarHeightForRotation[mPortraitRotation] =
+        mNavigationBarHeightForRotation[mUpsideDownRotation] =
+                mContext.getResources().getDimensionPixelSize(
+                        com.android.internal.R.dimen.navigation_bar_height);
+
+        mNavigationBarHeightForRotation[mLandscapeRotation] =
+        mNavigationBarHeightForRotation[mSeascapeRotation] =
+                mContext.getResources().getDimensionPixelSize(
+                        com.android.internal.R.dimen.navigation_bar_height_landscape);
+
+
+___________________________________
+布局的计算：
+computeFrameLw(Rect parentFrame, Rect displayFrame,Rect contentFrame, Rect visibleFrame)
+@WindowManagerLayout.java
+
+@param parentFrame The frame of the parent container this window
+         * is in, used for computing its basic position.
+包含该窗口的父容器帧，用来计算基准位置
+
+@param displayFrame The frame of the overall display in which this
+         * window can appear, used for constraining the overall dimensions
+         * of the window.
+显现窗口的显示器帧，限制窗口的大小
+          
+@param contentFrame The frame within the display in which we would
+         * like active content to appear.  This will cause windows behind to
+         * be resized to match the given content frame.
+显示器中，要显示的内容所在的帧。能够使窗口调整，直到符合该帧的大小。
+
+@param visibleFrame The frame within the display that the window
+         * is actually visible, used for computing its visible insets to be
+         * given to windows behind.
+         * This can be used as a hint for scrolling (avoiding resizing)
+         * the window to make certain that parts of its content
+         * are visible.
+
+显示器中，窗口被实际看到的帧。用来计算加载到窗口中的显示的插图。可以用作提示，滚动窗口是要显示的
+部分显示出来
+
+
+Gravity：将对象放入容器的工具类
+apply(int gravity, int w, int h, Rect container,int xAdj, int yAdj, Rect outRect)@Gravity.java
+设置outRect的位置(对角线的两点，绝对值不是相对容器的值)。
+
+根据物体的长宽，位置(容器中)，偏移的大小。
+
+
+
+

@@ -1,0 +1,39 @@
+//进入休眠流程
+freeze_processes-->try_to_freeze_tasks(设置所有进程TIF_FREEZE)-->进程检测到TIF_FREEZE调用
+refrigerator(设置进程PF_FROZEN)-->进程状态为TASK_UNINTERRUPTIBLE，进入循环检测PF_FROZEN是否被清除
+
+//退出休眠
+thaw_processes(清除PF_FROZEN)
+
+//kernel进程检测状态并进入休眠
+try_to_freeze-->refrigerator
+
+
+默认进程不能休眠，通过调用set_freezable()清除PF_NOFREEZE。进程可进入休眠。必须在
+默认地方调用try_to_freeze
+
+/*
+一般kernel进程会在某个地方调用下面函数。下面函数进入可中断sleep并会检查TIF_FREEZE
+*/
+wait_event_freezable()/wait_event_freezable_timeout()
+
+
+	set_freezable();
+	do {
+		hub_events();
+		wait_event_freezable(khubd_wait,
+				!list_empty(&hub_event_list) ||
+				kthread_should_stop());
+	} while (!kthread_should_stop() || !list_empty(&hub_event_list));
+
+(from drivers/usb/core/hub.c::hub_thread()).
+
+
+//用户空间进程进入
+收到signal-->try_to_freeze
+
+
+
+kernel/power/process.c
+include/linux/freezer.h
+

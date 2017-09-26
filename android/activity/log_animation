@@ -1,0 +1,16 @@
+V/WindowManager( 1313): Loading animations: layout params pkg=com.syu.settings resId=0x1030001
+V/WindowManager( 1313): Loading animations: picked package=android
+V/WindowManager( 1313): applyAnimation: wtoken=AppWindowToken{42095f20 token=Token{42131fb0 ActivityRecord{41e84680 com.syu.settings/.MainActivity}}} anim=android.view.animation.AnimationSet@41e59c30 animAttr=0x8 transit=4104 Callers com.android.server.wm.WindowManagerService.setTokenVisibilityLocked:4386 com.android.server.wm.WindowManagerService.handleAppTransitionReadyLocked:8354 com.android.server.wm.WindowManagerService.performLayoutAndPlaceSurfacesLockedInner:8909 
+V/WindowManager( 1313): Loaded animation android.view.animation.AnimationSet@41e59c30 for AppWindowToken{42095f20 token=Token{42131fb0 ActivityRecord{41e84680 com.syu.settings/.MainActivity}}}
+V/WindowManager( 1313): Loading animations: layout params pkg=com.syu.settings resId=0x1030001
+V/WindowManager( 1313): Loading animations: picked package=android
+V/WindowManager( 1313): Loading animations: layout params pkg=com.syu.settings resId=0x1030001
+V/WindowManager( 1313): Loading animations: picked package=android
+V/WindowManager( 1313): applyAnimation: wtoken=AppWindowToken{41e92790 token=Token{41e91818 ActivityRecord{41e916d0 com.syu.radio/.RadioActivity}}} anim=android.view.animation.AnimationSet@42138bf8 animAttr=0x9 transit=4104 Callers com.android.server.wm.WindowManagerService.setTokenVisibilityLocked:4386 com.android.server.wm.WindowManagerService.handleAppTransitionReadyLocked:8380 com.android.server.wm.WindowManagerService.performLayoutAndPlaceSurfacesLockedInner:8909 
+V/WindowManager( 1313): Loaded animation android.view.animation.AnimationSet@42138bf8 for AppWindowToken{41e92790 token=Token{41e91818 ActivityRecord{41e916d0 com.syu.radio/.RadioActivity}}}
+V/WindowManager( 1313): Loading animations: layout params pkg=com.syu.radio resId=0x1030001
+V/WindowManager( 1313): Loading animations: picked package=android
+V/WindowManager( 1313): Loading animations: layout params pkg=null resId=0x0
+V/WindowManager( 1313): Loading animations: layout params pkg=com.syu.settings resId=0x1030001
+V/WindowManager( 1313): Loading animations: picked package=android
+

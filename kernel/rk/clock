@@ -1,0 +1,280 @@
+cat /proc/clocks
+cat /sys/dvfs/dvfs_tree
+================
+
+clk结构：
+#define CLK(dev, con, ck) \
+{\
+	.dev_id = dev,\
+	.con_id = con,\
+	.clk = ck,\
+}
+
+
+#define CLK1(name) \
+{\
+	.dev_id = NULL,\
+	.con_id = #name,\
+	.clk = &clk_##name,\
+}
+_________________
+
+clk_get_sys
+
+clk_set_rate{
+- 
+- clk_set_rate_nolock{
+	- clk->set_rate	
+	}
+}@clock.c
+
+map_io@board-rkpx3-sdk.c-->rk30_map_io@common.c-->
+board_clock_init@board-rkpx3-sdk.c-->rk30_clock_data_init-->_rk30_clock_data_init{
+- 
+- 遍历clks中所有的时钟{
+	- 将clk加入链表，clkdev_add
+	- 注册clk，clk_register
+	}
+
+- rk30_clock_common_init
+}
+
+rk30_clock_common_init{
+- 
+- uart初始化，rk30_clock_common_uart_init
+}
+
+
+
+kernel/arch/arm/mach-rkpx3/clock_data_rkpx3.c
+kernel/arch/arm/mach-rkpx3/dvfs.c
+kernel/arch/arm/plat-rk/clock.c
+________________________________
+lcdc时钟:"dclk_lcdc0/1"
+clk->set_rate-->dclk_lcdc_set_rate-->clkset_rate_evendiv_autosel_parents
+
+================================
+rk时钟初始：
+board_clock_init@board-rkpx3-sdk.c-->rk30_clock_data_init(768M,594M,I2S_12288KHZ){
+- _rk30_clock_data_init{
+	- 注册默认操作，clk_register_default_ops_clk(&def_ops_clk)
+	- 遍历clks，加入到链表clkdev_add，注册clk_register
+	- div_clk_for_pll_init
+	- 使能rk30_init_enable_clocks
+	}
+- rk3188_dvfs_init{
+	- rk_regist_vd
+	- rk_regist_clk(&rk30_clks)-->clk_register_dvfs@plat-rk/dvfs.c
+	}@mach-rkpx3/dvfs.c
+}@clock_data_rkpx3.c
+
+
+rk3188_cpufreq_init_cpu0-->clk_enable_dvfs(ddr_clk)@cpufreq.c
+
+kernel/arch/arm/mach-rkpx3/clock_data_rkpx3.c
+kernel/arch/arm/mach-rkpx3/dvfs.c
+kernel/arch/arm/plat-rk/dvfs.c
+================================
+
+	Part 1 - introduction and interface split
+
+clock框架的使能CONFIG_COMMON_CLK。框架可分为两部分，一部分是clk结构，另一部分是clk.h中接口的实现
+(平台相关，通过clk_ops实现)。
+
+
+	Part 2 - common data structures and api
+
+结构体clk :
+
+	struct clk {
+		const char		*name;
+		const struct clk_ops	*ops;
+		struct clk_hw		*hw;
+		char			**parent_names;
+		struct clk		**parents;
+		struct clk		*parent;
+		struct hlist_head	children;
+		struct hlist_node	child_node;
+		...
+	};
+
+硬件相关的操作通过：
+
+	struct clk_ops {
+		int		(*prepare)(struct clk_hw *hw);
+		void		(*unprepare)(struct clk_hw *hw);
+		int		(*enable)(struct clk_hw *hw);
+		void		(*disable)(struct clk_hw *hw);
+		int		(*is_enabled)(struct clk_hw *hw);
+		unsigned long	(*recalc_rate)(struct clk_hw *hw,
+						unsigned long parent_rate);
+		long		(*round_rate)(struct clk_hw *hw,
+						unsigned long rate,
+						unsigned long *parent_rate);
+		long		(*determine_rate)(struct clk_hw *hw,
+						unsigned long rate,
+						unsigned long min_rate,
+						unsigned long max_rate,
+						unsigned long *best_parent_rate,
+						struct clk_hw **best_parent_clk);
+		int		(*set_parent)(struct clk_hw *hw, u8 index);
+		u8		(*get_parent)(struct clk_hw *hw);
+		int		(*set_rate)(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long parent_rate);
+		int		(*set_rate_and_parent)(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long parent_rate,
+					    u8 index);
+		unsigned long	(*recalc_accuracy)(struct clk_hw *hw,
+						unsigned long parent_accuracy);
+		void		(*init)(struct clk_hw *hw);
+		int		(*debug_init)(struct clk_hw *hw,
+					      struct dentry *dentry);
+	};
+
+	Part 3 - hardware clk implementations
+
+drivers/clk/clk-gate.c中gateble时钟的实现:
+
+struct clk_gate {
+	struct clk_hw	hw;   //存放控制该clk的寄存器信息，位信息
+	void __iomem    *reg;
+	u8              bit_idx;
+	...
+};
+
+
+驱动使能该clock的调用流程：
+
+	struct clk *clk;
+	clk = clk_get(NULL, "my_gateable_clk");
+
+	clk_prepare(clk);
+	clk_enable(clk);
+
+The call graph for clk_enable is very simple:
+
+clk_enable(clk);
+	clk->ops->enable(clk->hw);
+	[resolves to...]
+		clk_gate_enable(hw);
+		[resolves struct clk gate with to_clk_gate(hw)]
+			clk_gate_set_bit(gate);
+
+clk_gate_set_bit的定义:
+
+static void clk_gate_set_bit(struct clk_gate *gate)
+{
+	u32 reg;
+
+	reg = __raw_readl(gate->reg);
+	reg |= BIT(gate->bit_idx);
+	writel(reg, gate->reg);
+}
+
+to_clk_gate的定义 :
+
+#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, clk)
+
+
+	Part 4 - supporting your own clk hardware
+
+When implementing support for a new type of clock it only necessary to
+include the following header:
+
+#include <linux/clk-provider.h>
+
+include/linux/clk.h is included within that header and clk-private.h
+must never be included from the code which implements the operations for
+a clock.  More on that below in Part 5.
+
+To construct a clk hardware structure for your platform you must define
+the following:
+
+struct clk_foo {
+	struct clk_hw hw;
+	... hardware specific data goes here ...
+};
+
+To take advantage of your data you'll need to support valid operations
+for your clk:
+
+struct clk_ops clk_foo_ops {
+	.enable		= &clk_foo_enable;
+	.disable	= &clk_foo_disable;
+};
+
+Implement the above functions using container_of:
+
+#define to_clk_foo(_hw) container_of(_hw, struct clk_foo, hw)
+
+int clk_foo_enable(struct clk_hw *hw)
+{
+	struct clk_foo *foo;
+
+	foo = to_clk_foo(hw);
+
+	... perform magic on foo ...
+
+	return 0;
+};
+
+
+clk_ops中函数实现原则：
+
+                              clock hardware characteristics
+                -----------------------------------------------------------
+                | gate | change rate | single parent | multiplexer | root |
+                |------|-------------|---------------|-------------|------|
+.prepare        |      |             |               |             |      |
+.unprepare      |      |             |               |             |      |
+                |      |             |               |             |      |
+.enable         | y    |             |               |             |      |
+.disable        | y    |             |               |             |      |
+.is_enabled     | y    |             |               |             |      |
+                |      |             |               |             |      |
+.recalc_rate    |      | y           |               |             |      |
+.round_rate     |      | y [1]       |               |             |      |
+.determine_rate |      | y [1]       |               |             |      |
+.set_rate       |      | y           |               |             |      |
+                |      |             |               |             |      |
+.set_parent     |      |             | n             | y           | n    |
+.get_parent     |      |             | n             | y           | n    |
+                |      |             |               |             |      |
+.recalc_accuracy|      |             |               |             |      |
+                |      |             |               |             |      |
+.init           |      |             |               |             |      |
+                -----------------------------------------------------------
+[1] either one of round_rate or determine_rate is required.
+
+
+注册时钟：
+clk_register(...)
+
+See the basic clock types in drivers/clk/clk-*.c for examples.
+
+	Part 5 - static initialization of clock data
+
+For platforms with many clocks (often numbering into the hundreds) it
+may be desirable to statically initialize some clock data.  This
+presents a problem since the definition of struct clk should be hidden
+from everyone except for the clock core in drivers/clk/clk.c.
+
+To get around this problem struct clk's definition is exposed in
+include/linux/clk-private.h along with some macros for more easily
+initializing instances of the basic clock types.  These clocks must
+still be initialized with the common clock framework via a call to
+__clk_init.
+
+clk-private.h must NEVER be included by code which implements struct
+clk_ops callbacks, nor must it be included by any logic which pokes
+around inside of struct clk at run-time.  To do so is a layering
+violation.
+
+To better enforce this policy, always follow this simple rule: any
+statically initialized clock data MUST be defined in a separate file
+from the logic that implements its ops.  Basically separate the logic
+from the data and all is well.
+
+

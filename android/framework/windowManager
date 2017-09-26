@@ -1,0 +1,388 @@
+管理窗口：
+======================================
+服务开始：
+
+WINDOW_SERVICE = "window"
+加入服务:
+WindowManagerService.main--ServiceManager.addService(WINDOW_SERVICE)@SystemServer.java
+获取服务:
+Context.getSystemService(Context.WINDOW_SERVICE)-->getSystemService-->fetcher.getService-->
+WindowManagerImpl.getDefault@ContextImpl.java-->getDefault-->new CompatModeWrapper
+@WindowManagerImpl.java
+
+----------------------------
+WindowManagerService.main@SystemServer.java-->main-->WMThread.start-->WMThread.run-->
+WindowManagerService(构造方法)@windowManagerService.java
+
+
+新线程：
+WMThread.start
+
+PolicyThread.start
+____________________________
+mPolicy构造：
+mPolicy = PolicyManager.makeNewWindowManager()@WindowManagerService.java-->makeNewWindowManager-->
+sPolicy.makeNewWindowManager()@PolicyManager.java-->makeNewWindowManager@Policy.java-->
+new PhoneWindowManager()@PhoneWindowManager.java
+
+mPolicy初始化：
+main-->WMThread.start-->WMThread.run-->new WindowManagerService-->new PolicyThread().start-->
+PolicyThread.run--mPolicy.init@WindowManagerService.java-->init@PhoneWindowManager.java-->
+mWindowManagerFuncs= WindowManagerService
+
+____________________________
+加入窗口视图：
+addView(创建ViewRootImpl,加入View)-->root.setView@WindowManagerImpl.java-->setView
+-->@ViewRootImpl.java
+
+____________________________
+结束开机动画，进入主界面。通过方法performEnableScreen()
+performLayoutAndPlaceSurfacesLocked-->performLayoutAndPlaceSurfacesLockedInner-->
+enableScreenIfNeededLocked-->mH.sendMessage-->handleMessage.ENABLE_SCREEN-->
+performEnableScreen@WindowManagerServices.java-- mPolicy.enableScreenAfterBoot()-->
+
+30秒强制打开屏幕：
+activityIdleInternal(判断是否已经启动，若否设置已启动，设置打开显示)-->
+mService.enableScreenAfterBoot@ActivityStack.java-->enableScreenAfterBoot-->
+WindowManager.enableScreenAfterBoot@ActivityManagerService.java-->
+enableScreenAfterBoot(发送消息BOOT_TIMEOUT)-->mH.sendMessageDelayed(BOOT_TIMEOUT)
+-->performBootTimeout(设置mForceDisplayEnabled = true)-->performEnableScreen(打开屏幕显示)
+@WindowManagerService.java
+
+----------------------------
+触摸震动反馈：
+performHapticFeedbackLw@PhoneWindowManager.java
+
+
+
+
+jb/frameworks/base/core/java/com/android/internal/policy/PolicyManager.java
+jb/frameworks/base/policy/src/com/android/internal/policy/impl/Policy.java
+jb/frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+frameworks/base/core/java/android/view/WindowManagerImpl.java
+============================
+增加窗口：
+addWindowToListInOrderLocked-->placeWindowAfter-->mWindows.add@WindowMangerService.java
+
+
+addWindowToListInOrderLocked-->placeWindowBefore-->mWindows.add@WindowMangerService.java
+
+
+addInputMethodWindowToListLocked-->mWindows.add@WindowMangerService.java
+
+
+reAddWindowLocked-->mWindows.add@WindowMangerService.java
+
+============================
+窗口：
+
+输入法绑定服务：
+onTouchEvent(触摸事件)-->viewClicked-->imm.viewClicked@TextView.java-->viewClicked@
+InputMethodManager.java-->viewClicked-->checkFocus-->checkFocusNoStartInput(检测输入法是否已经启动)
+--startInputInner@InputMethodManager.java-->onCreateInputConnection@TextView.java--mService.startInput
+@InputMethodManager.java-->startInput-->startInputLocked-->startInputUncheckedLocked-->
+(开始输入服务)mContext.bindService(SERVICE_INTERFACE)@InputMethodManagerService.java
+
+绑定服务后返回服务代理：
+onBind-->onCreateInputMethodInterface@AbstractInputMethodService.java-->onCreateInputMethodInterface
+-->new InputMethodImpl@InputMethodService.java
+
+onBind-->(返回服务代理)new IInputMethodWrapper@AbstractInputMethodService.java
+
+输入法创建窗口：
+onCreate-->new SoftInputWindow@InputMethodService.java
+SoftInputWindow-->initDockWindow(TYPE_INPUT_METHOD)@SoftInputWindow.java
+
+输入法加入窗口：
+addWindow(TYPE_INPUT_METHOD)-->addInputMethodWindowToListLocked-->addWindowToListInOrderLocked@WindwoManagerService.java
+
+输入法显示窗口：
+onTouchEvent-->imm.showSoftInput@TextView.java-->showSoftInput-->executeMessage(DO_SHOW_SOFT_INPUT)
+-->inputMethod.showSoftInput@IInputMethodWrapper.java-->InputMethodImpl.showSoftInput-->
+showWindow-->showWindowInner-->mWindow.show@InputMethodService.java-->show-->mWindowManager.addView
+(mDecor, l)@Dialog.java
+
+showSoftInput-->mService.showSoftInput@InputMethodManager.java-->showSoftInput
+-->showCurrentInputLocked
+
+frameworks/base/core/java/android/view/inputmethod/InputMethodManager.java
+frameworks/base/core/java/android/widget/TextView.java
+frameworks/base/services/java/com/android/server/InputMethodManagerService.java
+frameworks/base/core/java/android/inputmethodservice/SoftInputWindow.java
+frameworks/base/core/java/android/inputmethodservice/InputMethodService.java
+frameworks/base/core/java/android/inputmethodservice/AbstractInputMethodService.java
+frameworks/base/core/java/android/inputmethodservice/IInputMethodWrapper.java
+
+===========================
+activity窗口的建立：
+(设置窗口和windowManager)attach-->PolicyManager.makeNewWindow@Activity.java-->
+makeNewWindow-->sPolicy.makeNewWindow@PolicyManager.java-->makeNewWindow-->
+new PhoneWindow@Policy.java
+
+attach--mWindow.setWindowManager@Activity.java-->new LocalWindowManager@Window.java
+
+加入actvity中View：
+setContentView-->getWindow().setContentView@Activity.java-->setContentView{
+- installDecor，产生mDeocr(包含标题栏和mContentParent)，mContentParent 
+- mContentParent.addView(加入activity要加入的View)
+}@PhoneWindow.java-->addView@ViewGroup.java
+
+将activity窗口加入窗口管理器：
+ensureActivitiesVisibleLocked-->r.app.thread.scheduleWindowVisibility@ActivityStack.java
+-->scheduleWindowVisibility@ApplicationThreadNative.java-->scheduleWindowVisibility-->queueOrSendMessage
+-->handleWindowVisibility-->updateVisibility-->r.activity.makeVisible@ActivityThread.java-->makeVisible
+-->wm.addView(mDecor)@Activity.java-->addView@Window.LocalWindowManager.java-->super.addView--addView
+-->CompatModeWrapper.mWindowManager.addView-->addView{
+- 创建ViewRootImpl,new ViewRootImpl
+- 向ViewRootImpl中加入View，root.setView(view, wparams, panelParentView)
+}@WindowManagerImpl.java
+
+makeVisible-->mDecor.setVisibility@Activity.java-->setVisibility-->setFlags-->invalidate
+-->invalidate(true)@View.java
+
+加入窗口：
+(通过Session将window加入WindowManager)
+addView(创建ViewRootImpl)-->root.setView@WindowManagerImpl.java-->setView-->sWindowSession.add
+(new W(this))@ViewRootImpl.java-->add-->mService.addWindow@Session.java-->addWindow(创建WindowState，
+并加入到容器中)-->win.attach@WindowManagerService.java-->attach-->mSession.windowAddedLocked
+@WindowState.java-->windowAddedLocked-->(增加窗口数目)mNumWindow(mService.mSessions.add(this)@Session.java
+
+beginLayout(判断是否是导航栏，状态栏并设置位置)@PhoneWindowManagerService.java-->(计算窗口位置)
+computeFrameLw@WindowState.java
+----------------------------
+
+加入应用的窗口标记：
+startActivityLocked-->mService.mWindowManager.addAppToken@ActivityStack.java-->
+addAppToken-->new AppWindowToken@WindowManagerService.java
+
+activity窗口：
+setAppStartingWindow-->addWindowToListInOrderLocked@WindwoManagerService.java
+
+setAppStartingWindow-->H.handleMessage(ADD_STARTING)-->mPolicy.addStartingWindow@WindowMangerService.java
+-->addStartingWindow-->PolicyManager.makeNewWindow--wm.addView@PhoneWindowManager.java
+
+
+resumeTopActivityLocked-->mService.mWindowManager.setAppStartingWindow@ActivityStack.java
+
+startActivityLocked-->mService.mWindowManager.setAppStartingWindow@ActivityStack.java
+
+-----------------------------
+增加窗口标记：壁纸，输入法
+addWindowToken
+
+增加窗口标记：应用
+addAppToken
+
+增加窗口：session(应用)，
+addWindow
+___________________________
+activity窗口切换：
+过度动画的一些定义：
+TRANSIT_ACTIVITY_OPEN  /在同一个task中一个activity窗口上，一个activity窗口正被打开
+TRANSIT_ACTIVITY_CLOSE /在同一个task中，最上的activity窗口正被关闭，其下的窗口将被显示
+TRANSIT_TASK_OPEN      /一个task中的窗口被打开，遮盖另个task中的窗口
+TRANSIT_TASK_CLOSE     /一个task中的窗口被关闭，另一个task中的窗口将被显示
+
+prepareAppTransition(transit,boolean)-->mNextAppTransition = transit--sendMessageDelayed
+(APP_TRANSITION_TIMEOUT,发送延迟5s消息)-->H.handleMessage(APP_TRANSITION_TIMEOUT)-->
+performLayoutAndPlaceSurfacesLocked@WindowAMangerService.java
+
+
+executeAppTransition-->performLayoutAndPlaceSurfacesLocked{
+1. 由于内存关系，移除mForceRemoves中的窗口removeWindowInnerLocked
+2. performLayoutAndPlaceSurfacesLockedInner
+3. 移除动画窗口mPendingRemove
+4. 最多6次重复布局requestTraversalLocked
+}-->requestTraversalLocked-->mH.sendEmptyMessage(H.DO_TRAVERSAL)-->H.handleMessage(DO_TRAVERSAL)-->
+performLayoutAndPlaceSurfacesLocked@WindowManagerService.java
+
+
+performLayoutAndPlaceSurfacesLockedInner{
+. 窗口焦点发生变化
+. Surface.openTransaction
+.
+.
+.
+}@WindowManagerService.java
+
+
+---------------------------
+隐藏壁纸窗口：在performLayoutAndPlaceSurfacesLockedInner中执行
+mWallpaperTarget      //当前可视的壁纸窗口
+mLowerWallpaperTarget //当前正在壁纸切换的状态，这个为切换过程中较底层的窗口
+mUpperWallpaperTarget //切换过程中较高层次的窗口
+
+animateAwayWallpaperLocked-->adjustWallpaperWindowsLocked@WindowManagerService.java
+
+
+---------------------------
+窗口层次：
+WINDOW_LAYER_MULTIPLIER = 5; //每层的增加数为5，为窗口间可能的surface预留
+
+assignLayersLocked(窗口的层次，动画窗口的层次)@WindowManagerService.java
+
+---------------------------
+管理状态栏,锁屏窗口：判断是否将它们显示
+
+FLAG_SHOW_WHEN_LOCKED //窗口标识位，视窗口能够显示在锁屏窗口上，当改窗口结束，回到锁屏界面
+FLAG_DISMISS_KEYGUARD //窗口标识位，使非安全锁屏窗口消失(不能使要密码等安全校验的锁屏消失)
+
+beginAnimationLw(初始化各状态)--animatingWindowLw(根据窗口标识位，判断状态栏窗口，锁屏窗口是否显示)
+--finishAnimationLw(根据前一步的判断，设置状态栏，锁屏窗口，决定是否重新窗口布局)@PhoneWindowManager.java
+
+___________________________
+添加要移除的窗口：
+stepAnimationLocked-->finishExit-->mService.mPendingRemove.add@WindowStateAnimator.java
+
+stepAnimationLocked-->mAppToken.windows.get(i).mWinAnimator.finishExit@AppWindowAnimator.java
+
+animate-->performAnimationsLocked-->updateWindowsAndWallpaperLocked-->
+winAnimator.stepAnimationLocked@WindowAnimator.java
+
+animate-->updateWindowsAppsAndRotationAnimationsLocked-->stepAnimationLocked@WindowAnimator.java
+
+
+frameworks/base/services/java/com/android/server/wm/WindowAnimator.java
+===========================
+statusBar的窗口:
+super.start-->createAndAddWindows-->addStatusBarWindow-->makeStatusBarView-->
+WindowManagerImpl.getDefault().addView@TabletStatusBar.java-->sWindowManager.addView-->
+addView@WindowMangerImpl.java-->addView(View, ViewGroup.LayoutParams,CompatibilityInfoHolder, boolean)
+-->root.setView@WindowManagerImpl.java-->setView(初始化mView)@ViewRootImpl.java
+
+
+addView：将要加入的view保存到mViews[]中，新建一个ViewRootImpl加入到mRoots[]中，最后
+调用root.setView(view,...)
+
+===========================
+壁纸窗口：
+
+updateSurface-->mSession.add@WallpaperService.java-->add-->mService.addWindow@Session.java-->
+addWindow-->addWindowToListInOrderLocked@WindwoManagerService.java
+
+
+adjustWallpaperWindowsLocked-->isWallpaperVisible@WindowManagerService.java
+
+
+performLayoutAndPlaceSurfacesLockedInner-->updateWallpaperVisibilityLocked-->
+isWallpaperVisible@WindowManagerService.java
+
+===========================
+fakeWindow全屏时接收事件：
+
+beginLayoutLw-->WindowManagerFuncs.addFakeWindow(InputEventReceiver.Factory)@PhoneWindowManager.java-->addFakeWindow-->mInputMonitor.updateInputWindowsLw@WindowManagerService.java-->updateInputWindowsLw
+-->addInputWindowHandleLw--mService.mInputManager.setInputWindows@InputMOnitor.java-->
+setInputWindows@InputManagerService.java-->nativeSetInputWindows-->nativeSetInputWindows
+-->im->setInputWindows-->NativeInputManager::setInputWindows-->mInputManager->getDispatcher()->setInputWindows
+@com_android_server_input_InputManagerService.cpp-->InputDispatcher::setInputWindows@InputDispatcher.cpp
+
+============================
+policy：
+布局：
+performLayoutLockedInner-->mPolicy.beginLayoutLw--mPolicy.layoutWindowLw@WindowManagerService.java-->layoutWindowLw-->win.computeFrameLw@PhoneWindowManager.java-->computeFrameLw@WindowState.java
+
+
+
+performLayoutAndPlaceSurfacesLocked-->performLayoutAndPlaceSurfacesLockedInner-->performLayoutLockedInner
+
+updateFocusedWindowLocked-->performLayoutLockedInner
+
+H.handleMessage(DO_TRAVERSAL)-->performLayoutAndPlaceSurfacesLocked
+
+relayoutWindow-->performLayoutAndPlaceSurfacesLocked
+
+setAppStartingWindow-->performLayoutAndPlaceSurfacesLocked
+
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+frameworks/base/services/java/com/android/server/wm/WindowState.java
+____________________________
+应用启动之间会启动starting window，用来显示启动过程的内容
+
+____________________________
+窗口管理：
+
+窗口布局：
+performTraversals-->relayoutWindow-->sWindowSession.relayout@ViewRootImpl.java-->
+relayout-->mService.relayoutWindow@Session.java-->relayoutWindow@WindowMangerService.java
+
+
+窗口可视变化：
+sendAppVisibilityToClients-->win.mClient.dispatchAppVisibility
+
+setTokenVisibilityLocked-->wtoken.sendAppVisibilityToClients
+
+setAppVisibility-->wtoken.sendAppVisibilityToClients
+
+setAppStartingWindow-->wtoken.sendAppVisibilityToClients
+
+_____________________________
+窗口方位：
+updateOrientationFromAppTokensLocked
+
+resumeRotationLocked
+
+updateRotationUnchecked
+
+performLayoutAndPlaceSurfacesLockedInner
+
+stopFreezingDisplayLocked-->
+
+
+updateRotationUncheckedLocked-->mPolicy.rotationForOrientationLw@WindowManagerService.java
+-->rotationForOrientationLw@PhoneWindowManger.java
+
+mLandscapeRotation   // default landscape rotation,横屏视图
+mSeascapeRotation    // "other" landscape rotation, 180 degrees from mLandscapeRotation
+mPortraitRotation    // default portrait rotation,竖屏视图
+mUpsideDownRotation  // "other" portrait rotation
+
+宽大于高的默认是平板，否则是手机：
+setInitialDisplaySize(若屏幕宽大于高，则横屏角度为Surface.ROTATION_0。否则竖屏为Surface.ROTATION_0)
+@PhoneWindowManager.java
+
+
+获取应用需要的方位：
+updateOrientationFromAppTokensLocked(更新mForcedAppOrientation，窗口和应用请求的方向值)-->
+computeForcedAppOrientationLocked-->getOrientationFromWindowsLocked(从保存的窗口中，获取最上面的窗口的方向)
+--(如果窗口有应用信息，则从应用中获取方向)getOrientationFromAppTokensLocked(获取应用请求的方向)
+
+
+
+=============================
+获取主题：
+getTheme-->Resources.selectDefaultTheme@ContextImpl.java-->selectDefaultTheme(Theme,Theme_Holo,Theme_DeviceDefault)
+-->selectSystemTheme(根据系统版本返回合适的主题，版本jb返回Theme_DeviceDefault)@Resources.java
+
+frameworks/base/core/res/res/values/themes_device_defaults.xml
+
+获取主题属性：
+getWindowStyle@PhoneWindow.java-->mContext.obtainStyledAttributes@Window.java-->
+obtainStyledAttributes-->getTheme().obtainStyledAttributes@Context.java-->Theme.
+obtainStyledAttributes-->getCachedStyledAttributes@Resources.java
+
+
+recycle(赋值mResources.mCachedStyledAttributes=this，实现缓存)@TypedArray.java
+
+setContentView{
+generateLayout(根据产生的窗口，获取默认的主题，再根据主题载入对应的容器)
+mLayoutInflater.inflate(layoutResID, mContentParent)//将View加入到activity
+}
+
+
+
+
+
+DecorView extends FrameLayout implements RootViewSurfaceTaker
+
+
+
+frameworks/base/core/java/com/android/internal/policy/PolicyManager.java
+frameworks/base/policy/src/com/android/internal/policy/impl/Policy.java
+frameworks/base/core/java/android/view/ViewRootImpl.java
+frameworks/base/core/java/android/view/WindowManagerImpl.java
+frameworks/base/services/java/com/android/server/wm/Session.java
+frameworks/base/core/java/android/content/Context.java
+frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/core/java/android/content/res/Resources.java
+

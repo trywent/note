@@ -1,0 +1,186 @@
+I2C:
+i2c_init
+
+
+board_late_init-->rk_i2c_init{
+- i2c_set_bus_num(1/4)
+- i2c_init-->rk_i2c_init@rk_i2c.c
+}@rk30xx.c
+
+
+uboot/board/rockchip/rk30xx/rk30xx.c
+uboot/drivers/i2c/rk_i2c.c
+
+==================
+hush:
+背光：gpio set 0x31d //29
+
+led：gpio set 0x12 //18
+
+t136: gpio 0x30a //10
+
+grf:20008000
+
+RK30_PIN0_PC2和RK30_PIN3_PB2
+
+
+
+
+
+
+
+==================
+MBR与PBR的结构不同。http://en.wikipedia.org/wiki/Master_boot_record#PTE
+
+mmc:
+设备注册：
+board_init_r-->mmc_initialize(gd->bd)@board.c-->mmc_initialize-->mmc_register{
+- 设置设备类型，mmc->block_dev.type
+- 设置操作读写函数，mmc->block_dev.block_write = mmc_bwrite...
+- 加入到链表，list_add_tail
+}@rkemmc.c
+
+获取设备:
+mmc_get_dev{
+- 获取对应编号的mmc设备，find_mmc_device
+- 初始化设备，mmc_init
+}@rkemmc.c
+
+块设备：
+get_device_and_partition-->get_device(ifname设备，devstr设备号，)-->get_dev-->block_drvr-->
+get_dev("mmc","0")-->(不同类型的设备对应不同的操作函数，如mmc)mmc_get_dev@part.c
+
+块设备读取：
+disk_read-->cur_dev->block_read@fat.c-->mmc_bread@rkemmc.c-->SdmmcBootReadLBA@sdmmcBoot.c
+
+
+do_load-->fs_set_blk_dev("mmc","0:auto"/*设备编号*/){
+- 获取设备和分区信息。get_device_and_partition(ifname/*设备mmc/usb*/,dev_part_str/*分区*/)
+- 探测设置设备。info->probe-->fat_set_blk_dev@fs.c-->fat_set_blk_dev@fat.c
+}@fs.c
+
+drivers/mmc/rkemmc.c
+disk/part.c
+
+修改：
+int mmc_register(struct mmc *mmc)
+{
+mmc->block_dev.part_type = PART_TYPE_DOS;
+}@uboot/drivers/mmc/rkemmc.c
+
+____________________
+扫描设备：
+uboot_mmc_rescan-->do_mmcops{
+- 获取当前设备编号，get_mmc_num()
+- 扫描rescan命令{
+	- 查找当前编号设备，find_mmc_device(num){
+		- 遍历mmc_devices中设备，查找对应编号的设备
+		}@rkemmc.c
+	- 初始化，mmc_init{
+		- SdmmcInit{
+			- SdmmcReinit
+			}
+		- sdmmcGetcapbility	
+		}
+	}
+- 
+}
+
+SdmmcReinit(0){
+- 设置host中的配置，SDM_Init-->SDC_Init
+- 注册卡，SDM_IOCtrl(SDM_IOCTRL_REGISTER_CARD)
+
+}@sdmmcBoot.c
+
+SDM_IOCtrl{
+- _IdentifyCard{
+	- 设置power，SDC_ControlPower(cardId, TRUE)
+	- 设置bus，SDC_SetHostBusWidth
+	- 设置识别时时钟400k，SDC_UpdateCardFreq-->_ChangeFreq
+	- 发送命令识别卡，_Identify_SendCmd{
+				
+		}
+	- (升级卡设备)SD20_Init-->_SD_DecodeCID
+	- (emmc设备)
+	}
+}@hw_SDM.c
+
+common/cmd_mmc.c
+board/rockchip/common/common/emmc/sdmmcBoot.c
+board/rockchip/common/common/emmc/hw_SDM.c
+
+#define RK_SD_BOOT
+#define DEBUG_FLASH
+#define DEBUG_MSG
+log:
+MSG:Card Identify SUCCESS                                                       
+MSG:SDHC Card                                                                   
+MSG:Manufacture Data:2012.9                                                     
+MSG:Use Wide bus mode                                                           
+MSG:Use High speed mode  
+
+
+====================
+usb:
+
+usb启动：
+startRockusb{
+- 从USB引导,UsbBoot{
+		- usb复位，UsbPhyReset
+		- USB控制器寄存器初始化，UdcInit
+		- 中断寄存器初始化，EnableOtgIntr
+	}
+- UsbHook{
+	
+	}usbCtrl.c
+}@rk30xx.c
+
+
+
+中断：
+IrqHandler{
+
+- usb中断，UsbIsr
+- gpio中断处理，gpio_isr
+}Isr.c
+
+
+UsbIsr{
+
+}@usbIsr.c
+
+
+board/rockchip/common/common/rockusb/rockusb.h
+board/rockchip/common/common/rockusb/rockusb.c
+board/rockchip/common/platform/rk30/Isr.c
+board/rockchip/common/common/rockusb/usbIsr.c
+board/rockchip/common/common/rockusb/usbCtrl.c
+
+====================
+emmc:
+
+board_init_r@board-->env_relocate@env_common.c-->env_relocate_spec@env_rk.c-->StorageInit{
+- 将卡信息SDCardInfoTag初始化为0，SdmmcSDMInit
+- 遍历可启动设备，顺序SDCARD，FLASH，SDMMC，SPI。Init{
+	- 设备存在设置对应的标识
+	- 检测是否从sd卡启动，BootFromSdCard
+	}
+}@storage.c
+
+//emmc设备
+emmcFunOp->Iinit(SDMMC_SDC_ID/*2*/)-->SdmmcInit-->SdmmcReinit@sdmmcBoot.c-->
+SDM_IOCtrl-->MMC_Init@hw_SDM.c
+
+
+
+board/rockchip/common/common/emmc/hw_SDM.c
+board/rockchip/common/common/storage.c
+common/env_common.c
+common/env_rk.c
+arch/arm/lib/board.c
+
+_______________
+sd卡设备：
+
+uboot/board/rockchip/common/common/emmc/hw_SD.c
+

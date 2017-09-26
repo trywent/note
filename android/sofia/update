@@ -1,0 +1,4 @@
+main{
+- sql_SystemUpdate
+- fyt_wait_mcu_reboot
+}

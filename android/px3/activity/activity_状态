@@ -1,0 +1,148 @@
+//
+start:
+
+app.thread.scheduleLaunchActivity
+
+
+
+______________
+resumed
+
+______________
+pause:
+/*
+- 执行onPause
+- 调用resumeTopActivitiesLocked(prev)
+*/
+startPausingLocked{
+- 设置mResumedActivity为空
+- 设置mPausingActivity
+- 执行，prev.app.thread.schedulePauseActivity@ApplicationThreadNative.java-->
+	schedulePauseActivity-->handlePauseActivity{
+	- 应用端执行暂停，performPauseActivity
+	- 通知服务端，ActivityManagerNative.getDefault().activityPaused
+	}@ActivitThread.java
+- 发送暂停超时，mHandler.sendMessageDelayed(PAUSE_TIMEOUT_MSG)
+}@ActivityStack.java
+
+//应用端执行onPause后，通知服务端
+activityPaused-->activityPausedLocked{
+- 移除超时消息，removeMessages(PAUSE_TIMEOUT_MSG)
+- 若当前activity是mPausingActivity，执行completePauseLocked{
+	- 若activity为finishing，finishCurrentActivityLocked
+	- 若因为config变化则销毁，destroyActivityLocked
+	  否则,{
+		- 加入mStoppingActivities.add
+		- 太多等待结束则强制执行，mStackSupervisor.scheduleIdleLocked
+		- 
+		}
+	- 清除mPausingActivity
+
+	- 获取焦点栈，mStackSupervisor.getFocusedStack
+	- mStackSupervisor.resumeTopActivitiesLocked(传入上个prev)
+	}
+}
+
+______________
+stoping:
+activityIdleInternalLocked-->processStoppingActivitiesLocked(remove){
+- 确保所有resume的activity可见，allResumedActivitiesVisible
+  //要stop的activity可能在等待resumedActivity可见。
+- 将要stop的activity隐藏，mWindowManager.setAppVisibility
+- 若需要移除，mStoppingActivities.remove
+}
+______________
+finishing:
+
+finishActivity@Activity.java-->finishActivity@ActivityManagerNative.java-->
+finishActivity@ActivityManagerService.java-->requestFinishActivityLocked-->
+finishActivityLocked{
+- 设置activity为finishing，r.makeFinishing
+- 当前应用是resumed需先暂停，startPausingLocked-->(应用端执行onPause后)activityPaused-->
+	activityPausedLocked-->	completePauseLocked{
+		- finishCurrentActivityLocked
+		- mStackSupervisor.resumeTopActivitiesLocked
+		}
+
+- finishCurrentActivityLocked{
+	- 设置r.state= FINISHING
+	}
+}@ActivityStack.java
+
+______________
+destory:
+finishCurrentActivityLocked-->destroyActivityLocked{
+- 存在app{
+	- r.app.thread.scheduleDestroyActivity
+	- (DESTROY_TIMEOUT_MSG)-->activityDestroyedLocked
+	}
+- 不存在app，removeActivityFromHistoryLocked
+}
+
+
+
+
+______________
+idle:
+
+
+handleResumeActivity-->
+Looper.myQueue().addIdleHandler(new Idler())-->(消息队列进入空闲)Idler.queueIdle
+-->am.activityIdle@ActivityThread.java-->activityIdle@ActivityManagerService.java-->
+activityIdleInternalLocked{
+- 
+}@ActivityStackSupervisor.java
+
+______________
+sleep:
+
+scheduleSleeping-->handleSleeping
+
+______________
+缩略图：
+activityIdleInternalLocked-->requestThumbnail@ActivityStackSupervisor.java
+-->handleRequestThumbnail-->createThumbnailBitmap@ActivityThread.java
+
+handleRequestThumbnail@ActivityThread.java-->reportThumbnail-->sendPendingThumbnail
+@ActivityManagerService.java
+
+
+
+
+frameworks/base/services/java/com/android/server/am/ActivityStack.java
+frameworks/base/core/java/android/app/ApplicationThreadNative.java
+==============
+activity:
+
+//恢复
+resumeTopActivityLocked(RESUMEED)
+
+//暂停
+startPausingLocked(PAUSING)
+
+
+activityPausedLocked(PAUSED)
+
+
+//停止
+stopActivityLocked(STOPING)
+activityStoppedLocked(STOPED)
+
+//结束 设置ActivityRecord.state
+finishCurrentActivityLocked(FINISHING/若当前不能结束则STOPING){
+- 设置r.state= FINISHING
+}
+
+
+//销毁
+destroyActivityLocked(DESTROYING/DESTROYED)-->
+
+
+=============
+activity设置可见：
+resumeTopActivityLocked{
+- mWindowManager.prepareAppTransition
+- 隐藏prev，mWindowManager.setAppVisibility(prev.appToken, false)
+- 显示next，mWindowManager.setAppVisibility(next.appToken, true)
+}
+

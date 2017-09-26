@@ -1,0 +1,2 @@
+include device/rockchip/common/device_sofia.mk
+@device/rockchip/sofia3gr_car/device.mk

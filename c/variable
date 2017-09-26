@@ -1,0 +1,77 @@
+作用域，生存期
+
+xxx //全局
+static xxx //当前文件可用
+{
+xxx //局部。当前作用域，当前执行块的生存期
+static xxx //静态局部。当前作用域，程序执行的生存期
+}
+
+______________________
+声明：
+
+变量的声明与操作符的优先级基本一样
+
+引伸声明："array of" [] 和"function returning" () 类型的操作优先级比"pointer to" *高
+
+声明的解析通常：以xxx是开始：foo is ...，并以基本类型结尾：foo is ... int
+中间部分的填充规则可总结为："go right when you can, go left when you must"
+
+从变量名开始，根据优先级和解析引申类型标识，尽可能的向左处理字符(不要进入括号)。然后向右处理。
+
+A simple example:
+long **foo[7];
+1)foo is ... long
+2)foo is array of 7 ... long
+3)foo is array of 7 pointer to ... long
+4)foo is array of 7 pointer to pointer to long
+
+
+
+char *(*(**foo [][8])())[];
+
+foo是     char
+f是二维数组指向， 指向函数返回值指向，字符指针的数组 
+
+A hairy example
+
+char *(*(**foo [][8])())[];
+1)foo is ... char
+
+最里层是数组，和指针，向右解析：
+2)foo is array of ... char
+
+向右：
+3)foo is array of array of 8 ... char
+
+碰到括号，向左解析：
+4)foo is array of array of 8 pointer to ... char
+
+5)foo is array of array of 8 pointer to pointer to ... char
+
+碰到函数向右：
+6)foo is array of array of 8 pointer to pointer to function returning ... char
+
+碰到括号，向左
+7)foo is array of array of 8 pointer to pointer to function returning pointer to ... char
+
+碰到数组向右：
+8)foo is array of array of 8 pointer to pointer to function returning pointer to array of ... char
+
+向左：
+9)foo is array of array of 8 pointer to pointer to function returning pointer to array of pointer to char
+
+
+======================
+const:修饰左边的元素
+
+Actually, according to the standard, const modifies the element directly to its left. The use of const at the beginning of a declaration is just a convenient mental shortcut. So the following two statements are equivalent:
+
+char const * pointerToConstantContent1;
+const char * pointerToConstantContent2;
+In order to ensure the pointer itself is not modified, const should be placed after the asterisk:
+
+char * const constantPointerToMutableContent;
+To protect both the pointer and the content to which it points, use two consts.
+
+char const * const constantPointerToConstantContent;

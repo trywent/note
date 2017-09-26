@@ -1,0 +1,154 @@
+===============================
+scripts的调用方法：
+
+/path/to/script 	# 脚本中指定shell
+/bin/sh /path/to/script # 命令在自己的shell中执行，当前shell的环境不受命令影响
+. script        	# 类似将script中的命令拷贝到当前窗口执行。命令执行后的变量都在这个窗口中可用
+source script   	# 与"."的作用相同
+
+
+___________________
+#!/bin/bash          #"shebang"表该脚本中的命令，用哪个shell执行
+
+===============================
+rename 's/\.c/\.h/'  ./*              //批量改后缀
+
+
+___________________
+判断：
+if/then结构判断命令的退出结果，根据结果执行相应的命令。
+
+"["等同test，根据参数的对比，或文件的判断返回相应的结果。
+
+Bash中[[...]]关键字扩展test命令。bash将[[ $a -lt $b ]]看作一个返回退出结果的元素。
+
+((...))和let... 结构返回退出状态值。根据表达式值是否为非0，返回一个退出状态值(表达式为0，状态值为1。反之)。
+
+if不仅仅能够判断表达式，也能够判断命令的执行。
+
+
+___________________
+正则表达式：
+是一串字符。能被解释成不同含义的字符称为元字符。正则表达式是一串字符或元字符的，用来定义匹配模式
+
+正则表达式包含以下:
+字符集，保持字面意思的字符。
+
+anchor(锚，如：^,$..),指定在文本中的某一行，正则表达式(RE)用来匹配字串。
+
+Modifiers. 用来扩展或缩小RE的匹配范围。包括星号(asterisk), 括号(brackets), 反斜杠(backslash)
+
+星号 -- * -- 匹配任意数的重复字符。"1133*" 匹配: 113, 1133, 1133333。
+
+句号 -- . -- 匹配至少一个字符除了换行符。"13." : 1133, 11333, 不包括13
+
+取反符 -- ^ -- 表示一行开头，或字串的取反。
+
+货币符 -- $ -- 在表达式的末尾，表示一行末尾。at the end of an RE matches the end of a line.
+
+方括号 -- [...] -- 包含要匹配的一个字符
+
+"[xyz]" 匹配x, y, z其中之一
+
+"[c-n]" 匹配从c到n范围的字符
+
+"[B-Pk-y]" 匹配从B 到 P 和k 到 y的字符
+
+"[a-z0-9]" 匹配小写字母或数字
+
+"[^b-d]" 匹配不在 b到 d范围内的其他字符
+
+The backslash -- \ -- 转义字符，是使字符不再是转义，而是表示字面意思。
+
+转义"尖括号" -- \<...\> -- 表示字串边界.
+
+问号 -- ? -- 匹配RE的0个或一个字符 
+
+加号 -- + -- 匹配RE的一个或多个字符.与*类似，但不匹配0个
+
+转义花括号 -- \{ \} -- 指明匹配数字的个数。[0-9]\{5\}匹配5个数字
+
+小括号 -- ( ) -- 限定RE范围.
+
+或符号 -- | -- 匹配任一可选的匹配字符
+_______________________
+变量：
+var="xxx"   //变量名紧接=，值也紧随=，中间没有空格
+var=${x,,}  //输出小写字符串，使用一个","只转换首字符
+var=${x^^}  //输出大写字符串，使用一个"^"只转换首字符
+_______________________
+参数：
+$0 这个程式的执行名字
+$n 这个程式的第n个参数值，n=1..9
+$* 这个程式的所有参数,此选项参数可超过9个。
+$# 这个程式的参数个数
+$$ 这个程式的PID(脚本运行的当前进程ID号)
+$! 执行上一个背景指令的PID(后台运行的最后一个进程的进程ID号)
+$? 执行上一个指令的返回值 (显示最后命令的退出状态。0表示没有错误，其他任何值表明有错误)
+$- 显示shell使用的当前选项，与set命令功能相同
+$@ 跟$*类似，但是可以当作数组用
+
+=======================
+修复文件系统：
+sudo fsck.msdos -aw /dev/sdb1
+sudo fsck.msdos -r /dev/sdb1  //worked
+
+动手损坏系统：
+# dd bs=512 count=10 seek=100 if=/dev/urandom of=/dev/block/vold/259:1
+
+fsck_msdos -p -f /dev/block/mmcblk0p9
+
+编码转换：
+iconv -f gb2312 -t utf8 foxmail通讯录.csv > thunderbird.csv
+
+挂在img文件：
+mount -t filetype -o loop "pathto/image" /mnt
+
+strace命令：跟踪系统调用流程
+
+find过滤文件夹-path -prune -o
+find . -path ./misc -prune -o -name '*.txt' 
+
+复制指定文件：
+find <start directory> -iname "<all my files type>" -exec cp {} <target_dir> \;
+
+赋值文件并创建目录：
+test -d "$d" || mkdir -p "$d" && cp file "$d"
+
+
+==========================
+改变UUID：
+sudo blkid  //查看
+
+uuidgen  //生成UUID f0acce91-a416-474c-8a8c-43f3ed3768f9 
+
+sudo tune2fs /dev/sde5 -U f0acce91-a416-474c-8a8c-43f3ed3768f9 //改变UUID
+
+
+dmidecode|grep -A16 "MemoryDevice"|grep 'Speed' 
+
+
+__________________________
+循环删除文件：
+find . -name "*~" -print0 | xargs -0 rm -rf
+
+归档过滤：
+tar  -zcvf /backup/filename.tgz PATH --exclude="./folder" --exclude="./.repo"
+
+
+列出文件名:
+find . -name .svn -exec ls {} \;
+
+删除：
+find . -name .svn -exec rm -rf {} \;
+__________________________
+字符转二进制：
+echo -n 5a | sed 's/\([0-9A-F]\{2\}\)/\\\\\\x\1/gI' | xargs printf
+
+__________________________
+$ split -b 1M <archive-name>.tar.gz "parts-prefix"
+$ cat vid* > test.tar.gz
+
+
+重新加载udev rules:
+udevadm control --reload-rules

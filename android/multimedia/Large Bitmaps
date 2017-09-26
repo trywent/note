@@ -1,0 +1,23 @@
+读取图像资源前检查资源大小：
+BitmapFactory.Options options = new BitmapFactory.Options();
+options.inJustDecodeBounds = true;   //设置后，仅读取资源大小
+BitmapFactory.decodeResource(getResources(), R.id.myimage, options);
+int imageHeight = options.outHeight;
+int imageWidth = options.outWidth;
+String imageType = options.outMimeType;
+
+加载已经缩小的图片资源:
+options.inSampleSize  //设置缩小比例
+
+    // First decode with inJustDecodeBounds=true to check dimensions
+    final BitmapFactory.Options options = new BitmapFactory.Options();
+    options.inJustDecodeBounds = true;
+    BitmapFactory.decodeResource(res, resId, options);
+
+    // Calculate inSampleSize
+    options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+
+    // Decode bitmap with inSampleSize set
+    options.inJustDecodeBounds = false;
+    return BitmapFactory.decodeResource(res, resId, options);
+

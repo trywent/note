@@ -1,0 +1,57 @@
+
+头文件：
+#include <asm/gpio.h>@kernel/include/linux/gpio.h
+
+#include <mach/gpio.h>@kernel/arch/arm/include/asm/gpio.h
+
+gpio有5组bank：
+#include <plat/gpio.h>@kernel/arch/arm/mach-rk30/include/mach/gpio.h
+
+#include <asm-generic/gpio.h>@kernel/arch/arm/plat-rk/include/plat/gpio.h
+
+@kernel/include/asm-generic/gpio.h
+
+
+gpio操作函数实现：
+
+input-->chip->direction_input
+
+output-->chip->direction_output-->rk30_gpiolib_pull_updown@gpio-rk30.c
+
+pull_updown-->chip->pull_updown
+
+
+kernel/drivers/gpio/gpiolib.c
+
+if (gpio==0x11d)printk(">>>>>>gpio set%d\n",value);
+================
+平台gpio：
+MACHINE_START.init_irq@board-rkpx3-sdk.c-->rk30_init_irq@common.c-->rk30_gpio_init{
+- 遍历rk30_gpio_banks，并加入{
+	- gpiochip_add
+	- 设置每个io口的中断
+	}
+}@gpio-rk30.c
+
+rk30_gpio_sysinit-->register_syscore_ops
+
+kernel/drivers/gpio/gpio-rk30.c
+kernel/arch/arm/mach-rk30/common.c
+================
+iomux:
+map_io@board-rkpx3-sdk.c-->rk30_map_io-->rk30_iomux_init@common.c-->iomux_init-->
+(循环初始化默认配置)default_mode@iomux.c
+
+kernel/arch/arm/plat-rk/iomux.c
+kernel/arch/arm/mach-rk30/common.c
+kernel/arch/arm/mach-rkpx3/board-rkpx3-sdk.c
+
+_________________
+UART0_RTSN 0x1a31:(GPIO1_A3)
+
+<6>[    1.433344] [BT_RFKILL]: ** disable irq
+<4>[    1.433360] >>>>ddd set:0x1a31
+<6>[    1.433370] [BT_RFKILL]: setup rfkil
+
+
+UART1_SIN:(GPIO1_A4)0x1a40

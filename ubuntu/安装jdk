@@ -1,0 +1,3 @@
+add-apt-repository ppa:openjdk-r/ppa
+apt-get update
+sudo apt-get install openjdk-7-jdk

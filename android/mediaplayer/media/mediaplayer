@@ -1,0 +1,284 @@
+服务初始化：
+
+main--> MediaPlayerService::instantiate@main_mediaserver.cpp
+MediaPlayerService::instantiate-->addService(String16("media.player"), new MediaPlayerService())@
+MediaPlayerService.cpp
+
+frameworks/av/media/mediaserver/main_mediaserver.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+=====================
+mediaplayer:
+-new MediaPlayer();
+-setAudioStreamType(AudioManager.STREAM_MUSIC)
+-setDataSource(getApplicationContext(), myUri)
+-prepare()//获取源，解码。导致耗时长，mediaPlayer使用另一线程执行
+-start()，pause，stop
+-release
+
+_____________________
+监听错误：
+setOnErrorListener(OnErrorListener)@MediaPlayer.java
+
+native_setup-->android_media_MediaPlayer_native_setup-->mp->setListener@android_media_MediaPlayer.cpp
+
+收到并处理错误：
+MediaPlayer::notify-->listener->notify@mediaPlayer.cpp-->JNIMediaPlayerListener::notify
+-->env->CallStaticVoidMethod(mClass, fields.post_event)@android_media_MediaPlayer.cpp
+-->postEventFromNative-->mp.mEventHandler.sendMessage(发送消息)-->
+EventHandler.handleMessage(MEDIA_ERROR)-->mOnErrorListener.onError@MediaPlayer.java
+
+mediaPlayer销毁：
+IMediaDeathNotifier::DeathNotifier::binderDied-->notifier->died@IMediaDeathNotifier.cpp
+-->MediaPlayer::died--> notify(MEDIA_ERROR_SERVER_DIED)@mediaplayer.cpp
+
+frameworks/av/media/libmedia/IMediaDeathNotifier.cpp
+_____________________
+初始：
+new MediaPlayer-->native_setup@MediaPlayer.java-->android_media_MediaPlayer_native_setup(设置player)
+@android_media_MediaPlayer.cpp-->new MediaPlayer(创建本地mediaPlayer)@mediaplayer.cpp
+
+_____________________
+设置流类型：
+setAudioStreamType@MediaPlayer.java-->android_media_MediaPlayer_setAudioStreamType
+-->mp->setAudioStreamType@android_media_MediaPlayer.cpp-->MediaPlayer::setAudioStreamType
+(设置mStreamType值)@mediaplayer.cpp
+
+服务端在prepare时设置：
+MediaPlayer::prepareAsync_l-->mPlayer->setAudioStreamType(mStreamType)@mediaplayer.cpp
+-->MediaPlayerService::Client::setAudioStreamType-->mAudioOutput->setAudioStreamType
+@MediaPlayerService.cpp
+
+_____________________
+设置源/创建player：
+setDataSource@MediaPlayer.java-->android_media_MediaPlayer_setDataSourceFD
+@android_media_MediaPlayer.cpp-->setDataSource{
+- 获取服务 service(getMediaPlayerService()){
+	- 获取服务管理器，defaultServiceManager()
+	- 获取播放器服务，sm->getService(String16("media.player"))
+	- 设置服务，sMediaPlayerService = interface_cast<IMediaPlayerService>(binder)
+	}
+- 通过服务创建palyer，service->create(this, mAudioSessionId)
+- doSetRetransmitEndpoint(player)
+- 设置源，player->setDataSource(url, headers)
+- 设置mPlayer，attachNewPlayer(player)
+}@mediaplayer.cpp
+
+_____________________
+创建服务端player代理:
+
+service->create@mediaplayer.cpp-->create{
+- remote()->transact(CREATE, data, &reply)-->(服务端)create{
+	- 创建服务端client,new Client()
+	- 将client加入容器，mClients.add
+	}@MediaPlayerService.cpp
+- 返回服务，interface_cast<IMediaPlayer>-->BpMediaPlayer@IMediaPlayer.cpp
+}@IMediaPlayerService.cpp
+
+
+服务端播放器设置源：
+player->setDataSource@mediaplayer.cpp-->(跨进程)Client::setDataSource(source){
+- 资源路径是"content://"{
+	- 打开资源文件，android::openContentProviderFile
+	- setDataSource(fd...)
+	}
+- 其他资源{
+	- 获取播放器类型，getPlayerType(url)-->getDefaultPlayerType(默认播放器类型)
+	- 创建播放器，setDataSource_pre{
+		- 根据类型创建播放器，Client::createPlayer
+		- 设置声音输出类，new AudioOutput
+		- 设置AudioSink，setAudioSink
+		}
+	- 设置源，p->setDataSource(url, headers)-->(假设stageFright)mPlayer->setDataSource-->
+		@StagefrightPlayer.cpp-->AwesomePlayer::setDataSource-->setDataSource_l
+		- 
+		}
+	- setDataSource_post{
+		- p->setRetransmitEndpoint
+		- 设置mPlayer
+		}
+	}
+}@MediaPlayerService.cpp
+
+
+创建播放器：
+createPlayer-->MediaPlayerService::Client::createPlayer{
+- 是否存在mPlayer且类型与要创建的player类型一致，不一致则清除mPlayer
+- 创建player,MediaPlayerFactory::createPlayer{
+	- 从sFactoryMap获取对应类型factory，sFactoryMap.valueFor(playerType
+	- 创建播放器，factory->createPlayer-->(如创建stagefright)new StagefrightPlayer(创建AwesomePlayer)
+	- 初始化，p->initCheck()
+	}@MediaPlayerFactory.cpp
+- 设置UID，setUID
+}@MediaPlayerService.cpp
+
+//真正的工作将会在finishSetDataSource_l中执行，
+AwesomePlayer::setDataSource-->setDataSource_l{
+- 设置mStats.mURI = mUri，
+}@AwesomePlayer.cpp
+
+---------------------
+注册播放器factory：
+
+内置factory：
+MediaPlayerService::MediaPlayerService@MediaPlayerService.cpp-->
+registerBuiltinFactories{
+- registerFactory_l(new StagefrightPlayerFactory(), STAGEFRIGHT_PLAYER)
+- registerFactory_l(new NuPlayerFactory(), NU_PLAYER)
+- registerFactory_l(new TestPlayerFactory(), TEST_PLAYER)
+- registerFactory_l(new ApePlayerFactory(),APE_PLAYER);
+}@MediaPlayerFactory.cpp
+
+frameworks/av/media/libmedia/IMediaPlayerService.cpp
+frameworks/av/media/libmedia/IMediaPlayer.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp
+
+_____________________
+prepare@MediaPlayer.java-->android_media_MediaPlayer_prepare-->
+process_media_player_call@android_media_MediaPlayer.cpp-->
+MediaPlayer::prepare-->MediaPlayer::prepareAsync_l{
+- mPlayer->setAudioStreamType-->(服务端)MediaPlayerService::Client::setAudioStreamType
+	-->mAudioOutput->setAudioStreamType{
+	- mStreamType = streamType
+	}@MediaPlayerService.cpp
+- mPlayer->prepareAsync-->(服务端)MediaPlayerService::Client::prepareAsync-->
+	mPlayer->prepareAsync-->
+}@mediaplayer.cpp
+
+
+_____________________
+start：
+start-->_start@MediaPlayer.java-->android_media_MediaPlayer_start-->getMediaPlayer.start
+@android_media_MediaPlayer.cpp-->MediaPlayer::start-->mPlayer->start@mediaplayer.cpp-->
+MediaPlayerService::Client::start-->getPlayer()->start@MediaPlayerService.cpp
+
+
+frameworks/base/media/java/android/media/MediaPlayer.java
+frameworks/base/media/jni/android_media_MediaPlayer.cpp
+frameworks/av/media/libmedia/mediaplayer.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+_____________________
+_____________________
+
+
+====================
+服务端player:
+- new StagefrightPlayer
+- setDataSource
+- prepareAsync
+- start
+
+服务端设置源时创建mediaplayer:
+MediaPlayerService::Client::createPlayer-->MediaPlayerFactory::createPlayer-->
+StagefrightPlayerFactory->createPlayer-->new StagefrightPlayer-->mPlayer(new AwesomePlayer)
+@MediaPlayerFactory.cpp
+
+
+setDataSource:
+setDataSource-->mPlayer->setDataSource(fd,,)@StagefrightPlayer.cpp-->setDataSource_l{
+- 根据不同源设置Extractor，MediaExtractor::Create
+- setDataSource_l(extractor){
+	- 从源中获取bitrate	
+	- 若是视频源，setVideoSource
+	- 若是音频源，setAudioSource
+	}
+}@AwesomePlayer.cpp
+
+请求调用(从Mediaplayer.java开始)：
+invoke{
+- 
+- 设置tracker，selectTrack-->selectAudioTrack_l(mExtractor->getTrack){
+	- 设置源为tracker，setAudioSource
+	- 初始decoder，initAudioDecoder
+	- 设置时间，seekTo_l
+	- 若正在播放则开始播放，play_l
+	}
+}
+
+prepareAsync：
+prepareAsync-->prepareAsync_l{
+- new AwesomeEvent(onPrepareAsyncEvent)
+- mQueue.postEvent-->onPrepareAsyncEvent-->beginPrepareAsync_l{
+	- 
+	}
+}@AwesomePlayer.cpp
+
+
+start:
+StagefrightPlayer::start-->mPlayer->play-->play_l{
+- 若没有准备，执行prepare_l
+- 设置状态，PLAYING
+- 若音频源不为空,mAudioSource{
+	- 创建，createAudioPlayer_l{
+		- new AudioPlayer
+		- 设置源为mAudioSource，setSource
+		}
+	- 没有视频，mVideoSource为空{
+		- 开始，startAudioPlayer_l{
+			- mAudioPlayer->start
+			}
+		- 若失败，使用软解{
+			- mAudioSource = mOmxSource
+			- mAudioSource->start
+			- createAudioPlayer_l
+			- startAudioPlayer_l	
+			}
+		}
+	}
+- 视频源不为空，mVideoSource{
+	- postVideoEvent_l
+	}
+}@AwesomePlayer.cpp
+
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp
+frameworks/av/media/libmediaplayerservice/StagefrightPlayer.cpp
+frameworks/av/media/libstagefright/AwesomePlayer.cpp
+____________________
+播放器factory：
+MediaPlayerService::MediaPlayerService-->MediaPlayerFactory::registerBuiltinFactories
+-->registerFactory_l@MediaPlayerFactory.cpp
+
+
+frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp
+===================
+audio播放器：
+
+设置源：AudioPlayer::setSource{
+- 设置mSource
+}
+
+播放：
+AudioPlayer::start{
+- 开始源，mSource->start
+- 读取，mSource->read
+- mAudioSink不为空{
+	- mAudioSink->open-->new AudioTrack@MediaPlayerService.cpp
+	- mAudioSink->start
+	}
+- 使用audioTrack{
+	- new AudioTrack
+	- mAudioTrack->initCheck
+	- mAudioTrack->start
+	}
+}
+
+暂停：
+AudioPlayer::pause{
+- 播放剩余数据，mAudioSink->stop/mAudioTrack->stop
+- 立即停止，mAudioSink->pause/mAudioTrack->pause
+}
+
+
+frameworks/av/media/libstagefright/AudioPlayer.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+====================
+
+====================
+Handling audio focus:
+由于只有一个声音输出设备，多任务有可能竞争。只有获得focus的应用才能使用该设备
+从AudioManager调用requestAudioFocus() 来获得focus
+
+每个资源audio，image，video都封装了内部，外部sd卡表的路径：INTERNAL_CONTENT_URI，EXTERNAL_CONTENT_URI
+通过这些路径获取对应的资源.(一般通过mediastore中的类获取URI，在通过contentResolver获取这些URI指定的资源)
+格式content://media/[internal/external]/

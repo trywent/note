@@ -1,0 +1,29 @@
+fat_build_inode-->fat_fill_inode@inode.c-->fat_subdirs-->fat_get_short_entry-->fat_get_entry
+-->fat__get_entry@dir.c-->fat_bmap-->fat_bmap_cluster-->fat_get_cluster@cache.c
+
+
+fat_ent_read{
+- ops->ent_blocknr-->fat_ent_blocknr
+- ops->ent_get
+}@fatent.c
+
+fat_fill_super-->parse_options@inode.c
+
+__fat_fs_error@misc.c
+
+
+
+kernel/fs/fat/fatent.c
+kernel/fs/fat/misc.c
+kernel/fs/fat/inode.c
+kernel/fs/fat/dir.c
+
+
+===================
+出错：
+fat_subdirs{
+- fat_get_short_entry{	
+	- loop
+	}
+}@dir.c
+kernel/fs/fat/dir.c

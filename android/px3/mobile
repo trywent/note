@@ -1,0 +1,37 @@
+模式转换：
+main{
+- MiscManager::Instance
+- 执行模式转换，new G3Dev().handleUsb
+- 加入设备，addMisc(g3)
+}
+
+
+system/vold/main.cpp
+system/vold/G3Dev.cpp
+======================
+service ril-daemon /system/bin/rild@init.rc
+
+main{
+- rilLibPath为空，从kernel获取ID号getBpID。根据id获取路径名property_get
+- 开始mux服务，startmux
+- 加载库，dlopen(rilLibPath, RTLD_NOW)
+- 开始监听事件，RIL_startEventLoop
+- 从库中获取初始化函数，rilInit
+- 初始化函数rilInit，并注册RIL_register
+}
+
+
+获取id：
+getBpID{
+- open("/dev/voice_modem")
+- 获取bid，ioctl(bp_fd,BP_IOCTL_GET_BPID)
+}
+
+
+hardware/ril/rild/rild.c
+______________________
+驱动：
+
+
+include/linux/bp-auto.h
+misc/bp/bp-auto.c

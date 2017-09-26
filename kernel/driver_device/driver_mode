@@ -1,0 +1,100 @@
+总线：
+声明：struct bus_type;//总线名，总线match(用于驱动和设备匹配，可选)
+注册：int bus_register(struct bus_type * bus);//加入到全局总线链表
+
+属性文件：
+struct bus_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct bus_type *, char * buf);
+	ssize_t (*store)(struct bus_type *, const char * buf, size_t count);
+};
+
+static BUS_ATTR(debug,0644,show_debug,store_debug);//等同static bus_attribute bus_attr_debug;
+
+int bus_create_file(struct bus_type *, struct bus_attribute *);
+void bus_remove_file(struct bus_type *, struct bus_attribute *);
+
+###########################################
+设备类：用来描述某一类型的设备(如声音，网络。不一定是同一总线)
+设备类定义了一些设备可用的接口。设备驱动实现这些接口
+
+编程接口：
+typedef int (*devclass_add)(struct device *);
+typedef void (*devclass_remove)(struct device *);
+
+struct device_class input_devclass = {
+        .name		= "input",
+        .add_device	= input_add_device,
+	.remove_device	= input_remove_device,
+};
+ 
+注册，注销类使用函数：
+int devclass_register(struct device_class * cls);
+void devclass_unregister(struct device_class * cls);
+
+设备：
+设备都是关联到驱动，它们会被加入到驱动属于的类中。
+设备类中没有设备的链表，而是通过类中驱动的链表访问设备。
+
+设备驱动：
+驱动在注册时被加入到设备类中。驱动设置device_driver::devclass域说明属于的类
+
+属性文件：
+struct devclass_attribute {
+        struct attribute        attr;
+        ssize_t (*show)(struct device_class *, char * buf, size_t count, loff_t off);
+        ssize_t (*store)(struct device_class *, const char * buf, size_t count, loff_t off);
+};
+static DEVCLASS_ATTR(debug,0644,show_debug,store_debug);//等同static devclass_attribute devclass_attr_debug;
+
+int devclass_create_file(struct device_class *, struct devclass_attribute *);
+void devclass_remove_file(struct device_class *, struct devclass_attribute *);
+
+###########################################
+设备结构： struct device.
+编程接口：
+int device_register(struct device * dev);
+
+struct device * get_device(struct device * dev);
+void put_device(struct device * dev);
+
+属性：
+struct device_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct device *dev, struct device_attribute *attr,
+			char *buf);
+	ssize_t (*store)(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count);
+};
+
+设备属性必须在KOBJ_ADD事件产生前创建。实现这种要求通过定义属性组实现。
+
+#define DEVICE_ATTR(name,mode,show,store)
+
+例：
+static DEVICE_ATTR(type, 0444, show_type, NULL);
+static DEVICE_ATTR(power, 0644, show_power, store_power);
+
+定义了dev_attr_type和dev_attr_power两个struct device_attribute。可以加入到组
+
+static struct attribute *dev_attrs[] = {
+	&dev_attr_type.attr,
+	&dev_attr_power.attr,
+	NULL,
+};
+
+static struct attribute_group dev_attr_group = {
+	.attrs = dev_attrs,
+};
+
+static const struct attribute_group *dev_attr_groups[] = {
+	&dev_attr_group,
+	NULL,
+};
+
+在调用device_register()前，将组关联到设备:
+
+      dev->groups = dev_attr_groups;
+      device_register(dev);
+
+uevent在设备注册时产生，通知用户空间新设备可用。属性文件在注册后生成的，用户空间将不会被通知。

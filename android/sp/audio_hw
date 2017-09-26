@@ -1,0 +1,198 @@
+//audio
+
+//开一个线程处理设备选择
+hal_module_methods.open-->adev_open{
+- 创建tiny_audio_device adev
+- 初始化adev->hw_device{ //设置audio_hw_device
+	- adev_set_parameters //设置参数
+	- adev_open_output_stream //打开output
+	- adev_open_output_stream //打开intput
+	}
+  ///system/etc/audio_hw.xml 解析modem信息
+- adev_modem_parse-->adev_modem_parse
+- 设置mixer,adev->mixer = mixer_open
+- 参数vb_effect_getpara //audio_param
+- adev_config_parse //解析tiny_hw.xml
+- vbc_ctrl_open(adev) //vbc
+- vbc_ctrl_voip_open(voip_res) //创建vbc控制线程
+- stream_routing_manager_create-->stream_routing_thread_entry //创建通路设置进程
+- audio_bt_sco_thread_create //bt 
+}
+
+//解析配置
+adev_open-->adev_config_parse{
+- 文件tiny_hw.xml
+- adev_config_start//解析配置，并保存到adev.dev_cfgs中
+}
+
+//选择路径
+adev_set_parameters-->
+select_devices_signal/select_devices_signal_asyn-->
+do_select_devices{
+- 
+}
+
+
+____________
+//参数设置
+AudioSystem::setParameters-->
+
+//stream 参数
+AudioFlinger::setParameters-->AudioFlinger::ThreadBase::setParameters-->
+SetParameterConfigEvent-->processConfigEvents_l(CFG_EVENT_SET_PARAMETER)-->
+AudioFlinger::MixerThread::checkForNewParameter_l-->
+outputStrem.set_parameters-->out_set_parameters
+
+inputStream.set_parameters-->in_set_parameters
+
+//全局参数
+AudioFlinger::setParameters(设置非iohandle参数)-->set_parameters-->adev_set_parameters
+
+
+
+audiopara_tuning_thread_entry
+
+
+=============
+//play
+adev_open_output_stream{
+- 创建out，tiny_stream_out
+- 初始化，out->stream{ //设置参数设置接口out_set_parameters 等..
+	- out_set_parameters
+	- out_write
+	}
+- 
+}
+
+//out
+out_write{
+- out_bypass_data //丢弃一些数据，还没准备好
+- do_output_standby //若is_voip，AUDIO_MODE_IN_CALL状态变化则先standby
+- start_output_stream{
+
+	}
+- 使用nxp:NxpTfa_Write
+- is_voip:out_write_sco 
+- is_bt_sco:out_write_bt_sco
+- call_connected:out_write_vaudio
+- 其他直接写数据
+}
+=============
+AUDIO_OLD_MODEM //没有定义
+FM_VERSION_IS_GOOGLE //没有定义
+RECORD_NR  //定义
+
+//record
+hw_device.open_input_stream@AudioFlinger.cpp-->
+adev_open_input_stream{
+- in->stream初始化{
+	- in_read
+	}
+- in->requested_channels = channel_count //请求的通道
+}
+
+in_read{
+  //audiopolicy.startOutput判断设置了AUDIO_STREAM_VOICE_CALL，就为voip状态
+- 若是voip_start，则设置is_voip=true //蓝牙从设备通话状态，
+- start_input_stream//若是standby则重新开始
+- 读取数据{
+	- SprdSrc_To_44K，是否要重采样
+	- AudioRecordNr_Proc
+	- read_pcm_data-->pcm_read-->ioctl(pcm->fd, SNDRV_PCM_IOCTL_READI_FRAMES)@pcm.c
+	}
+- 
+- 若有错误执行do_input_standby
+}@audio_hw.c
+
+//打开pcm设备
+start_input_stream{
+- 非adev->call_start，选择i2s，选择设备{
+	- i2s_pin_mux_sel
+	- select_devices_signal-->stream_routing_thread_entry.do_select_devices
+	}
+- if(in->is_voip){//AUDIO_STREAM_VOICE_CALL流又输出
+
+   }else(in->is_bt_sco || adev->i2sfm_flag){//
+
+   }else(adev->call_start){//电话
+
+   }else{
+   - if(adev->fm_open && adev->fm_record){
+
+     }else{
+     - in->config.channels//声道数
+     - in->config.rate //采样率
+     - pcm_open(s_tinycard/*声卡号3 sprdphone*/,PORT_MM_C/*设备号2 AuxRecord codec-i2s-ext-2*/)
+     
+     }
+   }   
+
+}
+
+external/tinyalsa/pcm.c
+=============
+//debug
+audiodebug_process
+
+
+=============
+//dump
+
+
+=============
+//audiopolicyManager SPRD
+
+AudioPolicyManagerSPRD::startOutput{
+- 若是AUDIO_STREAM_VOICE_CALL{
+	- param.add(String8("sprd_voip_start"), String8("true"))
+	}
+}
+
+
+=============
+//vbc
+vbc_ctrl_open{
+- vbc_ctrl_init{
+	- st_vbc_ctrl_thread_para //分配参数内存
+	  //从adev拷贝pipe信息，modem.csfb@audio_hw.xml
+	- memcpy(st_vbc_ctrl_thread_para ,adev->cp->vbc_ctrl_pipe_info)
+	}
+
+- vbc_ctrl_thread_routine{
+ - para->vbpipe_fd = open(para->vbpipe) //打开 /dev/spipe_lte6
+ - read_common_head.cmd_type{
+	- VBC_CMD_HAL_OPEN{
+		- force_all_standby
+		
+		}
+	}
+ }
+}
+
+SetParas_Route_Incall-->SetCall_ModePara
+
+
+vbc_ctrl_voip_open-->
+vbc_ctrl_voip_thread_routine{
+- para->vbpipe_fd = open(para->vbpipe)//打开pipe /dev/spipe_lte4
+- select(maxfd,&fds_read) //监听
+- ReadParas_Head //读取vbpipe_fd
+- 读取(read_common_head.cmd_type){
+	- VBC_CMD_HAL_OPEN
+	- VBC_CMD_HAL_CLOSE
+	}
+}
+
+
+vbc_ctl_modem_monitor_routine{
+- fd = socket_local_client("modemd"
+- do_select_devices_l{
+	- 
+	- vb_effect_profile_apply //设置eq
+	- SetAudio_gain_route{
+		- GetAudio_gain_by_devices //获取要设置的值
+		- SetAudio_gain_by_devices //设置
+		}
+	}
+}
+vendor/sprd/modules/audio/normal/vb_control_parameters.c

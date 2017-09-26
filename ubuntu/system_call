@@ -1,0 +1,127 @@
+#define __SYSCALL(nr, call) [nr] = (call)
+#define __NR_mount 40 
+__SC_COMP(__NR_mount, sys_mount, compat_sys_mount)-->
+#define __SC_COMP(_nr, _sys, _comp) __SYSCALL(_nr, _comp)@unistd.h
+
+
+
+#define __SYSCALL_DEFINEx(x, name, ...)					\
+	asmlinkage long sys##name(__SC_DECL##x(__VA_ARGS__))
+
+#define SYSCALL_DEFINEx(x, sname, ...)				\
+	__SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
+
+#define SYSCALL_DEFINE1(name, ...) SYSCALL_DEFINEx(1, _##name, __VA_ARGS__)
+@syscalls.h
+
+
+mount的系统调用函数为：
+compat_sys_mount@compat.c-->do_mount-->do_new_mount-->do_kern_mount-->vfs_kern_mount
+@namespace.c-->mount_fs-->(不同的文件系统file_system_type)type->mount@super.c-->
+(FAT32)vfat_mount@namei_vfat.c
+
+
+fs/super.c
+fs/namespace.c
+fs/compat.c
+include/asm-generic/unistd.h
+include/linux/syscalls.h
+========================================
+添加系统调用：
+1，系统调用接口：
+系统调用在内核空间执行，执行系统调用通过中断调用中断表中的函数。
+在linux/arch/i386/kernel/entry.S添加要实现的系统调用。
+如：
+  .data
+  ENTRY(sys_call_table)
+    .long SYMBOL_NAME(sys_ni_call)           /* 0 */
+    .long SYMBOL_NAME(sys_exit)
+    .long SYMBOL_NAME(sys_fork)
+    ...
+    .long SYMBOL_NAME(sys_vfork)             /* 190 */
+
+添加自己的系统调用
+    .long SYMBOL_NAME(sys_myservice)         /* 191 */
+
+添加系统调用的入口，在文件linux/include/asm/unistd.h :
+
+  /*
+   * This file contains the system call numbers.
+   */
+
+  #define __NR_exit                 1
+  #define __NR_fork                 2
+  ...
+  #define __NR_vfork              190
+
+使用#defines 添加自己的系统调用号, 前缀"__NR_" :
+  #define __NR_myservice          191
+
+
+2. 实现系统调用
+
+
+架构无关的系统调用头文件，一般在linux/include/linux/ 而架构相关的在linux/include/asm/.
+
+
+4. System Call Source File Basics
+为了链接正确，系统调用使用修饰符"asmlinkage"并且前面加“sys_”前缀,
+必须包含头文件 #include <linux/linkage.h> :
+
+  asmlinkage int sys_myservice(int arg1, char* arg2) {
+    /* implementation of myservice */
+  }
+
+
+
+在 <linux/unistd.h>中的宏"_syscallN(return type, function name, arg1 type, arg1 name ...)"
+用来定义系统调用。"N"表示参数个数。
+  _syscall2(int, myservice, int, arg1, char*, arg2);
+
+
+myservice.h
+#ifndef __LINUX_MYSERVICE_H
+#define __LINUX_MYSERVICE_H
+	
+#include <linux/unistd.h>
+#include <linux/linkage.h>
+
+_syscall2(int, myservice, int, arg1, char*, arg2);
+
+#endif
+myservice.c
+#include <linux/myservice.h>
+	
+asmlinkage int sys_myservice (int arg1, char* arg2) {
+    return(1);
+}
+
+
+4，初始化函数
+在系统调用的函数中可能使用了全局变量，需要在系统启动过程中初始化。
+
+myservice.h
+...
+
+#include <linux/init.h>
+
+...
+
+void __init myservice_init(void);
+myservice.c
+...
+
+void __init myservice_init(void) {
+    /* initialize global variables used by myservice */
+}
+linux/init/main.c
+...
+
+/* Around line 89 */
+extern void myservice_init(void);
+
+...
+
+/* Around line 1352 within "asmlinkage void __init start_kernel(void)" */
+myservice_init();
+

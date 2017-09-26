@@ -1,0 +1,40 @@
+驱动注册：
+mmc_blk_init@block.c-->(将驱动的bus设置为mmc)mmc_register_driver@bus.c-->
+
+设备注册(探测到mmc卡)：
+mmc_attach_mmc-->mmc_init_card@mmc.c-->(将设备的bus设置为mmc)mmc_alloc_card--(注册设备)mmc_add_card
+@bus.c-->device_add
+
+驱动与设备匹配：
+device_add@core.c-->bus_probe_device@bus.c-->device_attach-->__device_attach(调用driver_match_device
+-->drv->bus->match判断驱动与设备是否匹配)-->driver_probe_device-->really_probe-->
+(bus存在probe函数则执行bus的probe,否则执行驱动的probe函数。传入的参数都是device *)dev->bus->probe@dd.c-->
+
+匹配成功：
+dev->bus->probe@dd.c-->mmc_bus_probe-->drv->probe@/mmc/bus.c-->mmc_blk_probe{
+- mmc_blk_alloc-->mmc_blk_alloc_req@block.c-->alloc_disk-->alloc_disk_node@genhd.c
+- mmc_add_disk-->add_disk
+- (加入分区)list_for_each_entry(part_md, &md->part, part)
+}@block.c
+
+drivers/mmc/card/block.c
+=================
+//创建disk
+alloc_disk-->alloc_disk_node{
+- 
+- disk_expand_part_tbl
+}
+
+
+add_disk
+
+
+
+//
+add_disk-->register_disk-->blkdev_get
+
+
+block/genhd.c
+
+
+

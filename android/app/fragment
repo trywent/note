@@ -1,0 +1,49 @@
+通常加入到一个activity中。但有自己的生命周期，能够存放到activity的back stack通过返回键能够恢复。
+
+_______________________
+加入用户界面：
+fragment通常作为activity的一部分使用，并提供自己的布局。fragment提供布局需要实现onCreateView()回调函数，并
+返回View。
+
+可以从xml中获取布局。
+
+_______________________
+将fragment加入一个activity
+
+有两种方法：
+*在activity的layout文件中声明fragment
+ 系统在创建activity的layout时，将xml中声明的fragment实例化，并调用它的onCreateView函数。然后将返回的
+ View插入到相应的位置
+
+*在代码中将fragment加入到ViewGroup
+ 在activity运行的任何时候，都可将fragment加入activity。只需实现一个ViewGroup将fragment加入。
+ 进行fragment的操作(增加，移除，替换)，必须通过fragmenTransaction提供的接口。
+
+_______________________
+管理fragment
+
+通过getFragmentManager()获取FragmentManager来进行fragment的管理。
+可以用来
+-获取activity中的fragment。通过findFragmentById()(有UI)或 findFragmentByTag()（无UI）
+-通过popBackStack()将fragment从back stack中出栈。
+-addOnBackStackChangedListener()，注册back stack改变的监听器。
+
+还可以通过FragmentTransaction,进行fragment的增加移除等操作。
+
+_______________________
+fragment的交互操作
+执行FragmentTransaction提供的操作add(),remove(),和replace()，最后要调用commit()
+
+_______________________
+fragment与activity交互
+虽然fragment是一个独立于activity的对象。但fragment的实例是与包含它的activity绑定的。
+
+fragment可以通过getActivity()函数获取activity。
+
+同样，activity可以通过FragmentManager,使用findFragmentById()或findFragmentByTag()获取fragment
+
+
+==================================
+fragmentManager:
+addFragment-->makeActive-->mActive.add@FragmentManager.java
+

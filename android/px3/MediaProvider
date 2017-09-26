@@ -1,0 +1,22 @@
+URI_MATCHER:初始化各种类型的URI
+
+insert-->insertInternal{
+- MEDIA_SCANNER,获取对应的数据库设置开始扫描时间
+- 获取数据库，getDatabaseForUri().getWritableDatabase()
+- IMAGES_MEDIA类型,insertFile
+- AUDIO_MEDIA类型，
+}
+
+插入文件到表files中：
+insertFile{
+- 组织表数据，Value
+- 获取父目录，getParent-->(将目录插入表中)insertDirectory
+}
+
+=================
+DatabaseHelper.onCreate-->updateDatabase(创建关系表，VIEW){
+- db.execSQL，
+- db.execSQL，从files中创建视图"audio_meta"
+- recreateAudioView,创建audio VIEW
+}
+packages/providers/MediaProvider/src/com/android/providers/media/MediaProvider.java

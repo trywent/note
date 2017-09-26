@@ -1,0 +1,12 @@
+设置permission，feature：
+readPermissionsFromXml(/etc/permissions/*.xml)@ApplicationPackageManager.java
+
+
+获取feature：
+packageManager.getSystemAvailableFeatures-->mPM.getSystemAvailableFeatures
+@ApplicationPackageManager.java-->getSystemAvailableFeatures-->mAvailableFeatures
+@ApplicationPackageManager.java
+
+
+
+frameworks/base/core/java/android/app/ApplicationPackageManager.java

@@ -1,0 +1,6 @@
+分区info：p11
+
+
+dd if=/dev/block/mmcblk0p11 of=/mnt/usb_storage1/ bs=1024 count=100 skip=0x400000
+
+busybox dd if=/dev/block/mmcblk0p12 of=/mnt/external_sd/d2 bs=1024 count=100 skip=4194304

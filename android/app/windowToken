@@ -1,0 +1,11 @@
+
+sendAppVisibilityToClients{
+- 设置应用端窗口是否可视（clientHidden），win.mClient.dispatchAppVisibility
+}
+
+updateReportedVisibilityLocked{
+- 检查AppWindowToken中win的状态，更新值reportedDrawn,reportedVisible(visible/drawn)
+
+}
+frameworks/base/services/java/com/android/server/wm/WindowToken.java
+frameworks/base/services/java/com/android/server/wm/AppWindowToken.java

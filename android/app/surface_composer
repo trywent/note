@@ -1,0 +1,166 @@
+surfaceFlinger消息处理：
+
+创建MessageQueue：
+onFirstRef-->mEventQueue.init@SurfcaceFlinger.cpp-->MessageQueue::init-->
+(创建Looper,Handler)@MessageQueue.cpp
+
+初始化消息处理线程：
+readyToRun-->new EventThread(this)-->mEventQueue.setEventThread@SurfaceFlinger.cpp-->
+
+加入请求：
+pollInner-->epoll_wait(读取事件)-->mResponses.push@Looper.cpp
+
+发送消息：
+mEventQueue.postMessage(MessageBase)-->MessageQueue::postMessage-->mLooper->sendMessage@MessageQueue.cpp
+-->sendMessage-->sendMessageAtTime-->(根据指定延迟时间，查找消息位置)mMessageEnvelopes.insertAt(messageEnvelope)
+@Looper.cpp
+
+处理消息：
+SurfaceFlinger::threadLoop-->waitForEvent-->mEventQueue.waitMessage@SurfaceFlinger.cpp
+-->waitMessage(循环处理消息)-->mLooper->pollOnce-->pollInner-->mMessageEnvelopes.itemAt(0)
+-->handler->handleMessage@Looper.cpp
+
+frameworks/native/services/surfaceflinger/MessageQueue.cpp
+frameworks/native/libs/utils/Looper.cpp
+=============================
+Session:窗口用来与窗口服务联系，并维护surfaceSession。系统只有一个Session
+
+surfaceSession：
+addWindow-->new WindowState(设置session,)@WindowMangerService.java--attach-->mSession.windowAddedLocked
+@WindowState.java-->windowAddedLocked(增加窗口。若没有创建surfaceSession时创建Surfacesession)-->
+new SurfaceSession@Session.java-->init@SurfaceSession.java-->SurfaceSession_init-->new SurfaceComposerClient
+@android_view_Surface.cpp-->SurfaceComposerClient(初始化composer,)-->(第一次被引用，建立与服务的链接)
+mClient = sm->createConnection(mClient是远程调用的代理)@SurfaceComposerClient.cpp
+
+服务端创建连接：
+SurfaceFlinger::createConnection-->new Client(this)@SurfaceFlinger.cpp
+
+创建surface：
+performTraversals-->relayoutWindow-->sWindowSession.relayout@ViewRootImpl.java-->relayout-->
+mService.relayoutWindow@Session.java-->relayoutWindow-->winAnimator.createSurfaceLocked
+@WindowManagerService.java-->createSurfaceLocked@WindowStateAnimator.java-->Surface()-->
+init@Surface.java-->Surface_init-->client->createSurface@android_view_Surface.cpp-->
+SurfaceComposerClient::createSurface-->createSurface-->mClient->createSurface@SurfaceComposerClient.cpp
+(服务端)Client::createSurface-->mFlinger->postMessageSync-->SurfaceFlinger::postMessageSync@SurfaceFlinger.cpp
+-->(处理消息的线程在服务端，这时创建的surface上下文在该线程中)handleMessage-->this->handler()@MessageQueue.cpp
+-->MessageCreateSurface.handler()-->flinger->createSurface-->SurfaceFlinger::createSurface-->
+(创建普通surface)createNormalSurface(创建后加入到容器mLayerMap)-->new Layer()@SurfaceFlinger.cpp
+
+
+______________________________
+MessageQueue::Handler::handleMessage-->mQueue.mFlinger->onMessageReceived@MessageQueue.cpp-->
+onMessageReceived-->handlePageFlip-->handleTransactionLocked-->commitTransaction@SurfaceFlinger.cpp
+
+开始显示：
+SurfaceFlinger::turnElectronBeamOn(发送消息)-->SurfaceFlinger::turnElectronBeamOnImplLocked
+
+mEventQueue.invalidate()-->MessageQueue::invalidate-->mEvents->requestNextVsync@MessageQueue.cpp
+EventThread::Connection::requestNextVsync-->mEventThread->requestNextVsync-->
+mCondition.broadcast()@EventThread.cpp
+
+
+刷新屏幕：
+MessageQueue::eventReceiver-->mHandler->signalRefresh-->(发送消息)-->mQueue.mLooper->sendMessage(this,REFRESH)@MessageQueue.cpp-->(处理消息)MessageQueue::Handler::handleMessage-->
+mQueue.mFlinger->onMessageReceived@MessageQueue.cpp-->SurfaceFlinger::onMessageReceived-->
+handlePageFlip-->invalidateHwcGeometry(设置mHwWorkListDirty为true)--postFramebuffer-->
+hw.flip@SurfaceFlinger.cpp-->flip-->mHwc->commit@DisplayHardware.cpp-->commit-->mHwc->set
+@HWComposer.cpp-->hwc_set(判断显示类型TV，多媒体..)-->eglSwapBuffers@hwcomposer.cpp
+
+
+dev->post-->fb_post@framebuffer_device.cpp
+
+
+旋转：
+computeVisibleRegions-->layer->validateVisibility(planeTransform)@SurfaceFlinger.cpp
+
+mDisplayTransform
+
+frameworks/base/core/java/android/view/SurfaceSession.java
+frameworks/base/services/java/com/android/server/wm/Session.java
+frameworks/base/core/java/android/view/Surface.java
+frameworks/base/core/jni/android_view_Surface.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/EventThread.cpp
+frameworks/native/services/surfaceflinger/DisplayHardware/DisplayHardware.cpp
+frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
+hardware/mstar/hwcomposer/hwcomposer.cpp
+==============================
+composer:维护管理client的状态
+
+加入client：
+createSurfaceLocked(创建surface，设置位置，大小，透明度)-->mSurface.setPosition
+@WindowStateAnimator.javasetPosition@Surface.java-->Surface_setPosition-->
+surface->setPosition@android_view_Surface.cppSurfaceComposerClient::setPosition-->
+getComposer().setPosition(任何设置client的调用,若client不在容器mState中，则将client加入)
+-->Composer::getLayerStateLocked-->mState.add@SurfaceComposerClient.cpp
+
+
+设置client的状态：
+Composer::setPosition/setSize/setLayer-->(设置状态layer_state_t，位置，大小...)s@SurfaceComposerClient.cpp
+
+更新surfaceFlinger服务端状态:
+closeTransaction@Surface.java-->Surface_closeTransaction@android_view_Surface.cpp-->SurfaceComposerClient::closeGlobalTransaction-->Composer::closeGlobalTransaction-->Composer::getInstance().closeGlobalTransactionImpl-->Composer::closeGlobalTransactionImpl-->(获取"SurfaceFlinger"服务,)sm->setTransactionState@SurfaceComposerClient.cpp-->SurfaceFlinger::setTransactionState{
+//更新surface的状态(位置，大小，透明度....)
+- 设置状态需要更新的client，setClientStateLocked{
+		- 获取client对应的layer
+		- 设置layer位置，大小等属性
+	} 
+- 有属性发生改变，setTransactionFlags{
+		- 设置状态android_atomic_or(flags, &mTransactionFlags)
+		- 如果前一个状态中不包含设置的状态，唤醒服务signalTransaction{
+			- mEventQueue.invalidate
+		}
+	}
+
+}@SurfaceFlinger.cpp
+
+SurfaceFlinger::signalTransaction-->mEventQueue.invalidate()@SurfaceFlinger.cpp-->
+mEvents->requestNextVsync@MessageQueue.cpp
+
+
+onMessageReceived-->handleTransaction-->handleTransactionLocked-->commitTransaction@SurfaceFlinger.cpp
+
+_____________________________
+加入layer:
+SurfaceComposerClient::createSurface-->createSurface-->mClient->createSurface@SurfaceComposerClient.cpp
+-->Client::createSurface-->flinger->createSurface-->
+SurfaceFlinger::createSurface(创建Layer)-->addClientLayer-->client->attachLayer(将client关联layer)--addLayer_l-->mCurrentState.layersSortedByZ.add
+@SurfaceFlinger.cpp
+
+
+frameworks/base/core/java/android/view/Surface.java
+frameworks/base/services/java/com/android/server/wm/WindowStateAnimator.java
+frameworks/base/core/jni/android_view_Surface.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/MessageQueue.cpp
+==============================
+初始化：
+EventThread::onFirstRef-->mHw.setVSyncHandler@EventThread.cpp-->
+DisplayHardware::setVSyncHandler-->mVSyncHandler = handler@DisplayHardware.cpp
+
+readyToRun@surfaceFlinger.cpp-->new DisplayHardware()-->init-->new HWComposer(设置 mEventHandler为对应的display)
+@DisplayHardware.cpp
+
+______________________________
+设置屏幕更新sync信号：
+HWComposer-->hw_get_module(获取模块)--(打开设备)hwc_open(mModule, &mHwc)-->mHwc->
+registerProcs(mHwc, &mCBContext.procs)@HWComposer.cpp-->hwc_registerProcs@hwcomposer.cpp
+
+hwc_vsync_thread-->uevent_next_event(接收到事件)--handle_vsync_uevent-->ctx->procs->vsync@hwcomposer.cpp-->hook_vsync-->
+HWComposer::vsync-->mEventHandler.onVSyncReceived@HWComposer-->DisplayHardware::onVSyncReceived-->
+handler->onVSyncReceived@DisplayHardware.cpp-->EventThread::onVSyncReceived@EventThread.cpp
+
+frameworks/native/services/surfaceflinger/DisplayHardware/DisplayHardware.cpp
+frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
+hardware/mstar/hwcomposer/hwcomposer.cpp
+==============================
+客户端:
+ComposerState
+
+
+
+Composer::getLayerStateLocked(获取一个客户端，若不存在则新建一个)@SurfaceComposerClient.cpp
+
+

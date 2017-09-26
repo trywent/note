@@ -1,0 +1,21 @@
+三个与驱动相关的功能集，一个网络核心使用的功能集：
+ 1. netdev->hw_features
+根据用户请求改变特定设备的状态。在ndo_init回调函数中实现
+ 2. netdev->features 
+包含了设备当前已使能的功能。只能被网络核心改变或在ndo_set_features错误路径时改变
+ 3. netdev->vlan_features 
+包含那些被VLAN设备继承的功能。
+ 4. netdev->wanted_features 
+能够被用户请求的功能。被ndo_fix_feature过滤。这个功能集合在网络核心中，不能被驱动引用
+
+
+-------------------
+控制已使能的功能：
+如果netdev->features中的功能要改变，改变后的功能集会由ndo_fix_features 计算并由
+netdev_fix_features()过滤。如果与原来的结果不同，则调用ndo_set_features改变
+netdev->features中的值，改变后触发NETDEV_FEAT_CHANGE通知。
+
+以下事件会使功能改变：
+ 1. 设备注册，ndo_init正确返回
+ 2. 用户请求改变
+ 3. 调用netdev_update_features() 

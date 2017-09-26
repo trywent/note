@@ -1,0 +1,215 @@
+====================================
+多媒体数据MediaProvider:
+
+创建provider：
+onCreate-->attachVolume(外部，内部)-->new DatabaseHelper@MediaProvider.java
+
+(第一次使用数据库时)-->DatabaseHelper.onCreate-->updateDatabase(创建数据库中表)@MediaProvider.java
+
+接收卸载挂载信息：
+onReceive-->scan(开始扫描服务)@MediaScannerReceiver.java-->onStartCommand(获取scan传入的路径等信息项)
+@MediaScanService.java
+
+开始扫描：
+scan@MediaScanReceiver.java-->startService-->onStartCommand(发送广播)-->(扫描volume)
+scan(directories, volume)(inernel:/system/media/,externel:/实际挂载位置)-->
+scanner.scanDirectories@MediaScannerService.java-->scanDirectories(根据volume,设置数据库的路径)
+-->prescan(清除表中不存在文件条目，但不删除文件)--processDirectory@MediaScanner.java
+
+打开数据库：若是外部存储卡，需要新建数据库
+scan-->openDatabase-->getContentResolver().insert@MediaScannerService.java-->insert-->
+insertInternal(传入uri是VOLUMES)-->attachVolume@MediaProvider.java-->创建DatabaseHelper
+
+扫描:
+scanFile-->requestScanFile.startService@context-->onStartCommand-->mServiceHandler.sendMessage-->
+scan@MediaScannerService.java-->scanDirectories@MediaScanner.java-->processDirectory-->
+
+jni层处理：
+processDirectory(将client转化为MyMediaScannerClient extends MediaScannerClient)-->
+android_media_MediaScanner_processDirectory-->(mp为mNativeContext@MediaScanner.java)
+mp->processDirectory@android_media_MediaScanner.cpp-->(调用StagefrightMediaScanner中方法
+,继承MediaScanner)processDirectory-->-->doProcessDirectory-->doProcessDirectoryEntry(扫到文件项)
+-->client.scanFile@MediaScanner.cpp-->scanFile-->mEnv->CallVoidMethod(jni上层scanFile)
+@MyMediaScannerClient@android_media_MediaScanner.cpp-->scanFile-->doScanFile--beginFile--
+processFile--endFile(如果不是isAudio||isVideo||isImage退出不处理，操作表中数据，insert或update)
+@MyMediaScannerClient@MediaScanner.java
+
+beginFile{
+
+}
+
+
+处理扫描到的文件：
+processFile@MediaScanner.java-->android_media_MediaScanner_processFile-->mp->processFile(获取文件信息)
+@android_media_MediaScanner.cpp-->processFile(通过mRetriever获取信息)@StagefrightMediaScanner.cpp
+
+创建mediascanner:
+MediaScnaner@MediaScnaner.java-->native_setup-->android_media_MediaScanner_native_setup(设置MediaScanner)
+-->new StagefrightMediaScanner继承MediaScaner@android_media_MediaScanner.cpp
+----------------------------
+保存扫描到的文件信息：
+processFile-->processFileInternal-->client.addStringTag(将导出的信息设置到client中)
+@StagefrightMediaScanner.cpp-->addStringTag-->(如果扫描的信息编码是非assic则endFile处理，若是assci)
+@MediaScannerClient.cpp-->MyMediaScannerClient::handleStringTag@android_media_MediaScanner.cpp-->
+MyMediaScannerClient.handleStringTag(获取到名字，作者，时常等信息)@MediaScanner.java
+
+字符转换(本地语言-->UTF8-->UTF16)：
+endFile-->convertValues(将本地语言编码转换成UTF-8)@MediaScannerClient.cpp-->
+MyMediaScannerClient::handleStringTag@android_media_MediaScanner.cpp-->
+NewStringUTF(将UTF-8转换成java中String(UTF-16))@jni.cpp
+
+frameworks/av/media/libstagefright/StagefrightMediaScanner.cpp
+frameworks/av/media/libmedia/MediaScannerClient.cpp
+----------------------------
+扫描到音视频文件：
+processFile-->android_media_MediaScanner_processFile-->mp->processFile@android_media_MediaScanner.cpp
+-->processFile-->processFileInternal-->mRetriever->extractMetadata@StagefrightMediaScanner.cpp-->
+extractMetadata-->mRetriever->extractMetadata(retriever由"media.player"创建service->createMetadataRetriever)
+@mediametadataretriever.cpp-->extractMetadata@MetadataRetrieverClient.cpp-->extractMetadata
+@StagefrightMetadataRetriever.cpp
+
+FileHasAcceptableExtension(根据后缀判断是否处理)@StagefrightMediaScanner.cpp
+
+导出mp3图片：
+makeThumbInternal-->getCompressedAlbumArt-->scanner.extractAlbumArt@MediaProvider.java-->
+extractAlbumArt-->android_media_MediaScanner_extractAlbumArt-->mp->extractAlbumArt@android_media_MediaScanner.cpp-->
+extractAlbumArt-->mRetriever->extractAlbumArt@StagefrightMediaScanner.cpp-->extractAlbumArt-->
+mRetriever->extractAlbumArt@mediametadataretriever.cpp-->(跨进程调用MediaPlayerService)extractAlbumArt-->
+mRetriever->extractAlbumArt@MetadataRetrieverClient.cpp-->extractAlbumArt@StagefrightMetadataRetriever.cpp
+
+createMetadataRetriever@MeidaPlayerService.cpp
+
+(设置mRetriever为StagefrightMetadataRetriever)setDataSource-->createRetriever@MetadataRetrieverClient.cpp
+
+
+provider创建mp3图片：
+endFile--> mMediaProvider.insert@MediaScanncer.java-->insert-->insertInternal(插入不同的多媒体文件)
+-->insertFile(插入音频MEDIA_TYPE_AUDIO)/update-->getKeyIdForName-->makeThumbAsync-->
+mThumbHandler.handleMessage(ALBUM_THUMB)-->makeThumbInternal
+
+makeThumbInternal-->getAlbumArtOutputUri(将缩略图路径，写入表album_art)
+
+writeAlbumArt-->getContext().getContentResolver().openOutputStream@MediaProvider.java-->
+openOutputStream-->openAssetFileDescriptor-->unstableProvider.openAssetFile@ContentProvider.java
+--openFile(从表中获取缩略图路径)-->openFileAndEnforcePathPermissionsHelper@MediaProvider.java
+
+缩略图路径：Android/data/com.android.providers.media/albumthumbs"
+URI：content://media/external/audio/albumart
+
+扫描的文件类型：
+sFileExtensions@MediaFile.java
+
+___________________________________
+跳过指定文件夹：
+doProcessDirectory-->shouldSkipDirectory@MediaScanner.cpp
+
+获取要跳过的文件夹：
+MediaScanner-->loadSkipList(获取系统属性"testing.mediascanner.skiplist"，字符串以","号分开)
+@MediaScanner.cpp
+
+
+
+
+frameworks/base/media/java/android/media/MediaScanner.java
+frameworks/base/media/jni/android_media_MediaScanner.cpp
+frameworks/av/media/libmedia/MediaScanner.cpp
+frameworks/av/media/libstagefright/StagefrightMediaScanner.cpp
+frameworks/av/media/libmedia/MediaScannerClient.cpp
+frameworks/av/media/libmedia/mediametadataretriever.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/libmediaplayerservice/MetadataRetrieverClient.cpp
+packages/providers/MediaProvider/src/com/android/providers/media/MediaProvider.java
+frameworks/av/media/libstagefright/StagefrightMetadataRetriever.cpp
+frameworks/av/media/libmedia/mediametadataretriever.cpp
+frameworks/av/media/libmediaplayerservice/MetadataRetrieverClient.cpp
+frameworks/av/media/libstagefright/StagefrightMetadataRetriever.cpp
+===================================
+服务端扫描：
+MediaScanner-->native_setup@MediaScanner.java-->
+android_media_MediaScanner_native_setup{
+- 创建MediaScanner，new StagefrightMediaScanner
+- 设置本地MediaScanner，env->SetIntField(thiz, fields.context, (int)mp)
+}
+
+doScanFile-->processFile(传入MediaScanner对象)@MediaScanner.java-->
+android_media_MediaScanner_processFile{
+- 获取MediaScanner，getNativeScanner_l
+- 封装MediaScanner对象为本地对象，myClient
+- 处理文件mp->processFile-->StagefrightMediaScanner::processFile
+}
+
+processFile-->processFileInternal{
+- 是否是可接受的文件类型，FileHasAcceptableExtension
+- 创建mRetriever(new MediaMetadataRetriever)
+- 设置数据源，mRetriever->setDataSource，
+- 获取数据信息，mRetriever->extractMetadata
+
+}@StagefrightMediaScanner.cpp
+
+
+MediaMetadataRetriever{
+- 获取服务service(getService()，getService-->sm->getService(String16("media.player")
+- 创建代理retriever(service->createMetadataRetriever(getpid()))
+
+}@MediaMetadataRetriever.cpp
+
+setDataSource-->mRetriever->setDataSource@mediametadataretriever.cpp
+
+extractMetadata-->mRetriever->extractMetadata@mediametadataretriever.cpp
+_____________________________________
+服务端：
+MediaPlayerService::createMetadataRetriever-->MetadataRetrieverClient@MediaPlayerService.cpp
+
+
+MetadataRetrieverClient::setDataSource-->createRetriever-->(类型是MST_PLAYER)
+StagefrightMetadataRetriever@MetadataRetrieverClient.cpp-->(默认嗅探器)RegisterDefaultSniffers@
+StagefrightMetadataRetriever.cpp
+
+MetadataRetrieverClient::setDataSource-->StagefrightMetadataRetriever::setDataSource
+-->MediaExtractor::Create(mSource)@StagefrightMetadataRetriever.cpp-->Create
+(创建对应文件类型的WAVExtractor)@MediaExtractor.cpp
+
+MetadataRetrieverClient::extractMetadata-->mRetriever->extractMetadata@MetadataRetrieverClient.cpp
+-->StagefrightMetadataRetriever::extractMetadata-->parseMetaData-->mExtractor->getMetaData
+@StagefrightMetadataRetriever.cpp
+
+frameworks/base/media/jni/android_media_MediaScanner.cpp
+frameworks/av/media/libstagefright/StagefrightMediaScanner.cpp
+frameworks/av/media/libmedia/mediametadataretriever.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/libmediaplayerservice/MetadataRetrieverClient.cpp
+frameworks/av/media/libstagefright/StagefrightMetadataRetriever.cpp
+frameworks/av/media/libstagefright/MediaExtractor.cpp
+====================================
+数据库:
+有两种数据库，内部，外部。
+ServiceHandler.handleMessage-->scan-->openDatabase@MediaScannerService.java-->insert-->insertInternal
+(传入uri是VOLUMES)-->attachVolume@MediaProvider.java-->创建DatabaseHelper
+
+接收到下载广播：（主存储卸载时关闭数据库，从存储卸载只删除数据库中内容）
+mUnmountReceiver.onReceiver-->mUnmountReceiver@MediaProvider.java
+
+
+读取storage_list.xml。readStorageList@MountService.java设置住存储（位置在volume中第0位，
+mExternalStoragePaths[0]@MediaProvider.java对应主存储名字）
+
+sqlhelper第一次调用：（database第一次创建默认调用，一般在执行数据表操作时调用）
+OnCreate-->updateDatabase@DatabaseHelper@MediaProvider.java-->
+attachVolume创建相应的volume(INTERNAL_VOLUME or EXTERNAL_VOLUME)数据库
+
+MediaProvider中函数
+delete():
+会删除表中条目，也会删除文件
+
+数据库位置：
+sqlite3 /data/data/com.android.providers.media/databases/***.db
+
+tables：
+album_art              audio_genres           log                  
+album_info             audio_genres_map       search               
+albums                 audio_genres_map_noid  searchhelpertitle    
+android_metadata       audio_meta             thumbnails           
+artist_info            audio_playlists        video                
+artists                audio_playlists_map    videothumbnails      
+artists_albums_map     files                
+audio                  images   

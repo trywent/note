@@ -1,0 +1,23 @@
+pppd:ppp是用来建立点对点连接的协议。pppd守护程序和内核ppp驱动，用来建立和维护一个ppp连接
+
+
+chat：用来定义计算机与调制解调器之间的对话（消息传递），开始是用来建立点对点的连接
+chat脚本由“expect-send”组组成，组由空格分开。每组可包括可选组 "subexpect-subsend"由破折号分开。
+
+ogin:-BREAK-ogin: ppp ssword: hello2u2
+
+第一个ogin:是期望收到的消息，若规定时间内没收到则发送终止流到远端，然后等待ogin:。若第一个ogin:收到则不会
+产生终止流。而是发送ppp字符串。再等待ssword:字符串，收到后发送hello2u2。
+
+注释：#在第一列时，这行是注释
+
+
+pppd 通过connect来执行命令（chat），并把命令的输入输出重定向到串口（与远端通信）。connect执行在建立
+连接前的命令。
+
+
+          # pppd connect "chat -f dial-c3po" /dev/cua3 38400 -detach \
+             crtscts modem defaultroute
+ 
+
+   

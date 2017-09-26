@@ -1,0 +1,122 @@
+加入窗口：
+handleResumeActivity-->(将activity的View加入到窗口)wm.addView(decor)@ActivityThread.java-->
+addView-->LocalWindowManager.addView(设置LayoutParams)-->super.addView@window.java-->
+CompatModeWrapper.addView-->mWindowManager.addView-->addView(View, ViewGroup.LayoutParams)
+-->addView(view, params, null, false)-->addView{
+- 加入系统属性监听方法
+- 查找View是否已经加入，则找到根root增加计数
+- 若是panel，找到改panel以来的窗口
+- 创建ViewRootImpl
+- 将ViewRootImpl，和要加入的View。加入对应的数组中
+- 执行root.setView
+}@WindowManagerImpl.java-->setView{
+- 请求布局requestLayout
+- 创建输入通道new InputChannel
+- 将窗口代理和窗口属性，加入到窗口管理器。sWindowSession.add(mWindow,mInputChannel) //窗口服务介入点
+
+}@ViewRootImpl.java
+
+
+ViewRootImpl(在应用进程中创建)：
+ViewRootImpl{
+- getWindowSession //获取一个session的代理(与windowManager通信)
+
+}
+
+
+================================
+view布局：
+sendAppVisibilityToClients-->win.mClient.dispatchAppVisibility@AppWindowToken.java-->
+W.dispatchAppVisibility-->dispatchAppVisibility-->mHandler.sendMessage(MSG_DISPATCH_APP_VISIBILITY)
+-->handleAppVisibility(mAppVisible 发生变化)-->scheduleTraversals-->mChoreographer.postCallback
+(CALLBACK_TRAVERSAL)--scheduleConsumeBatchedInput-->mChoreographer.postCallback(CALLBACK_INPUT)
+@ViewRootImpl.java
+
+
+doCallbacks(Choreographer.CALLBACK_TRAVERSAL)-->c.run@Choreographer.java-->TraversalRunnable.run
+-->doTraversal-->performTraversals{
+- 
+- 第一次执行{
+	- 设置期望窗口的高宽，(屏幕或应用自己说明)
+	- 初始attachInfo
+	- 获取最后配置，mLastConfiguration
+	- 设置contentIsert，fitSystemWindows	
+	}否则{
+	- 期望的窗口高宽设置，mWinFrame()		
+	}
+- 可见性变化viewVisibilityChanged
+- 执行布局layoutRequested{
+	- 第一次执行ensureTouchModeLocally
+	- 否则{
+		- 判断mContentInsets是否变化
+		- 更新mAttachInfo.mVisibleInsets
+		- 设置期望高宽desiredWindowWidth，desiredWindowHeight 
+		}
+	- 执行测量measureHierarchy
+	}
+- 第一次或可视变化{
+	- 窗口是否自动调整大小(有输入窗口时)，保存属性在params		
+	}
+- mFitSystemWindowsRequested设置窗口的contentInsert{
+	- fitSystemWindows(mFitSystemWindowsInsets)
+	- 若需布局，则测量measureHierarchy
+	}
+- 若mFirst || windowShouldResize || insetsChanged{
+	- 计算窗口relayoutWindow-->sWindowSession.relayout(mWindow){
+		- 设置了窗口，显示的帧mWinFrame，contentInsert
+		}
+	}
+- 若需要布局{
+	- performLayout-->host.layout
+	}
+}
+
+_________________________________
+服务端窗口变化：
+updateResizingWindows
+
+通知client窗口大小：
+performLayoutAndPlaceSurfacesLockedInner-->win.mClient.resized@WindowManagerService.java-->W.resized-->
+dispatchResized-->mHandler.sendMessage-->handleMessage(MSG_RESIZED_REPORT)(更新大小)@ViewRootImpl.java
+
+
+getContentInsetHintLw
+=================================
+测量布局：
+
+rootView的大小值：DisplayMetrics packageMetrics = mView.getContext().getResources().getDisplayMetrics()
+应该是在WindowManagerServcie.computeScreenConfigurationLocked设置。
+
+测量measure：
+
+performTraversals-->measureHierarchy-->performMeasure-->mView.measure@ViewRootImpl.java-->
+measureChildren-->measureChild-->child.measure@ViewGroup.java-->measure-->onMeasure-->setMeasuredDimension@View.java
+
+
+
+performMeasure-->mView.measure{
+- 
+	
+}
+
+
+
+performLayout-->host.layout(mView.layout){
+- 
+}
+
+
+_________________________________
+viewGroup:
+
+getChildMeasureSpec{
+- 根据传入的参数(包含大小，MATCH_PARENT,WRAP_CONTENT)，确定子view的大小和测量模式(AT_MOST,EXACTLY,UNSPECIFIED)
+- 返回测量结果，MeasureSpec.makeMeasureSpec
+}
+
+
+invalidateChildInParent
+
+_________________________________
+view:
+

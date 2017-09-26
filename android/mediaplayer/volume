@@ -1,0 +1,21 @@
+//设置音量索引范围与audioService一致
+VolumeStreamState@AudioService.java-->initStreamVolume@AudioSystem.java-->initStreamVolume
+@AudioSystem.cpp-->initStreamVolume-->mpAudioPolicy->init_stream_volume@AudioPolicyService.cpp
+-->ap_init_stream_volume@audio_policy_hal.cpp-->initStreamVolume@AudioPolicyManagerBase.cpp
+
+
+//将音量的索引值转换成db值
+initializeVolumeCurves{
+//初始化每个流中每个设备(speaker,earpeace,)的db值
+- mStreams[i].mVolumeCurve[j] =
+                    sVolumeProfiles[i][j];
+}
+
+
+//设置音量
+
+
+AudioPolicyManager::checkAndSetVolume(index){
+- 根据index计算db值，computeVolume
+- AudioOutputDescriptor::setVolume-->mCurVolume[stream] = volume//赋值
+}

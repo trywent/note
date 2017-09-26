@@ -1,0 +1,14 @@
+//获取播放音频
+tinycap /data/afe_out.wav -d 3 -c 2 -r 48000 -p 240 -n 2
+
+//获取录制
+tinycap /data/afe_in.wav -d 2 -c 2 -r 48000 -p 240 -n 2
+
+//hal
+touch data/pcm_play.pcm
+
+
+//
+tinymix
+
+

@@ -1,0 +1,20 @@
+emergency call：从系统属性ril.ecclist中读取
+isEmergencyNumberInternal@PhoneNumberUtils.java
+
+去电：
+onCreate-->processIntent-->sendOrderedBroadcast-->OutgoingCallReceiver@OutgoingCallBroadcaster.java
+-->SipCallOptionHandler.onCreate-->setResultAndFinish@SipCallOptionHandler.java-->placeCall
+@CallController.java-->displayCallScreen(通过intent打开)@PhoneApp.java-->InCallScreen
+
+MHandler.handleMessage-->onPhoneStateChanged
+
+packages/apps/Phone/src/com/android/phone/OutgoingCallBroadcaster.java
+packages/apps/Phone/src/com/android/phone/SipCallOptionHandler.java
+packages/apps/Phone/src/com/android/phone/InCallScreen.java
+
+telephony:
+frameworks/base/telephony/java/android/telephony/PhoneNumberUtils.java
+external/libphonenumber/java/src/com/android/i18n/phonenumbers/ShortNumberUtil.java
+
+
+setting中设置mobileNetworkSetting会使用phone中mobileNetworkSetting.java

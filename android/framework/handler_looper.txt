@@ -1,0 +1,132 @@
+概述：
+1，构造handler，初始化线程，looper开始循环等待消息
+2，通过handler发送消息，消息最终会被加入对类MessageQueue中。
+3，looper获取MessageQueue中的消息，并调用对应方法处理消息
+
+thread-local variable 线程本地变量，只在本线程可用。通过ThreadLocal来设置获取(set ,get)
+=========================
+创建Looper：
+Looper.prepare-->prepare(true){
+- 当前线程没有初始化looper，sThreadLocal.get()
+- 新建Looper，sThreadLocal.set(new Looper(quitAllowed))-->Looper(){
+	- 创建消息队列，mQueue = new MessageQueue(quitAllowed)
+	- 获取当前线程
+	}
+}
+
+开始处理：
+loop{
+- 获取一个消息，queue.next()
+- 执行处理Message，msg.target.dispatchMessage(msg)
+- 回收，msg.recycle()
+}
+
+退出循环:
+quite-->mQueue.quit()@Looper.java-->quit(mQuiting = true)@MessageQueue.java
+
+_________________________
+创建Handler:
+Handler(){
+- 获取使用的Looper,Looper.myLooper()
+- 获取MessageQueue，mLooper.mQueue
+- 设置Callback mCallback
+}@Handler.java
+
+dispatchMessage{
+- msg.callback不为空，handleCallback(msg)--> message.callback.run
+- mCallback不为空mCallback.handleMessage(msg)
+- handleMessage
+}
+_________________________
+获取message：
+obtainMessage-->Message.obtain@Handler.java-->obtain(Handler h...){
+- 获取message实例，obtain(){
+	- 若sPool不为空，则从中获取一个Message
+	- 否则新建new Message
+	}
+- 设置Message.target = handler
+- 设置回调，Message.callback = callback
+}@Message.java
+
+发送message：
+sendToTarget-->target.sendMessage(target是handler)@Message.java-->sendMessage-->
+sendMessageDelayed-->sendMessageAtTime(Message msg, long uptimeMillis){
+- 添加到消息队列中mQueue.enqueueMessage-->enqueueMessage{
+
+	}@MessageQueue.java
+}@Handler.java
+
+
+__________________________
+
+MessageQueue(boolean quitAllowed) {
+- nativeInit()-->android_os_MessageQueue_nativeInit{
+	- new NativeMessageQueue(){
+		-new Looper(false)
+		-设置Looper::setForThread(mLooper)
+		}
+	- android_os_MessageQueue_setNativeMessageQueue-->
+	  env->SetIntField(设置mPtr为本地NativeMessageQueue)
+	}
+}
+
+MessageQueue.addIdleHandler(加入IdleHandler，当消息队列执行完，等待下个消息时执行)-->
+MessageQueue.IdleHandler.queueIdle()
+
+
+enqueueMessage(Message msg, long when){
+- 若当前消息mMessages为空，则将消息设置为头mMessages = msg
+- 否则将遍历消息链表，根据时间when将消息放入到合适的位置
+- 是否需要唤醒，nativeWake
+}
+
+next(){
+- nativePollOnce-->android_os_MessageQueue_nativePollOnce-->nativeMessageQueue->pollOnce
+	-->mLooper->pollOnce-->pollOnce(timeoutMillis, NULL, NULL, NULL){
+	- 	
+	}
+- 若头消息是barrier，则查找第一个异步处理的消息。!msg.isAsynchronous()
+- 开始获取消息{
+	- 消息不到处理时间，设置下次获取消息的时间nextPollTimeoutMillis
+	- 返回获取到的消息，
+	- 没有消息，nextPollTimeoutMillis =-1
+	- 空闲处理(只进行一次，好像只是activity才加入空闲处理){
+		- 获取个数，pendingIdleHandlerCount = mIdleHandlers.size()
+		- 获取所有的handler,mPendingIdleHandlers = mIdleHandlers.toArray
+		- 进行处理，idler.queueIdle()
+		- 若不需要保存则移除mIdleHandlers.remove(idler)		
+		}
+	}
+}
+
+enqueueSyncBarrier{
+- 创建一个Handler为空,第一参数arg1为栅栏数的Message。Message.obtain()
+- 将改message插入到消息队列中的要求位置
+}
+
+frameworks/base/core/java/android/os/MessageQueue.java
+frameworks/base/core/jni/android_os_MessageQueue.cpp
+frameworks/native/libs/utils/Looper.cpp
+__________________________
+通常的使用方法
+mThread = new HandlerThread(TAG);
+mThread.start();  //新建一个looper线程，在run中会调用Looper.loop()
+mHandler = new MyHandler(mThread.getLooper());
+
+
+可以通过Messager类进行进程间通信，(实际上跟binder相关，查看android reference----service)
+
+
+____________________________
+空闲时执行队列(IdleHandler)：(activity)
+
+
+(加入)addIdleHandler-->mIdleHandlers.add@MessageQueue.java
+
+(移除)removeIdleHandler-->mIdleHandlers.remove@MessageQueue.java
+
+next-->(当消息队列执行完，或第一个消息要在将来进行执行，获取空闲处理个数)mIdleHandlers.size--
+(获取容器中mPendingIdleHandlers空闲处理，并执行)idler.queueIdle@MessageQueue.java
+
+frameworks/base/core/java/android/os/MessageQueue.java
+frameworks/base/core/jni/android_os_MessageQueue.cpp

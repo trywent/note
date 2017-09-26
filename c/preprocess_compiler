@@ -1,0 +1,37 @@
+预处理：
+
+# //将变量当作字符串操作
+## //连接符，将变量与字符串连接
+当带有这些操作符的宏被处理时，会先将这些操作符处理后再处理其它宏。
+
+_______________________________
+例：
+#define STRINGIFY2( x) #x
+#define STRINGIFY(x) STRINGIFY2(x)
+#define PASTE2( a, b) a##b
+#define PASTE( a, b) PASTE2( a, b)
+
+#define BAD_PASTE(x,y) x##y
+#define BAD_STRINGIFY(x) #x
+
+#define SOME_MACRO function_name
+
+//会先连接SOME_MACRO, __LINE__，结果是错误的
+STRINGIFY( BAD_PASTE( SOME_MACRO, __LINE__)))
+//会解析SOME_MACRO,再执行PAST2进行连接
+STRINGIFY( PASTE( SOME_MACRO, __LINE__)))
+
+
+6.10.3.1 Argument substitution
+After the arguments for the invocation of a function-like macro have been identified, argument substitution takes place. A parameter in the replacement list, unless preceded by a # or ## preprocessing token or followed by a ## preprocessing token (see below), is replaced by the corresponding argument after all macros contained therein have been expanded. Before being substituted, each argument’s preprocessing tokens are completely macro replaced as if they formed the rest of the preprocessing file; no other preprocessing tokens are available.
+
+_____________________________
+可变参数宏：使用__VA_ARGS__
+#define PRINT_E(...) printf(__VA_ARGS__)
+_____________________________
+#ifdef 单个条件，不是用括号
+#if defined(NAME) 可有多个条件判断，使用括号
+=============================
+集合初始化(结构体，数组)：(c99标准)
+可以初始化任意个成员，其他没有初始化的成员赋值为0。
+

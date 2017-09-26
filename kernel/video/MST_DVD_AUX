@@ -1,0 +1,76 @@
+lvds //显示器信号输入方式
+
+
+信号格式
+第一代CVBS，第二代是S-VIDEO，第三代是VGA，第四代是DVI,第五代是HDMI
+CVBS是复合视频全电视信号，同步信号和颜色亮度信号叠加在一起，
+
+
+YPbPr是模拟高清分量视频信号Y是同步信号和亮度信号，PbPr是色度信号
+
+YCbCr是数字系统的标识
+
+其中“Y”表示明亮度（Luminance或Luma），也就是灰阶值；而“U”和“V” 表示的则是色度（Chrominance或Chroma)
+“亮度”是透过RGB输入信号来建立的，方法是将RGB信号的特定部分叠加到一起。
+“色度”则定义了颜色的两个方面─色调与饱和度,分别用Cr和Cb来表示
+
+===============================
+onGlobalLayout(布局时打开，并传入显示屏幕大小)-->handleDisplay(int h, int w){
+- 打开设备，Util.openDev(int)
+- 设置通道，Util.setChannel(mScaFb, MY_CHANNEL)
+- 根据屏幕大小，开始显示Util.startDisplay(mScaFb,0,0, h, w)
+- 开始显示处理线程，等待准备好显示移除进度条，mDisplayHandleThread.start()
+
+}
+
+
+typedef enum
+{
+    SCA_SRC_VGA,
+    SCA_SRC_YPBPR,
+    SCA_SRC_CVBS,
+    SCA_SRC_CVBS2,
+    SCA_SRC_CVBS3,
+    SCA_SRC_SVIDEO,	// Add S-video input source //
+    SCA_SRC_DTV,
+    SCA_SRC_SC0_VOP,
+    SCA_SRC_SC1_VOP,
+    SCA_SRC_SC2_VOP,
+    SCA_SRC_BT656,
+    SCA_SRC_BT656_1,
+    SCA_SRC_NUM,
+}SCA_SRC_TYPE;
+
+hardware/mstar/kernel_headers/linux/mdrv_sca_st.h
+_____________________________
+内部DVD：
+DVD_PORT 10
+DVD_CHANNEL Util.SOURCE_CHANNEL_BT656
+
+
+openDev(10)@Util.java-->android_source_Util_openDev(设置源enSrc)@android_source_Util.cpp
+-->OpenDev-->open("/dev/mstar_sca")@scaler.c
+
+setChannel(通道值)@Util.java-->android_source_Util_setChannel(重新设置enSrc)@android_source_Util.cpp
+
+startDisplay@Util.java-->android_source_Util_startDisplay{
+- Connect_with_AutoDetect(fd, 源类型enSrc, SCA_DEST_MAIN, SCA_VE_OUTPUT_PAL, 窗口大小&dispWin)
+- 设置透明度，SetTransparent
+
+}@android_source_Util.cpp
+
+
+Connect_with_AutoDetect{
+- 将传入的配置值传入到驱动，ioctl(SCA_IOC_CONNECT)
+- 根据设置的屏幕大小，调整显示，ChangeDispWin{
+			- 设置窗口的属性值，stChangeWin
+			- ioctl(SCA_IOC_CHANGE_WINDOW，&stChangeWin)	
+	}
+}@scaler.c
+
+
+
+
+frameworks/base/core/java/android/source/Util.java
+frameworks/base/core/jni/android_source_Util.cpp
+hardware/mstar/mdrv_sca/scaler.c

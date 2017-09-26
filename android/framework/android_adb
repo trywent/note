@@ -1,0 +1,134 @@
+transport_socket_events@transport.c-->handle_packet@adb.c-->parse_banner@adb.c
+====================
+adb协议：
+消息头结构：
+struct message {
+    unsigned command;       /* command identifier constant      */
+    unsigned arg0;          /* first argument                   */
+    unsigned arg1;          /* second argument                  */
+    unsigned data_length;   /* length of payload (0 is allowed) */
+    unsigned data_crc32;    /* crc32 of data payload            */
+    unsigned magic;         /* command ^ 0xffffffff             */
+};
+消息：
+CONNECT  //host和client都发送该消息建立连接
+AUTH     //验证连接，若验证通过则发送CONNECT。不通过则继续发送AUTH，发送完私有key后发送publick key 由用户验证
+OPEN     //建立连接，若成功发送READY，失败发送CLOSE
+READY    //准备好
+WRITE    //发送数据。每次接收到READY后才发送消息
+CLOSE    //连接断开
+SYNC     //
+
+_______________________
+建立连接：
+发送CONNECT(version, maxdata, "system-identity-string")
+
+OPEN(local-id, 0, "destination") 告诉接收者local-id希望建立连接。（成功收到READY消息，否则CLOSE消息）
+处理open消息时会建立socket，存放在local_socket_list中。
+
+创建对应的服务线程shell，reboot...
+transport_registration_func(监听注册相关函数)-->transport_socket_events@transport.c-->handle_packet(A_OPEN)@adb.c-->create_local_service_socket@socket.c==>create_local_socket==service_to_fd@services.c-->create_service_thread
+(根据不同的fd创建处理线程，传入要调用函数。运行对应的服务root，reboot，remount..)
+-->adb_thread_create-->pthread_create
+
+连接后：
+发送WRITE(0, remote-id, "data")
+处理wirte消息。在handle_packet方法中将收到的A_WRTE包放入队列s->enqueue(s, p)，s是在open时建立
+
+local_socket_enqueue(socket->enqueue)-->fdevent_add-->fdevent_set
+
+service.c启动响应命令的服务
+
+
+fdevent_set@fdevent.c
+
+system/core/adb/fdevent.c
+=================================
+adb启动：
+adbd@init.rc-->main-->adb_main@adb.c-->fdevent_loop-->fdevent_process(将事件加入队列)--(取出fdevent)
+fdevent_call_fdfunc-->fde->func@fdevent.c
+
+
+
+main@adb.c-->usb_init-->adb_thread_create(&tid, usb_open_thread, h)-->usb_open_thread
+(打开/dev/android_adb)@usb_linux_client.c-->register_usb_transport-->register_transport
+@transport.c
+
+
+system/core/adb/usb_linux_client.c
+system/core/adb/transport.c
+_________________________________
+注册事件：
+fdevent_create-->fdevent_install(初始化fde，并将它注册)-->fdevent_register(设置fd_table[fde->fd]=fde)
+
+
+create_local_socket@soket.c-->fdevent_install@fdevent.c
+
+---------------------------------
+adb_main@adb.c-->init_transport_registration-->fdevent_install(监听执行transport_registration_func)
+@transport.c
+
+system/core/adb/adb.c
+
+---------------------------------
+adb root:
+设置ro.debuggable=1后adb root可用
+
+设置root时restart_root_service@service.c
+
+system/core/adb/
+
+_____________________________________
+识别设备：
+ 
+
+弹出调试允许对话框：
+setAdbEnabled-->UsbDebuggingHandler.handleMessage(MESSAGE_ADB_ENABLED)-->Thread.start
+run-->listenToSocket-->(接收到publick key)mHandler.obtainMessage(MESSAGE_ADB_CONFIRM)-->
+UsbDebuggingHandler.handleMessage(MESSAGE_ADB_CONFIRM)
+showConfirmationDialog-->mContext.startActivity(dialogIntent)@UsbDebuggingManager.java
+
+frameworks/base/services/java/com/android/server/usb/UsbDeviceManager.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/usb/UsbDebuggingActivity.java
+frameworks/base/services/java/com/android/server/usb/UsbDebuggingManager.java
+
+1|shell@rkpx3:/ $ adb devices                                                   
+* daemon not running. starting it now on port 5038 *                            
+cannot bind 'tcp:5038'                                                          
+ADB server didn't ACK                                                           
+* failed to start daemon *                                                      
+error: cannot connect to daemon  
+=====================================
+
+
+
+
+system/core/adb/services.c
+system/core/adb/framebuffer_service.
+_____________________________________
+数据库：
+sqlite3 data/data/com.android.providers.settings/databases/settings.db
+
+数据库中数据的默认数据在frameworks/base/packages/SettingsProvider/res/values/defaults.xml中定义，如果要在数据库中添加一个新的字段，则可用如下步骤：
+
+1、在defaults.xml中为新加的数据定义一个默认值（当然也可在代码中直接给定）
+
+2、在frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/DatabaseHelper.java中的loadSystemSettings（）方法中加入新字段的添加代码，如下：
+
+
+[java] view plaincopy
+loadIntegerSetting(stmt, "homescreen_switch_effict",  
+                    R.integer.def_homescreen_switch_effict);  
+
+3、重新编译一个SettingsProvider.apk，再替换原来的SettingsProvider.apk
+
+4、用Settings.System.putInt()；Settings.System.getInt()来设置和取得设置的值 
+_____________________________________
+adb shell /system/bin/screencap -p /sdcard/screenshot.png
+adb pull /sdcard/screenshot.png screenshot.png
+
+
+I/USB3G ( 829): usb 3g monitor v0.1 start
+I/USB3G ( 829): event { 'add', '/devices/platform/Mstar-ehci-2.1/usb1', 'usb', '', 189, 0 }
+I/USB3G ( 829): event { 'add', '/devices/platform/Mstar-ehci-3.2/usb2', 'usb', '', 189, 128 }
+

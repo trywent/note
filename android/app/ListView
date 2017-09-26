@@ -1,0 +1,13 @@
+用列表显示条目，使用Adapter获取数据并自动放入列表中。
+
+
+______________________
+布局绑定一个Adapter：
+当布局内容是动态变化时，通过继承AdapterView类来动态加载内容。
+//获取AdapterView
+ListView listView = (ListView) findViewById(R.id.listview);
+//设置adapter数据
+ArrayAdapter adapter = new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1, myStringArray);
+listView.setAdapter(adapter);
+//设置列表项单击事件处理方法
+listView.setOnItemClickListener(OnItemClickListener);

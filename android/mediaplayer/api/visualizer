@@ -1,0 +1,23 @@
+
+
+Visualizer-->native_setup@Visualizer.java-->android_media_visualizer_native_setup
+@android_media_Visualizer.cpp-->Visualizer-->initCaptureSize@Visualizer.cpp
+
+native_setPeriodicCapture-->android_media_setPeriodicCapture{
+- 获取对象，getVisualizer
+- 设置回调，pVisualizer->setCaptureCallBack
+}@android_media_Visualizer.cpp
+
+
+CaptureThread::threadLoop-->mReceiver.periodicCapture
+
+
+getWaveForm-->native_getWaveForm@Visualizer.java-->android_media_visualizer_native_getWaveForm
+@android_media_Visualizer.cpp-->getWaveForm
+
+release-->native_release@Visualizer.java-->android_media_visualizer_native_release-->
+
+
+frameworks/base/media/java/android/media/audiofx/Visualizer.java
+frameworks/base/media/jni/audioeffect/android_media_Visualizer.cpp
+frameworks/av/media/libmedia/Visualizer.cpp

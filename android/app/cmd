@@ -1,0 +1,32 @@
+启动activity：
+am start com.android.email/.activity.Welcome 
+
+-e|--es <EXTRA_KEY> <EXTRA_STRING_VALUE>
+
+am start -e "com.fyt.window" "second" com.android.email/.activity.Welcome 
+
+am start -e "com.fyt.window" "second" com.android.launcher2/com.android.launcher2.Launcher
+
+am start -->runStart-->makeIntent(构建intent)
+
+am startservice -n com.syu.ms/.ServiceMain
+
+
+px3:
+am start -e "com.syu.fyt" "fytSecond" com.syu.music/.MAct
+
+com.syu.video/.main.VideoListActivity
+
+强制结束：
+am force-stop com.android.launcher2/com.android.launcher2.Launcher
+
+frameworks/base/cmds/am/src/com/android/commands/am/Am.java
+
+
+dumpsys:
+dumpsys activity activities
+
+
+_________________________
+
+ps | busybox grep servicemanage  

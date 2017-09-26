@@ -1,0 +1,117 @@
+bootable/recovery/recovery.cpp
+
+主系统通过/cache中文件与recovery传递数据.
+工厂复位(Factory reset):主系统写"--wipe_data"到 /cache/recovery/command。并重启
+
+OTA升级：主系统写"--update_package=/cache/some-filename.zip"。并重启进入recovery
+
+prompt_and_wait{
+
+}
+
+
+main{
+- 重新设置输出流
+- 若启动命令是"--adbd"，则进入adb，adb_main.(只能通过函数apply_from_adb，重启后进入)
+- 加载挂载卷表，load_volume_table
+- 获取内外sd卡挂载路径，SetSdcardRootPath
+- 确保cache分区被挂载，ensure_path_mounted("/cache/..")
+- 获取参数，get_args{//参数以'\n'分隔
+	- 从分区misc获取bootloader命令，get_bootloader_message
+	- 读取misc中的命令
+	- 若没有读取到命令，则从"/cache/recovery/command"读取命令
+	- 写入bootloader命令，保证recovery执行没有完成，系统重启还进入recovery。(finish_recovery会清除命令)
+		set_bootloader_message
+	}
+- 根据参数表OPTIONS，处理传入的参数，getopt_long
+......
+- 升级命令update_package
+- sd卡升级auto_sdcard_update_path，
+- 擦除数据wipe_data
+}@recovery.cpp
+
+_____________________
+rk MISC:
+bootcmd:偏移0x4000
+
+struct bootloader_message {
+    char command[32];   //命令 boot-recovery
+    char status[32];
+    char recovery[768]; //recovery的命令。recovery--wipe_all
+    char stage[32];
+    char reserved[224];
+};
+
+=====================
+文件系统挂载表：
+load_volume_table{
+- 若是emmc，fs_mgr_read_fstab("/etc/recovery.emmc.fstab")
+- 否则，fs_mgr_read_fstab("/etc/recovery.fstab")
+}@roots.cpp
+
+
+bootable/recovery/roots.cpp
+
+
+
+
+
+将apk打包成镜像文件
+
+可能修改：
+//加入一个新的Volume到fstab中
+fs_mgr_add_entry@roots.cpp
+
+
+
+=====================
+UI:
+设置背景：
+ScreenRecoveryUI::SetBackground
+
+是否显示字符：
+ScreenRecoveryUI::ShowText
+
+输出字符：
+ScreenRecoveryUI::Print
+
+加载图片：
+ScreenRecoveryUI::Init(){
+- LoadBitmap("icon_installing", &backgroundIcon[INSTALLING_UPDATE])-->
+	res_create_surface{
+		- 根据图片名加载图片资源
+	}
+}
+
+=====================
+RKUPDATE:
+sdtool_main-->install_rkimage
+
+=====================
+update:
+
+install_package-->really_install_package{
+- 验证升级文件load_keys，verify_file
+- try_update_binary{
+	- 查找升级包中升级文件，mzFindZipEntry("update-binary")
+	- 将文件解压到"/tmp/update_binary"
+	- 执行升级文件exec(update_binary,path/*包路径*/)
+	}
+}@install.cpp-->
+
+
+bootable/recovery/install.cpp
+
+
+
+
+
+
+
+#######################
+ota：
+make otapackage-->ota_from_target_files BUILT_TARGET_FILES_PACKAGE(源文件) zip(目标)
+
+build/core/Makefile
+build/tools/releasetools/ota_from_target_files
+build/tools/releasetools/edify_generator.py

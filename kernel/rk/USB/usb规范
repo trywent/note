@@ -1,0 +1,73 @@
+=============
+协议层：
+包:
+- SYNC 
+ 所有的包都以SYNC开始，输入电路用这些信号对齐本地时钟
+
+token：
+Field PID ADDR ENDP CRC5
+Bits 	8   7    4    5
+
+data：
+Field PID   DATA   CRC16
+Bits   8    0-8192  16
+
+handshake:
+Field PID
+Bits   8
+
+
+
+四种传输类型
+1.控制传输
+2.中断传输 (host固定间隔去查询)
+3.批量传输
+4.同步传输
+
+5.分离传输(host和hub间，匹配host和device的不同速度)
+
+=================
+usb框架：
+usb设备可分为三个层次：
+• 最底层是发送和接收数据的总线接口
+
+• 中间层处理总线上到设备的各种端点的数据。端点是数据的接收或发送者
+
+• 最上层是总线上的功能设备，(鼠标..)
+
+usb设备可见的状态变化：
+Attached-->Powered-->Default-->Address-->Configured-->Suspended 
+
+_________________
+枚举：
+当端口插入usb设备:
+1. 插入usb设备的hub通过状态管道，回复自己的状态通知主控。这时usb设备状态是powered，插入设备的端口是disabled
+
+2. 主通通过查询hub获取更准确的状态
+3. 这是主控查询到了被插入设备的端口，并等待至少100ms使插入操作完成，等待电压稳定Now that the host knows the port to which the new device has been attached, the host then waits for at
+  least 100 ms to allow completion of an insertion process and for power at the device to become stable.
+ The host then issues a port enable and reset command to that port. Refer to Section 7.1.7.5 for
+sequence of events and timings of connection through device reset.
+4. The hub performs the required reset processing for that port (see Section 11.5.1.5). When the reset
+  signal is released, the port has been enabled. The USB device is now in the Default state and can draw
+ no more than 100 mA from VBUS. All of its registers and state have been reset and it answers to the
+default address.
+5. The host assigns a unique address to the USB device, moving the device to the Address state.
+6. Before the USB device receives a unique address, its Default Control Pipe is still accessible via the
+  default address. The host reads the device descriptor to determine what actual maximum data payload
+ size this USB device’s default pipe can use.
+7. The host reads the configuration information from the device by reading each configuration zero to
+  n-1, where n is the number of configurations. This process may take several milliseconds to complete.
+8.
+Based on the configuration information and how the USB device will be used, the host assigns a
+configuration value to the device. The device is now in the Configured state and all of the endpoints in
+this configuration have taken on their described characteristics. The USB device may now draw the
+amount of VBUS power described in its descriptor for the selected configuration. From the device’s
+point of view, it is now ready for use.
+When the USB device is removed, the hub again sends a notification to the host. Detaching a device
+disables the port to which it had been attached. Upon receiving the detach notification, the host will update
+its local topological information.
+
+
+
+

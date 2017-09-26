@@ -1,0 +1,84 @@
+//audioTrack通过audioFlinger进行操作
+
+
+1.new AudioTrack
+AudioTrack@AudioTrack.java-->native_setup-->android_media_AudioTrack_native_setup
+@android_media_AudioTrack.cpp-->AudioTrack{
+- 创建，new AudioTrack
+- 设置，set{
+	- 配置流，采用率等参数
+	- 获取output，AudioSystem::getOutput
+	- createTrack_l(创建mAudioTrack)-->audioFlinger->createTrack
+	}
+}@AudioTrack.cpp
+
+2.write
+write@AudioTrack.java-->native_write_byte-->android_media_AudioTrack_native_write_byte
+-->writeToTrack{
+- sharedBuffer为0，直接写入AudioTrack.write
+- sharedBuffer不为0，拷贝数据到sharedBuffer
+}@android_media_AudioTrack.cpp
+
+
+3.play
+play@AudioTrack.java-->native_start-->android_media_AudioTrack_start-->
+lpTrack->start@android_media_AudioTrack.cpp-->start-->mAudioTrack->start@AudioTrack.cpp
+-->AudioFlinger::TrackHandle::start@AudioFlinger.cpp-->mTrack->start@Tracks.cpp-->
+start-->playbackThread->addTrack_l@Track.cpp-->AudioSystem::startOutput@Threads.cpp
+
+
+4.stop
+stop@AudioTrack.java-->native_stop-->android_media_AudioTrack_stop
+lpTrack->stop@android_media_AudioTrack.cpp-->stop@AudioTrack.cpp
+
+==========================
+创建：
+AudioTrack::AudioTrack-->set{
+- 检查参数，获取参数
+- 获取output，AudioSystem::getOutput
+- 设置采样率，格式，channel
+- 若有回调函数，创建mAudioTrackThread，new AudioTrackThread->run
+- 创建，createTrack_l{
+	- 获取flinger，AudioSystem::get_audio_flinger
+	- 获取各种参数，AudioSystem::getxxxx(output, streamType, &xxxx)
+	- 创建mAudioTrack，audioFlinger->createTrack
+	- 更新proxy，
+	}
+- 赋值流类型，mStreamType = streamType
+}@AudioTrack.cpp
+
+
+AudioTrack::write{
+- 获取buffer，obtainBuffer-->obtainBuffer(Buffer*,timespec)-->obtainBuffer{
+	- 若服务对象dead，重建AudioTrack，restoreTrack_l
+	- 通过代理从获取buffer，proxy->obtainBuffer-->ClientProxy::obtainBuffer
+	}
+- 拷贝数据，memcpy
+}@AudioTrack.cpp
+
+start{
+- 设置状态，mState
+- 设置播放位置，mNewPosition
+- 开始线程mAudioTrackThread，若为空则创建androidSetThreadPriority
+- mAudioTrack->start@AudioTrack.cpp-->TrackHandle.start-->mTrack->start@Tracks.cpp-->
+	
+}@AudioTrack.cpp
+
+stop{
+- mAudioTrack->stop@AudioTrack.cpp-->(服务端Track)mTrack->stop@TrackHandle@-->stop
+	-->设置状态mState = STOPPED@Track.cpp
+}@AudioTrack.cpp
+
+
+//音量
+setStereoVolume-->native_setVolume@AudioTrack.java-->android_media_AudioTrack_set_volume
+@android_media_AudioTrack.cpp-->setVolume-->mProxy->setVolumeLR@AudioTrack.cpp
+mCblk->mVolumeLR@AudioTrackShared.h
+
+
+
+frameworks/base/media/java/android/media/AudioTrack.java
+frameworks/base/core/jni/android_media_AudioTrack.cpp
+frameworks/av/media/libmedia/AudioTrackShared.cpp
+frameworks/av/media/libmedia/AudioTrack.cpp
+frameworks/av/services/audioflinger/Tracks.cpp

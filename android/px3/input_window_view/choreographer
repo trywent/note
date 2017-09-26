@@ -1,0 +1,13 @@
+getInstance-->sThreadInstance.get-->new Choreographer{
+- mDisplayEventReceiver = new FrameDisplayEventReceiver
+}@Choreographer.java
+
+
+//接收到脉冲执行回调
+FrameDisplayEventReceiver.onVsync-->mHandler.sendMessageAtTime-->
+FrameDisplayEventReceiver.run-->doFrame{
+- 根据时间判断是否已经跳过了很多帧(参考信息之类)
+- 执行回调，doCallbacks
+}
+
+frameworks/base/core/java/android/view/Choreographer.java

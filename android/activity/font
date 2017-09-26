@@ -1,0 +1,3 @@
+设置font：
+mFont1=Typeface.createFromAsset(context.getAssets(), "eraslght.ttf");
+textView.setTypeface(mFont1 );

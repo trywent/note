@@ -1,0 +1,51 @@
+disk->part0流程 ：alloc_disk-->alloc_disk_node-->hd_ref_init  
+
+struct request kernel/include/linux/blkdev.h
+struct mmc_request kernel/include/linux/mmc/core.h
+struct mmc_queue  driver/mmc/card/queue.h
+struct request_queue kernel/include/linux/blkdev.h
+
+md->queue.issue_fn = mmc_blk_issue_rq  : mmc_blk_issue_rq-->mmc_blk_issue_rw_rq (将struct request中的参数赋值到mmc_request(包含在mmc_blk_request))
+
+md->disk->queue = md->queue.queue
+
+sdhci_ops.request = static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+
+ mmc->ops = &sdhci_ops;
+
+  struct mmc_host *mmc;
+  
+  
+大概流程：
+
+ mmc_init_queue-->mmc_queue_thread(进程大循环，获取requeset后执行操作)-->issue_fn   >>>>queue.c
+ --> mmc_blk_issue_rq-->mmc_blk_issue_rw_rq     >>>>block.c 
+ -->mmc_wait_for_req-->mmc_start_request        >>>>core.c
+ -->host->ops->request(host, mrq);              >>>>sirfsoc-sdmmc.c
+ 
+ kthread_run创建一个进程并开始
+ 
+ request_method(struct request_queue *q) 处理请求队列中的请求.
+ 
+ 
+ add_disk-->register_disk-->disk_part_iter_next(遍历分区,遍历分区有顺序，倒序，包括partition 0等选项)
+ 
+ -->kobject_uevent
+ 
+ 
+文件打开后获得fd，write，read 根据fd获取filp(file pointer)。
+ 
+在write中最终调用的是file->f_op->write.
+
+
+
+inode->i_data.a_ops = &def_blk_aops --> >>>>fs/block_dev.c
+block_read_full_page                    >>>>fs/buffer.c
+
+
+dd if=/dev/block/mmcblk0p1 bs=512 skip=4097 count=1
+dd if=/data/test.txt of=/dev/block/mmcblk0p1 bs=512 seek=4097 count=1
+
+FYI:
+
+用户程序读写块设备与读写字符设备一样，是通过前面打开块设备文件的struct file结构中的文件操作函数来实现的。用户进程分别通过read()和write()系统调用来读写块设备中的数据，read()和write()系统调用的内核实现函数分别是sys_read()和sys_write()函数。sys_read()和sys_write()函数分别调用vfs_read()和vfs_write()函数，而vfs_read()和vfs_write()函数调用打开设备文件的struct file结构中的f_op->read()和f_op->write()函数来读写块设备数据，而所有打开块设备文件的struct file结构中的f_op字段始终一直指向def_blk_fops结构，所以vfs_read()和vfs_write()函数将分别调用generic_file_read()和blkdev_file_write()函数来对块设备进行读写操作，其中blkdev_file_write()函数调用generic_file_write_nolock()函数，ganeric_file_write_nolock()函数调用generic_file_aio_write_nolock()函数，generic_file_aio_write_nolock()函数调用__generic_file_aio_write_nolock()。generic_file_read()和__generic_file_aio_write_nolock()函数见20.7节“访问文件操作”。generic_file_read()和__generic_file_aio_write_nolock()函数又将分别调用到块设备文件索引节点的地址空间操作函数组def_blk_aops中的blkdev_readpage()和blkdev_writepage()操作函数，这两个函数最终都将把对块设备的读写操作封装成由struct bio描述的I/O操作，并将I/O操作插入块设备的请求队列中，然后向块设备提交I/O操作请求。

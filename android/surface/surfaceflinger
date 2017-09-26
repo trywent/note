@@ -1,0 +1,170 @@
+//service surfaceflinger /system/bin/surfaceflinger@init.rc
+main{
+- new SurfaceFlinger-->onFirstRef-->(消息队列初始化)mEventQueue.init
+- flinger->init
+- sm->addService(String16(SurfaceFlinger::getServiceName()), flinger)
+- flinger->run-->waitForEvent@SurfaceFlinger.cpp
+}@main_surfaceflinger.cpp
+
+
+
+//消息队列
+SurfaceFlinger::onFirstRef-->(MessageQueue)mEventQueue.init{
+- 保存surfaceFlinger，mFlinger
+- new Looper
+- new Handler
+}
+
+//初始化
+SurfaceFlinger::init{
+- 
+- 创建HAL层接口mHwc,new HWComposer
+- 初始化displays{//创建三种类型,DISPLAY_PRIMARY
+	- 创建bq,BufferQueue
+	- 创建fbs,FramebufferSurface(mHwc)
+	- 创建DisplayDevice(fbs,bq)
+	- 设置屏幕可操作,acquireScreen
+	}
+- getDefaultDisplayDevice()->makeCurrent //将displayDevice的surface关联到当前EGL上下文
+- vsyncSrc = new DispSyncSource //创建同步源
+- 创建，new EventThread(sfVsyncSrc) //传入同步源
+- 设置MessageQueue的，mEventQueue.setEventThread
+- 新建一个进程用来控制hal层打开关闭sync，EventControlThread
+- initializeDisplays--onInitializeDisplays-->onScreenAcquired-->
+	resyncToHardwareVsync-->mEventControlThread->setVsyncEnabled//开始同步信号
+- 
+}@SurfaceFlinger.cpp
+
+__________________
+SurfaceFlinger::onTransact{
+- 创建/销毁surface，BnSurfaceComposer::onTransact
+- 1002(SHOW_UPDATES)Surface更新时闪烁界面,mDebugRegion
+- 
+}
+
+
+__________________
+//循环等待消息DISPLAY_EVENT_VSYNC
+SurfaceFlinger::run-->waitForEvent-->mEventQueue.waitMessage{
+- while循环{
+	- IPCThreadState::self()->flushCommands
+	- mLooper->pollOnce-->cb_eventReceiver-->eventReceiver{
+		- 获取同步信号DisplayEventReceiver::getEvents(mEventTube, buffer){
+			- mHandler->dispatchInvalidate-->SurfaceFlinger::onMessageReceived(刷新)
+			}
+		}
+	}
+}@MessageQueue.cpp
+
+
+
+
+//接收到同步事件
+onVSyncReceived{
+- mPrimaryDispSync.addResyncSample
+- 打开enableHardwareVsync
+- 或关闭disableHardwareVsync
+}
+
+
+frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/MessageQueue.cpp
+
+
+============
+//刷新
+repaintEverything-->
+
+//(应用提交绘制数据)layer更新
+signalTransaction/signalLayerUpdate@SurfaceFlinger.cpp-->
+invalidate-->mEvents->requestNextVsync-->mHandler->dispatchInvalidate
+-->Handler::handleMessage@MessageQueue.cpp-->
+onMessageReceived(INVALIDATE){
+- handleMessageTransaction
+- handleMessageInvalidate-->handlePageFlip
+- signalRefresh
+}
+
+//
+signalRefresh-->MessageQueue::refresh-->mHandler->dispatchRefresh-->
+sendMessage(REFRESH)@MessageQueue.cpp-->onMessageReceived(REFRESH)-->
+handleMessageRefresh{
+- preComposition
+- setUpHWComposer
+- doDebugFlashRegions
+- doComposition
+- postComposition
+}@SurfaceFlinger
+
+
+
+setUpHWComposer{
+- 若layer变化了(mHwWorkListDirty){
+	- 获取layer，mDisplays.getVisibleLayersSortedByZ
+	- 创建hwcomposer中的layer,createWorkList //初始化mDisplayData[0].list
+	- layer->setGeometry{ //将display中layer信息设置到hwcomposer中layer
+		- layer.setFrame
+		- layer.setCrop
+		}
+	}
+- 设置hwc中layer的帧数据{
+	- layer->setAcquireFence-->setAcquireFenceFd
+	- layer->setPerFrameData{
+		- setVisibleRegionScreen
+		- setBuffer
+		- setLayername
+		}@Layer.cpp
+	}
+- hw->prepareFrame@DisplayDevice.cpp
+}@SurfaceFlinger
+
+doComposition{
+- 获取脏区域,dirtyRegion
+- doDisplayComposition(dirtyRegion){
+	- 计算新的脏区,dirtyRegion
+	- doComposeSurfaces
+	- hw->swapBuffers
+	}
+- hw->compositionComplete@SurfaceFlinger-->
+	mDisplaySurface->compositionComplete@DisplayDevice.cpp-->mHwc.fbCompositionComplete
+	@FramebufferSurface.cpp-->fbCompositionComplete@HWCompser.cpp
+- postFramebuffer
+}
+
+doComposeSurfaces{
+- 若有hasGlesComposition{
+
+	}
+- 遍历layer,hw->getVisibleLayersSortedByZ{
+	- 获取layer需更新的可见区域,clip
+	- 根据合成类型执行操作,layer->getCompositionType{
+		- hwc处理,HWC_OVERLAY
+		- surfaceFlinger绘制HWC_FRAMEBUFFER,layer->draw
+		}
+	}
+}
+
+postComposition{
+- 
+- mAnimFrameTracker.setActualPresentFence/setActualPresentTime
+- mAnimFrameTracker.advanceFrame
+}
+
+//======== 显示
+FramebufferSurface::onFrameAvailable-->HWComposer::fbPost
+
+
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+
+
+//=======
+drawMesh@GLES20RenderEngine.cpp-->
+ProgramCache::getInstance().useProgram-->ProgramCache@ProgramCache.cpp
+
+
+waitForEvent@EventThread.cpp
+
+frameworks/native/services/surfaceflinger/RenderEngine/GLES20RenderEngine.cpp
+frameworks/native/services/surfaceflinger/RenderEngine/ProgramCache.cpp
+frameworks/native/services/surfaceflinger/EventThread.cpp

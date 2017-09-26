@@ -1,0 +1,46 @@
+//
+
+
+//---大内存分配<linux/dma-mapping.h>  分配页
+//请求一段连续内存
+void *
+dma_alloc_coherent(struct device *dev, size_t size,
+			     dma_addr_t *dma_handle, gfp_t flag)
+
+//封装dma_alloc_coherent，将内存初始为0
+void *
+dma_zalloc_coherent(struct device *dev, size_t size,
+			     dma_addr_t *dma_handle, gfp_t flag)
+
+
+//释放内存
+void
+dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
+			   dma_addr_t dma_handle)
+
+
+
+//---小内存分配<linux/dmapool.h>
+
+//创建一个内存pool
+struct dma_pool *
+dma_pool_create(const char *name, struct device *dev,
+		size_t size, size_t align, size_t alloc);
+
+//从内存pool分配空间
+void *dma_pool_alloc(struct dma_pool *pool, gfp_t gfp_flags,
+			dma_addr_t *dma_handle);
+
+//释放内存到pool
+void dma_pool_free(struct dma_pool *pool, void *vaddr,
+			dma_addr_t addr);
+
+//释放pool
+void dma_pool_destroy(struct dma_pool *pool);
+
+
+
+
+
+
+

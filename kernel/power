@@ -1,0 +1,260 @@
+suspend/resume:
+
+用户空间接口：
+static struct attribute * g[] {
+	&state_attr.attr,     //state接口
+	......
+	&wake_lock_attr.attr,  //计时锁接口
+	&wake_unlock_attr.attr,
+}
+
+
+pm_init{
+- 属性文件夹，kobject_create_and_add("power", NULL);
+- 创建属性文件接口，sysfs_create_group(power_kobj, &attr_group){
+	- state
+	- wakeup_count
+	- wake_lock/wake_unlock
+	}
+}@main.c
+______________________________
+状态接口操作函数：(开始休眠接口)
+state_store{
+- 是否请求进入休眠，hibernate()
+- 根据传入的参数确定要设置的状态，
+- android版进入,若要设置"on",或平台支持"mem"，则执行
+	request_suspend_state(state){
+	- 若旧状态不是SUSPEND_REQUESTED，并且当前不是设置PM_SUSPEND_ON，
+		则是睡眠操作{
+		- 设置状态为SUSPEND_REQUESTED
+		- queue_work(suspend_work_queue, &early_suspend_work)
+		}
+	- 若状态已经是SUSPEND_REQUESTED，并且当前是设置PM_SUSPEND_ON，
+		则是唤醒操作{
+		- 锁定防止睡眠wake_lock(&main_wake_lock);
+		- queue_work(suspend_work_queue, &late_resume_work)
+		}
+	}@earlysuspend.c
+- (不执行)没有early_suspend,进入通常linux休眠流程，enter_state
+}
+
+__________________
+suspend：
+early_suspend_work-->early_suspend{
+- 若state是请求SUSPEND_REQUESTED，则state|= SUSPENDED。()
+- 遍历early_suspend_handlers，执行第一阶段pos->suspend
+- 释放锁进入休眠，wake_unlock(&main_wake_lock)@wakelock.c
+}@earlysuspend.c
+
+//键wakelock机制
+(当锁被释放后自动进入)：suspend_work-->suspend@wakelock.c-->
+enter_state{
+- 同步文件系统sys_sync
+- suspend_prepare{
+	- 
+	- 冻结进程suspend_freeze_processes
+	}
+- 进入suspend，suspend_devices_and_enter{
+	- 
+	- suspend_enter{
+		- suspend_ops->prepare
+		- suspend_ops->prepare_late
+		- 休眠，syscore_suspend(syscore_ops_list遍历执行suspend)@syscore.c
+		- 进入休眠，suspend_ops->enter
+		- 唤醒，syscore_resume
+		}
+	}
+}@suspend.c
+
+__________________
+resume：
+late_resume_work-->late_resume{
+- 遍历early_suspend_handlers，执行pos->resume
+}@earlysuspend.c
+
+
+
+
+kernel/kernel/power/main.c
+kernel/kernel/power/suspend.c
+kernel/drivers/base/syscore.c
+________________________________
+锁接口操作函数：
+power_attr(wake_lock)-->{
+- wake_lock_attr={
+	wake_lock_show
+	wake_lock_store	
+	}@userwakelock.c
+}
+power_attr(wake_unlock)
+
+锁定：
+wake_lock_store{
+- 获取锁，lookup_wake_lock_name
+- 锁定，若计时wake_lock_timeout(&l->wake_lock, timeout)，否则掉用wake_lock(&l->wake_lock){
+
+	}
+}
+
+释放锁：
+wake_unlock_store{
+- 获取对应的锁，lookup_wake_lock_name{
+	- 解析时间字符串
+	- 在二叉树中查早对应名字的锁，若找到则返回该锁。rb_entry
+	- 没有找到创建锁，分配空间kzalloc
+	- 初始化锁，wake_lock_init
+	- 插入树中，rb_link_node，rb_insert_color
+	}
+- 释放锁，wake_unlock
+}
+
+kernel/kernel/power/userwakelock.c
+kernel/power/main.c
+kernel/power/earlysuspend.c
+kernel/power/userwakelock.c
+kernel/kernel/power/wakelock.c
+
+=================================
+wakelock：
+两种wakelock：WAKE_LOCK_SUSPEND阻止系统进入休眠。WAKE_LOCK_IDLE阻止进入IDLE(关闭中断))
+
+低8位标识：
+enum {
+	WAKE_LOCK_SUSPEND, /* Prevent suspend */
+	WAKE_LOCK_IDLE,    /* Prevent low power idle */
+	WAKE_LOCK_TYPE_COUNT
+};
+
+高8位标识：
+#define WAKE_LOCK_INITIALIZED            (1U << 8)
+#define WAKE_LOCK_ACTIVE                 (1U << 9)
+#define WAKE_LOCK_AUTO_EXPIRE            (1U << 10)  //只有改标识的锁释放才能进入suspend
+#define WAKE_LOCK_PREVENTING_SUSPEND     (1U << 11)
+
+
+
+core_initcall(wakelocks_init)-->wakelocks_init{
+- 初始化两种wakelock的链表活跃的，非活跃的，INIT_LIST_HEAD
+- 初始化deleted_wake_locks,main_wake_lock,unknown_wakeup,suspend_backoff_lock，wake_lock_init{
+	- 初始化lock.stat，flags初始值都为WAKE_LOCK_SUSPEND
+	- 将flags设置为已初始化，|WAKE_LOCK_INITIALIZED
+	- 加入到链表inactive_locks
+	}
+- wake_lock(&main_wake_lock)
+- 注册设备，驱动，platform_device_register，platform_driver_register
+- 创建工作队列，create_singlethread_workqueue
+}
+
+
+suspend_work-->suspend{
+- 同步文件系统，sys_sync
+- 记录进入时间
+- 进入休眠，pm_suspend{
+	- 进入linux休眠流程，enter_state	
+	}@suspend.c
+- 退出休眠，记录退出时间
+- 若进入和退出小于1s并超过10次,则防止10s内再次进入休眠，suspend_backoff
+- 若没有事件发生，则0.5s内防止进入休眠，wake_lock_timeout(&unknown_wakeup, HZ / 2)
+
+}wakelock.c
+
+_________________________________
+//是否有lock被锁定(设置了超时):
+has_wake_lock-->has_wake_lock_locked{
+- 遍历active_wake_locks,查找所有标识为WAKE_LOCK_AUTO_EXPIRE的lock
+- 若已经超时,将lock从active链表中移除,加入到inactive
+- 返回时间最长的lock的时间
+- 没有找到WAKE_LOCK_AUTO_EXPIRE的lock,返回-1
+}
+
+//获取已经超时lock的，超时时间。没有超时返回0
+get_expired_time{
+- 获取当前时间(xtime),线性时间的补偿(tomonotic)，睡眠时间(sleep).get_xtime_and_monotonic_and_sleep_offset
+- 判断是否超时lock->expires
+}
+
+update_sleep_wait_stats_locked(done){
+- 获取上次更新时到现在的时间，ktime_sub(now, last_sleep_time_update)
+- 遍历所有活跃锁，list_for_each_entry{
+	- 获取计时，get_expired_time	
+	- 若锁类型是WAKE_LOCK_PREVENTING_SUSPEND,记录该锁防止睡眠作用时间{
+		- 若已超时，设为上次设置时间到超时时间
+		- 没有超时，设为从上次设置到当前时间
+		}
+	- 释放锁或已超时清除标记WAKE_LOCK_PREVENTING_SUSPEND
+	- 没有超时则设置标记WAKE_LOCK_PREVENTING_SUSPEND
+	}
+- 更新最后时间last_sleep_time_update
+}
+
+
+/* 获取锁。
+ * 1，设置要操作的锁的超时时间，设置标识WAKE_LOCK_AUTO_EXPIRE
+ * 2，处理活跃链表中的锁，将定时器时间，设为当前所有锁中最长计时。(最长防止睡眠的锁WAKE_LOCK_SUSPEND)
+ */
+wake_lock(lock,0,0)/wake_lock_timeout-->
+wake_lock_internal(struct wake_lock *lock,long timeout, int has_timeout){
+- 若是WAKE_LOCK_SUSPEND，且wait_for_wakeup为true。增加锁唤醒计数wakeup_count++
+- 若锁是非活跃状态WAKE_LOCK_ACTIVE，设置锁最后时间last_time为当前时间
+- 将锁从当前所在链表中移除list_del
+- 若是自动超时锁设置lock->expires = jiffies + timeout
+  否则设置lock->expires = LONG_MAX。将锁加入到链表active_wake_locks
+- 若lock类型是WAKE_LOCK_SUSPEND，{
+	- 若是main_wake_lock清除防止睡眠，main_wake_lock不是活跃则设置防止睡眠。
+		update_sleep_wait_stats_locked
+	- 获取最近要超时的锁，has_wake_lock_locked
+	- 存在还没超时的锁，设置定时器mod_timer
+	- 没有锁，删除定时器del_timer。执行睡眠任务queue_work(suspend_work)
+	}
+}	
+
+//释放锁
+wake_unlock{
+- 设置lock中stat,wake_unlock_stat_locked{
+	- 更新锁的一些作用时间
+	}
+- 将lock从activie中移除,加入到inactive_locks链表
+- 是WAKE_LOCK_SUSPEND类型的锁{//这步与wake_lock一样处理其他的锁
+	- 是否有没有超时的锁，WAKE_LOCK_SUSPEND
+	- 存在还没超时的锁，设置定时器mod_timer
+	- 没有锁，删除定时器del_timer。执行睡眠任务queue_work(suspend_work)
+	}
+- 若是main_wake_lock,更新所有锁的作用时间update_sleep_wait_stats_locked
+}
+
+________________________________
+超时释放锁，进入休眠：
+expire_timer-->expire_wake_locks{
+- 检测是否锁定，has_wake_lock_locked
+- 没有锁定，queue_work(suspend_work_queue, &suspend_work)-->suspend_work-->suspend
+}
+
+kernel/power/wakelock.c
+kernel/power/suspend.c
+=================================
+冻结进程：
+suspend_freeze_processes@power.h-->freeze_processes{
+- try_to_freeze_tasks
+}@process.c
+
+
+kernel/kernel/power/process.c
+_________________________________
+notifier:
+有些操作需要在休眠之前或唤醒之后调用，需要系统完全正常工作状态。这时suspend和resume函数不能执行这些操作。
+电源管理的不同事件：
+PM_HIBERNATION_PREPARE	
+
+PM_POST_HIBERNATION	
+
+PM_RESTORE_PREPARE	
+
+PM_POST_RESTORE		
+
+PM_SUSPEND_PREPARE	
+
+PM_POST_SUSPEND	
+
+通过register_pm_notifier() and unregister_pm_notifier()注册和注销notifier。notifer函数实现对不同事件的
+处理。
+

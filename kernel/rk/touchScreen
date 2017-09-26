@@ -1,0 +1,135 @@
+
+i2c2_info{
+		.type          = "Goodix-TS",
+		.addr          = 0x14,
+		.flags         = 0,
+		.irq           = RK30_PIN1_PB7,
+	},
+
+driver：
+late_initcall(goodix_ts_init)-->i2c_add_driver(&goodix_ts_driver)@gt9xx.c
+
+
+goodix_ts_probe{
+- 创建goodix_ts_data，
+- 初始化工作队列，INIT_WORK(&ts->work, goodix_ts_work_func);
+- 申请ic所需的GPIO，gtp_request_io_port
+- 测试i2c，gtp_i2c_test
+- 初始化触摸面板，gtp_init_panel{
+	- 初始配置参数值，cfg_info_group3
+	- 若参数数组不为空，则sensor_id=0
+	- 若没有参数，则读取sensor_id，gtp_i2c_read_dbl_check
+	- 读取配置版本，gtp_i2c_read_dbl_check(GTP_REG_CONFIG_DATA){
+		- 配置不是最新，则设置配置
+		- 若配置是最新，则读取配置并返回。gtp_get_info
+		}
+	- 拷贝配置，memcpy(config, send_cfg_buf)
+	- 设置配置，gtp_send_cfg
+	}
+- 请求输入设备，gtp_request_input_dev(ts)
+- 设置中断处理函数，gtp_request_irq-->request_irq(goodix_ts_irq_handler)
+}
+
+中断处理：
+goodix_ts_irq_handler-->ts->work-->goodix_ts_work_func{
+
+- 若doze_status状态为enabled，读取0x814B值，判断是否触摸唤醒操作{
+		- 若为手势操作则唤醒，设置doze_status= DOZE_WAKEUP
+		- 若为滑动操作则唤醒，设置doze_status= DOZE_WAKEUP
+		- 若为双击操作则唤醒，设置doze_status= DOZE_WAKEUP
+		- 其它则不处理
+		- 返回
+		}
+- 
+- 读取0x814E中，触摸点个数和触点1的坐标。gtp_i2c_read(ts->client, point_data, 12);
+- 判断触摸点个数是否正确
+- 若触摸点数大于1(finger & 0x0f)，继续读取其它触点坐标。gtp_i2c_read(0x8158)
+- 若配置有触摸按键，则上报按键状态input_report_key
+
+- 若有触摸事件没有处理(pre_touch)，或触点个数touch_num不为0{
+	- 取得坐标数据，coor_data = &point_data[3]
+	- 发出坐标，gtp_touch_down(ts, id, input_x, input_y, input_w)-->input_report_abs
+	}
+}
+
+注册触摸设备：
+gtp_request_input_dev{
+- 创建设备，input_allocate_device()
+- 多点触摸设备，input_mt_init_slots
+- 有触摸按键功能，input_set_capability
+- 
+}
+
+唤醒：
+gtp_wakeup_sleep{
+
+- while(retry++<10){
+	- 设置中断脚为输出，GTP_GPIO_OUTPUT(GTP_INT_PORT, 1)
+	- 测试通信，gtp_i2c_test
+	- 正常则返回
+	- 失败则复位，gtp_reset_guitar{
+		- 
+		- gtp_init_ext_watchdog
+		}
+	}
+- 
+}
+
+
+drivers/input/touchscreen/gt9xx_touch/gt9xx.c
+_____________________
+suspend,resume:
+
+gtp_esd_check_func{
+- gtp_i2c_read_no_rst(读取{0x80,0x40})
+- 复位 gtp_reset_guitar
+- 
+}@gt9xx.c
+
+
+goodix_ts_early_suspend
+
+static struct i2c_driver goodix_ts_driver = {
+#ifndef CONFIG_HAS_EARLYSUSPEND
+   .suspend    = goodix_ts_early_suspend,
+   .resume     = goodix_ts_late_resume,
+#endif
+}@gt9xx.c
+=====================
+配置文件：
+
+__SQL_INFO__{
+...
+
+struct touchpanel_cfg touch_cfgs{
+	int sendcfg
+	char parama[256];
+	}
+...
+}
+
+
+===========================
+mst的处理：
+typedef struct _DEVINFO{
+    unsigned char  header[8];  //字符DEVINFO.
+    unsigned short board_name;
+    unsigned char  package_name;
+    unsigned char  miu0_type;
+    unsigned char  miu0_size;
+    unsigned char  miu1_type;
+    unsigned char  miu1_size;
+    unsigned char  panel_type;
+    unsigned char  rtk_flag;
+    unsigned char  boot_device;
+    unsigned char  uartpad_select;
+    unsigned char  cpu_speed;
+    unsigned char  rom_flag;
+    unsigned char  customer_flag[4];
+    unsigned char  rtk_qst_cfg;
+}DEVINFO_st;
+
+
+pBuff[0x409]==0x2a ) //更新触摸配置
+或检测到触摸配置值校验正确 //更新触摸配置
+

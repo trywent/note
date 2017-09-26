@@ -1,0 +1,22 @@
+
+
+
+
+
+
+
+
+
+
+activity切换：
+
+resumeTopActivityLocked{
+
+- 要启动的activity的进程不为空{
+	- 若配置发生改变则直接返回{
+		-ensureActivitiesVisibleLocked
+		}
+	- 没有发生改变则，更新activity状态，next.visible = true，next.stopped = false
+	（ativityThread中根据这些状态判断是否设置View中的可见性）
+	}
+}

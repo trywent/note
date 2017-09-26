@@ -1,0 +1,113 @@
+binder调用的：
+服务管理，服务，客户，内核
+
+1,服务向服务管理注册服务，服务管理记录服务对象引用
+2,客户从服务管理处获取服务对象引用(这时的引用实际是一个远程代理)
+3,客户调用服务中方法，该调用由远程代理发出
+4,内核收到调用请求，根据远程代理判断该代理的实际服务所在进程，将调用传入该进程
+5,服务端进程等待调用，收到调用请求后调用相应方法并返回
+
+===============================
+ioctl:驱动的操作通过该接口实现。
+命令：
+BINDER_WRITE_READ 
+BINDER_SET_WAKEUP_TIME 
+BINDER_SET_IDLE_TIMEOUT 
+BINDER_SET_REPLY_TIMEOUT 
+BINDER_SET_MAX_THREADS
+数据：
+struct binder_write_read
+{
+    ssize_t     write_size;
+    const void* write_buffer;//包括传送的命令和数据
+    ssize_t     read_size;
+    void*       read_buffer;
+}
+_______________________________
+发送数据到驱动：
+命令：
+enum BinderDriverCommandProtocol {
+    bcTRANSACTION,
+    bcREPLY,
+    
+        binder_transaction_data: the sent command.
+    ......	
+}
+数据：
+binder_transaction_data
+
+如bcTRANSACTION命令，后面会有数据 binder_transaction_data。这种情况下target中是handle，
+由handle指定的对象处理这次传输，code指定处理函数，priority是处理这次IPC的线程的优先级。
+
+根据handle，驱动决定处理这次IPC的接收对象在哪个线程中，并将数据传送到该进程。
+_______________________________
+从驱动中接收数据：
+命令：
+enum BinderDriverReturnProtocol {
+    ......
+	
+    brTRANSACTION,
+    brREPLY,
+    
+        binder_transaction_data: the received command.
+    ......
+}
+数据:
+struct binder_transaction_data
+{
+    union {
+        size_t  handle;     // target descriptor of command transaction
+        void    *ptr;       // target descriptor of return transaction
+    } target;
+    uint32  code;           // transaction command
+    
+
+    // General information about the transaction.
+    uint32  flags;
+    int32   priority;       // requested/current thread priority
+    size_t  data_size;      // number of bytes of data
+    size_t  offsets_size;   // number of bytes of object offsets
+    
+    // If this transaction is inline, the data immediately
+    // follows here; otherwise, it ends with a pointer to
+    // the data buffer.
+    union {
+        struct {
+            const void  *buffer;    // transaction data
+            const void  *offsets;   // binder object offsets
+        } ptr;
+        uint8   buf[8];
+    } data;
+};
+
+____________________________
+大概流程：
+发送请求 ------bcTRANSACTION-------> 驱动 ---------brTRANSACTION--------> 处理请求
+接收结果 <---------brREPLY----------      <------------bcREPLY----------- 返回结果
+
+===============================
+对象的映射：
+驱动要维护进程间对象的映射(对象的应用在两个进程中用不同的表示方法)。
+对象的应用不同的表示方式：在进程中用地址表示(当前进程中的对象)，
+或用一个32位的handle表示(远程进程中的对象)
+
+进程间能够将引用传输到，另一进程中的对象中(对象处理的数据的引用)。驱动负责将引用进行转换。
+
+
+
+==============================
+driver:
+binder_ioctl(BINDER_WRITE_READ)-->(读取请求bwr.read_size>0)binder_thread_read{
+- 
+- BINDER_WORK_DEAD_BINDER,设置命令cmd = BR_DEAD_BINDER
+}@binder.c
+
+
+binder_deferred_release{
+- 
+- 进程被杀，ref->death->work.type = BINDER_WORK_DEAD_BINDER
+}
+
+driver/staging/android/binder.c
+
+

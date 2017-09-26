@@ -1,0 +1,37 @@
+//usb设备
+
+
+
+
+
+//usb设备驱动
+usb_register@usb.h-->usb_register_driver{
+- new_driver->drvwrap.driver{//创建并设置普通驱动
+	- usb_bus_type，设置bus类型
+	- usb_probe_interface,设置probe
+	}
+}@driver.c
+
+//驱动注册
+usb_register_device_driver@/usb/core/driver.c-->driver_register-->
+(调用driver_find，判断是否已经注册)@driver.c-->bus_add_driver@bus.c-->driver_attach@dd.c-->
+bus_for_each_dev（遍历bus上的device，调用传入的匹配函数__driver_attach）@bus.c-->
+__driver_attach@dd.c-->(是否匹配driver_match_device-->drv->bus->match(dev, drv)@base.h）-->
+(若匹配)driver_probe_device-->really_probe-->drv->probe@dd.c(调用probe函数)-->
+usb_device_match-->usb_match_id-->usb_match_one_id-->usb_match_device
+（只匹配interface，操作的对象不是device）@driver.c
+
+
+//设备probe
+usb_probe_interface{ //普通设备探测
+- driver = to_usb_driver(dev->driver)，获取usb设备的驱动
+- driver->prove，调用usb驱动的probe
+}
+
+
+include/linux/usb.h
+drivers/usb/core/driver.c
+
+
+
+

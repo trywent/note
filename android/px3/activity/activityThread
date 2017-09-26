@@ -1,0 +1,65 @@
+//应用程序提供的在服务端接口
+ApplicationThread{
+- schedulePauseActivity
+- scheduleStopActivity
+- scheduleWindowVisibility
+- scheduleLaunchActivity
+}
+
+//开始应用进程
+startProcessLocked@ActivityManagerService.java-->Process.start("android.app.ActivityThread")-->
+main{
+- 设置looper，Looper.prepareMainLooper()
+- attach-->(关联到服务端)mgr.attachApplication(mAppThread)-->attachApplicationLocked
+	@ActivityManagerService.java-->bindApplication-->handleBindApplication{
+	- 
+	}
+	
+- 设置sMainThreadHandler
+- Looper.loop
+}
+================
+startActivity(Intent)-->startActivity(Intent,Bundle)-->
+mMainThread.getInstrumentation().execStartActivity@ContextImpl.java
+
+realStartActivityLocked-->app.thread.scheduleLaunchActivity@ActivityStackSupervisor.java-->
+ApplicationThread.scheduleLaunchActivity-->H.handleMessage-->handleLaunchActivity{
+- 创建窗口，performLaunchActivity
+- 加入View，获取窗口大小，进行布局，handleResumeActivity
+- 若设置启动后进入pause状态，mInstrumentation.callActivityOnPause
+}
+
+
+performLaunchActivity{
+- getPackageInfo
+- 设置component，setComponent
+- 若是alias，创建真正component，new ComponentName
+- 创建activity，mInstrumentation.newActivity //加载apk中代码，创建activity
+- 创建application，makeApplication
+- 设置activity上下文{
+	- 上下文context,createBaseContextForActivity
+	- 配置configuration,new Configuration
+	- 关联activity.attach
+	- 设置主题，activity.setTheme
+	}
+}
+
+
+//加入view到窗口
+handleResumeActivity{
+- performResumeActivity-->r.activity.performResume@Activity.java
+- 获取窗口，getWindow
+- 获取窗口管理器，加入窗口，wm.addView
+- 通知服务端更新状态，ActivityManagerNative.getDefault().activityResumed
+}
+
+
+//暂停pause
+schedulePauseActivity-->handlePauseActivity{
+- 执行暂停，performPauseActivity
+- 回调服务端，ActivityManagerNative.getDefault().activityPaused
+}
+
+
+
+frameworks/base/core/java/android/app/ContextImpl.java

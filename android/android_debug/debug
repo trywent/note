@@ -1,0 +1,129 @@
+出错日志：/data/tombstone
+Android中较容易出现以下三类问题:Force close / ANR / Tombstone
+
+前两者主要是查看当前的进程或者系统框架层的状态和堆栈就基本可以分析出来，本文主要讨论一下tombstone的情况。
+
+tombstone一般是由Dalvik错误、状态监视调试器、C层代码以及libc的一些问题导致的。
+
+当系统发生tombstone的时候，kernel首先会上报一个严重的警告信号（signal）,上层接收到之后，进程的调试工具会把进程中当时的调用栈现场保存起来，并在系统创建了data/tombstones目录后把异常时的进程信息写在此目录里面，开发者需要通过调用栈来分析整个调用流程来找出出问题的点。
+
+基本工具：
+
+prebuilt/linux-x86/toolchain/arm-eabi-4.4.0/bin
+
+在分析的时候仔细读取汇编会获得更多有用的异常发生时的信息。
+
+1.arm-eabi-addr2line 将类似libxxx.so 0x00012345的调用栈16进制值翻译成文件名和函数名
+
+  arm-eabi-addr2line -e libxxx.so 0x00012345
+
+2.arm-eabi-nm 列出文件的符号信息
+
+  arm-eabi-nm -l -C -n -S libdvm.so > dvm.data
+
+3.arm-eabi-objdump 列出文件的详细信息
+
+  arm-eabi-objdump -C -d libc.so > libc.s
+
+通过以上工具的分析 ，我们可以得到较完整的调用栈以及调用逻辑的汇编码。
+
+然后需要结合ARM架构及ARM汇编的知识（有些情况下可能需要使用gdb）
+
+来分析出现tombstone的原因，以下是本人遇到过的一些tombstone的情况：
+
+1.无效的函数指针：指针为NULL或者已经被重新赋值
+
+2.strlen崩溃：导致不完全的栈信息，栈被破坏
+
+3.FILE操作：因为stdio并非线程安全的，多线程操作时，容易出现异常。
+
+
+    本文涉及到的tombstone处理的主要逻辑所在文件如下：
+    BootReceiver.java -- frameworks\base\services\java\com\android\server
+    Debuggerd.c -- system\core\debuggerd
+    ThreadLocal.java -- libcore\luni\src\main\java\java\lang
+__________________________
+crash日志：
+prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-addr2line
+
+objdump 将库文件中的函数输出地址
+addr2line 将地址转换为库中的函数:
+-f 列出函数名
+-e 要解析的文件
+
+addr2line -f -e lib addrssss
+__________________________
+gdb:
+编译：gcc -g d.c
+执行：gdb ./xxx
+设置断点：(gdb) bradk file.c:lineNum  //在某行设置断点
+	  (gdb) break  func           //在某个函数上设置断点
+	  (gdb)	continue              //继续执行
+          (gdb)	step                  //执行下一条语句  	
+          (gdb)	next                  //执行下一条语句，不会进入子程序，而是将调用的子程序调用看作一行  
+输出变量值：
+	  (gdb)	print var             //输出变量值，print/x 输出十六进制值
+          (gdb)	watch var             //监控var变量，当var改变时程序停止，输出变量改变前后值
+
+backtrace - 当产生段错误后输出调用栈信息
+where - 类似backtrace，same as backtrace; you can think of this version as
+working even when you’re still in the middle of the program
+finish - 执行完某一个函数
+delete - 删除一个断点
+info breakpoints - 查看所有的断点信息
+
+当收到信号SIGSEGV时会产生core文件。
+使用core文件：gdb ./xxx core
+
+
+adb
+debuggerd
+
+
+_________________________
+mmap出现错误
+
+ProcessState@ProcessState.cpp-->LOG_ALWAYS_FATAL_IF-->android_printAssert@log.h-->
+__android_log_assert@logd_write.c-->__builtin_trap(gcc实现的函数)-->abort
+
+
+abort
+bionic/libc/arch-arm/bionic/abort_arm.S
+
+ERR:Invalid argument
+
+frameworks/native/libs/binder/ProcessState.cpp
+system/core/include/cutils/log.h
+system/core/liblog/logd_write.c
+
+
+kernel报错：
+binder_mmap-->@binder.c-->get_vm_area(失败)-->__get_vm_area_node-->alloc_vmap_area@vmalloc.c
+
+drivers/staging/android/binder.c
+mm/vmalloc.c
+
+binder: 1299:1312 transaction failed 29189, size 80-0 
+
+vmap allocation for size 1306624 failed: use vmalloc=<size> to increase size.   
+binder_mmap: 2578 4c41e000-4c55c000 get_vm_area failed -12  
+
+
+vmap allocation for size 1306624 failed: use vmalloc=<size> to increase size.   
+binder_mmap: 3204 4c41e000-4c55c000 get_vm_area failed -1
+
+没有释放？
+binder: release proc 2877, transaction 184766, not freed                        
+binder: release proc 2877, transaction 184768, not freed     
+
+1302528   13E000
+1306624   13F000
+
+
+VmallocTotal:     385024 kB                                                     
+VmallocUsed:      156860 kB                                                     
+VmallocChunk:     170756 kB 
+
+VmallocTotal:     245760 kB                                                     
+VmallocUsed:      204224 kB                                                     
+VmallocChunk:       2820 kB  

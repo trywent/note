@@ -1,0 +1,11 @@
+
+shouldCloseOnTouch
+
+onCreate-->mAlert.installContent@AlertDialog.java-->installContent-->setupView{
+- 
+- 若没有按钮设置触摸消失，mWindow.setCloseOnTouchOutsideIfNotSet(true)
+}@AlertController.java
+
+frameworks/base/core/java/com/android/internal/app/AlertController.java
+frameworks/base/core/java/android/app/AlertDialog.java
+frameworks/base/core/java/android/view/Window.java

@@ -1,0 +1,234 @@
+===============================
+upnp示例 binary light大概工作框架：
+———————————————————————————————
+servcie服务（提供数据，操作）：
+1）servcie，设备提供的服务（设备能点亮灯，播放视频）如：switchPower
+2）device，将设备与服务绑定 如：new LocalDevice(identity, type, details, icon, switchPowerService)
+3）upnpService，将设备注册 upnpService.getRegistry().addDevice（device）
+
+———————————————————————————————
+control point客户端（使用数据，操作）：
+1，添加监听器upnpService.getRegistry().addListener
+监听器监听添加，移除设备事件执行相应的函数。upnpService.getControlPoint().execute（执行传入callback函数，
+并提供执行成功或失败的处理函数）   	
+
+2，搜索提供服务的设备upnpService.getControlPoint().search
+
+===============================
+ The Cling Core API:
+———————————————————————————————
+服务接口：
+public interface UpnpService {
+
+    public UpnpServiceConfiguration getConfiguration();
+    public ProtocolFactory getProtocolFactory();
+    public Router getRouter();
+
+    public ControlPoint getControlPoint();
+    public Registry getRegistry();
+
+    public void shutdown();
+
+}
+实现类：UpnpServiceImpl
+
+-------------------------------
+自定义配置设置configuration settings：提供给UpnpServiceImpl
+public interface UpnpServiceConfiguration {
+
+    // NETWORK
+    public NetworkAddressFactory createNetworkAddressFactory();
+
+    public DatagramProcessor getDatagramProcessor();
+    public SOAPActionProcessor getSoapActionProcessor();
+    public GENAEventProcessor getGenaEventProcessor();
+
+    public StreamClient createStreamClient();
+    public MulticastReceiver createMulticastReceiver(NetworkAddressFactory naf);
+    public DatagramIO createDatagramIO(NetworkAddressFactory naf);
+    public StreamServer createStreamServer(NetworkAddressFactory naf);
+
+    public Executor getMulticastReceiverExecutor();
+    public Executor getDatagramIOExecutor();
+    public Executor getStreamServerExecutor();
+
+    // DESCRIPTORS
+    public DeviceDescriptorBinder getDeviceDescriptorBinderUDA10();
+    public ServiceDescriptorBinder getServiceDescriptorBinderUDA10();
+
+    // PROTOCOL
+    public Executor getAsyncProtocolExecutor();
+    public Executor getSyncProtocolExecutor();
+
+    // REGISTRY
+    public Namespace getNamespace();
+    public Executor getRegistryMaintainerExecutor();
+    public Executor getRegistryListenerExecutor();
+
+}
+接口UpnpServiceConfiguration可直接用的实现DefaultUpnpServiceConfiguration，配置网络，descripter等信息。
+执行操作一般通过Configuration中函数（可能实现了线程池？？？）
+
+-------------------------------
+The protocol factory：
+public interface ProtocolFactory {
+
+    public ReceivingAsync createReceivingAsync(IncomingDatagramMessage message)
+                            throws ProtocolCreationException;;
+
+    public ReceivingSync createReceivingSync(StreamRequestMessage requestMessage);
+                            throws ProtocolCreationException;;
+
+    public SendingNotificationAlive createSendingNotificationAlive(LocalDevice ld);
+    public SendingNotificationByebye createSendingNotificationByebye(LocalDevice ld);
+    public SendingSearch createSendingSearch(UpnpHeader searchTarget);
+    public SendingAction createSendingAction(ActionInvocation invocation, URL url);
+    public SendingSubscribe createSendingSubscribe(RemoteGENASubscription s);
+    public SendingRenewal createSendingRenewal(RemoteGENASubscription s);
+    public SendingUnsubscribe createSendingUnsubscribe(RemoteGENASubscription s);
+    public SendingEvent createSendingEvent(LocalGENASubscription s);
+    
+}
+
+获取协议流程中要用的操作，一般通过ProtocolFactory中函数
+-------------------------------
+底层的网络接口rounter：
+public interface Router {
+
+    public void received(IncomingDatagramMessage msg);
+    public void received(UpnpStream stream);
+
+    public void send(OutgoingDatagramMessage msg);
+    public StreamResponseMessage send(StreamRequestMessage msg);
+
+    public void broadcast(byte[] bytes);
+
+}
+在协议栈处理前接收底层收到的数据，通过UpnpService获取
+————————————————————————————————
+客户端client：
+public interface ControlPoint {
+
+    public void search(UpnpHeader searchType);
+    public void execute(ActionCallback callback);
+    public void execute(SubscriptionCallback callback);
+
+}
+主要功能：
+1 扫描网络中提供服务的设备
+2 执行设备提供的服务，能够返回执行结果
+3 订阅处理服务发送的事件
+--------------------------------
+扫描：
+发送不同的消息，接收者根据消息决定是否发送应答。
+STAllHeader（所有的接收者都会应答），
+UDNHeader（扫描特定设备）
+
+--------------------------------
+调用服务中函数：
+upnp服务提供状态（当前服务的状态）和操作（查询或改变服务状态）。从设备(设备可以是本地或远程的)上获取服务：
+
+Service service = device.findService(new UDAServiceId("SwitchPower"));
+Action getStatusAction = service.getAction("GetStatus");
+
+执行操作通过ActionInvocation实现：
+
+ActionInvocation getStatusInvocation = new ActionInvocation(getStatusAction);
+
+ActionCallback getStatusCallback = new ActionCallback(getStatusInvocation) {
+    @Override
+    public void success(ActionInvocation invocation) {
+        ActionArgumentValue status  = invocation.getOutput("ResultStatus");
+    }
+    @Override
+    public void failure(ActionInvocation invocation,UpnpResponse operation,String defaultMsg) {       
+    }
+};
+
+upnpService.getControlPoint().execute(getStatusCallback);
+带参数的调用，传入远程调用的参数：
+Action action = service.getAction("SetTarget");
+
+ActionInvocation setTargetInvocation = new ActionInvocation(action);
+
+setTargetInvocation.setInput("NewTargetValue", true); // Can throw InvalidValueException
+
+// Alternative:
+//
+// setTargetInvocation.setInput(
+//         new ActionArgumentValue(
+//                 action.getInputArgument("NewTargetValue"),
+//                 true
+//         )
+// );
+
+ActionCallback setTargetCallback = new ActionCallback(setTargetInvocation) {
+};
+
+upnpService.getControlPoint().execute(setTargetCallback);
+
+发送操作：
+execute@ControlPointImpl.java-->getConfiguration().getSyncProtocolExecutor().execute(
+getDefaultExecutor-->getDefaultExecutor--defaultExecutorcreateDefaultExecutor--> new ClingExecutor
+@DefaultUpnpServiceConfiguration.java-->ThreadPoolExecutor)
+-->execute-->run@ActionCallback.java-->prot.run()-->run@SendingAction.java(execute@SendingSync.java
+-->executesyn-->invokeRemote(远程调用)@SendingAction.java)
+
+处理接收的操作：
+received@RouterImpl.java-->process@UpnpStream.java-->createReceivingSync@ProtocolFactoryImpl.java-->
+executeSync@ReceivingAction.java
+---------------------------------
+从服务接收事件：
+
+—————————————————————————————————
+The Registry:upnp的核心
+
+—————————————————————————————————
+Creating and binding services
+
+=================================
+
+创建广播数据接收类：
+RouterImpl(这里创建和执行multicastReceivers)@RouterImpl.java-->createMulticastReceiver
+@DefaultUpnpServiceConfiguration.java-->new MulticastReceiverImpl(端口1900)
+
+RouterImpl(这里创建和执行multicastReceivers)@RouterImpl.java-->createDatagramIO
+@DefaultUpnpServiceConfiguration.java-->new DatagramIOImpl(端口0)
+
+接(广播或datagram)收数据包：
+DatagramIOImp.java,MulticastReceiveImp.java(广播)都实现来接收数据包的流程。
+run@DatagramIOImp.java-->received-->getProtocolFactory().createReceivingAsync@RoutreImp.java-->
+createReceivingAsync@ProtocolFactoryImpl.java--（建立ReceivingAsync，再调用getConfiguration().
+getAsyncProtocolExecutor().execute执行）
+
+获取executor：
+getAsyncProtocolExecutor-->createDefaultExecutor-->ClingExecutor@DefaultUpnpServiceConfiguration-->
+ThreadPoolExecutor-->execute(Runnable)
+
+发送search数据包：
+upnpService.getControlPoint().search()@MainActivity.java-->search@ControlPointImpl.java-->
+getConfiguration().getAsyncProtocolExecutor().execute(传入SendingSearch)
+创建getProtocolFactory().createSendingSearch-->SendingSearch-->getUpnpService().getRouter().send(msg)-->
+
+
+自动发送notify:
+(加入设备时发送)upnpService.getRegistry().addDevice@MainActivity.java-->localItems.add-->add-->
+advertiseAlive@LocalItem.java-->createSendingNotificationAlive@ProtocolFactoryImpl.java
+
+
+开始UpnpServiceImpl：
+onCreate-->createConfiguration@AndroidUpnpServiceImpl.java-->AndroidUpnpServiceConfiguration@
+AndroidUpnpServiceConfiguration.java-->
+
+AndroidUpnpServiceImpl.java-->UpnpServiceImpl-->createRouter@UpnpServiceImpl.java-->
+RouterImpl@RouterImpl.java-->createMulticastReceiver@DefaultUpnpServiceConfiguration.java-->
+new MulticastReceiverImpl
+
+设备提供的服务：
+MediaServer@MediaServer.java--> AnnotationLocalServiceBinder().read(ContentDirectoryService.class)
+-->ContentDirectoryService(服务实现处，只有browse)@ContentDirectoryService.java
+
+
+
+_____________________________________
+播放器GPlayer：

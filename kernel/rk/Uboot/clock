@@ -1,0 +1,18 @@
+#include "clock-rk3188.c"@clock.c
+
+lowlevel_init@lowlevel_init.S-->rkclk_set_pll{
+- 设置时钟APLL，GPLL，CPLL。rkclk_pll_clk_set_rate{
+
+	}@clock-rk3188.c
+}@clock
+
+使能时钟：
+rk30_lcdc_init@rk3188_lcdc.c-->lcdc_clk_enable@clock.c
+
+设置时钟：
+rk30_load_screen@rk3188_lcdc.c-->set_lcdc_dclk@clock.c
+
+uboot/arch/arm/cpu/armv7/rk30xx/lowlevel_init.S
+uboot/arch/arm/cpu/armv7/rk30xx/clock-rk3188.c
+uboot/arch/arm/cpu/armv7/rk30xx/clock.c
+uboot/drivers/video/rk3188_lcdc.c

@@ -1,0 +1,37 @@
+4中任务标记：
+PF_NOFREEZE  		//不可冻结
+PF_FROZEN		//可冻结    
+TIF_FREEZE		//可冻结	 
+PF_FREEZER_SKIP		//可冻结
+
+
+步骤：
+freeze_processes{
+- 唤醒内核空间进程，并需主动调用休眠(wait_event_freezable)
+- 向用户空间进程发送假signal，在进程的信号处理函数中执行try_to_freeze(进入休眠)
+- try_to_freeze_tasks{
+	- 将所有可冻结的任务设置标记TIF_FREEZE
+	- 设置了TIF_FREEZE标记的任务执行，refrigerator{
+		- 设置任务标记，PF_FROZEN
+		- 设置进程状态为TASK_UNINTERRUPTIBLE，并循环直到PF_FROZEN被清除
+		}
+	}
+}@defined in kernel/power/process.c
+
+
+通常不直接调用refrigerator，try_to_freeze-->refrigerator
+
+内核可休眠进程若没有执行try_to_freeze()，会导致整个休眠失败。
+
+休眠起来调用thaw_processes(清除PF_FROZEN标记)-->refrigerator(继续执行)
+
+_________________
+内核进程：
+
+默认是不能冻结的，需调用set_freezable(清除PF_NOFREEZE标记)使可睡眠
+
+为什么冻结进程：
+1)防止文件系统内容被修改
+2)休眠是需要大量内存，冻结进程防止内存消耗
+3)防止用户空间进程或内核进程在，suspending/resumeing时操作设备
+4)防止用户空间进程知道正在休眠

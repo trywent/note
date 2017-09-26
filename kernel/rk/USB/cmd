@@ -1,0 +1,2 @@
+check speed:
+/sys/bus/usb/devices/usb?/speed

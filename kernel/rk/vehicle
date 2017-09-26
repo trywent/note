@@ -1,0 +1,287 @@
+//
+aux:w
+
+close(aux)-->open(vehicle)-->close(vehicle)-->open(aux)
+______________________
+写：
+0：1视频类型
+1：0 关闭，1 倒车，2 aux，3 dvd
+
+读：
+1:是否有信号(0无，1有)
+2:是否bsp倒车(0,1)
+3:0关闭，1倒车，2AUX
+
+设置：
+{
+- 1 视频类型{
+	- 倒车1 App_Video_set(1),vehicle_dvd_state(1)
+	- aux2 App_Video_set(2),vehicle_dvd_state(1)
+	- dvd3 App_Video_set(3),vehicle_dvd_state(1)
+	- 4	App_RearView_state(3)
+	- close 0 vehicle_dvd_state(0)
+	}
+}
+
+
+rk_vehicle_system_main{
+- rk_vehicle_system_init
+- 打开vehicle_ad_dvd_open
+- kthread_run(rk_vehicle_Signal_Detect)//开始检测进程
+- while{
+	- 获取倒车状态并发送，fyt_sendnlmsg
+	- 信号状态，vehicle_ad_get_signal
+	- 获取倒车系统状态，rk_vehicle_system_get_mode{
+		- 启动后由应用倒车，不根据gpio改变状态
+		- 检测顺序{
+			- 当前
+			}
+		}
+	- 设置状态，rk_vehicle_system_set_mode{
+		- 
+		}
+	}
+}
+
+==================
+
+RK30_PIN0_PC4:T132控制脚
+RK30_PIN3_PB5:复位脚
+
+rksdmmc2_gpio_init.RK30_PIN3_PD7 @rk-sdmmc-ops.c
+
+进入倒车：
+echo -en '\x31\x00\x00\x00' > /dev/vehicle
+
+
+mstar探测信号:isDisplayReady-->android_source_Util_isDisplayReady@android_source_Util.cpp
+	      -->isConnectDone-->ioctl(fd, SCA_IOC_GET_MONITOR_STATUS_CONFIG)@scaler.c
+	      -->mstar_sca_drv_ioctl-->_MDrv_SCAIO_IOC_Get_Monitor_Status_Config{
+		- 
+		- 获取SCA_Get_Monitor_Status_Config-->
+		}@mdrv_sca_io.c
+
+
+jb/hardware/mstar/mdrv_sca/scaler.c
+jb/frameworks/base/core/jni/android_source_Util.cpp
+drivers/mstar/scaler/mdrv_sca_io.c
+========================
+cif(camera interface)
+IPP (Image Post Processor):缩放旋转图片，deinterlacing(反交错)
+
+
+状态：
+VEHICLE_FRIS_START	101 //0x65
+VEHICLE_RIS_START	102 //0x66
+VEHICLE_RIS_STOP	201 //0xc9
+
+VEHICLE_DVD_START	105 //0x69
+VEHICLE_DVD_STOP	205 //0xcd
+
+
+VEHICLE_DVD_STATE       2
+VEHICLE_RIS_STATE       1
+
+倒车配置@drivers/media/video/vehicle/vehicle_config.h
+=========================
+vehicle_system_start-->kthread_run(rk_vehicle_system_main,NULL,VEHICLE_SYSTEM_NAME)-->
+rk_vehicle_system_main{
+- 初始化，rk_vehicle_system_init{
+	- 获取倒车时lcdc的配置vehicleConfig[VEHICLE_RIS]，rk_vehicle_get_config{
+		- - 捕获的数据长宽，RIS_CIF_HEIGHT，RIS_CIF_WIDTH  //720 480 
+		}
+	- 获取dvd时lcdc的配置vehicleConfig[VEHICLE_DVD]，rk_vehicle_get_config{
+		- 捕获的数据长宽，DVD_CIF_HEIGHT，DVD_CIF_WIDTH    //720 480
+		}
+	- 设置lcdc设置地址，rk_vehicle_init_lcdc-->rk_lcdc_init_addr{
+		- 初始化寄存器地址
+		- 注册中断处理,request_irq(LCDC_IRQ_ID,rk_lcdc_irq)
+		}@rkpx2_lcdc.c
+	- 初始化cif时钟，配置地址，rk_vehicle_init_cif
+	- 初始倒车进行的帧缓存地址frame_buf，rk_vehicle_init_buf-->(获取地址)board_mem_reserve_get{
+		- Y,UV。一个buffer两个种数据。大小为REVERSE_IMAGE_L*REVERSE_IMAGE_W
+		}
+	- 初始工作队列
+	- 设置时钟
+	}
+- kthread_run(rk_vehicle_Signal_Detect){
+	- vehicle_ad_get_signal //读取信号
+	- 读不到信号，两秒后复位vehicle_T132_SoftwareReset
+	}
+- 进入循环{
+	- 获取当前模式值，rk_vehicle_system_get_mode{//两种dvd，ris(开机倒车)
+		- 从gpio获取是否倒车状态，cur_state
+		- 检测信号格式是否改变，rk_vehicle_check_single
+		- rk_vehicle_err_state中有ERR_CIF_REOPEN错误，清除错误位
+		- 根据cur_state判断是开始/停止倒车，开始/停止DVD
+		}
+	- 设置视频模式，rk_vehicle_system_set_mode{
+		- 设置状态，rk_vehicle_system_state((CMD_SET)
+		- 开始倒车，rk_vehicle_reverse_open{
+			- cif，rk_cif_open(VEHICLE_RIS)
+			}
+	
+		- 结束倒车，rk_vehicle_reverse_close
+		- 打开dvd，rk_vehicle_dvd_open{
+			- cif，rk_cif_open(VEHICLE_DVD)
+			}
+		- 关闭dvd，rk_vehicle_dvd_close
+		}
+	- 设置时钟频率，rk_vehicle_system_frame_clk{
+		- 若是倒车状态，频率不匹配则重新设置频率
+		- 若是dvd状态，设置正确频率
+		}
+	}
+- 退出rk_vehicle_system_exit
+}@vehicle_main.c
+
+
+
+//打开倒车，开始捕获图像
+rk_vehicle_reverse_open{
+- 获取视频格式(NTPS,PAL),vehicle_ad_get_format
+- 设置分辨率(长高宽...)，rk_vehicle_get_resolution
+- //不处理，rk_vehicle_frame_sync(_NONE_)
+- vehicle_ad_reverse_open(设置视频处理IC)@soc_ad_dev.c
+- 配置cif，时钟rk_cif_set_clk
+- rk_cif_open
+- 设置cif配置，rk_cif_set_config(cif,frame_buf[VEHICLE_FRAME_BUF_0]){
+	- 设置数据格式
+	- 设置数据存储地址ADDR_Y，ADDR_UV为frame_buf[VEHICLE_FRAME_BUF_0]
+	- 设置捕获数据模式ping-pong,CIF_CIF_CTRL
+	}
+- 设置状态，rk_vehicle_cif_state
+}
+
+/*处理帧
+ *cif捕获的帧 rk_camera_irq_cif0/1
+ *lcdc处理新帧  
+*/
+rk_vehicle_frame_sync(type){
+- 获取状态(倒车，DVD)，rk_vehicle_system_state
+- type类型为空，设置初始值并返回
+
+- type类型为VEHICLE_FRAME_CIF{
+	- 若CIF状态rk_vehicle_cif_state为关闭，则返回
+	- 若是倒车状态，处理下一帧vehicle_ipp_next_frame
+	- 若是DVD状态，处理下一帧rk_vehicle_next_mem{
+		- queue_delayed_work(lcdc_mem_workqueue, &lcdc_mem_work)-->lcdc_mem_work
+		  -->rk_vehicle_mem_cpy-->(拷贝frame_vir_mem[VEHICLE_FRAME_BUF_0]，到当前缓存)		
+		}
+	- 开始帧处理队列，queue_delayed_work(lcdc_ctl_workqueue, &lcdc_ctl_work)-->(工作执行)
+		lcdc_ctl_work-->rk_vehicle_lcdc_ctl(设置显示寄存器){
+			- rk_lcdc_set_fb,打开窗口win0			
+			- rk_lcdc_set_pan，开始显示
+			- rk_lcdc_color_key
+			- 设置lcdc状态，LCDC_STATE_OPEN_VIDEO_WINx
+			}
+	}
+- type类型VEHICLE_FRAME_IPP{
+	- rk_vehicle_ipp_sync-->(设置ipp处理的数据地址)vehicle_ipp_set_addr
+	}
+- type类型VEHICLE_FRAME_LCDC{
+	- 设置lcdc的地址为ipp处理数据后的存储地址，rk_vehicle_lcdc_sync()
+	}
+
+}@vehicle_main.c
+____________________
+停止倒车：
+rk_vehicle_reverse_close@vehicle_main.c-->rk_lcdc_close-->(恢复倒车前寄存器)write_relaxed
+
+
+====================
+获取外部显示数据：获取的数据存储在frame_buf[VEHICLE_FRAME_BUF_0]
+
+VEHICLE_CIF0_ID
+
+//获取到新图像中断，帧结束
+rk_vehicle_system_init-->rk_vehicle_init_cif-->
+rk_cif_init_addr-->(注册中断处理)request_irq(ID_IRQ_CIF0,rk_camera_irq_cif0...)-->
+rk_camera_irq_cif0{
+- 读取CIF中断状态寄存器，vehicle_read_reg(CIF_CIF_INTSTAT)
+- 若停止工作，则关闭中断rk_cif_interrup_close
+- 判断是中断位中否有错，rk_cif_interrup_error
+- 处理新帧中断{
+	- 清除中断标识
+	- 增加帧计数，rk_cif_frame_num
+	- 处理帧，rk_vehicle_frame_sync(VEHICLE_FRAME_CIF)
+	}	
+}@rkpx2_cif.c
+
+===================
+处理显示数据(fyt没有使用)：HZ 100
+
+rk_camera_irq_ipp{
+- rk_vehicle_frame_sync(VEHICLE_FRAME_IPP)-->rk_vehicle_ipp_sync(cif_frame_num)-->
+	vehicle_ipp_set_addr(){
+	- 设置目标地址为当前帧地址，IPP_DST0_Y_MST
+	}
+}
+
+
+kernel/drivers/media/video/vehicle/rkpx2_ipp.c
+===================
+显示外部数据：
+
+LCDC_STATE_CLOSE		0 //关闭状态
+LCDC_STATE_OPEN			1 //打开状态
+LCDC_STATE_OPEN_VIDEO_WINx	2 //执行打开动作
+
+//lcdc处理捕获的图像数据
+rk_vehicle_lcdc_ctl{
+- 获取状态，rk_vehicle_system_state
+- 若是倒车,VEHICLE_RIS_START{
+	- 设置时钟，rk_lcdc_set_dclk
+	- rk_lcdc_open(frame_buf[VEHICLE_FRAME_BUF_0]){
+		- 保存android界面win1的配置
+		- 设置YRGB，CBR地址为CIF捕获的YCbCr数据地址
+		}@rkpx2_lcdc.c
+	}
+- 设置状态为打开窗口LCDC_STATE_OPEN_VIDEO_WINx，rk_vehicle_lcdc_state(LCDC_STATE_OPEN_VIDEO_WINx)
+}@vehicle_main.c
+
+
+rk_lcdc_init_addr(注册中断，传入寄存器基地址)-->rk_lcdc_irq{
+- lcdc同步数据并处理，rk_vehicle_frame_sync(VEHICLE_FRAME_LCDC)
+- 读取中断寄存器，LCDC_INT_STATUS。判断是否帧开始中断(获取到新帧)
+- 若开始帧中断，则处理rk_vehicle_frame_sync
+- 若lcdc状态是LCDC_STATE_OPEN_VIDEO_WINx{
+	- 开始显示win0,关闭win1。rk_lcdc_start_video_win
+	- 设置倒车状态LCDC_STATE_OPEN
+	}
+- 通知android层显示，vehicle_rkpx3_lcdc_irq{
+	- 若是帧开始中断，唤醒android层正在等待帧的进程。complete
+	- 清除中断位		
+	}
+}@rkpx2_lcdc.c
+
+透明(color key)：
+rk_lcdc_color_key@rkpx2_lcdc.c
+
+
+
+kernel/drivers/media/video/vehicle/vehicle_main.c
+kernel/drivers/media/video/vehicle/soc_ad_dev.c
+kernel/drivers/media/video/vehicle/rkpx2_cif.c
+kernel/drivers/media/video/vehicle/rkpx2_lcdc.c
+kernel/drivers/video/rockchip/lcdc/rk3188_lcdc.c
+
+===========================
+cif error：
+
+rk_camera_irq_cif0-->rk_cif_interrup_error
+
+[   62.241765] ....CIF_CIF_FOR=0xc  val=0xc
+[   62.281323] rk_camera_irq_cif0: CIF_ERR_PIX :00000200--1440--480 --- 720--2
+[   62.281738] [vechile]: rk_vehicle_system_get_mode: reverse stop mode
+[   62.281745] 
+[   62.451838] [vechile]: rk_vehicle_system_get_mode: reverse start mode
+[   62.451865] 
+[   62.451956] ++Video init Open++
+[   62.517440] 0 addr=0x22
+[   62.561336] 0 addr=0x23
+[   62.582089] [vechile]: rk_vehicle_reverse_open : reset cif!!!
+[   62.582101] 
+[   62.691748] ....CIF_CIF_FOR=0xc  val=0xc
+[   62.731045] rk_camera_irq_cif0: CIF_ERR_PIX :00000200--1440--480 --- 720--2
+

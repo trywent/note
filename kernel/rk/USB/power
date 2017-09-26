@@ -1,0 +1,4 @@
+
+//disconnect connect
+# echo suspend > /sys/bus/usb/devices/1-1/power/level
+# echo auto > /sys/bus/usb/devices/1-1/power/level

@@ -1,0 +1,59 @@
+reference对象用来封装一个obj的引用。通过reference可以对那个obj进行访问。
+三种类型的reference，从高到底
+ Soft references 用来实现内存紧张的缓存
+ weak references 用来实现键值可以被回收的映射，
+ phantom references 提供除析构机制外，一种更灵活的在清除对象前执行相关操作。
+
+通知：（将状态发生改变的引用，加入队列）
+引用可以在reference创建时，将reference注册到reference队列中，使在对象的可达性改变时被通知到。
+有时gc判定被引用对象的可达性，变成对应的reference的级别时，这个reference将被加入到对应的队列中。在此时，
+这个reference的状态是enqueued。引用能够将reference从队列中移除。
+
+
+While some programs will choose to dedicate a thread to removing reference objects from one or more queues and processing them, this is by no means necessary. A tactic that often works well is to examine a reference queue in the course of performing some other fairly-frequent action. For example, a hashtable that uses weak references to implement weak keys could poll its reference queue each time the table is accessed. This is how the WeakHashMap class works. Because the ReferenceQueue.poll method simply checks an internal data structure, this check will add little overhead to the hashtable access methods.
+
+Automatically-cleared references
+soft和weak引用，在放入者测的队列之前会被gc自动清除。phantom引用可以用来从队列中获取引用的对象，执行析构前的操作
+(被引用的对象)。
+Soft and weak references are automatically cleared by the collector before being added to the queues with which they are registered, if any. Therefore soft and weak references need not be registered with a queue in order to be useful, while phantom references do. An object that is reachable via phantom references will remain so until all such references are cleared or themselves become unreachable.
+
+
+可访问性(Reachability)：
+反映对象的生命周期，
+
+strongly访问是线程能够直接访问到的对象(不同过其他引用对象)。在线程中新创建的对象是strongly访问
+
+softly访问是对象不能直接访问但能通过soft reference访问
+
+weakly访问是通过weak reference能访问的对象。当一个对象的弱引用被清除，这个对象可以进行析构
+
+phantom访问是对象已经析构，但还是有phantom引用指向它。
+
+不可访问是被回收，以上方式都不能访问
+_________________________________
+weakreference:WeakReference (T r, ReferenceQueue<? super T> q)
+当GC判定一个对象的可访问性是weak后：
+1，产生一个引用集合，包括所有对该对象的弱引用，所有包含(强，软引用)该对象的对象的弱引用
+	weak -> obj
+	weak -> o_obj(strong soft) --> obj
+2，该集合中的引用被清除(不是被引用的对象)
+3，集合中被引用的对象可以执行finalization
+4，(被引用的对象被清除)在将来的某个时间，集合中的引用被加入相应的队列(如果有)
+
+weakreference就是封装一个对象。这个对象被GC回收后，weakreference会被放入到一个队列中
+weakreference 当gc发现后立即被清除
+SoftReference 实在没有内存才会被gc清除
+
+
+---------------------------------
+PhantomReference
+
+phantom被gc判定将要被清除后，会加入的队列中。phantom通常用来提供除析构外，对象被清除前要执行的操作。
+(加入到phantom队列的对象在将来某个时候都会被清除)。
+
+当gc判定引用是phantom引用后，会将将引用加入队列。为了保持phantom引用的这种状态(被引用的对象要被清除)，
+调用phantom引用的get方法一直返回null(被引用的对象不可用，要被清除)。
+
+不像soft和weak引用，phantom引用在加入队列前不会被gc自动清除。一个被phantom引用的对象会一直能够通过phantom引用访问，
+直到所有引用被清除或被引用的对象变成不可访问。
+

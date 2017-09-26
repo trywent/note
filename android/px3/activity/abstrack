@@ -1,0 +1,11 @@
+ActivityStack //activity栈
+
+TaskRecord  //任务，在mTaskHistory中
+
+ActivityRecord //activity记录
+
+
+ActivityRecord-->TaskRecord-->ActivityStack
+
+————————————————————————
+mWindowManager.moveTaskToTop(task.taskId) //窗口与task关联？？？？？

@@ -1,0 +1,147 @@
+======================================
+file_operations中int *mmap,系统调用mmap时底层调用的函数。
+
+v4l2:
+
+几个接口调用流程
+v4l2_device_register_subdev_nodes@v4l2-device.c-->__video_register_device@v4l2-dev.c
+
+
+视频设备：
+video_device:
+设备名，设备类型(type1，type2)，字设备号minor
+
+设备注册函数video_register_device@v4l2-dev.h
+
+soc_camera_probe-->>video_dev_create(初始化设备的操作函数...)@soc_camera.c
+                -->>soc_camera_video_start-->>video_register_device@v4l2-dev.h
+-->>__video_register_device@v4l2-dev.c
+
+__video_register_device中将video_device设备注册字符设备，sysfs。(生成设备文件)
+
+设备ioctl实现：
+vdev->fops@soc_camera.c(被赋值)-->soc_camera_fops@soc_camera.c(被赋值)-->
+video_ioctl2-->video_usercopy-->__video_do_ioctl@v4l2-ioctl.c-->vdev->ioctl
+(调用vfd->ioctl_ops中实现的函数)
+
+vdev->ioctl_ops@soc_camera.c(被赋值)-->soc_camera_ioctl_ops@soc_camera.c-->>
+ soc_camera_host->ops@rk30_camera_oneframe.c
+
+以上赋值操作都在video_dev_create@soc_camera.c中，将合适的函数引用填充到对应结构体中
+
+video_device调用自己的file_ops函数(实际是v4l2实现的video_ioctl2).
+video_ioctl2主要将调用流程细化，将ioctl传入的命令，调用各自对应的函数，函数最终调用video_device的ioctl_ops
+指向的函数。
+
+
+
+host注册：
+rk_camera_probe@-->>rk30_camera_oneframe.c
+soc_camera_host_register@soc_camera.c-->>scan_add_host@soc_camera.c
+				     -->>v4l2_device_register@v4l2-device.c	
+
+platform_driver_register(&rk_camera_driver)-->>rk_camera_probe
+在probe中设置host.ops=&rk_soc_camera_host_ops,实际的处理函数都在rk30这里实现
+
+
+ADD：
+platform_driver_probe@soc_camera.c这个函数，不经匹配就会调用probe函数
+
+
+==================================
+平台设备：
+文件包含：
+#include "../../../arch/arm/plat-rk/rk_camera.c"@rk30_camera.c
+#include "../../../drivers/media/video/rk30_camera.c"@board-rk3168-tb-camera.c
+#include "board-rk3168-tb-camera.c"@board-rkpx3-sdk.c
+
+struct platform_device rk_device_camera_host_0 = {
+	.name		  = RK29_CAM_DRV_NAME,//rk30中名字"rk30-camera"
+}
+主控设备注册：
+rk_register_camera_devices{
+- 检测设备头接入的host设备，rk_init_camera_plateform_data
+- 注册host，platform_device_register(&rk_device_camera_host_0/1)
+- 注册所有的摄像头，platform_device_register
+}@rk30_camera.c
+
+驱动注册：
+oneframe模式：
+fs_initcall(rk_camera_init)-->rk_camera_init_async-->platform_driver_register(&rk_camera_driver)
+-->rk_camera_probe{
+- 获取资源获取中断号
+- 设置时钟并关闭cif_clk
+- 设置缓存地址，meminfo_ptr
+- 初始化soc_host，并注册soc_camera_host_register
+}@rk30_camera_oneframe.c
+
+
+pingpang模式：
+device_initcall_sync(rk_camera_init)-->rk_camera_init_async-->platform_driver_register(&rk_camera_driver)
+-->rk_camera_probe{
+- 获取资源获取中断号
+- 设置时钟并关闭cif_clk
+- 设置缓存地址，meminfo_ptr
+- 初始化soc_host，并注册soc_camera_host_register
+}@rk30_camera_pingpong.c
+
+
+drivers/media/video/rk30_camera.c
+arch/arm/mach-rk30/board-rk3168-tb-camera.c
+arch/arm/mach-rk30/board-rk3168-tb.c
+arch/arm/plat-rk/rk_camera.c
+drivers/media/video/rk30_camera_pingpong.c
+drivers/media/video/rk30_camera_oneframe.c
+
+___________________________________
+host注册：
+rk_camera_probe-->soc_camera_host_register{
+- 查找host中是否已经注册，list_for_each_entry
+- 注册v4l2_device_register
+- 加入host链表list_add_tail
+- 遍历devices中设备，若匹配则注册。scan_add_host
+}
+
+
+soc_camera注册：
+soc_camera_init-->platform_driver_probe(&soc_camera_pdrv, soc_camera_pdrv_probe)-->
+soc_camera_pdrv_probe{
+- 创建soc_camera_device设备
+- 注册soc_camera_device设备，soc_camera_device_register(将设备加入到链表devices)
+- 设置设备总线类型，soc_camera_device_init(设置总线类型soc_camera_bus_type)
+}@soc_camera.c
+
+
+总线类型匹配成功：soc_camera_bus_type
+soc_camera_probe-->soc_camera_power_set-->icl->power@soc_camera.c-->power-->rk_sensor_power
+-->rk_sensor_pwrseq-->rk_sensor_ioctrl@rk_camera.c
+
+drivers/media/video/soc_camera.c
+drivers/media/video/rk29_camera.c
+_____________________
+摄像头：
+平台数据：
+rk_camera_device_register_info_t rk_camera_platform_data = {
+- 
+- .register_dev{
+	.device_info = {
+            	.name	= "soc-camera-pdrv",
+		}
+	}
+}@rk_camera.c
+
+carmera设备：
+rkcamera_platform_data new_camera[] = { 
+	.device_info = {
+                	.name = "soc-camera-pdrv",
+	}
+}@board-rk3168-tb-camera.c
+
+rk_register_camera_devices{
+- 设备名不为空，platform_device_register(&rk_camera_platform_data.register_dev[i].device_info)
+- rk_camera_platform_data.sensor_register
+}@rk30_camera.c
+
+kerrnel/drivers/media/video/rk30_camera.c
+kernel/arch/arm/plat-rk/rk_camera.c
+kernel/arch/arm/mach-rk30/board-rk3168-tb-camera.c

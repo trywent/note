@@ -1,0 +1,69 @@
+==============================
+late_initcall(ddrfreq_late_init){
+- 注册misc设备misc_register(&video_state_dev)
+- 创建守护进程，kthread_create(ddrfreq_task)
+- 改变进程优先级，sched_setscheduler_nocheck
+- 增加任务计数，get_task_struct
+- 绑定cpu，kthread_bind
+- 运行进程，wake_up_process
+- 注册重启通知，register_reboot_notifier
+}
+
+ddrfreq_init-->dvfs_clk_register_set_rate_callback(ddr_scale_rate_for_dvfs)
+
+改变频率(一个进程专门执行)：
+ddrfreq_late_init-->wake_up_process-->ddrfreq_task-->ddrfreq_task(ddr.sys_status状态变化时设置)
+-->ddrfreq_work-->(根据状态改变频率)ddrfreq_mode@ddr_freq.c-->clk_set_rate{
+- 支持dvfs则dvfs_vd_clk_set_rate@plat-rk/dvfs.c-->dvfs_target-->dvfs_clk->clk_dvfs_target
+		@mach-rkpx3/dvfs.c-->ddr_scale_rate_for_dvfs-->ddr_set_rate-->
+		_ddr_change_freq{
+		- 
+		
+			
+		}@ddr_freq.c
+- 否则clk_set_rate_nolock
+}
+
+
+
+设置状态：
+ddrfreq_set_sys_status-->(设置对应的bit)set_bit(status, &ddr.sys_status);
+
+//根据视频状态设置ddr
+video_state_fops.video_state_write
+
+//根据时钟
+定义：CLK_NOTIFIER{
+- 设置回调，ddrfreq_clk_event-->ddrfreq_set_sys_status
+- 将回调设置到notifier，ddrfreq_clk_##name##_notifier = {
+	 .notifier_call = ddrfreq_clk_##name##_event 
+	};
+
+}
+注册：core_initcall(ddrfreq_init)-->REGISTER_CLK_NOTIFIER-->clk_notifier_register{
+- 查找对应的clk_notifier，list_for_each_entry
+- 没有找到{
+	- 创建新的clk_notifier
+	- 将clk加入链表，list_add(&cn_new->node, &clk_notifier_list)
+	}
+- 注册回调raw_notifier_chain_register
+}
+
+ddrfreq_init{
+REGISTER_CLK_NOTIFIER(pd_gpu);
+REGISTER_CLK_NOTIFIER(pd_rga);
+REGISTER_CLK_NOTIFIER(pd_cif0);
+REGISTER_CLK_NOTIFIER(pd_cif1);
+REGISTER_CLK_NOTIFIER(pd_lcdc0);
+REGISTER_CLK_NOTIFIER(pd_lcdc1);
+}
+
+kernel/arch/arm/plat-rk/ddr_freq.c
+kernel/arch/arm/plat-rk/clock.c
+
+
+============
+[   17.529501] DWC_OTG: ********vbus detect*********************************************
+[   40.866686] ddrfreq: change freq to 396 MHz when normal
+
+

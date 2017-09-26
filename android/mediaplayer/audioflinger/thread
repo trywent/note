@@ -1,0 +1,71 @@
+//创建播放进程
+AudioFlinger::openOutput-->thread = new MixerThread(AudioFlinger,AudioStreamOut)-->
+PlaybackThread(AudioFlinger,AudioStreamOut){
+- ThreadBase(audioFlinger)
+- mOutput = AudioStreamOut
+}
+
+//加入track(每一个要播放的客户端对应一个track)
+PlaybackThread::Track::start@Tracks.cpp-->addTrack_l{
+- 开始播放，AudioSystem::startOutput
+- mActiveTracks.add
+}
+
+//客户端写入播放数据
+
+
+//thread = new MixerThread
+AudioFlinger::PlaybackThread::onFirstRef-->run-->threadLoop{
+- 处理配置事件，processConfigEvents
+- 准备工作，prepareTracks_l-->AudioFlinger::MixerThread::prepareTracks_l
+- 剩余字节mBytesRemaining为0，更新字节数{
+	- 若MIXER_TRACKS_READY，执行混合threadLoop_mix
+	- 没有数据可写，执行睡眠threadLoop_sleepTime	
+	- 设置剩余字节数，mBytesRemaining	
+	- 若挂起则清除字节数
+	}
+- 若不是等待回调waitingAsyncCallback,(playbackThread一直为false){
+	- 有要写的字节mBytesRemaining，写数据threadLoop_write{
+		- 若有mNormalSink
+		- 若没有则直接写hardware，mOutput->stream->write
+		}
+	- 获取混合的数据，threadLoop_drain-->mOutput->stream->drain
+	}
+
+- 移除要移除的tracks，threadLoop_removeTracks
+}
+
+AudioFlinger::MixerThread::prepareTracks_l{
+- 
+}@Threads.cpp
+
+
+PlaybackThread::threadLoop_write{
+- mOutput->stream->write-->AudioStreamOut.stream-->write@audioFlinger-->
+	AudioStreamOutALSA.write@AudioHardware.cpp
+}
+
+________________
+AudioMixer::AudioMixer{
+- mState.hook         = process__nop
+}
+
+//mix
+MixerThread::threadLoop_mix-->mAudioMixer->process-->mState.hook@AudioMixer.cpp
+
+
+mFastMixer->run-->FastMixer::threadLoop{
+- 好多，
+}@FastMixer.cpp
+
+
+_________________
+//
+sendCreateAudioPatchConfigEvent-->processConfigEvents_l(CFG_EVENT_CREATE_AUDIO_PATCH)-->
+RecordThread::createAudioPatch_l-->set_parameters@Threads.cpp
+
+frameworks/av/services/audioflinger/Threads.cpp
+frameworks/av/services/audioflinger/Threads.h
+frameworks/av/services/audioflinger/AudioMixer.cpp
+frameworks/av/services/audioflinger/FastMixer.cpp
+frameworks/av/services/audioflinger/Tracks.cpp

@@ -1,0 +1,281 @@
+main{
+- VolumeManager->setBroadcaster(CommandListener) //设置命令监听器
+- NetlinkManager->setBroadcaster(CommandListener)
+- VolumeManager->start
+- 解析fstab创建Volume，process_config
+- NetlinkManager->start
+- 开始监听，CommandListener-->startListener
+}@main.cpp
+
+============================
+VolumeStateChange             = 605;
+VolumeUuidChange              = 613;
+VolumeUserLabelChange         = 614;
+VolumeDiskInserted            = 630;
+VolumeDiskRemoved             = 631;
+VolumeBadRemoval              = 632;
+
+
+移除(disk和partition的移除步骤不一样)：
+vold: VolumeStateChange(unmounting)-->VolumeDiskRemoved-->
+
+mountService.onEvent: (VolumeStateChange)unmounting(发送广播eject)-->(VolumeDiskRemoved)-->
+umounted-->removed
+
+============================
+挂载路径：
+device/rockchip/rksdk/fstab.rk30board.bootmode.emmc
+
+路径配置：
+PRODUCT_COPY_FILES += \
+device/rockchip/rksdk/init.$(TARGET_BOARD_HARDWARE).hasUMS.false.rc:root/init.$(TARGET_BOARD_HARDWARE).environment.rc
+px3/device/rockchip/rksdk/init.rk30board.hasUMS.false.rc
+
+    export EXTERNAL_STORAGE /storage/emulated/legacy
+    export EMULATED_STORAGE_SOURCE /mnt/shell/emulated
+    export EMULATED_STORAGE_TARGET /storage/emulated
+    export EXTERNAL_STORAGE_FLASH /mnt/internal_sd
+
+
+
+init.rk30board.rc:
+    mkdir /mnt/internal_sd 0000 system system
+    mkdir /storage 0050 system sdcard_r
+    mkdir /mnt/shell/emulated 0700 shell shell
+    mkdir /storage/emulated 0555 root root
+
+symlink /storage/emulated/legacy /sdcard          //sdcar 指向legacy
+symlink /storage/emulated/legacy /mnt/sdcard
+symlink /storage/emulated/legacy /storage/sdcard0
+symlink /mnt/shell/emulated/0 /storage/emulated/legacy   //legacy指向emulated/0
+
+====================SERVICE
+mountService处理广播：
+onEvent{
+- VolumeStateChange{
+	- notifyVolumeStateChange
+	}
+- VolumeUuidChange
+- VolumeUserLabelChange
+
+- VolumeDiskInserted，VolumeDiskRemoved，VolumeBadRemoval{
+	- 若是插入执行挂载，doMountVolume
+	- 移除VolumeDiskRemoved，{
+		- 发送广播MEDIA_UNMOUNTED		
+		- 发送广播ACTION_MEDIA_REMOVED
+		}
+	- VolumeBadRemoval{
+		- 发送广播MEDIA_UNMOUNTED		
+		- 发送广播ACTION_MEDIA_BAD_REMOVAL
+		}
+	}
+
+}
+
+
+mountService挂载命令：
+vold:
+(执行命令)vm->mountVolume(argv[2])@CommandListener.cpp-->VolumeManager::mountVolume(path){
+- 根据路径,lookupVolume(根据path查找Volume)
+- v->mountVol();
+}@VolumeManager.cpp
+
+创建挂载点：
+VolumeManager::mkdirs-->fs_mkdirs@VolumeManager.cpp
+
+
+
+
+====================VOLD
+加入卷：
+process_config{
+- 获取配置文件名字，property_get("ro.hardware")
+- 打开文件"/fstab."+rk30board.bootmode.emmc
+- 创建卷，new DirectVolume
+- 设置卷对应的块设备路径，dv->addPath(fstab->recs[i].blk_device)
+- vm->addVolume@main.cpp-->addVolume-->mVolumes->push_back@VolumeManager.cpp
+}@main.cpp
+
+处理kernel消息：
+NetlinkHandler::onEvent-->(block事件)vm->handleBlockEvent@NetlinkHandler.cpp-->
+VolumeManager::handleBlockEvent-->(遍历mVolumes中实例)执行(*it)->handleBlockEvent
+@VolumeManager.cpp-->DirectVolume::handleBlockEvent{
+- 遍历卷中路径mPaths{
+	- 卷路径和事件中路径("DEVPATH")匹配，!strncmp(dp, *it, strlen(*it))){
+	- 获取事件类型，evt->getAction
+	- 若是add{
+		- 创建设备节点，createDeviceNode
+		- 若是磁盘设备,handleDiskAdded{
+			- 记录分区数mPendingPartMap
+			- 设备分区数为0，设置卷状态State_Idle，并向上层发送插入广播
+			- 分区数不为0，则等待分区
+		}
+		- 若是分区设备,handlePartitionAdded{
+			- 记录分区编号对应的块设备号，mPartMinors[part_num -1] = minor
+			- 清除已加入的分区，mPendingPartMap
+			- 等待处理所有分区后，设置状态State_Idle并挂载mountVol
+		}@Volume.cpp
+	}
+	- 若是remove{
+		- disk移除{
+			- usb移除，handlePartitionRemoved-->Volume::unmountPartition{
+				- 遍历mPartitions，找到对应id的分区执行umount			
+				}
+			- handleDiskRemoved-->Volume::unmountVol
+		}
+	}
+	}
+	}
+}@DirectVolume.cpp
+
+
+//内部sd卡挂载点/mnt/internal_sd
+mountVol{
+- 若不是usb存储设备{
+	- 若挂载点被占用isMountpointMounted，则返回
+	}
+- 是usb存储设备{
+	- 获取usb设备所有分区的设备节点，getDeviceNodes((dev_t *) &deviceNodes
+	- 获取所有分区的挂载点，getUdiskMountpoint{
+		- 遍历所有的分区mPartitions，若有对应的设备节点。则返回该分区的挂载路径
+		- 否则设置挂载点为 (已定义的usb挂载path)/分区标记
+		}
+	- 判断挂载点是否被占用，isMountpointMounted
+	}
+- 获取所有设备号，getDeviceNodes
+- 若是加密则{
+
+	}
+- 挂载分区{
+	- 根据设备号，创建设备路径devicePath
+	- 检测块设备，Fat::check
+	-若是usb设备{
+		- 查找没有被占用的字符getNextLetter  //从A开始
+		- 获取挂载点getUdiskMountpoint，创建挂载点mkdir
+		}
+	- 非usb设别直接获取挂载点，getMountpoint
+	- 执行挂载(ums或非ums){
+		- Fat::doMount,Ntfs::doMount
+		}
+	- 若是usb设备，记录分区mPartitions.push_back
+	- 设置状态setState(Volume::State_Mounted)-->mVm->getBroadcaster()->sendBroadcast(广播到上层){
+			- 参数1lable，"internal_sd"。参数2，挂载点"internal_sd"
+			}
+	- 若是usb多分区设备，则继续挂载
+	}
+
+- 
+}@DirectVolume.cpp
+
+
+___________________
+卸载：
+
+
+
+system/vold/DirectVolume.cpp
+system/core/fs_mgr/fs_mgr.c
+system/vold/VolumeManager.cpp
+system/vold/NetlinkHandler.cpp
+___________________
+处理mountService命令：
+dispatchCommand@FrameworkListener.cpp-->VolumeCmd::runCommand(obb){
+- mount命令，vm->mountObb-->
+}@CommandListener.cpp
+
+
+
+===================
+
+
+___________________
+
+获取sd卡路径：
+getExternalStorageDirectory-->sCurrentUser.getExternalDirsForApp()[0]-->
+UserEnvironment.mExternalDirsForApp@Environment.java
+
+
+getExternalStorageState{
+- sCurrentUser.getExternalDirsForApp   //new File("/storage/emulated/0")
+- getStorageState{
+	- 获取挂载服务ServiceManager.getService("mount")
+	- 遍历卷查找对应路径的卷，mountService.getVolumeList()
+	- 返回该卷的状态mountService.getVolumeState
+	}
+}
+
+frameworks/base/core/java/android/os/Environment.java
+____________________
+配置文件：frameworks/base/core/res/res/xml/storage_list.xml
+被覆盖：px3/device/rockchip/rksdk/overlay/
+
+第一卷{
+android:mountPoint="/storage/sdcard0"
+android:storageDescription="@string/storage_sd_card"
+}
+
+===================
+模拟卷：
+
+
+symlink /mnt/shell/emulated/0 /storage/emulated/legacy   //legacy指向emulated/0
+创建模拟挂载卷：
+readStorageListLocked(读取文件com.android.internal.R.xml.storage_list)-->
+createEmulatedVolumeForUserLocked{
+- 获取挂载点userEnv.getExternalStorageDirectory() //"/storage/emulated/0"
+- 创建卷StorageVolume.fromTemplate("/storage/emulated/0")
+- 加入卷addVolumeLocked(volume)
+}
+
+mountObb{
+- 创建ObbState
+- 创建action，new MountObbAction
+- mObbActionHandler.sendMessage(OBB_RUN_ACTION, action)-->ObbActionHandler.hanleMessage{
+	- 连接到服务DefaultContainerService，connectToService-->
+		mContext.bindService(service, mDefContainerConn)-->
+		mDefContainerConn(连接到服务)-->发送命令sendMessage(OBB_MCS_BOUND, imcs)-->
+		-->hanleMessage-->action.execute-->
+		
+	- 加入action，mActions.add(action)
+	}
+}
+
+MountObbAction.handleExecute{
+- mConnector.execute("obb", "mount")
+- 加入到容器obbStates和mObbPathToStateMap，addObbStateLocked(mObbState)
+}
+
+获取路径：
+voldPath = buildObbPath(canonicalPath, userId, true)-->buildObbPath-->
+new File(Environment.getEmulatedStorageSource(userId)@MountService.java-->
+getEmulatedStorageSource-->getenv(ENV_EMULATED_STORAGE_SOURCE)@Environment.java
+-->创建路径：mkdirs-->mConnector.execute("volume", "path", state.voldPath)
+
+
+frameworks/base/services/java/com/android/server/MountService.java
+====================
+多分区：
+BUILD_WITH_MULTI_USB_PARTITIONS := false@/rksdk/BoardConfig.mk
+
+
+====================
+
+Volume::doUnmount-->process:killProcessesWithOpenFiles
+
+VolumeManager::unmountVolume-->VolumeManager::unmountAsec/unmountObb-->VolumeManager::unmountLoopImage
+-->process:killProcessesWithOpenFiles
+
+system/vold/Process.cpp
+system/vold/Volume.cpp
+system/vold/VolumeManager.cpp
+
+
+
+//创建文件的默认权限umask
+将Fat::doMount(devicePath, "/mnt/secure/staging", false, false, false, 
+                1000, 1015, 0702, true))  
+
+修改为：
+
+Fat::doMount(devicePath, "/mnt/secure/staging", false, false, false, 
+                1000, 1015, 0002, true)) 

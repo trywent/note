@@ -1,0 +1,13 @@
+board_late_init-->pmic_init-->{
+- 设置cdcd，{
+	- 获取值pmic_get_vol
+	- 设置act8846_set_bits
+	}
+- 设置ldo{
+	- 获取值pmic_get_vol
+	- 设置act8846_set_bits
+	}
+}
+
+
+uboot/drivers/power/pmic/pmic_act8846.c

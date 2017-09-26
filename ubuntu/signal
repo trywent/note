@@ -1,0 +1,16 @@
+SIGNAL用于进程间通信，若进程收到信号则执行对应的信号处理函数(注册的或默认的处理函数)
+
+http://en.wikipedia.org/wiki/Unix_signal
+
+
+SIGFPE 浮点错误
+The SIGFPE signal is sent to a process when it executes an erroneous arithmetic operation, such as division by zero (the name "FPE", standing for floating-point exception, is a misnomer as the signal covers integer-arithmetic errors as well).[3]
+
+
+信号编码：
+ #define SI_TKILL        -6              /* sent by tkill system call */
+
+
+
+SIGSEGV 段错误
+The SIGSEGV signal is sent to a process when it makes an invalid virtual memory reference

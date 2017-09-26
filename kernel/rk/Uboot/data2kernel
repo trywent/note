@@ -1,0 +1,13 @@
+void          *my_data;
+unsigned int  my_dlen;
+EXPORT_SYMBOL(my_data);
+EXPORT_SYMBOL(my_dlen);
+
+and then the driver can retrieve it.
+
+extern void          *my_data;
+extern unsigned int  my_dlen;
+
+request_mem_region(my_data, my_dlen, DRV_NAME);
+md_map = ioremap(my_data, my_dlen);
+

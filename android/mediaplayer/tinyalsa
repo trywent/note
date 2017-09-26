@@ -1,0 +1,46 @@
+//mix
+mixer_open{///dev/snd/controlC%u
+- ioctl(fd, SNDRV_CTL_IOCTL_ELEM_LIST)//获取条目信息
+- 
+}
+
+
+//pcm
+pcm_open{
+- "/dev/snd/pcmC%uD%u'c'/'p'"  //dev/snd/pcmC0D0c 录制 p 播放
+- ioctl(pcm->fd, SNDRV_PCM_IOCTL_INFO, &info) //
+- ioctl(pcm->fd, SNDRV_PCM_IOCTL_HW_PARAMS, &params) //设置参数
+
+}
+
+pcm_write{
+- pcm_prepare
+- ioctl(pcm->fd, SNDRV_PCM_IOCTL_WRITEI_FRAMES,&x)//写书据
+}
+
+
+===========
+//control
+main{
+- mixer_open(card)  //打开"/dev/snd/controlC%u"
+- tinymix_list_controls{//列出控制
+	
+	}
+- tinymix_detail_control{//列出某个控制详细信息
+
+	}
+- tinymix_set_value{ //设置某个控制的值
+
+	}
+}
+
+
+//play
+"Usage: %s file.wav [-D card] [-d device] [-p period_size] [-n n_periods]"
+
+play_sample{
+- pcm_config //设置配置
+- pcm_open(card, device, PCM_OUT, &config) //打开
+- pcm_frames_to_bytes //获取buffer大小
+- pcm_write  	      //写数据
+}

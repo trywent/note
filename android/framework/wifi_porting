@@ -1,0 +1,717 @@
+Porting WiFi drivers to Android
+by Nicu Pavel on 11 August 2010
+
+Update(19/05/2011): Verify validity against Gingerbread.
+Update (11/08/2010): Updated patch to fix the loading of awext driver at run time. 
+Added STOP and RESTART commands. 
+
+For mini-box.com picoPC we want to support several USB and miniPCI WiFi dongles, this guide provides a step by step explanation of what's involved in adding a new wifi driver and making wifi work in a custom Android build  (this guide was written for android 2.1 but should be applicable to previous android releases and hopefully future releases). 
+Contents
+0. Understand how Android WiFi works. 
+1. Enable building of wpa_supplicant in your BoardConfig.mk 
+2. (Optional) Enable debug for wpa_supplicant. 
+3. Provide a proper wpa_supplicant.conf for your device 
+4. Have the correct paths and permissions created from init.rc 
+5. Make sure your wpa_supplicant and dhcpcd (optional) are starting from init.rc  
+6. Provide your driver either as a module or built in kernel and proper kernel support for it and modify Android source code accordingly. 
+7. Provide a firmware if your module needs it. 
+8. Make your driver work with Android custom wpa_supplicant commands and SIOCSIWPRIV ioctl 
+
+Now onto details. 
+
+0. Understand how Android WiFi works.
+Android uses a modified wpa_supplicant ( external/wpa_supplicant ) daemon for wifi support which is controlled through a socket by hardware/libhardware_legacy/wifi/wifi.c (WiFiHW) that gets controlled from Android UI through android.net.wifi package from frameworks/base/wifi/java/android/net/wifi/ and it's corresponding jni implementation in frameworks/base/core/jni/android_net_wifi_Wifi.cpp Higher level network management is done in frameworks/base/core/java/android/net 
+
+1. Enable building of wpa_supplicant in your BoardConfig.mk
+This is by simply adding: BOARD_WPA_SUPPLICANT_DRIVER := WEXT to your BoardConfig.mk . This will set  WPA_BUILD_SUPPLICANT to true in external/wpa_supplicant/Android.mk enabling building of driver_wext.c
+If you have a custom wpa_supplicant driver (like madwifi or my custom android private commands emulation - see last paragraph) you can replace WEXT with AWEXT or your driver name (MADWIFI, PRISM etc). 
+
+2. (Optional) Enable debug for wpa_supplicant. 
+By default wpa_supplicant is set to MSG_INFO that doesn't tell much. 
+To enable more messages: 
+  2.1 modify common.c and set wpa_debug_level = MSG_DEBUG 
+  2.2 modify common.h and change #define wpa_printf from if ((level) >= MSG_INFO) to if ((level) >= MSG_DEBUG) 
+
+3. Provide a proper wpa_supplicant.conf for your device 
+Providing a wpa_supplicant.conf it's important because the control socket for android is specified in this file (ctrl_interface= ). This file should be copied by your AndroidBoard.mk to $(TARGET_OUT_ETC)/wifi (usually /system/etc/wifi/wpa_supplicant.conf ). This location will be used on wpa_supplicant service from init.rc. 
+There are two different ways in which wpa_supplicant can be configured, one is to use a "private" socket in android namespace, created by socket_local_client_connect() function in wpa_ctrl.c and another is by using a standard unix socket. 
+
+Minimum required config options in wpa_supplicant.conf : 
+- Android private socket 
+
+ctrl_interface=wlan0 
+update_config=1 
+
+- Unix standard socket 
+
+ctrl_interface=DIR=/data/system/wpa_supplicant GROUP=wifi 
+update_config=1 
+
+
+Depending on your driver you might also want to add: 
+ap_scan=1 
+
+If you have AP association problems with should change to ap_scan=0 to let the driver do the association instead of wpa_supplicant. 
+If you want to let wpa_supplicant connect to non-WPA or open wireless networks (by default it skips these kind) add: 
+
+
+network={ 
+key_mgmt=NONE 
+} 
+
+
+4. Have the correct permissions and paths created from init.rc 
+Incorrect permisions will result in wpa_supplicant not being able to create/open the control socket and libhardware_legacy/wifi/wifi.c won't connect. 
+Since Google modified wpa_supplicant to run as wifi user/group the directory structure and file ownership should belong to wifi user/group (see os_program_init() function in wpa_supplicant/os_unix.c ).
+
+Otherwise errors like: 
+E/WifiHW  (  ): Unable to open connection to supplicant on "/data/system/wpa_supplicant/wlan0": No such file or directory will appear. 
+
+Also wpa_supplicant.conf should belong to wifi user/group because wpa_supplicant will want to modify this file. If your system has /system as read-only use a location like /data/misc/wifi/wpa_supplicant.conf and modify wpa_supplicant service in init.rc with new location. 
+Make sure the paths are correctly created in init.rc: 
+
+
+mkdir /system/etc/wifi 0770 wifi wifi 
+chmod 0770 /system/etc/wifi 
+chmod 0660 /system/etc/wifi/wpa_supplicant.conf 
+chown wifi wifi /system/etc/wifi/wpa_supplicant.conf 
+#wpa_supplicant control socket for android wifi.c (android private socket) 
+mkdir /data/misc/wifi 0770 wifi wifi 
+mkdir /data/misc/wifi/sockets 0770 wifi wifi 
+chmod 0770 /data/misc/wifi 
+chmod 0660 /data/misc/wifi/wpa_supplicant.conf 
+chown wifi wifi /data/misc/wifi 
+chown wifi wifi /data/misc/wifi/wpa_supplicant.conf 
+
+
+If you use a Unix standard socket in wpa_supplicant.conf (see above) add: 
+
+# wpa_supplicant socket (unix socket mode) 
+mkdir /data/system/wpa_supplicant 0771 wifi wifi 
+chmod 0771 /data/system/wpa_supplicant 
+chown wifi wifi /data/system/wpa_supplicant 
+
+Do not add these if you use Android private socket because it will make wpa_supplicant non-functional, because hardware/libhardware_legacy/wifi/wifi.c check for existence of the /data/system/wpa_supplicant folder and will pass a wrong interface name to wpa_ctrl_open() function. 
+
+5. Make sure your wpa_supplicant and dhcpcd are starting from init.rc 
+
+For wpa_supplicant the init.rc startup like should be depending on which path you chosen: 
+- Android private socket: 
+
+service wpa_supplicant /system/bin/wpa_supplicant -dd -Dwext -iwlan0 -c /system/etc/wifi/wpa_supplicant.conf 
+socket wpa_wlan0 dgram 660 wifi wifi 
+group system wifi inet 
+disabled 
+oneshot 
+
+- Unix standard socket: 
+
+service wpa_supplicant /system/bin/wpa_supplicant -dd -Dwext -iwlan0 -c /system/etc/wifi/wpa_supplicant.conf 
+group system wifi inet 
+disabled 
+oneshot 
+
+If your wifi driver creates a wifi interface with other name than wlan0 you will have to modify the above line accordingly. 
+You also should have dhcpcd starting from init.rc 
+
+service dhcpcd /system/bin/dhcpcd wlan0 
+group system dhcp 
+disabled 
+oneshot 
+
+
+Newer AOSP versions after Gingerbread use dhcpcd_wlan0 as service name.
+
+6. Provide your driver either as a module or built in kernel and proper kernel support for it. 
+ First make sure that  CONFIG_PACKET and CONFIG_NET_RADIO (wireless extensions)  are enabled in your kernel. The driver can be built as module (default android way) or built in kernel (if you want to rely in kernel auto probing to support multiple driver eg. USB wifi) but will require source code modifications (see below). 
+ - As kernel module: 
+   Define in your BoardConfig.mk : 
+   1. WIFI_DRIVER_MODULE_PATH := path to the module to be loaded 
+       You need to specify module name in that path too, usually should look something like /system/lib/modules/wlan.ko 
+   2.  WIFI_DRIVER_MODULE_NAME:= the name of the network interface that the driver creates, for example wlan0 
+   3. WIFI_DRIVER_MODULE_ARG:= any arguments that you want to pass to the driver on insmod, for example nohwcrypt 
+   
+   Make sure you copy your kernel module when building android to the correct location. 
+- As built in kernel: 
+  - First init.rc needs to be modified to inform hardware/libhardware_legacy/wifi/wifi.c about the name of the interface, that the driver  is already loaded and set the status of wpa_supplicant to running: 
+
+setprop wifi.interface "wlan0" 
+setprop wlan.driver.status "ok" 
+
+
+Do NOT add setprop init.svc.wpa_supplicant "running" as I previously mentioned as it will prevent wpa_supplicant from starting from init. 
+ - Secondly hardware/libhardware_legacy/wifi/wifi.c need to be modified so the functions insmod() and rmmod() return 0 (simply add return 0; as the first line in functions since they are not needed when driver is built in kernel) and return before checking for /proc/modules in  check_driver_loaded() function. 
+You might encounter problems with WifiHW module not being able to connect to wpa_supplicant socket even with the correct permisions. Try to turn off / turn on Wifi from the GUI. 
+
+ 7. Provide a firmware if your driver needs it 
+
+If your driver needs a firmware you will have to copy this firmware file to /etc/firmware on your android build. Android doesn't use a standard hotplug binary (although there is an implementation available on android-x86 system/code/toolbox/hotplug.c ) instead the init process takes care of firmware events and loads the firmware file from /etc/firmware (see: system/core/init/devices.c handle_firmware_event() function). 
+Firmware file name is defined by the driver and might also contain a folder like: RTL8192SU/rtl8192sfw.bin, entire file path should be available in /etc/firmware 
+
+8. Make your driver work with Android custom wpa_supplicant commands and SIOCSIWPRIV ioctl. 
+
+ Android uses SIOCSIWPRIV ioctl to send commands to modify driver behaviour and receive information like signal strength, mac address of the AP, link speed etc. This ioctl is usually not implemented in any known wireless drivers except bcm4329 which is in google msm kernel branch . 
+The errors from not having this ioctl implemented will look like: 
+E/wpa_supplicant(  ): wpa_driver_priv_driver_cmd failed wpa_driver_priv_driver_cmd RSSI len = 4096  
+E/wpa_supplicant(  ): wpa_driver_priv_driver_cmd failed  
+D/wpa_supplicant(  ): wpa_driver_priv_driver_cmd LINKSPEED len = 4096 
+E/wpa_supplicant(  ): wpa_driver_priv_driver_cmd failed  
+I/wpa_supplicant(  ): CTRL-EVENT-DRIVER-STATE HANGED 
+
+After 4, WEXT_NUMBER_SEQUENTIAL_ERRORS errors, android will abort using the device. 
+
+To quickly test your wifi from interface you can disable error checking in external/wpa_supplicant/driver_wext.c by simply making ret = 0; in wpa_driver_priv_driver_cmd() function after the SIOCSIWPRIV ioctl call. This will make all access points in android UI appear without signal or MAC address. 
+To proper implement the ioctl you will need to modify your kernel driver to reply to SIOCSIWPRIV ioctl with RSSI (signal strength) and MACADDR commands being the most important. 
+A better way is to add a custom driver_xxx.c to google external/wpa_supplicant/ implementing wpa_driver_priv_driver_cmd() function that will take care of RSSI, MACADDR and others, through calls to SIOCGIWSTATS, SIOCGIFHWADDR ioctls, with the rest of the functions being called from driver_wext.c. 
+Below is a link to a patch for wpa_supplicant that I did for mini-box.com picoPC Android build. It creates a new driver awext which "emulates" android driver commands using wireless extensions ioctls. 
+
+How to use the new driver: 
+
+1. In your BoardConfig.mk define:  BOARD_WPA_SUPPLICANT_DRIVER := AWEXT 
+2. Change init.rc wpa_supplicant service command line by replacind -Dwext with -Dawext
+
+AWEXT driver patch download:   android_wext_emulation_driver_awext.patch 
+For Gingerbread patches see the post above.
+Labels: android, wifi, wpa_supplicant
+
+49 Comments:
+At May 10, 2010 at 8:23 AM ,  Blogger yonathana said...
+Hi, 
+Was trying the same but have been facing some errors. E/WifiHW ( ): Unable to open connection to supplicant on "/data/system/wpa_supplicant/wlan0"
+Even though i have added permissions as mentioned. Would like to compare my files with yours. Would you mind sharing a copy of the modified files ? 
+Thanks 
+Yonathana
+ 
+At May 10, 2010 at 9:36 AM ,  Blogger panic said...
+Add a chown wifi wifi on the folders and verify with ls -l /data/system/ on console. I placed the files here: 
+http://www.linuxconsulting.ro/android/files/wifi/
+ 
+At May 10, 2010 at 12:41 PM ,  Blogger panic said...
+Also try to turnoff/turnon wifi, maybe wpa_supplicant hasn't yet created the socket. I've seen this on my build.
+You should see something similar to this in logcat (if you enabled wpa_supplicant debug):
+
+D/wpa_supplicant( 843): Initializing interface 'wlan0' conf '/system/etc/wifi/wpa_supplicant.conf' driver 'awext' ctrl_interface 'N/A' bridge 'N/A'
+D/wpa_supplicant( 843): Configuration file '/system/etc/wifi/wpa_supplicant.conf' -> '/system/etc/wifi/wpa_supplicant.conf' 
+D/wpa_supplicant( 843): Reading configuration file '/system/etc/wifi/wpa_supplicant.conf' 
+D/wpa_supplicant( 843): ctrl_interface='wlan0'
+ 
+At May 10, 2010 at 5:24 PM ,  Blogger yonathana said...
+This is what i did panic : drop both your files in the respective dir and cross check in the rfs if they are same 
+Check permissions of 
+s -l /data/system
+-rw-rw-r-- system system 35326 2000-01-01 00:00 packages.xml
+-rw------- system system 8 2000-01-01 00:01 syncmanager.prefs
+drwxrwx--x system system 2000-01-01 00:00 registered_services
+drwxrwxrwx wifi wifi 2000-01-01 00:00 wpa_supplicant
+-rw------- system system 4096 2000-01-01 00:00 entropy.dat
+-rw------- system system 171 2000-01-01 00:00 wallpaper_info.xml
+-rw-rw---- system system 16384 2000-01-01 00:00 accounts.db
+-rw------- system system 604 2000-01-01 00:00 batterystats.bin
+drwx------ system system 2000-01-01 00:00 usagestats
+-rw------- system system 64 2000-01-01 00:00 appwidgets.xml
+
+
+I/ActivityManager( 802): Starting activity: Intent { act=android.intent.action.MAIN cmp=com.android.settings/.WirelessSettings }
+D/dalvikvm( 802): GC freed 9763 objects / 499352 bytes in 96ms
+I/ActivityManager( 802): Displayed activity com.android.settings/.WirelessSettings: 556 ms (total 556 ms)
+W/WifiHW ( 802): Could not open /proc/modules: No such file or directory
+I/StatusBarPolicy( 802): received intent android.net.wifi.WIFI_STATE_CHANGED
+D/SettingsWifiEnabler( 985): Received wifi state changed from Disabled to Enabling
+D/WifiService( 802): ACTION_BATTERY_CHANGED pluggedType: 1
+E/WifiHW ( 802): Unable to open connection to supplicant on "/data/system/wpa_supplicant/wlan0": No such file or directory
+D/SettingsWifiEnabler( 985): Received wifi state changed from Enabling to Enabled
+I/StatusBarPolicy( 802): received intent android.net.wifi.WIFI_STATE_CHANGED
+E/WifiHW ( 802): Unable to open connection to supplicant on "/data/system/wpa_supplicant/wlan0": No such file or directory
+E/WifiHW ( 802): Unable to open connection to supplicant on "/data/system/wpa_supplicant/wlan0": No such file or directory
+I/StatusBarPolicy( 802): received intent android.intent.action.TIME_TICK
+E/WifiHW ( 802): Unable to opeinit: no such service 'dhcpcdwlan0'
+n connection to supplicant on "/data/system/wpa_supplicant/wlan0": No such file or directory
+V/WifiStateTracker( 802): Supplicant died unexpectedly
+E/WifiStateTracker( 802): Could not stop DHCP
+D/NetworkStateTracker( 802): setDetailed state, old =IDLE and new state=DISCONNECTED
+D/ConnectivityService( 802): ConnectivityChange for WIFI: DISCONNECTED/DISCONNECTED
+I/EthernetService( 802): setEthState from 2 to 2
+init: no such service 'dhcpcdwlan0'
+D/SettingsWifiEnabler( 985): Received wifi state changed from Enabled to Disabling
+I/StatusBarPolicy( 802): received intent android.net.wifi.supplicant.CONNECTION_CHANGE
+I/StatusBarPolicy( 802): received intent android.net.wifi.WIFI_STATE_CHANGED
+
+Am i at loss of ideas, Any clues what could be wrong ?
+ 
+At May 10, 2010 at 5:32 PM ,  Blogger yonathana said...
+Also when i do a command line init as soon as system boots 
+wpa_supplicant -iwlan0 -c/system/etc/wifi/wpa_supplicant.conf -ddI/StatusBarPolicy( 802): received intent android.intent.action.TIME_TICK
+
+D/wpa_supplicant( 989): Initializing interface 'wlan0' conf '/system/etc/wifi/wpa_supplicant.conf' driver 'default' ctrl_interface 'N/A' bridge 'N/A'
+D/wpa_supplicant( 989): Configuration file '/system/etc/wifi/wpa_supplicant.conf' -> '/system/etc/wifi/wpa_supplicant.conf'
+D/wpa_supplicant( 989): Reading configuration file '/system/etc/wifi/wpa_supplicant.conf'
+E/wpa_supplicant( 989): Failed to read or parse configuration '/system/etc/wifi/wpa_supplicant.conf'.
+D/wpa_supplicant( 989): Failed to add interface wlan0
+D/wpa_supplicant( 989): Cancelling scan request
+D/wpa_supplicant( 989): Cancelling authentication timeout
+# I/StatusBarPolicy( 802): received intent android.intent.action.TIME_TICK
+
+# cat /system/etc/wifi/wpa_supplicant.conf
+ctrl_interface=DIR=/data/system/wpa_supplicant GROUP=wifi
+update_config=1
+
+
+
+This is what i see ? Wonder why the wpa_supplicant .conf is not being parsed
+ 
+At May 10, 2010 at 5:57 PM ,  Blogger panic said...
+Should have read access to wifi user/group. Also specify -Dwext as driver.
+ 
+At May 12, 2010 at 5:11 AM ,  Blogger Oramon said...
+Dear sir, I had setup my device with wpa_supplicant working good. But the message "ioctl[SIOCGIWRATE]: No such device" is showed after linkspeed command parsed by driver_awext.c. Would you please help me to figure out where to setup the correct interface in this situation? Thank you~
+ 
+At May 12, 2010 at 2:36 PM ,  Blogger panic said...
+@yonathana You have syntax errors on your dhcpcd line also check permissions for /system/etc/wifi
+
+@Oramon Your driver doesn't support WRATE ioctl that means you will have no link speed information but wifi should be working without.
+ 
+At June 2, 2010 at 6:36 PM ,  Blogger Sireesha said...
+Hi
+
+In Step6, building it as a module, 
+When you say:
+"Make sure you copy your kernel module when building android to the correct location."
+
+What is the correct location ? I built my driver on linux and copied the generated wl.ko file to the out/target/product/xxx/system/lib/modules/2.6.29-android-x86/kernel/drivers/net/wireless/wl/wl.ko
+
+But, I get "Exec format error" when I try to do insmod wl.ko.
+
+How do I include the module to be built by android ? Mine is a broadcom 4311 wireless card.
+
+Regards
+Sireesha.
+ 
+At August 3, 2010 at 5:14 PM ,  Blogger pyro said...
+Hi panic,
+
+thanks for your work. It helped me a lot.
+
+Here some improvements:
+
+@ point 4
+if you use dhcp in init.rc you should also add a working folder.
+
+mkdir /data/misc/dhcp 0770 dhcp dhcp
+chmod 0770 /data/misc/dhcp
+
+@ point 5
+you have to use the wpa_supplicant.conf in /data/misc/wifi because in /system/etc/wifi/ is only a template which is write protected. to save configured networks you need to have write access to the conf file.
+
+@ point 8
+your awext driver patch misses a small part.
+diff --git a/drivers.c b/drivers.c
+index 45c2f55..cc5621c 100644
+--- a/drivers.c
++++ b/drivers.c
+@@ -15,6 +15,9 @@
+#include "includes.h"
+
+
++#ifdef CONFIG_DRIVER_AWEXT
++extern struct wpa_driver_ops wpa_driver_awext_ops; /* driver_awext.c */
++#endif /* CONFIG_DRIVER_AWEXT */
+#ifdef CONFIG_DRIVER_WEXT
+extern struct wpa_driver_ops wpa_driver_wext_ops; /* driver_wext.c */
+#endif /* CONFIG_DRIVER_WEXT */
+@@ -62,6 +65,9 @@ extern struct wpa_driver_ops wpa_driver_custom_ops; /* driver_ti.c */
+
+struct wpa_driver_ops *wpa_supplicant_drivers[] =
+{
++#ifdef CONFIG_DRIVER_AWEXT
++ &wpa_driver_awext_ops,
++#endif /* CONFIG_DRIVER_AWEXT */
+#ifdef CONFIG_DRIVER_WEXT
+&wpa_driver_wext_ops,
+#endif /* CONFIG_DRIVER_WEXT */
+ 
+At August 10, 2010 at 2:34 PM ,  Blogger kiran said...
+Hi,
+
+I'm trying to build wpa_supplicant_6 (Andriod 2.1),have made the modifications as said.But im getting build errors
+-----------------------------------------
+config.c:60: error: expected declaration specifiers or ‘...’ before ‘size_t’
+config.c: In function ‘wpa_config_parse_string’:
+config.c:66: warning: implicit declaration of function ‘os_strrchr’
+config.c:66: warning: assignment makes pointer from integer without a cast
+config.c:67: error: ‘NULL’ undeclared (first use in this function)
+config.c:67: error: (Each undeclared identifier is reported only once
+config.c:67: error: for each function it appears in.)
+config.c:69: error: ‘len’ undeclared (first use in this function)
+config.c:70: warning: implicit declaration of function ‘os_malloc’
+----------------------------------------
+
+Also pls clarify where the kernel module needs to copied.
+
+Thanks
+Kiranmai
+ 
+At August 11, 2010 at 9:49 AM ,  Blogger panic said...
+Kiran the patch and howto is for wpa_supplicat not for the wpa_supplicant_6 that appeared on froyo. I will look on _6 version soon.
+ 
+At August 11, 2010 at 1:38 PM ,  Blogger kiran said...
+panic,i want to use upnp-service discovery in andriod.Do you i/p's about that?
+Any workiing library sources/refernces.
+
+Thanks
+Kiranmai
+ 
+At August 23, 2010 at 4:47 PM ,  Blogger guru said...
+Hi, I followed the steps to enable wifi on froyo. wifi is getting enabled but when tried to connect it is not setting system properties like dhcp.eth0.ipaddress and other. it is setting only dhcp.eth0.dns1, dhcp.eth0.dns2 and dns3. whether I need to configure or change to set all system properties?
+ 
+At September 3, 2010 at 2:28 AM ,  Blogger Eric Nelson said...
+Thanks Nicu. I wish I had found your post a couple of days earlier, but even so, it saved me considerable time configuring things for one of our customers.
+
+I posted some notes on my experiences on our blog:
+http://boundarydevices.com/blogs/?p=284
+ 
+At September 28, 2010 at 8:08 PM ,  Blogger G2 said...
+Great stuff! Works like a charm on Eclair. What about Froyo and wpa_supplicant_6?
+ 
+At November 1, 2010 at 7:38 AM ,  Blogger G2 said...
+If you are interested, I have done it for supplicant 0.6.10: it's here:
+http://git.alwaysinnovating.com/cgit.cgi/ai.android/tree/preprocess/froyo/wifi.patch
+The only notable difference is .get_scan_results2
+ 
+At January 22, 2011 at 12:39 AM ,  Blogger Blake said...
+Hi,
+
+I'd like very much to speak to you about your informative post on porting Wi-Fi drivers to Android. Are you interested in freelance consulting work? I'd be really grateful if you could contact me - blake@hfield.com. I look forward to hearing from you.
+
+-Blake
+ 
+At February 22, 2011 at 4:06 PM ,  Blogger proveyourselfthom said...
+Sorry but I haven't found any way to contact you. So, why your sis drivers aren't part of Xorg?
+Is it updated?
+Thank you.
+ 
+At March 4, 2011 at 11:43 AM ,  Blogger hoyushen said...
+Dear Sir
+
+First, thank you for your shares, it really helps me a lot. Now I have a question of supporting multi-WiFi drivers at the same time. Is there any possibility not to init interface name(ex.wlan0,wpa_supplicant -iwlan0 -c xxxxx......) in init.rc? Because different WiFi drivers have different interface names. Or could you provide any other suggestions for this purpose? My work-arounded solution is to modify the same interface name for different WiFi drivers in src code(ex.wlan0). Then modify wifi.c(hardware\libhardware_legacy\wifi) to load different WiFi modules base on VID/PID table, which I've added for this purpose. But I think it's not a good solution. I'd appreciate of your comments. Thank you for your kindly help again.
+
+ps. my email is hoyushen@gmail.com
+
+Sincerely, Kevin
+ 
+At March 22, 2011 at 5:19 PM ,  Blogger panic said...
+proveyourselfthom:
+
+No the X11 drivers are no longer updated, although Mandriva had picked up my driver and added fixes and updates. I think the driver name was sisimedia or something similar.
+ 
+At March 22, 2011 at 5:20 PM ,  Blogger panic said...
+hoyushen:
+
+Might be possible with gingerbread, since I've seen that the wpa_supplicant and dhcp are now started from wifi.c in hardware_legacy/wifi
+You will need to modify wifi.c to get the interface name from sysfs and build up the wpa_supplicant command.
+ 
+At May 4, 2011 at 2:57 PM ,  Blogger Urvish Gohil said...
+Hi panic,
+Thanks a lot for this beautiful guide.
+I could now make wifi working on GingerBread.
+
+The issue I am facing is, it doesn't scan any network(it doesnt give error thoug). (ping works fine)
+
+wpa_supplicant.conf
+--------------------
+update_config=1
+ctrl_interface=DIR=/data/system/wpa_supplicant GROUP=wifi
+eapol_version=1
+ap_scan=1
+fast_reauth=1
+
+
+What I do is,
+"insmode wlan.ko"
+To do it from shell, I have 2 shells open.
+1. wpa_supplicant -dd -Dwext -imlan0 -c/data/misc/wifi/wpa_supplicant.conf
+
+2. wpa_cli -p /data/system/wpa_cupplicant
+> scan
+
+
+
+Logcat
+========
+D/wpa_supplicant( 1450): CMD: PING
+D/wpa_supplicant( 1450): CMD: SCAN
+D/wpa_supplicant( 1450): Setting scan request: 0 sec 0 usec
+D/wpa_supplicant( 1450): wpa_supplicant_scan: scan_req = 2, ap_scan = 1
+D/wpa_supplicant( 1450): State: INACTIVE -> SCANNING
+I/wpa_supplicant( 1450): CTRL-EVENT-STATE-CHANGE id=-1 state=2 BSSID=00:00:00:00:00:00
+D/wpa_supplicant( 1450): Starting AP scan (broadcast SSID)
+D/wpa_supplicant( 1450): wpa_driver_wext_combo_scan: Start
+D/wpa_supplicant( 1450): Scan requested - scan timeout 10 seconds
+D/wpa_supplicant( 1450): CMD: PING
+D/wpa_supplicant( 1450): Scan timeout - try to get results
+D/wpa_supplicant( 1450): Received 0 bytes of scan results (0 BSSes)
+D/wpa_supplicant( 1450): New scan results available
+D/wpa_supplicant( 1450): No suitable AP found.
+D/wpa_supplicant( 1450): State: SCANNING -> INACTIVE
+I/wpa_supplicant( 1450): CTRL-EVENT-STATE-CHANGE id=-1 state=1 BSSID=00:00:00:00:00:00
+D/wpa_supplicant( 1450): CMD: PING
+
+Can you please help out in terms of what I am missing???
+ 
+At August 20, 2011 at 12:24 PM ,  Blogger Yegnesh said...
+Hi,
+
+I followed the steps as you have mentioned in the post, using Android Sockets, but I get an error as follows:-
+
+I/wpa_supplicant( 1221): CTRL_IFACE monitor[0]: 13 - Permission denied
+I/wpa_supplicant( 1221): CTRL-EVENT-STATE-CHANGE id=-1 state=1 BSSID=00:00:00:00:00:00
+I/wpa_supplicant( 1221): CTRL_IFACE monitor[0]: 13 - Permission denied.
+
+Please let me know if you have come across this issue.
+
+Thanks & Regards,
+Yegnesh
+ 
+At December 23, 2011 at 7:17 AM ,  Blogger ernice said...
+http://blog.naver.com/ernice/20146498720
+
+Thanks. I successed with RTL8188cu usb wifi modules and NFS
+ 
+At January 16, 2012 at 8:44 PM ,  Blogger eyob said...
+Panic,
+Are you still taking some wifi related questions?
+ 
+At February 5, 2012 at 1:49 AM ,  Blogger Nicu Pavel said...
+Next update will be for Android 4.x ICS
+ 
+At March 6, 2012 at 2:56 PM ,  Blogger Andrey said...
+Hi !
+What is the difference between Android private socket and Unix standard socket ? What should one prefer ?
+Thanks,
+Andrey
+ 
+At April 5, 2012 at 12:02 AM ,  Blogger Adel Nour said...
+i am using panda board runs Android ICS and the on board wifi interface is enabled "wlan0"
+Now i am trying to add another interface "wlan1" to android and i want when i enable the wifi on the GUI it turns on my interface , i have succeeded to do so with wpa_supplicant by setting wifi.interface wlan1 , but the problem is with the DHCP , the DHCP is always trying to run over wlan0 not wlan1
+Is there is any property that i can sit to convince the GUI to run the DHCP over wlan1?
+ 
+At April 6, 2012 at 2:55 PM ,  Blogger globula_neagra said...
+Salut, as dori si eu niste ajutor, am o tableta arnova 7c g2, filesystem yaffs, si am reusit sa folosesc un rom de zte v9, problema e ca, nu am wifi, telefonie, radio, bluetoth, am incercat sa portez asa cum zici tu aici, dar nu reusesc de nici un fel (am folosit driverele originale care erau pe room-ul de la arnova, editat init etc.)
+Am aproximativ acelasi rezultat cu un tip care a postat pe aici, as aprea foarte mult orice tip de sfat.
+ 
+At April 17, 2012 at 8:10 AM ,  Blogger AT said...
+Panic,
+
+I have a hardware device very similar to the O2 joggler. Specifically it is an Atom-based Openpeak Openframe 7E.
+
+There are some great Android builds out there for it's sister device, the o2 Joggler, but that device has a different WiFi radio. 
+
+http://www.jogglerwiki.com/forum/viewtopic.php?f=2&t=196&start=240
+
+As a result it appears that the joggler image mentioned doesn't have the necessary WiFi driver for the Openframe hardware.
+
+The Wireless hardware in the OpenFrame, verified by lspci, is the BCM43225. From this site, I believe the driver would be the brcmsmac.
+
+Assuming that makes sense so far, here's my goal. I'd like to add the appropriate Android driver for this WiFi hardware to the custom build mentioned above. I believe it would entail the addition of the .ko driver, as well as the .bin firmware files as you outline.
+
+My challenge, however, is that I cannot find an Android driver (.ko) already built, nor have I been able to verify that adding that driver would actually work.
+
+Naively I took an ubuntu version of the brcmsmac.ko, added it to my device, and ran insmod on it. That errors out and fails to load.
+
+Any suggestions? Any questions that would help clarify what I'm trying to do?
+
+Bottom line, I have an andriod image that's 99% of the way there, I just need to "add" support for the specific wireless device installed in my hardware.
+
+Any guidance would be greatly appreciated.
+
+Thanks and best regards
+AT
+ 
+At April 17, 2012 at 9:12 PM ,  Blogger Nicu Pavel said...
+@AT you will need to get the kernel source for that device, and compile the kernel module for the wifi. It probably fails because of missmatched kernel version / arch. The ubuntu compiled .ko won't work since it's compiled for another kernel and probably with another march flags.
+ 
+At April 17, 2012 at 9:16 PM ,  Blogger Nicu Pavel said...
+@globula_neagra If you change the kernel version by using another ROM the old modules won't work, they need to be recompiled.
+ 
+At April 17, 2012 at 9:20 PM ,  Blogger Nicu Pavel said...
+@Adel Nour The latest gingerbread added support for multiple interface DHCPCD.
+They are configured in init.rc by dhcpcd_wlan0, dhcpcd_wlan1
+For older versions of android see my patch: https://gitorious.org/picopc-android-eclair/system-core/commit/515dbcf064d432d6a8f04a106f31287e1780e96b
+ 
+At April 19, 2012 at 2:00 AM ,  Blogger AT said...
+Thanks Nicu! I have the source for the driver. Can I compile on OSX by specifying the proper target architecture??
+ 
+At May 11, 2012 at 9:10 AM ,  Blogger start_kernel said...
+Hi Nicu , 
+
+According to following :
+
+Android uses wireless-extensions to support its 802.11 drivers. The drivers that Android devices have up to this day used are all using wireless-extensions for communication. 
+
+It seems to said that a kernel driver implment via mac80211, cfg80211 API could not support Andorid now, right ?
+
+I am trying to port a rtl81xx series driver (in linux 2.6.35, realtek chip) to support Android but failed; the Android setting UI - wifi enable checkbox appers to on then off again and again ...
+
+I find this driver implement via mac80211 , cfg80211 API , issues seems to be related about after scanning ... 
+
+Is there any solution to resolve this ? 
+
+Thanks very much .
+ 
+At May 11, 2012 at 9:15 AM ,  Blogger start_kernel said...
+Hi Nicu , 
+
+According to following :
+
+Android uses wireless-extensions to support its 802.11 drivers. The drivers that Android devices have up to this day used are all using wireless-extensions for communication. 
+
+It seems to said that a kernel driver implment via mac80211, cfg80211 API could not support Andorid now, right ?
+
+I am trying to port a rtl81xx series driver (in linux 2.6.35, realtek chip) to support Android but failed; the Android setting UI - wifi enable checkbox appers to on then off again and again ...
+
+I find this driver implement via mac80211 , cfg80211 API , issues seems to be related about after scanning ... 
+
+Is there any solution to resolve this ? 
+
+Thanks very much .
+ 
+At May 25, 2012 at 4:29 PM ,  Blogger ffxx68 said...
+Hi, thanks for this clear and complete tutorial. Very helpful!
+
+But... one thing I miss, very basic I think. I have prepared my wpa_supplicant.conf and I have built my driver from the kernel. So, in opedr to pick them with my Andorid build, in my full_.mk I've added these copy operations:
+
+PRODUCT_COPY_FILES += \
+$(LOCAL_PATH)/bcm/dhd.ko:system/lib/modules \
+$(LOCAL_PATH)/bcm/4329_nvram.txt:system/etc/firmware \
+$(LOCAL_PATH)/bcm/fw4329.bin:system/etc/firmware \
+$(LOCAL_PATH)/bcm/wpa_supplicant.conf:system/etc/wifi
+
+
+but as neither system/etc/firmware nor system/etc/wifi exist in the AOSP out/target dir, the result is incomplete.
+
+How to make the AOSP build create the missing directories?
+
+thanks
+
+PS- Anyone interested, this is he discussion group about the platform I'm working on: 
+
+https://groups.google.com/forum/?fromgroups#!forum/renesas-emev-osp
+ 
+At May 25, 2012 at 4:33 PM ,  Blogger ffxx68 said...
+Hi Pavel, thanks a lot for this helpful tutorial.
+
+One thing I miss. Once I have the kernel driver, firmware and wpa_supplicant.conf, in order to include these in the AOSP build I should add these copy operations in my full_.mk, I think:
+
+PRODUCT_COPY_FILES += \
+$(LOCAL_PATH)/bcm/dhd.ko:system/lib/modules \
+$(LOCAL_PATH)/bcm/4329_nvram.txt:system/etc/firmware \
+$(LOCAL_PATH)/bcm/fw4329.bin:system/etc/firmware \
+$(LOCAL_PATH)/bcm/wpa_supplicant.conf:system/etc/wifi
+
+But system/etc/firmware and system/etc/wifi directories aren't created by the standard build, so that isn't enough.
+
+What do I miss?
+
+thanks
+Fabio
+
+PS - anyone interested - this is the group where we discuss about the platform I'm building for: https://groups.google.com/forum/?fromgroups#!forum/renesas-emev-osp
+ 
+At July 7, 2012 at 5:59 PM ,  Blogger Ashwin Bhanushali said...
+Hi Techies,
+
+I had downloaded the android ICS source code from google repositories.
+I am able to compile and run the source code and build for emulator is working superb.Then I decided to burn on device Huawei Ascend G300 U8818.I had downloaded the Device configuration from github repository.
+Now I started compiling for Huawei device.
+When I execute the command make -j4 then I get the following error 
+
+make: *** No rule to make target `out/target/product/u8818/obj/STATIC_LIBRARIES/lib_driver_cmd_wext_intermediates/lib_driver_cmd_wext.a', needed by `out/target/product/u8818/obj/EXECUTABLES/wpa_supplicant_intermediates/LINKED/wpa_supplicant'. St
+
+Please help in me.I am googling for almost 15 days but no guide no clues.
+Thank You.
+ 
+At July 7, 2012 at 6:01 PM ,  Blogger Ashwin Bhanushali said...
+Hi Techies,
+
+I had downloaded the android ICS source code from google repositories.
+I am able to compile and run the source code and build for emulator is working superb.Then I decided to burn on device Huawei Ascend G300 U8818.I had downloaded the Device configuration from github repository.
+Now I started compiling for Huawei device.
+When I execute the command make -j4 then I get the following error 
+
+make: *** No rule to make target `out/target/product/u8818/obj/STATIC_LIBRARIES/lib_driver_cmd_wext_intermediates/lib_driver_cmd_wext.a', needed by `out/target/product/u8818/obj/EXECUTABLES/wpa_supplicant_intermediates/LINKED/wpa_supplicant'. St
+
+Please help in me.I am googling for almost 15 days but no guide no clues.
+Thank You.
+ 
+At July 14, 2012 at 11:20 PM ,  Blogger vemman said...
+Thanks a ton!
+I got wifi running on CyanMobileX custom ROM for Galaxy 551 (GT-I5510)
+
+THanks
+ 
+At August 3, 2012 at 12:23 AM ,  Blogger Mils said...
+Hello Nicu,
+
+Thank you for this tutorial
+I want to know if are you doing the update for Android 4.x.
+
+Because I can't do this modifications in Android 4.0.
+
+Thank you.
+Best regards,
+S.K
+ 
+At August 9, 2012 at 2:43 AM ,  Blogger Mils said...
+Hello Nicolae,
+
+Do you have the update for android version 4.X ?
+
+Thank you.
+
+Best regards,
+S.K
+ 
+At August 9, 2012 at 2:43 AM ,  Blogger Mils said...
+Hello Nicolae,
+
+Do you have the update for android version 4.X ?
+
+Thank you.
+
+Best regards,
+S.K
+ 
+At August 14, 2012 at 7:14 PM ,  Blogger Nicu Pavel said...
+I will start working on ICS version in a few weeks. But probably rowboat, cyanogen might already have these patches ported to ICS so it's worth checking them out too.
+Regarding the issue where wifi automatically turns off after enabling it, it's because it can't ifup the interface (missing firmware, driver has other name for interface instead of wlan0). Check logcat it should tell you more.
+ 
+At October 8, 2012 at 5:58 PM ,  Blogger ffxx68 said...
+Hi Nicu,
+
+I've amanged to complete the integration on GB and now I'm porting to JB. issue is that in GB I used to have the "wifi" option enabled under wireless settings, even before integrating the driver etc, while I miss this in JB. Any idea what could be missing?
+
+thanks again
+Fabio
+ 
+At October 8, 2012 at 6:56 PM ,  Blogger ffxx68 said...
+Ok, got it. In order for the WiFi Settings sub-option to show up, the sfollowing file needs to be present in the build:
+
+system/etc/permissions/android.hardware.wifi.xml
+
+In ICS or JB we do something like this in device.mk to copy the file:
+
+PRODUCT_COPY_FILES += \
+frameworks/base/data/etc/android.hardware.wifi.xml:system/etc/permissions/android.hardware.wifi.xml
+
+Content is simply something like:
+
+
+
+
+
+
+
+
+- manu Thanks to Viesh , from https://groups.google.com/d/msg/android-porting/KDMjAcfPUtc/z9yYLPO9MowJ -
+ 
+At October 11, 2012 at 4:20 PM ,  Blogger Nicu Pavel said...
+Thanks for letting me know. Also for some reason the content of android.hardware.wifi doesn't show up in comments.

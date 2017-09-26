@@ -1,0 +1,3 @@
+从总线中查找某个驱动：driver_find("ivtv", &pci_bus_type)
+
+

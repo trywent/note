@@ -1,0 +1,257 @@
+==============================
+surface:
+作用到由显示compositor操作的buffer上
+
+
+===============================surfaceFlinger
+添加服务：
+main@systemServer.java-->system_init@system_init.cpp-->SurfaceFlinger::instantiate()-->instantiate-->
+publish-->sm->addService(String16(SERVICE::getServiceName()), new SERVICE(), allowIsolated)
+(项serviceManager中添加服务)@BinderService.h-->BpServiceManager.addService-->remote()->transact
+@IServiceManager.cpp
+
+添加服务都是添加强引用：
+virtual status_t  addService( const String16& name,
+                            const sp<IBinder>& service,
+                            bool allowIsolated = false) = 0;
+
+
+从init.rc启动：
+service surfaceflinger /system/bin/surfaceflinger-->main@main_surfaceflinger.cpp-->
+SurfaceFlinger::publishAndJoinThreadPool(加入到serviceManager,启动服务线程池)@BinderService.h
+
+
+frameworks/native/cmds/surfaceflinger/main_surfaceflinger.cpp
+frameworks/native/include/binder/BinderService.h
+frameworks/base/cmds/system_server/library/system_init.cpp
+______________________________
+开始服务：
+new SERVICE(新建服务)@BinderService.h-->SurfaceFlinger::SurfaceFlinger-->init--构建强引用-->
+incStrong-->onFirstRef-->run@SurfaceFlinger.cpp
+
+run-->createThreadEtc(_threadLoop,...)-->_threadLoop-->self->readyToRun@Threads.cpp-->readyToRun
+@SurfaceFlingher.cpp
+
+run-->createThreadEtc(_threadLoop,...)-->_threadLoop-->self->readyToRun--self->threadLoop@Threads.cpp
+-->threadLoop@SurfaceFlingher.cpp
+
+初始化：
+readyToRun@surfaceFlinger.cpp-->new DisplayHardware(创建显示器对象)-->init-->new FramebufferNativeWindow()--
+new HWComposer@DisplayHardware.cpp
+------------------------------
+消息队列：
+onFirstRef-->mEventQueue.init(初始化looper，handler)
+------------------------------
+createConnection-->new Client
+______________________________
+windowManager获取control
+设置control：
+Surface_init@Surface.java-->setSurfaceControl(通过SurfaceSession操作)@android_view_Surface.cpp
+
+SurfaceSession：
+WindowManagerService@WindowManagerService.java-->mFxSession =new SurfaceSession-->init@SurfaceSession.java
+-->SurfaceSession_init@android_view_Surface.cpp-->new SurfaceComposerClient@SurfaceComposerClient.cpp
+
+opengl的test中使用的函数：
+android_createDisplaySurface-->new FramebufferNativeWindow()@FrameBufferNativeWindow.cpp
+
+jb/frameworks/native/libs/gui/SurfaceComposerClient.cpp
+jb/frameworks/base/core/jni/android_view_Surface.cpp
+jb/frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+jb/frameworks/native/services/surfaceflinger/SurfaceFlinger.h
+jb/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+jb/frameworks/native/include/binder/BinderService.h
+jb/frameworks/base/services/java/com/android/server/SystemServer.java
+jb/frameworks/base/cmds/system_server/library/system_init.cpp
+
+===============================
+
+client端获取屏信息：
+SurfaceComposerClient::getDisplayInfo-->get_cblk-->ComposerService::getControlBlock-->
+getInstance().mServerCblk-->ComposerService-->mComposerService->getCblk@SurfaceComposerClient.cpp
+-->(IBinder)SurfaceFlinger::getCblk-->return mServerHeap@SurfaceFlinger.cpp
+
+服务端获取信息：
+SurfaceFlinger::readyToRun-->(分配内存，mServerCblk地址位于该分配内存的起始位)
+mServerHeap = new MemoryHeapBase--(设置屏信息的存放地址)dcblk = mServerCblk->displays + dpy--
+(设置屏信息)dcblk->xxxx= plane.getxxxx，hw.get@SurfaceFlinger.cpp
+
+SurfaceFlinger::readyToRun-->(获取一个GraphicPlane实例)plane(graphicPlane(dpy))--
+plane.setDisplayHardware(hw)-->GraphicPlane::setDisplayHardware(设置长宽mDisplayWidth，mDisplayHeight)
+-->GraphicPlane::setOrientation(设置GraphicPlane长宽，方向)@SurfaceFlinger.cpp
+
+所有信息都是从DisplayHardware获取：
+SurfaceFlinger::readyToRun-->new DisplayHardware@SurfaceFlinger.cpp-->DisplayHardware::DisplayHardware
+-->init(设置屏幕属性值长宽，频率等)-->new FramebufferNativeWindow@DisplayHardware.cpp-->
+FramebufferNativeWindow-->(获取HAL层模块)hw_get_module(GRALLOC_HARDWARE_MODULE_ID)--
+framebuffer_open(module, &fbDev){
+- module->methods->open,获取fb设备信息
+
+}--(获取设备信息后，设置屏幕属性)xdpi = fbDev->xdpi
+
+
+其中屏幕density值从系统属性"ro.sf.lcd_density"获取：
+mDensity = Density::getBuildDensity() / 160.0f;
+
+frameworks/native/services/surfaceflinger/DisplayHardware/DisplayHardware.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
+
+===============================
+OpenGL ES
+
+处理帧缓冲区(打开framebuffer)：FramebufferNativeWindow.cpp中
+framebuffer_open@fb.h-->gralloc_module_methods.open-->gralloc_device_open@gralloc_module.cpp
+-->framebuffer_device_open(会回调gralloc_device_open，打开GPU)-->init_frame_buffer-->init_frame_buffer_locked@framebuffer_device.cpp
+
+gralloc_device_open@gralloc_module.cpp-->alloc_device_open@alloc_device.cpp
+
+struct private_module_t
+{
+	gralloc_module_t base;//hw_get_module获取private_module_t后，方便转换gralloc_module_t
+
+	private_handle_t* framebuffer;
+};
+
+
+———————————————————————————————
+hwcomposer,获得hwc_module_t：
+DisplayHardware::init-->new HWComposer-->HWComposer::HWComposer-->hw_get_module
+(HWC_HARDWARE_MODULE_ID, &mModule)-->获取HAL_MODULE_INFO_SYM@hwcomposer.cpp-->
+
+初始化：
+DisplayHardware::init-->new HWComposer-->HWComposer::HWComposer-->hwc_open@hwcompoesr.h-->
+module->methods->open-->hwc_device_open@hwcomposer.cpp-->hw_get_module(GRALLOC_HARDWARE_MODULE_ID,)关联
+到private_module_t
+
+———————————————————————————————
+eglCreateWindowSurface-->createWindowSurface-->new egl_window_surface_v2_t-->hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &pModule)@/libagl/egl.cpp
+
+———————————————————————————————
+设置display
+eglGetDisplay@eglAPI.cpp-->egl_init_drivers-->egl_init_drivers_locked@egl.cpp-->Loader::open-->
+Loader::load_driver将egl函数名egl_names@egl.cpp取出转换
+
+
+jb/frameworks/native/opengl/libagl/egl.cpp
+jb/frameworks/native/opengl/libs/EGL/Loader.cpp
+jb/frameworks/native/opengl/libs/EGL/eglApi.cpp
+jb/hardware/mstar/gralloc/framebuffer_device.cpp
+jb/hardware/mstar/gralloc/gralloc_module.cpp
+jb/hardware/mstar/hwcomposer/hwcomposer.cpp
+
+==============================
+屏幕方向：
+GraphicPlane::setDisplayHardware-->GraphicPlane::orientationToTransfrom-->tr->set
+(设置mDisplayTransform转换角度)@SurfaceFlinger.cpp-->
+
+
+GraphicPlane::setDisplayHardware-->GraphicPlane::setOrientation(根据屏幕角度，和出入的角度，设置全局转换角度)
+-->GraphicPlane::orientationToTransfrom
+
+
+==============================
+处理事务：
+onMessageReceived-->handleTransaction-->handleTransactionLocked-->plane.setOrientation@SurfaceFlinger.cpp
+
+
+computeVisibleRegions-->(获取方向转换)planeTransform(plane.transform())--(转换视图)layer->validateVisibility(planeTransform)
+
+
+
+更新client状态：
+closeTransaction@Surface.java-->Surface_closeTransaction@android_view_Surface.cpp-->SurfaceComposerClient::closeGlobalTransaction-->Composer::closeGlobalTransaction-->Composer::getInstance().closeGlobalTransactionImpl-->Composer::closeGlobalTransactionImpl-->(获取"SurfaceFlinger"服务,)sm->setTransactionState@SurfaceComposerClient.cpp-->SurfaceFlinger::setTransactionState{
+//更新surface的状态(位置，大小，透明度....)
+- 设置状态需要更新的client，setClientStateLocked{
+		- 获取client对应的layer
+		- 
+	} 
+- setTransactionFlags
+
+}@SurfaceFlinger.cpp
+
+______________________________
+服务端：
+onMessageReceived{
+- handlePageFlip
+- handleRefresh
+- handleWorkList
+- handleRepaint
+- hw.compositionComplete
+- postFramebuffer
+
+}
+
+handlePageFlip{
+
+
+}
+
+
+
+==============================
+处理所有要显示的层次：
+
+处理显示区：
+SurfaceFlinger::computeVisibleRegions{
+- 
+- layer->setVisibleRegion(visibleRegion)
+-
+}
+
+
+
+DisplayEventReceiver-->ComposerService::getComposerService()@DisplayEventReceiver.cpp
+-->ComposerService::getInstance().mServerCblk@SurfaceComposerClient.cpp
+
+
+显示一帧：
+NativeDisplayEventReceiver::handleEvent@android_view_DisplayEventReceiver.cpp
+
+requestNextVsync
+
+EventThread::Connection::requestNextVsync-->mEventThread->requestNextVsync@EventThread.cpp
+
+frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp
+frameworks/native/libs/gui/DisplayEventReceiver.cpp
+frameworks/native/services/surfaceflinger/EventThread.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
+
+
+______________________________
+开机动画：
+service bootanim /system/bin/bootanimation@init.rc
+
+开始动画：
+init-->startBootAnim@SurfaceFlinger.cpp
+
+
+重开始动画
+binderDied-->startBootAnim@SurfaceFlinger.cpp
+
+停止动画:surfaceFlinger继承BnSurfaceComposer
+performEnableScreen-->surfaceFlinger.transact(IBinder.FIRST_CALL_TRANSACTION)@WindowManagerService.java-->
+SurfaceFlinger::onTransact(调用BOOT_FINISHED)@SurfaceFlinger.cpp-->BnSurfaceComposer::onTransact()
+@ISurfaceComposer.cpp-->bootFinished(设置service.bootanim.exit，退出动画)@SurfaceFlinger.cpp
+
+启动时间：
+“Boot is finished”@bootFinished
+
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+
+
+______________________________
+通过skia实现2D的图形显示：
+最上层的视图是window，window加入到windowManager。实现了标准的UI策略。
+将View加入到window中，实现View的显示。在window中的View被组织成一个树。
+
+draw(Canvas,ViewGroup,long)-->draw(只从ViewGroup调用)-->onDraw(一般由用户实现)@View.java
+
+jb/external/skia/src/core/SkCanvas.cpp
+
+
+
+===============================
+surfaceFlinger服务dump信息：
+SurfaceFlinger::dump-->dumpAllLocked-->(输出所有可视的层次)LayerBase::dump@SurfaceFlinger.cpp
+

@@ -1,0 +1,322 @@
+//
+WindowManagerService{
+- 
+- 获取动画速度，mWindowAnimationScale
+}
+
+- activityManagerService启动时创建主stack
+- 启动activity时将对应token加入到windowManagerService,确定token在栈中位置
+- resumeActivity时将窗口，事件接收器加入到windowManagerService，执行布局，显示
+==============
+//窗口管理
+
+加入栈：
+setWindowManager(默认栈)-->createStack@AcivityManagerService-->createStack{
+- 
+}
+
+加入task到对应的stack：
+/*
+* 主要在移动时使用的接口
+*/
+moveTaskToStack@ActivityStackSupervisor.java-->addTask{
+- 找到对应的栈，mStackIdToStack.get(stackId)
+- 加入到栈stack.addTask
+- 执行performLayoutAndPlaceSurfacesLocked
+}
+
+
+加入activity：
+/*
+* 创建对应activity的token，创建对应的task
+*/
+startActivityLocked@ActivityStack-->addAppToken
+(int addPos, IApplicationToken token, int taskId, int stackId,
+            int requestedOrientation, boolean fullscreen, boolean showWhenLocked, int userId,
+            int configChanges){
+- 已经加入则返回，findAppWindowToken
+- 创建new AppWindowToken，设置属性
+- 创建task，createTask
+- 加入到task，task.addAppToken
+- 加入到容器mTokenMap
+}
+
+
+加入窗口：
+/*
+* 窗口参数attr，大小，
+* 可见
+*/
+handleResumeActivity@ActivityThread.java-->setView@ViewRootImpl.java-->
+addToDisplay@Session.java-->addWindow{
+- 获取WindowToken，mTokenMap.get
+- 创建new WindowState
+- 注册接收输入事件，mInputManager.registerInputChannel
+- 加入mWindowMap
+- 加入到正确位置，addWindowToListInOrderLocked{
+	- token.windows
+	}
+- mPolicy.getContentInsetHintLw
+- 更新输入法窗口，mInputMonitor.updateInputWindowsLw
+}
+
+
+移除窗口：
+removeView@WindowManagerImpl.java-->removeView-->removeViewLocked@WindowManagerGlobal.java
+die-->doDie-->dispatchDetachedFromWindow-->mWindowSession.remove@ViewRootImpl.java
+-->removeWindow-->removeWindowLocked
+
+______________
+//设置应用开始窗口：
+startActivityLocked@ActivityStack.java-->
+setAppStartingWindow{
+- transferFrom不为空，使用前一个应用的开始窗口{
+	- 
+	}
+- sendMessage(ADD_STARTING)-->handleMessage(ADD_STARTING){
+	- 创建窗口并加入到窗口服务，mPolicy.addStartingWindow
+	- 若已经加入了则移除，removeStartingWindowTimeout
+	- 设置wtoken.startingView为新窗口的View
+		
+	}
+}
+
+
+//移除
+scheduleRemoveStartingWindow-->H.handleMessage(REMOVE_STARTING)-->
+mPolicy.removeStartingWindow
+
+addWindow-->H.handleMessage(REMOVE_STARTING_TIMEOUT)-->
+mPolicy.removeStartingWindow
+______________
+//设置应用窗口可见
+setAppVisibility{
+- 若设置了动画，加入mOpeningApps/mClosingApps
+- 通知应用端使应用开始绘制，wtoken.sendAppVisibilityToClients-->dispatchAppVisibility
+	@AppWindowToken.java-->dispatchAppVisibility-->handleMessage(MSG_DISPATCH_APP_VISIBILITY)
+	-->handleAppVisibility@ViewRootImpl.java
+- setTokenVisibilityLocked(设置窗口动画)
+- wtoken.updateReportedVisibilityLocked
+}
+
+
+==============
+屏幕方向：
+
+updateRotationUncheckedLocked{
+- 延迟，正在执行旋转动画，显示屏没有准备，返回
+- 获取当前方向，mPolicy.rotationForOrientationLw
+- 当前方向是否和应用方向匹配，mPolicy.rotationHasCompatibleMetricsLw //返回应用强制的方位
+- 设置当前方位mRotation，mAltOrientation
+}
+
+updateRotation-->updateRotationUnchecked
+
+==============
+布局：
+//reevaluateStatusBarVisibility
+//移除窗口，removeWindowLocked
+//removeWindowInnerLocked
+//设置窗口内容，setInsetsWindow
+//setUniverseTransformLocked
+//setNewConfiguration
+//executeAppTransition
+//setAppStartingWindow
+//setTokenVisibilityLocked
+//unsetAppFreezingScreenLocked
+//moveStackWindowsLocked
+//createStack
+//addTask
+//resizeStackBox
+//setCurrentUser
+//updateRotationUnchecked
+//computeNewConfiguration
+//handleMessage(DO_TRAVERSAL/WINDOW_FREEZE_TIMEOUT/APP_TRANSITION_TIMEOUT)
+//reconfigureDisplayLocked
+//重新布局，relayoutWindow
+
+(以上调用)-->performLayoutAndPlaceSurfacesLocked-->
+performLayoutAndPlaceSurfacesLockedLoop-->performLayoutAndPlaceSurfacesLockedInner
+
+
+performLayoutAndPlaceSurfacesLockedInner{
+- 更新焦点，updateFocusedWindowLocked
+- 更新正在退出app的窗口状态为，hasVisible = false
+
+-  SurfaceControl.openTransaction();
+- 遍历所有显示器中的窗口,numDisplays{
+	- 设置所有窗口层次，大小{
+		- 更新壁纸，assignLayersLocked
+		- 更新配置，updateOrientationFromAppTokensLocked
+		- 设置窗口(状态，导航，应用)大小，performLayoutLockedInner
+	
+		- mPolicy.beginPostLayoutPolicyLw
+		- systemui变化则布局变化，mPolicy.applyPostLayoutPolicyLw
+		- mPolicy.finishPostLayoutPolicyLw
+		}
+	- 遍历所有窗口{
+		- 设置壁纸是否可见，updateWallpaperVisibilityLocked
+		- 若窗口被移除且需执行动画shouldAnimateMove{
+			- loadAnimation
+			- setAnimation	
+			- mClient.moved
+			}
+		- 若窗口被显示,w.mHasSurface{
+			- commitFinishDrawingLocked
+			- 设置surface大小位置，setSurfaceBoundariesLocked
+			}
+		- 若是应用窗口，增加窗口绘制计数{
+			- atoken.numInterestingWindows++
+			- atoken.numDrawnWindows++
+			}
+		- 保存窗口大小发生变化的窗口，updateResizingWindows
+		}
+	}
+- SurfaceControl.closeTransaction
+- 更新所有应用窗口已经绘制状态，updateAllDrawnLocked-->allDrawn = true
+- 遍历mResizingWindows，通知客户端窗口变化client.resized
+- 移除mDestroySurface
+- 移除已经退出的应用，mTaskIdToTask
+}
+
+
+//执行计算窗口大小
+performLayoutLockedInner{
+- 显示器信息displayContent.getDisplayInfo
+- 设置假窗口大小为显示屏大小， mFakeWindows.get(i).layout
+- 设置systemUI窗口大小，mPolicy.beginLayoutLw
+- 获取栈窗口大小，mPolicy.getContentRectLw
+- 设置栈窗口大小，displayContent.setStackBoxSize
+- 设置应用窗口大小，mPolicy.layoutWindowLw
+}
+//记录窗口变化的应用
+updateResizingWindows{
+- 设置窗口大小是否变化，WindowState.setInsetsChanged
+- 若窗口变化(mContentInsetsChanged||mVisibleInsetsChanged||winAnimator.mSurfaceResized){
+	- 更新窗口，mLastOverscanInsets
+	- makeWindowFreezingScreenIfNeededLocked
+	- 若方位变化设置winAnimator.mDrawState=DRAW_PENDING，
+		需要应用重绘View，并通知到窗口服务
+	- 加入到改变窗口，mResizingWindows.add
+	}
+- 若窗口方位正在变化mOrientationChanging{
+	- 设置为false，mOrientationChanging
+	}
+}
+
+getDisplayContentLocked-->
+newDisplayContentLocked{
+- 创建，new DisplayContent
+- 获取显示器大小配置，mDisplaySettings.getOverscanLocked
+- 设置显示器大小信息，mDisplayManagerService.setDisplayInfoOverrideFromWindowManager
+- 
+- 注册事件监听，registerPointerEventListener
+}
+
+
+
+relayoutWindow{
+- 设置显示(viewVisibility == View.VISIBLE){
+	- toBeDisplayed，设置动画applyEnterAnimationLocked
+	- 创建surface，winAnimator.createSurfaceLocked。传递到ViewRootImp(outSurface)
+	}否则{
+	- 
+	- 清除surface，outSurface.release()
+	}
+- 获取systemui设置，systemUiVisibility
+- 设置窗口大小到View，outFrame.set(win.mCompatFrame)
+}
+
+
+
+
+//根据一个标准屏计算当前屏布局的缩放比例
+computeCompatibleScaling
+
+
+//若所有窗口都绘制完成，则通知应用
+updateAllDrawnLocked-->sendMessage(NOTIFY_ACTIVITY_DRAWN)-->mActivityManager.notifyActivityDrawn
+@WindowManagerService.java-->notifyActivityDrawn@ActivityManagerService.java-->
+notifyActivityDrawnLocked@ActivityStack.java
+
+==============
+输入，焦点：
+handleMessage(TAP_OUTSIDE_STACK)-->mActivityManager.setFocusedStack@WindowManagerService.java
+-->setFocusedStack-->setFocusedActivityLocked@ActivityManagerService.java
+-->setFocusedApp{
+- mInputMonitor.setFocusedAppLw
+- updateFocusedWindowLocked
+}@WindowManagerService.java
+
+//焦点应用
+setFocusedActivityLocked@AtivityManagerService.java-->setFocusedApp@WindowManagerService.java
+
+//设置当前焦点窗口
+updateFocusedWindowLocked{
+- 查找焦点窗口(第一个能接收事件的窗口)，computeFocusedWindowLocked
+	-->findFocusedWindowLocked{
+	- 遍历windows
+	- 窗口是否能够接收按键事件，canReceiveKeys
+	- 查找mFocusedApp之上的所有应用窗口，返回能否接收事件的窗口
+	- 若mFocusedApp之上没有合适窗口，则返回空
+	}
+- 当前焦点发生改变，mCurrentFocus!= newFocus{	  
+	- 将输入法窗口移动到，目标窗口之上,moveInputMethodWindowsIfNeededLocked
+	- 移动了窗口重新查找焦点，computeFocusedWindowLocked
+	- nativeAuditContext
+	- mPolicy.focusChangedLw
+	} 
+}
+
+moveInputMethodWindowsIfNeededLocked{
+	- 找到第一个输入法目标窗口imPos，findDesiredInputMethodWindowIndexLocked
+	- 找到目标窗口{	
+		- 第一个输入法窗口，firstImWin
+		- 基准输入法窗口(若当前不存在则是最后一个)，baseImWin
+		- 基准输入法窗口就是第一个窗口，则不需移动
+		- 当前输入法不为空，移动搜有输入法到目标窗口之上{
+			- 移除输入法窗口并计算移除后，要插入的位置，tmpRemoveWindowLocked
+			- 将输入法窗口移到计算后的位置，reAddWindowLocked
+			- 移动所有其它输入法窗口，到当前输入法之上，moveInputMethodDialogsLocked
+			}
+		- 当前输入法为空，移动所有输入法到目标窗口之上，moveInputMethodDialogsLocked
+	}
+	- 没有目标窗口，将输入法窗口移动到最底部，moveInputMethodDialogsLocked(-1)
+	- assignLayersLocked
+}
+
+
+//焦点框
+performLayoutAndPlaceSurfacesLockedInner-->setFocusedStackFrame{
+- 找到焦点栈
+- 设置大小，mFocusedStackFrame.setBounds
+- 设置可见，mFocusedStackFrame.setVisibility
+}
+
+==============
+配置信息：
+computeNewConfigurationLocked
+
+reconfigureDisplayLocked-->
+handleMessage(SEND_NEW_CONFIGURATION)-->sendNewConfiguration@WindowManagerService.java
+-->mActivityManager.updateConfiguration
+
+
+
+==============
+窗口层次：
+//普通窗口
+assignLayersLocked{
+- 相邻的同种窗口，输入法，壁纸窗口要加5个空隔,curLayer +=WINDOW_LAYER_MULTIPLIER
+  其它都是设置为w.mBaseLayer
+
+- 应用窗口，mLayer + animLayerAdjustment
+- 输入法，mLayer +mInputMethodAnimLayerAdjustment
+- 壁纸，mLayer + mWallpaperAnimLayerAdjustment
+}
+
+
+//壁纸窗口
+adjustWallpaperWindowsLocked
+
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java

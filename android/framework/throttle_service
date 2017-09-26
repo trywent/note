@@ -1,0 +1,17 @@
+ThrottleServcie:数据连接限流相关。
+_________________
+获取：
+getThrottle-->mPolicyThrottleValue.get()
+设置：
+onPolicyChanged-->mPolicyThrottleValue.set(value)
+
+设置mThrottleIndex：
+checkThrottleAndPostNotification-->mThrottleIndex.set(1)@ThrottleService.java
+
+系统启动Throttle流程:
+systemReady-->mHandler.obtainMessage(EVENT_REBOOT_RECOVERY).sendToTarget()-->mHandler.handleMessage
+-->onRebootRecovery@ThrottleService.java
+
+BroadcastReceiver.onReceive(收到ACTION_POLL)-->dispatchPoll-->mHandler.handleMessage-->onPollAlarm
+
+checkForSubscriberId-->retrieve

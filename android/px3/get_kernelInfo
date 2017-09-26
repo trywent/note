@@ -1,0 +1,14 @@
+getFormattedKernelVersion{
+- "/proc/version"
+}@/packages/app/Settings/src/com/android/settings/DeviceInfoSetting.java
+
+
+
+kernel:
+(kernel版本)init_uts_ns@version.c
+
+init/version.c
+linux/utsname.h
+
+uboot：
+

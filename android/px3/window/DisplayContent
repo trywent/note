@@ -1,0 +1,53 @@
+getDisplay-->getOrCreateDisplayLocked@DisplayManager.java-->getCompatibleDisplay-->
+new Display(/*屏信息*/getDisplayInfo())@DisplayManagerGlobal.java-->getDisplayInfo
+
+
+frameworks/base/core/java/android/hardware/display/DisplayManager.java
+frameworks/base/core/java/android/hardware/display/DisplayManagerGlobal.java
+frameworks/base/services/java/com/android/server/display/DisplayManagerService.java
+
+=====================
+createStack@WindowManagerService.java-->
+createStack(/*activityStack的id号*/，/*依靠栈id*/){
+- 创建在依靠栈之上{
+	- 创建栈容器，StackBox
+	- 创建栈任务，TaskStack
+	}
+- 分割依靠栈，box.split{
+	- 若分割栈id不是当前栈则返回
+	- 创建新任务栈，TaskStack
+	- 创建栈容器，StackBox
+	}
+}@DisplayContent.java
+
+
+performLayoutLockedInner@WindowManagerService-->(mPolicy.getContentRectLw,获取大小)setStackBoxSize
+-->mStackBoxes.get(stackBoxNdx).setStackBoxSizes@DisplayContent.java-->
+setStackBoxSizes{
+- 没有多个栈，mStack不为空。设置大小mBounds.set,设置栈大小
+	setBounds{
+	- 
+	}@TaskStack.java
+- 有多个栈，根据水平或是垂直平分{
+	- 设置mSecond大小
+	- 设置mFirst大小
+	}
+}@StackBox.java
+
+
+frameworks/base/services/java/com/android/server/wm/DisplayContent.java
+frameworks/base/services/java/com/android/server/wm/TaskStack.java
+frameworks/base/services/java/com/android/server/wm/StackBox.java
+
+
+===================
+DisplayMagnifier:
+setMagnificationCallbacks
+
+
+
+
+
+
+frameworks/base/services/java/com/android/server/accessibility/ScreenMagnifier.java
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java

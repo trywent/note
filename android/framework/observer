@@ -1,0 +1,30 @@
+===================================
+FileObserver:
+FileObserver类中：在初始化监测进程
+static {
+        s_observerThread = new ObserverThread();
+        s_observerThread.start();
+    }
+
+(线程开始)start-->ObserverThread.run-->observe@FileObserver.java-->android_os_fileobserver_observe-->
+env->CallVoidMethod(object, method_onEvent, event->wd, event->mask, path)@android_util_FileObserver.cpp
+-->ObserverThread.onEvent-->observer.onEvent--onEvent@FileObserver.java
+开始监测：
+(new FileObserver()).startWatching()-->s_observerThread.startWatching-->startWatching-->
+android_os_fileobserver_startWatching-->inotify_add_watch(fd, path, mask)（返回数wd(watch descripter)。fileObserver使用wd关联自己，用来决定执行哪个observer的onEvent）
+
+jb/frameworks/base/core/java/android/os/FileObserver.java
+jb/frameworks/base/core/jni/android_util_FileObserver.cpp
+
+==================================
+inotify:文件系统的变化通知机制。文件增加，删除等事件通知到用户空间
+用户接口：
+int fd = inotify_init ();
+int wd = inotify_add_watch (fd, path, mask);
+int ret = inotify_rm_watch (fd, wd);
+size_t len = read (fd, buf, BUF_LEN);//读取事件
+
+struct inotify_device
+struct inotify_watch
+文件inode中包含inotify_watch的链表，当文件发生改变时通过inode中inotify_watch，判断文件是否被监视，并将事件
+写入到inotify_device中的事件链表中

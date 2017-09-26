@@ -1,0 +1,5 @@
+packages/providers/TelephonyProvider/src/com/android/providers/telephony/TelephonyProvider.java
+
+
+device/rockchip/common/phone/etc/apns-full-config.xml:/etc/apns-conf.xml
+@device/rockchip/rkpx3/rkpx3.mk

@@ -1,0 +1,45 @@
+//
+Linux uses DT data for three major purposes:
+1) platform identification,
+2) runtime configuration, and
+3) device population.
+
+
+//kernel匹配dts
+setup_arch@setup.c-->setup_machine_fdt@devtree.c-->for_each_machine_desc(寻找合适的dts)
+__arch_info_begin@arch.h-->/*spreadtrum*/DT_MACHINE_START(SCPHONE, "sc8830")@mach-scx35-dt.c
+
+
+arch/arm/kernel/setup.c
+arch/arm/kernel/devtree.c
+arch/arm/include/asm/mach/arch.h
+
+
+/ {
+    node1 {
+        a-string-property = "A string";
+        a-string-list-property = "first string", "second string";
+        // hex is implied in byte arrays. no '0x' prefix is required
+        a-byte-data-property = [01 23 34 56];
+        child-node1 {
+            first-child-property;
+            second-child-property = <1>;
+            a-string-property = "Hello, world";
+        };
+        child-node2 {
+        };
+    };
+    node2 {
+        an-empty-property;
+        a-cell-property = <1 2 3 4>; /* each number (cell) is a uint32 */
+        child-node1 {
+        };
+    };
+};
+
+
+//compatible "<manufacturer>,<model>"
+系统用来匹配对应的驱动
+
+
+

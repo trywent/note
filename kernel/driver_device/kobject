@@ -1,0 +1,99 @@
+make menuconfig :找不到定义的函数
+
+sudo apt-get install build-essential
+sudo apt-get install libncurses5
+apt-get install libncurses5-dev
+__________________________
+kobject 可以用来组织层次结构
+ktype kobject嵌入其中的对象。每个有嵌入kobject的结构都有对应的ktype。用来控制kobject创建销毁时做的处理
+kset kobjcet的集合。通常在sysfs中同一个目录中的所有目录的kobject都属于一个kset。
+
+
+嵌入kobjects：
+
+通常kobjects都是嵌入到其他结构中,当知道kojbect指针，通过container_of(pointer, type, member)获取容器指针。
+
+初始化kobjcects：
+void kobject_init(struct kobject *kobj, struct kobj_type *ktype);
+
+注册到sysfs:
+int kobject_add(struct kobject *kobj, struct kobject *parent, const char *fmt, ...);
+
+add之后更改名字必须通过函数：
+int kobject_rename(struct kobject *kobj, const char *new_name);
+
+获取名字：
+const char *kobject_name(const struct kobject * kobj);
+
+同时初始化，加入到sysfs：
+int kobject_init_and_add(struct kobject *kobj, struct kobj_type *ktype,
+                          struct kobject *parent, const char *fmt, ...);
+
+事件：
+动kobject注册后，要通知用户空间。掉用int kobject_uevent(struct kobject *kobj, enum kobject_action action);
+当是移除操作时，kobject核心会自动产生相应的事件(无需手动)
+
+
+ktypes and release 方法：
+一旦注册kobject，不能直接使用kfree释放它，唯一安全的方法是调用kobject_put。
+每个kobject必须有release方法，kobject一直存在知道该方法被调用。
+release方法存在于kobj_type中，kobj_type用来描述kobject的类型。
+每个kobject在初始化时必须要有指针指向kobj_type.
+kobj_type:
+
+    struct kobj_type {
+	    void (*release)(struct kobject *);
+	    const struct sysfs_ops *sysfs_ops;
+	    struct attribute	**default_attrs;
+    };
+
+
+ksets：
+kset仅是一些需要关联在一起的kobject的集合。
+
+kset的功能:
+-是一些对象的容器。kset可以被内核用来跟踪“所有的块设备”或“所有的PCI设备驱动”
+-kset是sysfs中的子目录，关联的kobject显示其中。
+-kset能够支持kobject的“热插拔”，影响uevent提交到用户空间。
+
+
+kset 生成应该使用动态创建方法(不能静态声明，或在栈中创建):
+  struct kset *kset_create_and_add(const char *name,
+				   struct kset_uevent_ops *u,
+				   struct kobject *parent);
+
+kset释放:
+  void kset_unregister(struct kset *kset);
+
+
+如果kset要控制kobject的uevent操作，可以通过kset_uevent_ops来处理：
+struct kset_uevent_ops {
+        int (*filter)(struct kset *kset, struct kobject *kobj);
+        const char *(*name)(struct kset *kset, struct kobject *kobj);
+        int (*uevent)(struct kset *kset, struct kobject *kobj,
+                      struct kobj_uevent_env *env);
+};
+filter判断事件是否不被传送到用户空间
+name函数用来改变uevent传送的kset的默认名。(uevent中有kset的名字，会被传送到用户空间？)
+uevent函数在事件传送用户空间时调用，用来在uevent中加入环境变量。
+
+========================
+uevent:
+
+kobject_uevent-->kobject_uevent_env{
+- 设置要传输的通用信息，add_uevent_var
+- 设置设备的自定义信息，uevent_ops->uevent
+- 发送到用户空间，netlink_broadcast_filtered
+}@
+
+kernel/lib/kobject_uevent.c
+kernel/lib/kobject.c
+
+
+创建文件：
+sysfs_create_file@sysfs.h-->sysfs_create_file_ns-->sysfs_add_file_mode_ns-->
+__kernfs_create_file@file.c
+
+include/linux/sysfs.h
+fs/sysfs/file.c
+

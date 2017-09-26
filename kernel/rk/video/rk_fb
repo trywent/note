@@ -1,0 +1,165 @@
+//fb
+=====================
+fb设备信息注册：
+static struct platform_device device_fb = {
+	.name		= "rk-fb",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(resource_fb),
+	.resource	= resource_fb,
+}
+
+machine_rk30_board_init-->rk_platform_add_display_devices{
+- 初始化， lcdc0 = &device_lcdc0,//name="rk30-lcdc"
+- 加入，__rk_platform_add_display_devices{
+		- 注册fb设备，platform_device_register(fb)
+	}@rk_fb.h
+}@board-rk3188-sdk.c
+
+fb驱动注册：
+rk_fb_init-->platform_driver_register(&rk_fb_driver)
+
+探测：
+rk_fb_probe{
+- 设置g_fb_pdev
+- 初始化fb信息结构体fb_inf，并设置到fb设备中，platform_set_drvdata(pdev,fb_inf)
+}
+
+
+—————————————————
+fb注册(一个lcdc的注册，可能有多个fb)：
+rk3188_lcdc_probe-->注册fb设备，rk_fb_register(&(lcdc_dev->driver),&lcdc_driver){
+	- 初始化rk_fb_inf fb_inf{
+		- 设置fb_inf->lcdc_dev_drv为lcdc_dev->driver
+		}
+	- 根据默认驱动lcdc_driver,设置lcdc_dev->driver。init_lcdc_device_driver-->
+	   dev_drv->fb_layer_remap-->rk3188_fb_layer_remap{
+		- 重映射fb0，fb1的层次，win0，win1
+	   	}@rk3188_lcdc.c
+	- 初始化lcdc，设置io口，寄存器，dev_drv->init_lcdc
+	- 根据fb层次数，设置并注册fb.for{
+		- 设置驱动，fbi->par = dev_drv
+		- 设置fb的信息，赋值fbi->var屏幕信息(从lcdc驱动中的screen中获取)，操作函数
+		- 只有fb0才分配内存，rk_request_fb_buffer
+		- 设置fb的编号(用于win的对应)，fix.id
+		- register_framebuffer
+		- 设置fb_inf->fb =fbi  //设置fb_inf中的fb设备，实际fb设备
+		- 层次0{
+			- 
+			- 创建进程，kthread_run(rk_fb_wait_for_vsync_thread)
+			- 初始工作队列，init_kthread_worker
+			- 设置工作队列进程， kthread_run(&dev_drv->update_regs_worker)
+			- 初始化工作，init_kthread_work
+			}
+		}
+	- 
+	}@rk_fb.c
+
+
+
+=================
+fb设备的操作：
+static struct fb_ops fb_ops = {
+    .owner          = THIS_MODULE,
+    .fb_open        = rk_fb_open,//dev_drv->open-->lcdc_driver-->rk3188_lcdc_open
+    .fb_set_par     = rk_fb_set_par,//-->rk3188_lcdc_set_par
+    .fb_blank       = rk_fb_blank
+    .fb_ioctl       = rk_fb_ioctl, //
+    .fb_pan_display = rk_pan_display,//rk3188_lcdc_pan_display
+};
+
+
+
+
+
+_________________
+fbmem_init{
+- 创建proc文件，proc_create(fb)
+- 创建字符文件，register_chrdev(FB_MAJOR,"fb",&fb_fops)
+- 创建类fb_class，class_create(THIS_MODULE, "graphics")
+}@fbmem.c
+
+
+register_framebuffer(fb_info)-->do_register_framebuffer{
+- 
+- 创建设备，device_create
+- 初始化设备，fb_init_device
+}
+
+打开fb设备：
+fb_fops.open-->fb_open{
+- 获取对应编号的fbinfo，get_fb_info(fbidx)-->(返回注册的fb)registered_fb[id]
+- 执行info->fbops->fb_open
+}
+
+显示：
+do_fb_ioctl-->(FBIOPAN_DISPLAY)fb_pan_display@fbmem.c
+
+mmap:
+fb_fops.mmap-->fb_mmap{
+-->fb->fb_mmap
+- 失败，if ((vma->vm_end - vma->vm_start + off) > len)
+}@fbmem.c
+
+fb_set_var-->fb_pan_display@fbmem.c
+
+kernel/drivers/video/fbmem.c
+--------------------
+rk平台这些操作的实现：
+rk_fb_open{
+- 获取该fb对应的层次win，dev_drv->fb_get_layer
+- dev_drv->open@rk_fb.c-->rk3188_lcdc_open(...int layer_id,bool open){
+	- 是打开操作，且所有的fb都被关闭，则首先打开时钟...
+	- 获取备份寄存器配置，rk3188_lcdc_reg_resume
+	- 根据屏幕，设置显示参数，rk3188_load_screen{
+		- 时钟clk_set_rate(lcdc_dev->dclk, screen->pixclock)  //"dclk_lcdc0/1"
+		}
+	- 打开对应的窗口win0_open/win1_open{
+		-设置当前的win的状态，lcdc_dev->driver.layer_par[i]->state = open
+		}
+	- 若是关闭操作，且所有的fb都被关闭，则关闭时钟...
+	}@rk3188_ldcd.c
+}@rk_fb.c
+
+显示：
+fb_ops.fb_pan_display-->rk_pan_display-->pan_display-->dev_drv->pan_display@rk_fb.c
+-->lcdc_driver.pan_display-->rk3188_lcdc_pan_display{
+- 获取lcdc设备，rk3188_lcdc_device *lcdc_dev
+- 打开对应的窗口，win0_display{
+	- 设置窗口的显示地址
+	}
+- 若是第一帧，设置产生中断
+- 等待帧完成，wait_for_completion_timeout(&dev_drv->frame_done)// 等待lcdc中断帧开始，vehicle_rkpx3_lcdc_irq
+}@rk3188_lcdc.c
+
+ioctl:
+fb_ops.fb_ioctl-->rk_fb_ioctl@rk_fb.c
+
+/设置参数，
+fb_ops.fb_set_par-->rk_fb_set_par(fb_info){
+- 源数据格式data_format = var->nonstd&0xff
+- 根据屏幕设置参数
+- dev_drv->set_par-->rk3188_lcdc_set_par{
+	- 若是win0设置对应层次窗口的配置，win0_set_par{
+		- 源格式
+		- 设置缩放比参数
+		}
+	- 若是win1
+	}@rk3188_lcdc.c
+}@rk_fb.c
+
+//中断
+devm_request_irq(dev,lcdc_dev->irq, rk3188_lcdc_isr)-->rk3188_lcdc_isr
+----------------------------
+更新寄存器：(所有值保存dev_drv->layer_par[0/1]，最后更新寄存器)
+加入更新链表：
+list_add_tail(&regs->list,&dev_drv->update_regs_list)
+
+获取更新链表并更新：
+rk_fb_update_regs_handler-->rk_fb_update_reg-->dev_drv->lcdc_reg_update@rk_fb.c-->
+rk3188_lcdc_reg_update{}
+
+
+drivers/video/rockchip/rk_fb.c
+
+
+

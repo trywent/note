@@ -1,0 +1,10 @@
+register_android_server_BatteryService(在onload.cpp中调用，设置电池状态路径，关联service中状态变量)
+@com_android_server_BatteryService.cpp
+
+mPowerSupplyObserver@BatteryService.java监听驱动上报的uevent，若是电池则调用update()更新电池状态
+，更新后发送广播。
+
+/home/wangbo/src/jb/frameworks/base/services/jni/onload.cpp
+/home/wangbo/src/jb/frameworks/base/services/jni/com_android_server_BatteryService.cpp
+/home/wangbo/src/jb/frameworks/base/services/java/com/android/server/BatteryService.java
+

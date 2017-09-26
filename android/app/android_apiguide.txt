@@ -1,0 +1,178 @@
+======================================
+application：
+每个应用运行在自己的安全沙盒中：
+-每个应用是不同的用户
+-系统分配应用一个linux用户ID.系统设置应用中所有文件的权限，只有应用的用户ID能够访问
+-每个进程有自己的virtual machine(VM),所以应用的代码是隔离的
+-每个应用默认运行在自己的Linux进程中。android在应用的组件要运行时，开始这个进程。在不需要执行时或系统回收内存时借宿进程。
+
+应用间共享数据，应用访问系统服务：
+
+*两个应用可以共享同一个Linux userID，这时应用能够互相访问对方文件。相同ID的应用可以在同一个linux进行中运行，可以共享同一个VM
+*应用可以申请权限来访问设备数据，(短信，sdk，相机，蓝牙)。权限在应用安装的时候由用户同意给予权限。
+
+应用组件：
+activities
+services
+content Providers
+broadcast Receivers
+
+android系统的特别一面，应用程序可以启动另一个应用的组件。当启动其他程序的组件时，会启动其他程序的进程并初始化需要的实例。该组件运行在其他程序的进程中。
+android应用没有程序入口点(像main函数)。（实际上启动是由android系统实现，因为不同程序不能直接访问对方）
+
+activities, services, and broadcast receivers的启动由异步消息Intent。
+_____________________________________
+Manifest file：清单文件
+声明应用程序组件，声明应用程序功能，声明应用程序要求
+
+应用程序资源：
+android的sdk工具将每个资源生成一个整数ID，应用可以通过这个ID访问资源。
+
+进程生命周期：
+android系统尝试保持应用进程尽可能长的时间，但会当内存紧张时会移除老进程。
+移除哪个进程决定于用户与它交互的状态。根据运行在进程中的activity，进程有四个状态。
+
+根据优先级由高到低：
+
+1.foreground activity(用户正在操作的界面)
+2.visible activity(用户可见，但不是处在最前端。可能有一个对话框在它上面)
+3.background activity(用户不可见)当该进程被killed，用户回到这个activity时，它的onCreate(bundle)方法调用savedInstanceState
+(由函数onSavedInstanceState(Bundle)提供)，可以返回离开时的状态。
+4.empty process 没有应用程序组件的(没有activity，service，broadcastReceiver)。
+
+======================================
+BroadCastReceiver:
+两种注册方式：Context.registerReceiver() ，或在AndroidManifest.xml中使用<receiver>标签
+
+两种广播类型：
+Normal broadcast：异步处理方式，接收器无序接收广播。效率较高，但接收器不能使用接收结果，丢弃广播的APIs。
+Ordered broadcast: 一次传送到一个接收器。一个接收器的处理结果可以传递到下一个接收器。接收器可以丢弃一个接收的广播。接收优先级用android:priority确定。
+
+abortBroadcast@BroadcastReceiver.java
+如果发送stick广播，广播后intent不会消失。在其他人注册广播接收器时，会返回符合filter的stick intent
+______________________________________
+安全：
+-广播是全局性的，要考虑广播操作名是否会与其他人冲突
+-使用registerReceiver(BroadcastReceiver, IntentFilter)注册接收器时，任何应用都可以发送广播给这个接收器
+ 可以使用权限限制能够发送到接收器的广播
+-在manifest中定义的接收器，通过设置filter中android:exported="false"。决定不接收的广播。
+-使用sendBroadcast(Intent)发送广播，通常任何接收器都可接收它。可以通过权限设置限定接收器，或通过
+ Intent.setPackage指定接收的程序
+
+_____________________________________
+recevier生命周期：当onReceive(Context, Intent)执行完后，receiver进程被销毁
+
+_____________________________________
+注册：
+在AndroidManifest.xml中<receiver>
+registerReceiver-->registerReceiverInternal-->mPackageInfo.getReceiverDispatcher--
+ActivityManagerNative.getDefault().registerReceiver@ContextImpl-->
+
+发送：
+sendBroadcast-->ActivityManagerNative.getDefault().broadcastIntent@ContextImpl.java-->
+broadcastIntentLocked(默认广播不会发送到stoped状态的应用,判断函数Intent.isExcludingStopped)
+@ActivityManagerService.java
+
+查找app中receiver(xml中注册的接收器)：
+broadcastIntentLocked-->AppGlobals.getPackageManager().queryIntentReceivers@ActivityManagerService.java
+-->queryIntentReceivers-->mReceivers.queryIntentForPackage-->ActivityIntentResolver.queryIntentForPackage
+@PackageManagerService.java-->queryIntentFromList-->buildResolveList@IntentResolver.java
+
+查找其他receiver(通过registerReceiver注册的广播接收器)：
+broadcastIntentLocked(默认广播不会发送到stoped状态的应用)-->mReceiverResolver.queryIntent
+@ActivityManagerService.java-->queryIntent-->buildResolveList(判断是否跳过)@IntentResolver.java
+--(将符合广播接收的接收者加入一个链表，将连变加入一个执行队列)
+
+处理广播：
+scheduleBroadcastsLocked@ActivityManagerService.java-->sendMessage(BROADCAST_INTENT_MSG)-->
+processNextBroadcast-->mService.startProcessLocked@BroadcastQueue.java-->startProcessLocked
+-->startProcessLocked@ActivityManagerService.java
+
+frameworks/base/services/java/com/android/server/IntentResolver.java
+frameworks/base/services/java/com/android/server/pm/PackageManagerService.java
+frameworks/base/services/java/com/android/server/am/BroadcastQueue.java
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+======================================
+Intent：用于组件间发送请求
+三种基本应用：启动activity，启动service，发送broadcast
+
+intent结构中的主要信息：组件名，操作，数据，类型，标志
+-action 要执行的操作
+-data 要操作的数据的数据URI，数据type.(同时设置数据URI和type使用setDataAndType()，不要分开设置)
+-category 用来确定哪种组件可以处理该intent。
+-component 处理这个intent的组件。明确定义
+-extras 键值对。额外的数据，供目标组件使用。
+-flags  目标组件使用
+
+intent解析：
+两种类型：
+明确intent：明确说明要启动组件的名字。（为了安全服务使用明确的intent启动）
+隐含intent：只说明要操作的动作由，其他应用判断是否执行该操作。(系统通过应用的intent-filter，比较后决定将
+            intent传递到哪个组件)
+通常intent的解析机制会将，intent与安装的应用中的所有的<intent-filter>比较。
+匹配过程使用三种信息action, type和category。PackageManager会使用这些信息在安装的应用中查找匹配的组件。
+
+——————————————————————————————————————
+pending intent：
+主要作用是分配权限给其他应用，使它们在处理intent时就像是，在自己应用的进程中执行(相同的权限，标识)。
+-定义一个intent，当用户在notification上执行操作时执行
+-定义一个intent，当用户在AppWidget上执行操作时执行
+-定义一个intent在未来某个时间执行
+
+PendingIntent类描述了一个Intent和处理该intent的目标。
+该类的实例通过这些方法创建：
+getActivity(Context, int, Intent, int),
+getActivities(Context, int, Intent[], int), 
+getBroadcast(Context, int, Intent, int),
+getService(Context, int, Intent, int);
+
+传送一个PendingIntent到其他应用，会使其他应用在执行intent中说明的操作时，像你自己在
+执行(相同的权限，标识)
+
+______________________________________
+intent filter:用来描述如何匹配一个intent
+
+匹配三种intent特性：
+action, data, and categories.
+
+data中的特性: type, scheme, authority, and path
+
+匹配规则：
+action, data, and categories必须全部匹配。
+
+ 
+======================================
+ContentProvider：提供结构化的数据，封装数据，提供数据安全的机制
+ContentResolver与provider(contentProviders的实例)对象交互，provider接收申请，执行申请，返回数据。
+
+当应用需要提供数据供其他应用使用时，需要实现自己的content provider
+
+Contentesolver可以用做查询，插入，删除，更新。（都与数据库查询语言类似）
+如查询：query(Uri,projection,selection,selectionArgs,sortOrder)查询需要的数据，query与数据库
+
+
+URL是Contentesolver用来找到对应ContentProvider，相应的ContentProvider使用URL的一部分确定使用的表
+完整的URL：“content://user_dictionary/words”
+
+检索数据有两步：
+1)Request the read access permission for the provider.
+2)Define the code that sends a query to the provider.
+
+
+数据库sqlite：
+android提供数据库操作工具sqlite3
+
+
+context的生成：
+context = ActivityManagerService.main(factoryTest);
+main@ActivityManagerService.java-->getSystemContext@ActivityThread.java-->createSystemContext@ContextImpl.java
+
+ContextImpl继承Context并实现其中的方法(比如startActivity)。(android\frameworks\base\core\java\android\app\ContextImpl.java)
+startActivity-->mMainThread.getInstrumentation().execStartActivity@ContextImpl.java-->
+ActivityManagerNative.getDefault().startActivity@Instrumentation.java-->startActivity@ActivityManagerService.java-->
+startActivityMayWait@ActivityStack.java
+
+
+
+
+

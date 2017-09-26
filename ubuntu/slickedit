@@ -1,0 +1,55 @@
+color:
+RGB:0:30:46
+
+printenv
+set -o posix ; set
+
+
+Running SlickEdit® from a USB Drive.
+
+Answer
+
+SlickEdit can be installed on and run from a USB drive. This lets you take your copy of SlickEdit from one computer to another without having to install it on each one. To be completely mobile, you will also want the SlickEdit configuration directory on the USB drive.
+
+Installation:
+
+ To install SlickEdit on a USB drive, you can run the SlickEdit installer and specify a location on the USB drive. Or, if you already have an installed version of SlickEdit, you can just copy the SlickEdit install directory to your USB drive.
+
+Licensing:
+
+ In most cases, the location of the license file is managed by SlickEdit and depends on your platform. To set up a portable installation of SlickEdit to run on a USB drive, you must manually copy the license file to the win subdirectory of your SlickEdit installation on Windows or the bin subdirectory on all other platforms. You can find the location of your license file on your current installation of SlickEdit by selecting Help About SlickEdit from the main menu.
+
+Configuration Directory:
+
+ Use the -sc command line switch to specify the location for the config directory. By using a relative path, SlickEdit will look for the config directory on the same drive as the SlickEdit installation. This is important since the USB drive may be assigned a different drive letter on different computers. It's best to put the command line into a batch file or script and place that on the USB drive.
+
+Sample Installation:
+
+ Here is a sample installation on Windows. Let's assume you want to set up SlickEdit v13.0 as follows:
+USB Root\
+USB Root\vs.bat
+USB Root\SlickEdit\
+USB Root\SlickEdit\config\v13.0.0\
+USB Root\SlickEdit\win\slickedit.lic
+
+The root of the USB drive contains the SlickEdit install directory, called "SlickEdit" and the batch file to launch SlickEdit. Here, we have placed the config directory inside the SlickEdit install directory. You could place it at the root of the drive, instead, but you would have to adjust the vs.bat file accordingly.
+
+For the above directory structure, vs.bat would look like this:
+
+REM Starts SlickEdit and creates a versioned Configuration
+REM Directory in the SlickEdit installation directory.
+start .\SlickEdit\win\vs.exe -sc ..\config\
+
+Notice that the batch file specifies the full path to the SlickEdit executable, vs.exe, relative to the location of the batch file. Also, note that the path provided to the -sc option only specifies the root of the config directory, not the versioned subdirectory. To use an existing configuration for SlickEdit v13.0, you would copy your existing v13.0.0 directory to the USB drive. Otherwise, SlickEdit will create a new, default configuration in that location.
+
+Performance:
+
+Depending on the speed of your USB drive, you may find that SlickEdit performs more slowly than when installed directly on the computer. SlickEdit accesses your config files frequently, so you may find that you need to move the config directory to the computer's local hard drive. To do that, either specify the full path to the desired config directory in the -sc option. Alternatively, you can remove the -sc option and allow SlickEdit to use the default config location in \My Documents\My SlickEdit Config or $HOME/.slickedit on UNIX, Linux, and Mac.
+ 
+
+Category
+
+SlickEdit
+Tags for this item
+
+installation ,	 licensing

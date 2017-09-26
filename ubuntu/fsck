@@ -1,0 +1,7 @@
+修复文件系统：
+sudo fsck.msdos -aw /dev/sdb1
+sudo fsck.msdos -r /dev/sdb1  //worked
+
+
+fsck -t  ext4 /dev/sda1
+fsck.ext4 -f /dev/sda1

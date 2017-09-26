@@ -1,0 +1,95 @@
+/**/
+文件系统初始化：
+module_init(init_vfat_fs)-->init_vfat_fs-->register_filesystem(&vfat_fs_type)@namei_vfat.c
+-->register_filesystem-->find_filesystem(在file_systems链表中查找文件系统结构并赋值)@filesystems.c
+
+挂载：msdos是FAT16，vfat是FAT32
+vfat_mount@namei_vfat.c-->mount_bdev@super.c-->fat_fill_super(读取boot sector并填充该结构)
+-->parse_options@inode.c
+
+打开文件(sys_open):
+SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
+(构造sys_open)sys_open-->do_sys_open@open.c-->do_filp_open-->path_openat@namei.c
+
+读取文件(sys_read)：
+SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+(构造系统调用函数)sys_read-->vfs_read-->do_sync_read-->filp->f_op->aio_read@read_write.c
+-->(vFAT)generic_file_aio_read@filemap.c
+
+static struct file_system_type *file_systems;
+register_filesystem(将文件系统加入到file_system链表)@filesystems.c
+
+初始fat文件系统的函数：
+fat_fill_super@inode.c-->fat_ent_access_init(判断fat12，16，32)-->sbi->fatent_ops = &fat32_ops@fatent.c
+
+
+fat_get_cluster@cache.c-->fat_ent_read-->ops->ent_get-->(是fat32文件系统)fat32_ent_get@fatent.c
+
+FAT_ENT_FREE
+
+输出错误信息：
+fat_fs_error@fat.h-->__fat_fs_error(根据sb->options.errors错误将sb->s_flags设置成只读)@misc.c
+
+________________________________
+mount的系统调用函数为：
+compat_sys_mount@compat.c-->do_mount-->do_new_mount-->do_kern_mount-->vfs_kern_mount
+@namespace.c-->mount_fs-->(不同的文件系统file_system_type)type->mount@super.c-->
+(FAT32)vfat_mount@namei_vfat.c
+
+
+fs/filesystems.c
+fs/fat/fatent.c
+fs/fat/misc.c
+fs/fat/cache.c
+fs/fat/inode.c
+fs/read_write.c
+fs/open.c
+fs/namei.c
+=================================
+ext4:
+将磁盘分成一系列的逻辑块(block)，大小为一般为4KB(与x86上的也相同)，通过2 ^ (10 + sb.s_log_block_size)可得出块的大小。
+
+sb(super block),inode(inode表项)
+
+ext4为了防止碎片化将块分成块组进行管理，块组的大小为sb.s_blocks_per_group(也可通过8 * block_size_in_bytes计算)，
+所有的文件以小端保存数据，日志文件以大端保存数据。
+_________________________________
+结构
+Group 0 Padding：	1024 bytes
+ext4 Super Block：	1 block
+Group Descriptors：	many blocks
+Reserved GDT Blocks：	many blocks
+Data Block Bitmap：	1 block
+inode Bitmap：		1 block
+inode Table：		many blocks
+Data Blocks：		many more blocks
+
+				
+=========================================
+出错：
+ext4_fill_super(输出"feature flags set")@super.c
+
+ext4_mount(传入ext4_fill_super)@super.c-->mount_bdev(可能会有以前的superblock)-->
+(没有以前的superblock)fill_super@super.c-->ext4_fill_super@super.c
+
+
+"feature flags set on rev 0 fs" line 3247
+"block to be beyond the end of the filesystem" line 3468
+fs/ext4/super.c
+fs/super.c
+
+01 00           s_rev_level     Revision level  这里变为0
+
+00 5E 01 00 	s_blocks_count_lo	Total block count  00015E00  8960blocks  8960*4K =350M  这里值变为0
+02              Block size is 2 ^ (10 + s_log_block_size). 4K
+
+第一个数据块：
+0x14 s_first_data_block	First data block. 
+This must be at least 1 for 1k-block filesystems and is typically 0 for all other block sizes
+
+
+emmc read.p 0x45000000 recovery 0x800000;
+bootm 0x45000000
+
+dd if=system.img of=superblock bs=512 skip=2 count=10
+https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout

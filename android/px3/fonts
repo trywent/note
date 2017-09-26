@@ -1,0 +1,57 @@
+//
+"/system/etc/system_fonts.xml"中不支持的字体从"/system/etc/fallback_fonts.xml"
+中查找
+getSingletonInterface{
+- 获取字体，GetFontFamilies-->getSystemFontFamilies-->parseConfigFile(SYSTEM_FONTS_FILE)
+	@SkFontConfigParser_android.cpp
+- 创建并返回接口，SkFontConfigInterfaceAndroid(fontFamilies)
+}@SkFontConfigInterface_android.cpp
+
+
+
+external/skia/src/ports/SkFontConfigInterface_android.cpp
+external/skia/src/ports/SkFontConfigParser_android.cpp
+__________________
+setToDefaults()
+frameworks/base/core/java/android/content/res/Configuration.java
+
+//预加载
+mian-->preload-->Class.forname(Typeface)@ZygoteInit.java
+
+创建默认字体：
+DEFAULT-->create-->nativeCreate@Typeface.java-->Typeface_create-->SkTypeface::Typeface_create
+@Typeface.cpp-->SkTypeface::CreateFromName(NULL, style)-->(返回默认字体)RefDefault-->
+GetDefaultTypeface@SkTypeface.cpp-->SkFontHost::CreateTypeface-->SkFontMgr::legacyCreateTypeface
+-->
+
+
+从文件创建：
+createFromFile-->nativeCreateFromFile@Typeface.java-->Typeface_createFromFile-->
+SkTypeface::CreateFromFile-->SkFontHost::CreateTypefaceFromFile@Typeface.cpp
+-->fm->createFromFile@SkFontHost.cpp
+
+frameworks/base/graphics/java/android/graphics/Typeface.java
+frameworks/base/core/jni/android/graphics/Typeface.cpp
+external/skia/src/core/SkTypeface.cpp
+external/skia/src/core/SkFontHost.cpp
+
+TextView设置字体：
+setTypeface-->mTextPaint.setTypeface(tf)@TextView.java-->(TextPaint继承Paint)
+setTypeface@Paint.java-->native_setTypeface-->SkPaintGlue::setTypeface-->
+SkPaint-->setTypeface@Paint.cpp
+
+
+frameworks/base/core/java/android/widget/TextView.java
+frameworks/base/core/java/android/text/TextPaint.java
+frameworks/base/graphics/java/android/graphics/Paint.java
+frameworks/base/core/jni/android/graphics/Paint.cpp
+external/skia/src/core/SkPaint.cpp
+==================
+init
+
+"system_fonts.xml"
+
+create-->new FontLoader()
+
+frameworks/base/tools/layoutlib/bridge/src/com/android/layoutlib/bridge/Bridge.java
+frameworks/base/tools/layoutlib/bridge/src/com/android/layoutlib/bridge/impl/FontLoader.java

@@ -1,0 +1,20 @@
+
+windowsVisible{
+- 设置状态为可见，nowVisible = true
+- 若不是在idle状态，则stack.processStoppingActivitiesLocked
+- 若已经是idle状态，{
+	- 清除所有等待的activity，mWaitingVisibleActivities	
+	- 发送stack.mHandler.sendMessage(ActivityStack.IDLE_NOW_MSG)-->activityIdleInternal{
+		- 		
+		}
+	}
+}
+
+______________________
+finishing:
+makeFinishing{
+- finishing = true
+- 任务中的activity个数减1，task.numActivities--
+- 若已经stoped，清除没有处理的操作
+}
+

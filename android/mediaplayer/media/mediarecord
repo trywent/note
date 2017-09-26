@@ -1,0 +1,6 @@
+new MediaRecorder();
+setAudioSource(MediaRecorder.AudioSource.MIC);
+setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+setOutputFile(mFileName);
+setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+

@@ -1,0 +1,10 @@
+//写测试
+$ sync; dd if=/dev/zero of=tempfile bs=1M count=1024; sync
+
+
+//读测试，， 从buffer读取
+$ dd if=tempfile of=/dev/null bs=1024 count=102400
+
+
+//可移除设备
+$ sync; dd if=/dev/zero of=/mnt/usb_storage1/tempfile bs=1024 count=102400; sync

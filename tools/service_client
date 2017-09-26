@@ -1,0 +1,12 @@
+RemoteCallbackList<E extends android.os.IInterface>
+
+维护一组远程接口，如在服务端回调客户端。
+
+管理已经注册的接口的回调方法，通过唯一标识IBinder(通过IInterface.asBinder()获取)区分这些接口。
+关联一个IBinder.DeathRecipient到注册的接口，当接口进程结束后可以清除这些注册的接口。
+当多个线程调用时，会维护一个锁管理接口列表。
+
+使用这个类，在自己服务中实现这个类的实例，调用register(E)和unregiseter(E)来注册使用客户端的回调函数。
+回调客户端的方法通过beginBroadcast(), getBroadcastItem(int),和finishBroadcast()。
+
+当注册的客户端进程结束，则该类负责清除注册的信息。如果需要额外的操作，调用onCallbackDied(E)。

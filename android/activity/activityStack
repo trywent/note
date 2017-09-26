@@ -1,0 +1,182 @@
+mHistory  //ArrayList所有已经启动的activity的容器
+_____________________________
+start:
+startActivityLocked-->(将activityRecord加入栈中)mHistory.add--(向windowManagerService中加入应用窗口标记)
+mService.mWindowManager.addAppToken(加入应用标记到窗口服务)--resumeTopActivityLocked
+
+
+switchUser
+
+resetTaskIfNeededLocked
+
+moveActivityToFrontLocked
+
+moveTaskToFrontLocked
+
+moveTaskToBackLocked
+
+_____________________________
+resume:
+resumeTopActivityLocked{
+- 
+- 设置前个activity不可见,mService.mWindowManager.setAppVisibility(prev)
+
+}
+
+resumeTopActivityLocked-->startSpecificActivityLocked-->
+realStartActivityLocked-->(checkConfig为true)mService.mWindowManager.updateOrientationFromAppTokens
+@ActivityStack.java
+
+
+resumeTopActivityLocked-->mService.mWindowManager.updateOrientationFromAppTokens@ActivityStack.java
+
+
+completeResumeLocked{
+- 发送空闲超时消息，防止app没有执行空闲操作。sendMessageDelayed(IDLE_TIMEOUT_MSG)
+- 主栈中，更新组件状态信息(UsageStatsService)，mService.reportResumedActivityLocked
+- 设置焦点应用，mService.setFocusedActivityLocked-->mWindowManager.setFocusedApp
+- 恢复事件分配，next.resumeKeyDispatchingLocked-->service.mWindowManager.resumeKeyDispatching
+- 设置activity确保可见，ensureActivitiesVisibleLocked
+}
+
+
+_____________________________
+pause:(对mResumedActivity执行)
+resumeTopActivityLocked-->startPausingLocked{
+- mResumedActivity为空，启动activity，resumeTopActivityLocked
+- 设置正在暂停activity，mPausingActivity
+- 应用进程不为空，prev.app.thread.schedulePauseActivity
+- 停止事件分发，pauseKeyDispatchingLocked。发送暂停超时，sendMessageDelayed(PAUSE_TIMEOUT_MSG)
+}
+
+
+activity端回调：
+activityPaused{
+- mPausingActivity执行暂停，completePauseLocked{
+		- mPausingActivity不为空{
+			- mPausingActivity状态为finishing，结束actvity。执行finishCurrentActivityLocked
+			- 若是配置改变直接销毁，destroyActivityLocked
+			- 加入到正在结束，mStoppingActivities.add，进入空闲scheduleIdleLocked
+		}
+		- 恢复栈顶activity，resumeTopActivityLocked
+		- 记录cpu使用时间
+	}
+}
+
+_____________________________
+stop:
+activityIdleInternal-->stopActivityLocked{
+- activityRecord状态不是finishing，请求结束requestFinishActivityLocked
+- 设置焦点setFocusedActivityLocked，
+- 设置ActivityRecord.state状态为STOPPING,设置窗口不可见setAppVisibility
+  执行activity端stop，r.app.thread.scheduleStopActivity
+- 发送执行超时消息，sendMessageDelayed(STOP_TIMEOUT_MSG)
+}
+
+activity端回调：
+activityStoppedLocked{
+- 是否stoping状态
+- 非stopped{
+	- 设置状态stoped，
+	- finishing状态，直接清除未处理操作，clearOptionsLocked
+	- 由于配置更改结束，销毁destroyActivityLocked，重启resumeTopActivityLocked
+	- 设置前个app(用户返回该应用？)
+	}
+}
+_____________________________
+finish:
+
+requestFinishActivityLocked-->finishActivityLocked{
+- 设置activitRecord状态为finishing，r.makeFinishing()
+- 设置task中最前activityRecord，next.frontOfTask = true
+- 暂停要停止的activity的事件，重新设置焦点activity，setFocusedActivityLocked
+- 立即结束，则设置结束后结果返resultTo，finishCurrentActivityLocked
+- 若当前activity是mResumedActivity，则准备切换动画prepareAppTransition，设置不可见setAppVisibility
+  执行暂停startPausingLocked
+- 直接结束，finishCurrentActivityLocked
+}
+
+
+
+finishCurrentActivityLocked{
+- 要结束的activity可见，则延迟操作。mStoppingActivities不为空进入scheduleIdleLocked
+- 满足销毁条件，销毁destroyActivityLocked
+- 先pause，再finish。加入到mFinishingActivities中
+}
+
+removeActivityFromHistoryLocked{
+- 状态为非销毁状态{
+	- finishActivityResultsLocked
+	- 设置ActivityRecord状态为finish，r.makeFinishing
+	- 从history中移除，mHistory.remove。清楚ActivityRecord的history记录
+	- 从窗口服务中移除窗口，mService.mWindowManager.removeAppToken
+	- 移除该Activity与服务的连接，cleanUpActivityServicesLocked
+} 
+}
+_____________________________
+destory:
+
+destroyActivityLocked{
+- 清除activityRecord，cleanUpActivityLocked
+- 若在一个应用中，{
+		- 从app中移除，r.app.activities.remove
+		- 调用activity中销毁方法，r.app.thread.scheduleDestroyActivity
+		- 发送销毁超时操作防止上步没有成功，sendMessageDelayed(DESTROY_TIMEOUT_MSG)
+	}
+- 不在应用中，从history中移除removeActivityFromHistoryLocked
+}
+
+activity端回调：
+activityDestroyed{
+- 清除消息，DESTROY_TIMEOUT_MSG
+- 从history中移除activityRecord，removeActivityFromHistoryLocked
+- 恢复栈顶activity，resumeTopActivityLocked
+}
+_____________________________
+
+activityIdleInternal-->stopActivityLocked
+
+
+
+_____________________________
+显示：
+mService.mWindowManager.setAppVisibility
+
+ensureActivitiesVisibleLocked{
+- 若栈顶activity不是全屏，使它之下的activity可见。开始遍历{
+		- activity没有启动，则是可见setAppVisibility，并启动startSpecificActivityLocked
+		- 已经可见，停止冻结屏幕stopFreezingScreenLocked
+		- 已启动但不可见，设置可见{
+			- mService.mWindowManager.setAppVisibility
+			- r.app.thread.scheduleWindowVisibility
+		}
+		- 找到全屏activity，退出遍历
+	
+	}
+- 设置全屏之后的activity不可见{
+		- 设置窗口不可见，mService.mWindowManager.setAppVisibility
+		- 若状态为stopping或stopped。应用不可见r.app.thread.scheduleWindowVisibility
+	}
+}
+_____________________________
+空闲：
+checkReadyForSleepLocked
+
+finishCurrentActivityLocked
+
+completePauseLocked
+
+scheduleIdleLocked-->sendMessage(IDLE_NOW_MSG)-->handleMessage-->activityIdleInternal@ActivityStack.java
+
+设置超时处理：
+completeResumeLocked-->sendMessage(IDLE_TIMEOUT_MSG)-->handleMessage-->activityIdleInternal@ActivityStack.java
+
+windowsVisible{
+-
+- stack.mHandler.sendMessage(IDLE_NOW_MSG)
+}@ActivityRecord.java
+
+activityIdleInternal{
+- stopActivityLocked
+- destroyActivityLocked
+}

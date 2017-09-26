@@ -1,0 +1,162 @@
+wpa_supplicant
+--------------
+实现WPA supplicant组件，就是运行在工作站上的部分。实现身份验证，控制漫游。
+
+wpa_supplicant作为守护程序，运行在后台控制无线连接。wpa_supplicant支持前端程序wpa_cli，
+能够使用命令行。
+
+使用WPA连接AP的步骤：
+- wpa_supplicant requests the kernel driver to scan neighboring BSSes
+- wpa_supplicant selects a BSS based on its configuration
+- wpa_supplicant requests the kernel driver to associate with the chosen
+  BSS
+- If WPA-EAP: integrated IEEE 802.1X Supplicant completes EAP
+  authentication with the authentication server (proxied by the
+  Authenticator in the AP)
+- If WPA-EAP: master key is received from the IEEE 802.1X Supplicant
+- If WPA-PSK: wpa_supplicant uses PSK as the master session key
+- wpa_supplicant completes WPA 4-Way Handshake and Group Key Handshake
+  with the Authenticator (AP)
+- wpa_supplicant configures encryption keys for unicast and broadcast
+- normal data packets can be transmitted and received
+
+
+
+Building and installing
+-----------------------
+编译先要配置.config
+编译：make
+安装：cp wpa_cli wpa_supplicant /usr/local/bin
+
+debug模式：
+wpa_supplicant -iwlan0 -c/etc/wpa_supplicant.conf -d
+
+正常工作：
+wpa_supplicant -iwlan0 -c/etc/wpa_supplicant.conf -B
+
+
+Command line options
+--------------------
+
+usage:
+  wpa_supplicant [-BddfhKLqqtuvwW] [-P<pid file>] [-g<global ctrl>] \
+        -i<ifname> -c<config file> [-C<ctrl>] [-D<driver>] [-p<driver_param>] \
+        [-b<br_ifname> [-N -i<ifname> -c<conf> [-C<ctrl>] [-D<driver>] \
+        [-p<driver_param>] [-b<br_ifname>] ...]
+
+options:
+  -b = optional bridge interface name
+  -B = run daemon in the background
+  -c = Configuration file
+  -C = ctrl_interface parameter (only used if -c is not)
+  -i = interface name
+  -d = increase debugging verbosity (-dd even more)
+  -D = driver name
+  -f = Log output to default log location (normally /tmp)
+  -g = global ctrl_interface
+  -K = include keys (passwords, etc.) in debug output
+  -t = include timestamp in debug messages
+  -h = show this help text
+  -L = show license (GPL and BSD)
+  -p = driver parameters
+  -P = PID file
+  -q = decrease debugging verbosity (-qq even less)
+  -u = enable DBus control interface
+  -v = show version
+  -w = wait for interface to be added, if needed
+  -W = wait for a control interface monitor before starting
+  -N = start describing new interface
+
+drivers:
+  hostap = Host AP driver (Intersil Prism2/2.5/3) [default]
+	(this can also be used with Linuxant DriverLoader)
+  hermes = Agere Systems Inc. driver (Hermes-I/Hermes-II)
+  madwifi = MADWIFI 802.11 support (Atheros, etc.) (deprecated; use wext)
+  atmel = ATMEL AT76C5XXx (USB, PCMCIA)
+  wext = Linux wireless extensions (generic)
+  ralink = Ralink Client driver
+  ndiswrapper = Linux ndiswrapper (deprecated; use wext)
+  broadcom = Broadcom wl.o driver
+  ipw = Intel ipw2100/2200 driver (old; use wext with Linux 2.6.13 or newer)
+  wired = wpa_supplicant wired Ethernet driver
+  roboswitch = wpa_supplicant Broadcom switch driver
+  bsd = BSD 802.11 support (Atheros, etc.)
+  ndis = Windows NDIS driver
+
+在后台运行：
+wpa_supplicant -B -c/etc/wpa_supplicant.conf -iwlan0
+
+wpa_supplicant能够控制多个接口，两个接口在同一个进程中管理，或在两个不同进程中管理都可以。
+wpa_supplicant \
+	-c wpa1.conf -i wlan0 -D hostap -N \
+	-c wpa2.conf -i ath0 -D madwifi
+
+
+Configuration file
+------------------
+配置文件wpa_supplicant.conf。能够通过发送信号SIGHUP到wap_supplicant,重新加载。
+也可通过wpa_cli reconfigure命令重新加载。
+-
+用来定义一个接口。该接口能够被其他程序使用，用来控制wpa_supplicant
+ctrl_interface=/var/run/wpa_supplicant
+
+------------------
+wpa_cli
+与wpa_supplicant交互的命令行。查询状态，改变配置，触发事件，用户交互(下层的密码请求，报告事件)。
+
+wpa_cli支持两中模式：交互(能够返回消息给用户，如请求密码)，命令行
+
+wpa_cli可以用来在网络连接或断开时，执行相应的程序。(事件触发函数)
+wpa_cli -a/sbin/wpa_action.sh -B //网络变化时执行wpa_action.sh
+
+===========================
+配置文件:
+配置文件中写的文件路径应该都是绝对路径。
+
+# 是否允许wpa_supplicant更新配置。
+#update_config=1
+
+
+# 全局配置(被所有网络共享)
+控制接口。如果被配置，wpa_supplicant回答开一个控制接口供其他程序控制wpa_suppliant。
+在UNIX domain sockets(用于IPC)中，控制接口是一个文件夹用来监听其他程序的请求。
+ctrl_interface=/var/run/wpa_supplicant
+
+# IEEE 802.1X/EAPOL version。有些ap只支持特定版本eapol(Extensible Authentication Protocol)
+eapol_version=1
+
+eapol(Extensible Authentication Protocol)认证相关
+
+# AP scanning/selection
+默认情况下wpa_supplicant请求驱动扫描AP，并选择合适的AP。另种情况是，允许驱动扫描和选择AP，但
+使用wpa_supplicant处理EAPOL帧
+1: wpa_supplicant初始化AP扫描和选择，如果没有AP符合当前的网络，一个新的
+   网络可能(默认)会被建立
+0: 驱动扫描和选择AP。不会关联到AP(其他程序来执行关联)。有线网络驱动使用这种模式
+2: 和0类似,但是会使用SSID关联到AP。会尝试关联配置文件中定义的网络。
+ap_scan=1
+
+# EAP fast re-authentication
+fast_reauth=1
+
+
+# network block
+每个网络定义在不同的块结构中。网络使用按先后顺序优先
+# Example blocks:
+
+# Simple case: WPA-PSK, PSK as an ASCII passphrase, allow all valid ciphers
+network={
+	ssid="simple"
+	psk="very secret passphrase"
+	priority=5
+}
+
+# Same as previous, but request SSID-specific scanning (for APs that reject
+# broadcast SSID)
+network={
+	ssid="second ssid"
+	scan_ssid=1
+	psk="very secret passphrase"
+	priority=2
+}
+

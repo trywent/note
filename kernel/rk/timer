@@ -1,0 +1,91 @@
+timer:
+
+初始化：
+init_timer@timer.h-->init_timer_key-->__init_timer@timer.c
+
+
+修改timer的计时：
+mod_timer{
+- apply_slack
+- 
+- __mod_timer{
+	- 设置timer开始时状态信息，timer_stats_timer_set_start_info
+	- 	
+	- 
+	}
+}
+
+
+include/linux/timer.h
+kernel/kernel/timer.c
+
+kernel/kernel/time.c
+____________________
+计时器状态：
+开始统计状态 # echo 1 >/proc/timer_stats
+停止统计 # echo 0 >/proc/timer_stats
+获取统计数据 # cat /proc/timer_stats
+
+====================
+版本号kernel3.0.10
+clock：
+加入：
+clkdev_add{
+- 加入到链表clock，list_add_tail
+}
+
+clk链表加入到clock链表：
+clkdev_add_table(struct clk_lookup *cl, size_t num){
+- 循环加入，list_add_tail
+}
+
+获取：
+struct clk *clk_get{
+- 获取名字
+- 根据名字获取，clk_get_sys(dev_id, con_id){
+	- 查找clk，clk_find{
+		- 查找clock链表，返回匹配度最高的clock		
+		}
+	- 返回查找到的clk
+	}
+}@clkdev.c
+
+使能时钟：
+clk_enable{
+- __clk_enable{
+	- 若有父时钟clk->parent，则打开父时钟,__clk_enable(clk->parent)
+	- 若存在使能函数，则打开时钟。clk->ops->enable(clk)
+	}
+}@core.c
+
+drivers/clk/clkdev.c
+drivers/sh/clk/core.c
+include/linux/sh_clk.h
+____________________
+rk时钟：
+clk结构的封装：
+#define CLK(dev, con, ck) \
+{\
+	.dev_id = dev,\
+	.con_id = con,\
+	.clk = ck,\
+}
+
+所有clk：
+static struct clk_lookup clks[] = {
+	CLK(dev, con, ck)
+}
+
+
+rk30_clock_data_init{
+- _rk30_clock_data_init{
+	- 
+	- 循环将clks中clk加入到链表中
+	- 
+	}
+- rk3188_dvfs_init
+}@clock_data_rkpx3.c
+
+arch/arm/mach-rkpx3/clock_data_rkpx3.c
+arch/arm/plat-rk/clock.c
+

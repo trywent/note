@@ -1,0 +1,451 @@
+Structure of a driver
+---------------------
+
+All drivers have the following structure:
+
+//一个设备结构，用来存放设备状态
+1) A struct for each device instance containing the device state.
+
+//初始化子设备的命令和方法
+2) A way of initializing and commanding sub-devices (if any).
+
+//创建V4L2设备节点，并维护设备数据
+3) Creating V4L2 device nodes (/dev/videoX, /dev/vbiX and /dev/radioX)
+   and keeping track of device-node specific data.
+
+//文件操作结构，包含每个文件操作的数据
+4) Filehandle-specific structs containing per-filehandle data;
+
+//视频缓冲处理
+5) video buffer handling.
+
+This is a rough schematic of how it all relates:
+
+    device instances                //v4l2_device
+      |
+      +-sub-device instances        //v4l2_subdev
+      |
+      \-V4L2 device nodes           //video_device
+	  |
+	  \-filehandle instances
+
+
+
+struct v4l2_device
+------------------
+注册：
+v4l2_device_register(struct device *dev, struct v4l2_device *v4l2_dev){
+- 初始化v4l2_device
+- 设置设备名，若设备名为空则将从dev中获取设备名(驱动名+总线号)
+- dev_get_drvdata(dev)为空,设置dev-driver_data为v4l2_dev，dev_set_drvdata
+
+}
+
+多媒体：
+- dev_set_drvdata()设置dev->driver_data指向包含v4l2_device实例的结构
+- v4l2_device中mdev域设置为一个已经注册的media_device
+
+设备名：
+- 设备名v4l2_dev->name为空时会自动设为dev中的驱动名
+- 可通过v4l2_device_set_name()设置
+
+
+注销：v4l2_device_unregister(struct v4l2_device *v4l2_dev); //会自动注销子设备
+
+若是设插拔设备(usb)被移除，则需先调用：v4l2_device_disconnect(struct v4l2_device *v4l2_dev);
+
+若需调用同一硬件上的其他功能设备，可通过以下方法遍历获取已注册的设备：
+static int callback(struct device *dev, void *p)
+{
+	struct v4l2_device *v4l2_dev = dev_get_drvdata(dev);
+
+	/* test if this device was inited */
+	if (v4l2_dev == NULL)
+		return 0;
+	...
+	return 0;
+}
+
+int iterate(void *p)
+{
+	struct device_driver *drv;
+	int err;
+
+	/* Find driver 'ivtv' on the PCI bus.
+	   pci_bus_type is a global. For USB busses use usb_bus_type. */
+	drv = driver_find("ivtv", &pci_bus_type);
+	/* iterate over all ivtv device instances */
+	err = driver_for_each_device(drv, NULL, p, callback);
+	put_driver(drv);
+	return err;
+}
+
+记录设备个数:
+static atomic_t drv_instance = ATOMIC_INIT(0);
+
+static int __devinit drv_probe(struct pci_dev *pdev,
+				const struct pci_device_id *pci_id)
+{
+	...
+	state->instance = atomic_inc_return(&drv_instance) - 1;
+}
+
+
+手动引用计数：
+void v4l2_device_get(struct v4l2_device *v4l2_dev);
+or:
+int v4l2_device_put(struct v4l2_device *v4l2_dev);
+
+
+struct v4l2_subdev(编码解码)
+----------------------
+v4l2_subdev通常关联有更底层的总线设备，若是i2c设备：
+v4l2_subdev使用v4l2_set_subdevdata()管理i2c设备，
+
+i2c设备获取设置：i2c_client使用i2c_set_clientdata()关联v4l2_subdev。i2c_get_clientdata()
+
+获取设备主控数据：v4l2_get_subdev_hostdata() and v4l2_set_subdev_hostdata().
+
+
+各类型的操作结构:
+struct v4l2_subdev_core_ops {
+	int (*g_chip_ident)(struct v4l2_subdev *sd, struct v4l2_dbg_chip_ident *chip);
+	int (*log_status)(struct v4l2_subdev *sd);
+	int (*init)(struct v4l2_subdev *sd, u32 val);
+	...
+};
+
+struct v4l2_subdev_tuner_ops {
+	...
+};
+
+struct v4l2_subdev_audio_ops {
+	...
+};
+
+struct v4l2_subdev_video_ops {
+	...
+};
+
+//子设备的操作总结构
+struct v4l2_subdev_ops {
+	const struct v4l2_subdev_core_ops  *core;
+	const struct v4l2_subdev_tuner_ops *tuner;
+	const struct v4l2_subdev_audio_ops *audio;
+	const struct v4l2_subdev_video_ops *video;
+};
+
+
+
+初始化:	v4l2_subdev_init(sd, &ops);
+
+若与media框架交互，需通过media_entity_init()设置v4l2_subdev中的media_entity：
+	struct media_pad *pads = &my_sd->pads;
+	int err;
+
+	err = media_entity_init(&sd->entity, npads, pads, 0);
+
+销毁sub-device时需清除media entity：
+	media_entity_cleanup(&sd->entity);
+
+注册v4l2_subdev到v4l2_device:
+	int err = v4l2_device_register_subdev(v4l2_dev, sd);
+
+注销:	v4l2_device_unregister_subdev(sd);
+
+可直接调用子设备的操作函数:
+	err = sd->ops->core->g_chip_ident(sd, &chip);
+或通过宏：
+	err = v4l2_subdev_call(sd, core, g_chip_ident, &chip);
+
+调用所有的子设备操作函数:
+	v4l2_device_call_all(v4l2_dev, 0, core, g_chip_ident, &chip);//没有对应函数的子设备会被跳过
+
+带错误检测的:
+	err = v4l2_device_call_until_err(v4l2_dev, 0, core, g_chip_ident, &chip);
+
+当事件发生是子设备可通过v4l2_subdev_notify(sd, notification, arg)，通知父设备。
+
+
+V4L2 sub-device userspace API
+-----------------------------
+子设备会创建/dev/v4l-subdevX。若子设备要提供用户空间接口需设置V4L2_SUBDEV_FL_HAS_DEVNODE标识。
+注册后，调用v4l2_device_register_subdev_nodes()，会自动创建设备节点。子设备注销时会自动移除。
+
+
+提供的接口是V4L2 API的子集：
+VIDIOC_QUERYCTRL
+VIDIOC_QUERYMENU
+VIDIOC_G_CTRL
+VIDIOC_S_CTRL
+VIDIOC_G_EXT_CTRLS
+VIDIOC_S_EXT_CTRLS
+VIDIOC_TRY_EXT_CTRLS
+
+
+VIDIOC_DQEVENT
+VIDIOC_SUBSCRIBE_EVENT
+VIDIOC_UNSUBSCRIBE_EVENT
+
+
+Private ioctls
+	其他没有列出的操作会传递到core::ioctl
+
+
+I2C sub-device drivers
+----------------------
+
+一般创建的状态结构：
+struct chipname_state {
+	struct v4l2_subdev sd;
+	...  /* additional state fields */
+};
+
+初始化:(v4l2_subdev和i2c_client会设置指向对方的指针)
+	v4l2_i2c_subdev_init(&state->sd, client, subdev_ops);
+
+从v4l2_subdev获取chipname_state的帮助函数:
+static inline struct chipname_state *to_state(struct v4l2_subdev *sd)
+{
+	return container_of(sd, struct chipname_state, sd);
+}
+
+从v4l2_subdev获取i2c_client struct:
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+
+从i2c_client获取v4l2_subdev struct:
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+
+调用remove()前需调用v4l2_device_unregister_subdev(sd)
+
+
+bridge driver的帮助函数:
+
+struct v4l2_subdev *sd = v4l2_i2c_new_subdev(v4l2_dev, adapter,
+	       "module_foo", "chipid", 0x36, NULL);
+
+v4l2_i2c_new_subdev_cfg
+
+
+struct video_device
+-------------------
+真正的设备节点通过video_device创建
+
+动态创建：
+	struct video_device *vdev = video_device_alloc();
+
+	if (vdev == NULL)
+		return -ENOMEM;
+
+	vdev->release = video_device_release; //必须设置
+
+其他需设置的域:
+- v4l2_dev: 设置为v4l2_device.
+- name: 设置为唯一标识.
+- fops: 设置为v4l2_file_operations.
+- ioctl_ops: 建议使用v4l2_ioctl_ops，精简ioctl操作
+- lock: 设置NULL，或在执行v4l2_file_operations前设置为mutex_lock
+- prio: 权限管理指向一个v4l2_prio_state结构，用来实现VIDIOC_G/S_PRIORITY.可以实现自己的v4l2_prio_state
+- parent:当v4l2_device为空时设置。如：多个PCI devices共用一个v4l2_device 
+- flags: optional.
+
+若使用v4l2_ioctl_ops, 则需设置 v4l2_file_operations.unlocked_ioctl 为video_ioctl2。
+不要使用.ioctl(被废弃)。
+
+
+v4l2_file_operations and locking
+--------------------------------
+若设备有长延时操作则实现自己的锁操作(如配置USB摄像的曝光)。
+
+使用videobuf时需传入相同的锁 
+
+在videobuf2中需实现wait_prepare和wait_finish用来unlock/lock.若使用了video_device 也必须
+在wait_prepare和wait_finish中实现unlock/lock.
+
+热插拔设备执行v4l2_device_disconnect前也需获取锁
+
+video_device registration
+-------------------------
+
+注册video device:会创建字符设备
+
+	err = video_register_device(vdev, VFL_TYPE_GRABBER, -1);
+	if (err) {
+		video_device_release(vdev); /* or kfree(my_vdev); */
+		return err;
+	}
+
+VFL_TYPE_GRABBER: videoX for video input/output devices
+VFL_TYPE_VBI: vbiX for vertical blank data (i.e. closed captions, teletext)
+VFL_TYPE_RADIO: radioX for radio tuners
+
+最后一个参数是设备变化，-1为自动选择。
+
+当设备节点创建后，对应的属性文件也会创建/sys/class/video4linux。
+
+注册失败：
+- video_device_release()释放video_device struct。
+- 注册失败vdev->release()不能被调用
+
+
+video_device cleanup
+--------------------
+
+注销:	video_unregister_device(vdev);
+
+This will remove the device nodes from sysfs (causing udev to remove them
+from /dev).
+
+
+
+当最后一个用户退出，vdev->release()被调用，执行最后的清除操作。
+
+若初始了media entity在release中执行:
+	media_entity_cleanup(&vdev->entity);
+
+
+video_device helper functions
+-----------------------------
+void *video_get_drvdata(struct video_device *vdev); 
+void video_set_drvdata(struct video_device *vdev, void *data); //在调用video_register_device()之前
+
+struct video_device *video_devdata(struct file *file);
+
+void *video_drvdata(struct file *file);
+
+struct v4l2_device *v4l2_dev = vdev->v4l2_dev;
+
+const char *video_device_node_name(struct video_device *vdev);//设备节点名
+
+
+video buffer helper functions
+-----------------------------
+read(), mmap() and overlay() 
+
+Please see Documentation/video4linux/videobuf for more information on how
+to use the videobuf layer.
+
+struct v4l2_fh
+--------------
+
+调用v4l2_fh_init()，设置video_device->flags中V4L2_FL_USES_V4L2_FH位。
+这时file->private_data指向v4l2_fh(在文件打开时设置)。
+
+若v4l2_fh包含在其他结构体中：
+需v4l2_fh_init+v4l2_fh_add in open()和v4l2_fh_del+v4l2_fh_exit in release().
+
+例:
+struct my_fh {
+	int blah;
+	struct v4l2_fh fh;
+};
+
+...
+
+int my_open(struct file *file)
+{
+	struct my_fh *my_fh;
+	struct video_device *vfd;
+	int ret;
+
+	...
+
+	my_fh = kzalloc(sizeof(*my_fh), GFP_KERNEL);
+
+	...
+
+	v4l2_fh_init(&my_fh->fh, vfd);
+
+	...
+
+	file->private_data = &my_fh->fh;
+	v4l2_fh_add(&my_fh->fh);
+	return 0;
+}
+
+int my_release(struct file *file)
+{
+	struct v4l2_fh *fh = file->private_data;
+	struct my_fh *my_fh = container_of(fh, struct my_fh, fh);
+
+	...
+	v4l2_fh_del(&my_fh->fh);
+	v4l2_fh_exit(&my_fh->fh);
+	kfree(my_fh);
+	return 0;
+}
+
+v4l2_fh的函数说明:
+void v4l2_fh_init(struct v4l2_fh *fh, struct video_device *vdev)
+
+  Initialise the file handle. This *MUST* be performed in the driver's
+  v4l2_file_operations->open() handler.
+
+void v4l2_fh_add(struct v4l2_fh *fh)
+
+  Add a v4l2_fh to video_device file handle list. Must be called once the
+  file handle is completely initialized.
+
+void v4l2_fh_del(struct v4l2_fh *fh)
+
+  Unassociate the file handle from video_device(). The file handle
+  exit function may now be called.
+
+void v4l2_fh_exit(struct v4l2_fh *fh)
+
+  Uninitialise the file handle. After uninitialisation the v4l2_fh
+  memory can be freed.
+
+
+若v4l2_fh没有被包含，可使用如下函数:
+int v4l2_fh_open(struct file *filp)
+
+  This allocates a struct v4l2_fh, initializes it and adds it to the struct
+  video_device associated with the file struct.
+
+int v4l2_fh_release(struct file *filp)
+
+  This deletes it from the struct video_device associated with the file
+  struct, uninitialised the v4l2_fh and frees it.
+
+
+int v4l2_fh_is_singular(struct v4l2_fh *fh)
+
+  Returns 1 if the file handle is the only open file handle, else 0.
+
+int v4l2_fh_is_singular_file(struct file *filp)
+
+  Same, but it calls v4l2_fh_is_singular with filp->private_data.
+
+
+V4L2 events
+-----------
+传递事件到用户空间，必须使用v4l2_fh
+
+merge() //将两个最老的事件合并
+replace() //用一个新事件替换老事件
+
+相关函数:
+
+- v4l2_event_queue()
+  将事件加入到video device的队列。驱动填充type和data
+
+- v4l2_event_subscribe()
+
+  驱动调用video_device->ioctl_ops->vidioc_subscribe_event检测能否产生对应id的事件。
+  若可以则调用v4l2_event_subscribe()提交事件
+
+- v4l2_event_unsubscribe()
+
+  vidioc_unsubscribe_event在结构体v4l2_ioctl_ops中.
+  V4L2_EVENT_ALL取消提交所有事件
+
+- v4l2_event_pending()
+  
+  Returns the number of pending events. Useful when implementing poll.
+
+事件通过poll系统调用传递到用户空间。
+Events are delivered to user space through the poll system call. The driver
+can use v4l2_fh->wait (a wait_queue_head_t) as the argument for poll_wait().
+
+

@@ -1,0 +1,41 @@
+android-sdk-linux/docs/guide/topics/ui/themes.html
+
+style:作用在view上的显示属性
+theme:作用在activity和app的显示属性
+
+文件位置：res/values/*.xml
+访问方法：@style/*.xml
+可继承：<style name="xxx" parent="@android:style/yyy">
+继承自己定义的style：<style name="yyy.xxx"> //xxx继承自yyy
+
+使用style：
+View:      <view style=@style/xxx>
+App:       <application android:theme="@style/xxx">
+Activity:  <activity android:theme="@android:style/xxx">
+
+不同平台上兼容：res/values或res/values-v11
+
+==================
+applictaion设置默认主题:
+获取主题：
+getTheme{
+- 根据目标sdk获取资源，Resources.selectDefaultTheme{
+		- selectDefaultTheme{
+			- 根据目标版本，选择theme,Theme_Holo,Theme_DeviceDefault		
+		}
+	}@Resources.java
+- 根据资源获取主题，mTheme.applyStyle(mThemeResource)
+}@ContextImpl.java
+
+
+activity设置自定义themem：
+performLaunchActivity{
+- r.activityInfo.getThemeResource
+-  activity.setTheme(theme)
+}
+
+应用主题：
+generateLayout{
+- 获取theme配置，getWindowStyle
+- 
+}@PhoneWindow.java
