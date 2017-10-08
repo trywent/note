@@ -1,0 +1,109 @@
+repo init -u git://10.0.67.68/android/platform/manifest.git --repo-url=git://10.0.67.68/android/tools/repo.git
+
+在.repo/manifest.xml加入kernel
+<manifest>
+<project path="kernel" name="kernel/common"/>
+</manifest>
+还需要加入具体的revision号(也可以是hash id或者是固定的tags号revision="refs/tags/android-2.2_r1.3")
+<project path="kernel" name="kernel/common" revision="android-2.6.38" />
+或者
+<project path="kernel" name="kernel/common" revision="archive/android-2.6.32" />
+否则repo sync时将会提示如下错误
+Fetching projects: 100% (171/171), done. 
+Syncing work tree: 66% (113/171) error: revision master in kernel/common not found
+
+
+
+Creating an Android Mirror
+1. Prerequisites/Assumptions
+install repo git http://sites.google.com/a/android.com/opensource/download
+Git工具使用和安装git服务器即git-daemon配置git://localhost/test.git匿名下载服务器
+2.Setting up a Git Server
+a.sudo apt-get install git-daemon
+b.change iptables, git-daemon use tcp port 9481
+sudo /sbin/iptables -A INPUT -p tcp -m tcp --dport 9481 -j ACCEPT
+c.config /etc/sv/git-daemon/run, to export git trees in "/opt/coderepo"
+====================================================
+#!/bin/sh
+exec 2>&1
+echo 'git-daemon starting.'
+exec git-daemon --verbose --export-all --base-path=/opt/coderepo /opt/coderepo
+====================================================
+
+restart git-daemon: sudo /etc/init.d/git-daemon retart
+
+d.git-dameon log file: /var/log/git-daemon/current
+3. Using Git Behind a Firewall
+install corkscrew http://www.agroman.net/corkscrew
+create a new file called "git-proxy.sh" with following contents and replace <proxy-name> and <proxy-port>
+==================================================
+#!/bin/sh
+exec /usr/bin/corkscew <proxy-name> <proxy-port> $*
+==================================================
+chmod a+x git-proxy.sh
+git config --global core.gitproxy '<path to proxy>/git-proxy.sh'
+
+to configure git to only use the proxy for specific URLs
+git config --global core.gitproxy '"<path to proxy>/git-proxy.sh" for kernel.org' 'for kernel.org$'
+4. Create the mirror.
+mkdir /opt/coderepo/myandroid
+cd /opt/coderepo/myandroid
+repo init -u git://android.git.kernel.org/platform/manifest.git --mirror
+repo sync
+5.change manifest.git config, if not , can not push code change
+cd /opt/coderepo/myandroid/platform/manifest.git
+edit config file, add following lines
+[daemon]
+uploadpack=true
+uploadarch=true
+receivepack=true
+因为我按照如上方法完成之后git push时仍然出现如下问题
+Counting objects: 5, done.
+Delta compression using up to 2 threads.
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (3/3), 312 bytes, done.
+Total 3 (delta 1), reused 0 (delta 0)
+error: unpack failed: unpack-objects abnormal exit
+To git://10.0.67.68/android/platform/manifest.git
+! [remote rejected] master -> master (n/a (unpacker error))
+error: failed to push some refs to 'git://10.0.67.68/android/platform/manifest.git'
+那么最简答的解决办法就是将上面的设置去掉恢复到android默认的所有内容
+然后修改权限让其他组用户可以写你的git仓库
+luther@gliethttp:/vobs/git_repos/android-pub-mirror$ sudo chmod o+w -R platform/manifest.git
+这样之后就可以正常的git push了[luther.gliethttp]
+
+6. change manifest.git
+其实直接git clone git://10.0.67.68/android/platform/manifest.git然后git push即可[luther.gliethttp]
+a.clone manifest.git
+cd ~
+git clone git://android.git.kernel.org/platform/manifest.git
+
+b.Edit the file "~/manifest.git/default.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+<remote name="korg"
+- fetch="git://android.git.kernel.org/"
++ fetch="git://<your local ip>/myandroid/"
+review="review.source.android.com" />
+<default revision="master"
+remote="korg" />
+
+c. commit and push this change.
+git commit -a
+git push git://<your local ip>/myandroid/platform/manifest.git
+7. The setup of the mirror is now complete. make a test
+cd ~
+mkdir testmirror
+repo init -u git://<you local ip>/myandroid/platform/manifest.git
+repo sync
+
+8.References
+http://www.kernel.org/pub/software/scm/git/docs/git-daemon.html
+http://sites.google.com/a/android.com/opensource/download
+http://sites.google.com/a/android.com/opensource/download/using-repo
+
+repo mirror允许上传：
+repo forall -c 'git config receive.denyNonFastForwards True'
+repo forall -c 'git config daemon.uploadpack true'
+repo forall -c 'git config daemon.uploadarch true'
+repo forall -c 'git config daemon.receivepack true'
