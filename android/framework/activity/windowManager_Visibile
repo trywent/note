@@ -1,11 +1,21 @@
+//
+
+/*
+ActivityManager启动app完成后，设置应用可见WindowManager.setAppVisibility
+
+WindowManager知道窗口被设置可见后，通知应用进程进行布局，绘制..
+
+动画管理中显示窗口WindowStateAnimator.performShowLocked
+
+*/
+窗口管理器设置应用显示：
+setTokenVisibilityLocked-->wtoken.sendAppVisibilityToClients@WindowManagerService.java
+-->dispatchAppVisibility()-->handleAppVisibility-->scheduleTraversals-->mTraversalRunnable.run
+-->doTraversal-->performTraversals@ViewRootImpl.java
 
 创建surface：
-relayoutWindow@ViewRootImpl.java-->relayout@Session.java-->relayoutWindow
-
-绘制完成：
-performDraw@ViewRootImpl.java-->finishDrawing@Session.java-->finishDrawingWindow
-
-窗口UI：
+performTraversals-->(先布局)
+relayoutWindow@ViewRootImpl.java-->relayout@Session.java-->relayoutWindow-->
 relayoutWindow{
 - 创建窗口surface，createSurfaceLocked
 - 设置窗口可视状态，win.mViewVisibility = viewVisibility
@@ -13,6 +23,8 @@ relayoutWindow{
 
 
 绘制完成：
+performTraversals-->(再绘制)
+performDraw@ViewRootImpl.java-->finishDrawing@Session.java-->finishDrawingWindow-->
 finishDrawingWindow(Session session, IWindow client){
 - 获取窗口windowForClientLocked(session, client, false)
 - 窗口不为空，且win.mWinAnimator.finishDrawingLocked()为true{
@@ -88,7 +100,7 @@ setAppVisibility{
 	 setTokenVisibilityLocked(AppWindowToken wtoken, WindowManager.LayoutParams lp,
             boolean visible, int transit, boolean performLayout){
 		- 设置View的可视性，绘制View。wtoken.sendAppVisibilityToClients{
-			- 设置ViewRootImpl中的窗口W的可见性
+			- 设置ViewRootImpl中的窗口mAppVisible //设置app是否可见，这个决窗口，view是否可见
 			}
 		- 可视性发生变化{
 			- 动画值不为空，设置应用窗口动画wtoken.mAppAnimator类型

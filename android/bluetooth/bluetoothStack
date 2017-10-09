@@ -36,6 +36,12 @@ event_start_up_stack@stack_manager.c-->bte_main_enable@bte_main.c-->BTU_StartUp@
 //JNI
 bluetoothInterface.init-->
 
+===========
+//a2dp sink src转换
+-#define BTA_AV_SINK_INCLUDED TRUE
++#define BTA_AV_SINK_INCLUDED FALSE 
+
+
 
 system/bt/btif/src/bluetooth.c
 system/bt/btif/src/stack_manager.c

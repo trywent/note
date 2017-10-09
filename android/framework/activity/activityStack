@@ -67,7 +67,7 @@ _____________________________
 stop:
 activityIdleInternal-->stopActivityLocked{
 - activityRecord状态不是finishing，请求结束requestFinishActivityLocked
-- 设置焦点setFocusedActivityLocked，
+- 设置焦点adjustFocusedActivityLocked，
 - 设置ActivityRecord.state状态为STOPPING,设置窗口不可见setAppVisibility
   执行activity端stop，r.app.thread.scheduleStopActivity
 - 发送执行超时消息，sendMessageDelayed(STOP_TIMEOUT_MSG)
@@ -89,7 +89,7 @@ finish:
 requestFinishActivityLocked-->finishActivityLocked{
 - 设置activitRecord状态为finishing，r.makeFinishing()
 - 设置task中最前activityRecord，next.frontOfTask = true
-- 暂停要停止的activity的事件，重新设置焦点activity，setFocusedActivityLocked
+- 暂停要停止的activity的事件，重新设置焦点activity，adjustFocusedActivityLocked
 - 立即结束，则设置结束后结果返resultTo，finishCurrentActivityLocked
 - 若当前activity是mResumedActivity，则准备切换动画prepareAppTransition，设置不可见setAppVisibility
   执行暂停startPausingLocked

@@ -1,4 +1,5 @@
- Application Not Responding" (ANR)。
+//
+Application Not Responding" (ANR)。
 UI thread (which drives the user interface event loop)，所以耗时工作应该在另外的线程中执行。
 通常，当应用不能响应用户输入，系统显示ANR。
 
@@ -10,10 +11,8 @@ A BroadcastReceiver hasn't finished executing within 10 seconds.
 
 参考http://developer.android.com/training/articles/perf-anr.html#Avoiding
 
-______________________
-______________________|
-______________________|
 
+================
 按键：
 listener：1，实现处理方法 2，注册listener 3，触发事件执行处理方法
 view中handler负责处理事件，满足条件执行listener中的方法。
@@ -286,8 +285,11 @@ TouchInputMapper::configureSurface{
 }@InputReader.cpp
 ____________________________
 更新焦点窗口：
-addWindow-->finishUpdateFocusedWindowAfterAssignLayersLocked-->mInputMonitor.setInputFocusLw
-@WindowManagerService.java-->setInputFocusLw@InputMonitor.java
+updateFocusedWindowLocked{
+- computeFocusedWindowLocked-->findFocusedWindowLocked //获取焦点窗口,可见窗口才能获得焦点
+- mInputMonitor.setInputFocusLw-->setInputFocusLw@InputMonitor.java
+}
+@WindowManagerService.java
 
 更新事件接收窗口：
 addWindow@WindowManagerService.java-->updateInputWindowsLw-->mService.mInputManager.
@@ -297,7 +299,8 @@ getDispatcher()->setInputWindows@com_android_server_input_InputManagerService.cp
 setInputWindows@InputDispatcher.cpp
 
 创建本地windowHandle：
-NativeInputManager::setInputWindows@com_android_server_input_InputManagerService.cpp-->android_server_InputWindowHandle_getHandle-->new NativeInputWindowHandle@
+NativeInputManager::setInputWindows@com_android_server_input_InputManagerService.cpp-->
+android_server_InputWindowHandle_getHandle-->new NativeInputWindowHandle@
 com_android_server_input_InputWindowHandle.cpp
 
 查找事件接收窗口：
@@ -311,8 +314,11 @@ findTouchedWindowTargetsLocked
 
 setInputWindows
 
-更新窗口：
-performLayoutLockedInner
+设置焦点应用：
+setFocusedActivityLocked@ActivityManagerService.java-->setFocusedApp@WindowManagerService.java
+-->setFocusedAppLw@InputMonitor.java-->setFocusedApplication@InputManagerService.java
+-->setFocusedApplication@com_android_server_input_InputManagerService.cpp-->
+setFocusedApplication@InputDispatcher.cpp
 
 ====================================
 Connection注册(建立事件通道和事件接收目标的联系)：

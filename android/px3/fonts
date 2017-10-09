@@ -1,22 +1,19 @@
 //
-"/system/etc/system_fonts.xml"中不支持的字体从"/system/etc/fallback_fonts.xml"
-中查找
-getSingletonInterface{
-- 获取字体，GetFontFamilies-->getSystemFontFamilies-->parseConfigFile(SYSTEM_FONTS_FILE)
-	@SkFontConfigParser_android.cpp
-- 创建并返回接口，SkFontConfigInterfaceAndroid(fontFamilies)
-}@SkFontConfigInterface_android.cpp
 
-
-
-external/skia/src/ports/SkFontConfigInterface_android.cpp
-external/skia/src/ports/SkFontConfigParser_android.cpp
 __________________
 setToDefaults()
 frameworks/base/core/java/android/content/res/Configuration.java
 
 //预加载
-mian-->preload-->Class.forname(Typeface)@ZygoteInit.java
+mian-->preload-->Class.forname(Typeface)@ZygoteInit.java-->
+static{
+- init{
+	- familyList //解析/system/etc/font.xml
+	- sSystemFontMap //
+	}
+- DEFAULT-->create-->Typeface(nativeCreateFromTypeface)
+- DEFAULT_BOLD
+}
 
 创建默认字体：
 DEFAULT-->create-->nativeCreate@Typeface.java-->Typeface_create-->SkTypeface::Typeface_create
@@ -46,6 +43,19 @@ frameworks/base/core/java/android/text/TextPaint.java
 frameworks/base/graphics/java/android/graphics/Paint.java
 frameworks/base/core/jni/android/graphics/Paint.cpp
 external/skia/src/core/SkPaint.cpp
+_________________
+"/system/etc/system_fonts.xml"中不支持的字体从"/system/etc/fallback_fonts.xml"
+中查找
+getSingletonInterface{
+- 获取字体，GetFontFamilies-->getSystemFontFamilies-->parseConfigFile(SYSTEM_FONTS_FILE)
+	@SkFontConfigParser_android.cpp
+- 创建并返回接口，SkFontConfigInterfaceAndroid(fontFamilies)
+}@SkFontConfigInterface_android.cpp
+
+
+
+external/skia/src/ports/SkFontConfigInterface_android.cpp
+external/skia/src/ports/SkFontConfigParser_android.cpp
 ==================
 init
 

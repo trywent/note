@@ -16,6 +16,7 @@ android_ids[] = {
 </permission>
 @frameworks/base/data/etc/platform.xml
 ________________________________
+//获取权限
 parsePackage{
 - if (tagName.equals("uses-permission"))-->parseUsesPermission
 - 

@@ -1,3 +1,4 @@
+//
 service sdcard /system/bin/sdcard -u 1023 -g 1023 -l /data/media /mnt/shell/emulated
     class main
 @init.rk30board.rc
@@ -11,6 +12,7 @@ main{
 	- 
 	- mount("/dev/fuse", "/mnt/shell/emulated")
 	- ignite_fuse
+	- fuse_setup(&fuse_write, AID_EVERYBODY, full_write ? 0007 : 0002)//设置写权限
 	}
 }
 
