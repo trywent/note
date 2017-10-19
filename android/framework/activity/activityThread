@@ -17,7 +17,25 @@ main{
 	
 - 设置sMainThreadHandler
 - Looper.loop
-}
+}@ActivityThread.java
+
+//activityManagerServcie关联到进程
+attachApplication-->attachApplicationLocked(IApplicationThread,pid){
+- 查找对应pid的ProcessRecord，关联thread。app.makeActive(thread, mProcessStats)
+- mStackSupervisor.attachApplicationLocked//是否有activity等待运行
+	-->realStartActivityLocked{
+	- app.thread.scheduleLaunchActivity
+	- minimalResumeActivityLocked
+	}@ActivityStackSupervisor.java
+- mServices.attachApplicationLocked{//是否有服务等待运行
+	- 
+	}
+}@ActivityManagerService.java
+
+
+//idle状态
+activityIdleInternal-->activityIdleInternalLocked
+
 ================
 startActivity(Intent)-->startActivity(Intent,Bundle)-->
 mMainThread.getInstrumentation().execStartActivity@ContextImpl.java
@@ -26,7 +44,7 @@ realStartActivityLocked-->app.thread.scheduleLaunchActivity@ActivityStackSupervi
 ApplicationThread.scheduleLaunchActivity-->H.handleMessage-->handleLaunchActivity{
 - 创建窗口，performLaunchActivity
 - 加入View，获取窗口大小，进行布局，handleResumeActivity
-- 若设置启动后进入pause状态，mInstrumentation.callActivityOnPause
+- 若设置启动后进入pause状态，mInstrumentation.callActivityOnPause //当前应用还没有显示
 }
 
 

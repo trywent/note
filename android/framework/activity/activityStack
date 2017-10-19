@@ -1,182 +1,343 @@
-mHistory  //ArrayList所有已经启动的activity的容器
-_____________________________
-start:
-startActivityLocked-->(将activityRecord加入栈中)mHistory.add--(向windowManagerService中加入应用窗口标记)
-mService.mWindowManager.addAppToken(加入应用标记到窗口服务)--resumeTopActivityLocked
+//
+
+mStacks   //non-launcher
+mHomeStack //包含launcher的stack
+mFocusedStack //非homeStack,当前启动activity和接收输入的栈
+
+//启动launcher
+启动栈顶activity：
+systemReady@ActivityManagerService.java-->
+resumeTopActivitiesLocked(ActivityStack, ActivityRecord ,Bundle){
+- 目标栈targetStack为空，获取目标栈。getFocusedStack
+- 查找mStacks中所有栈，获取isFrontStack{
+	- 若stack==targetStack, stack.resumeTopActivityLocked(ActivityRecord,Bundle)
+	- 否则，stack.resumeTopActivityLocked
+	}
+}@ActivityStackSupervisor.java
+
+resumeTopActivityLocked@ActivityStack.java-->resumeHomeActivity{
+- 移动launcher到顶部，moveHomeToTop{
+	- 移动homeStack到前端，moveHomeStack
+	- 移动homeTask到栈顶，moveHomeTaskToTop{
+		- 移动到mTaskHistory栈顶
+		- 移动到窗口栈顶，mWindowManager.moveTaskToTop
+		}
+	}
+- 若mHomeStack中activityRecord是launcher，则恢复launcher，resumeTopActivitiesLocked
+- 若没有则启动launcher，mService.startHomeActivityLocked@ActivityManagerService.java
+	-->startHomeActivity-->startActivityLocked
+}
+
+frameworks/base/services/java/com/android/server/am/ActivityStackSupervisor.java
+_____________________
+找到焦点栈：
+resumeTopActivitiesLocked{
+- 目标栈targetStack为空，获取目标栈。getFocusedStack
+- 查找mStacks中所有栈，获取isFrontStack{
+	- 若stack==targetStack, stack.resumeTopActivityLocked(ActivityRecord,Bundle)
+	- 否则，stack.resumeTopActivityLocked
+	}
+}@ActivityStackSupervisor.java
 
 
-switchUser
-
-resetTaskIfNeededLocked
-
-moveActivityToFrontLocked
-
-moveTaskToFrontLocked
-
-moveTaskToBackLocked
-
-_____________________________
-resume:
+显示栈顶的activity：
 resumeTopActivityLocked{
+- 获取栈顶的ActivityRecord，topRunningActivityLocked
+- 若栈顶为空则启动launcher，mStackSupervisor.resumeHomeActivity
+- 若需resume的activity已经在栈顶{
+	- 执行窗口切换，mWindowManager.executeAppTransition
+	- mNoAnimActivities.clear
+	}
+- 前一个resumed activity不为空{
+	- 
+	}
+- 休眠状态，{
+	- 执行完要执行的动画，mWindowManager.executeAppTransition
+	- mNoAnimActivities.clear
+	}
+- 清除mStackSupervisor中activity的不对状态，mStoppingActivities,mGoingToSleepActivities
+- 要暂停的activity是否完成，mStackSupervisor.allPausedActivitiesComplete
+- 暂停当前已经resumed activity，startPausingLocked
+- 由于睡眠设置了NO_HISTORY的activity没有结束，结束它requestFinishActivityLocked
+- 上个activity不为空，且还是显示{
+	- 
+	- 当前activity已经显示，立即隐藏上个activity,mService.mWindowManager.setAppVisibility
+	}
+- 清除应用停止状态，AppGlobals.getPackageManager().setPackageStoppedState
+- windowManger准备动画，prev不为空{
+	- 状态为prev.finishing,设置动画mService.mWindowManager.prepareAppTransition(NONE/CLOSE)
+	- 不为finishing,设置动画mService.mWindowManager.prepareAppTransition(NONE/OPEN)
+	}else，栈不为空{
+	- 设置动画mService.mWindowManager.prepareAppTransition(NONE/OPEN)
+	}
+
+- next的app和进程已经存在，{
+	- 设置可见， mService.mWindowManager.setAppVisibility
+	- 启动计时，startLaunchTickingLocked
+	- 
+	- 若是mMainStack更新配置，mService.mWindowManager.updateOrientationFromAppTokens
+	}
+- next没有被启动过,startSpecificActivityLocked
+}@ActivityStack.java
+
+
+
+
+frameworks/base/services/java/com/android/server/am/ActivityStack.java
+
+========================
+activity启动流程：
+——————————1)
+startActivityMayWait{
+- 解析，resolveActivity
+- 启动，startActivityLocked
+- 设置启动结果
+}@ActivityStackSupervisor.java
+
+——————————2)
+* 获取调用者
+* 过滤权限
+
+startActivityLocked{
+- 调用者信息，callerApp
+- 结果发送到何处信息，resultRecord
+- 若设置FLAG_ACTIVITY_FORWARD_RESULT,则启动结果传送的caller的reusltTo(调用者的结果接收者)
+- 检查权限是否允许，checkPermission，checkComponentPermission
+- 过滤一些intent，mService.mIntentFirewall.checkStartActivity
+- 创建ActivityRecord，new ActivityRecord
+- 若不是焦点栈中应用发起的startAcvitiy，getFocusedStack{
+	- 若不允许调用者进行应用切换，则返回
+	}
+- 启动正等待启动的activity，doPendingActivityLaunchesLocked
+- 启动这次要启动的activity，并reusme，startActivityUncheckedLocked(,doresuem(true),)
+}@ActivityStackSupervisor.java
+
+——————————3)
+主要是找到对应task，处理task(移除activity，移动task)
+
+boolean addingToTask //启动新activity加入到task中，(task中没有找到要启动的activity)
+
+启动需要的信息：
+* 启动模式{
+	- FLAG_ACTIVITY_NEW_TASK
+	}
+* 启动者的ActivityRecord，启动者所在的task，所在的stack
+* 启动结果的返回ActivityRecord.resultTo
+* 被启动者将要在的任务TaskRecord reuseTask，将要在的栈ActivityStack targetStack
+* 若要启动到新task{
+	- 获得目标task中的栈顶activity，ActivityRecord intentActivity
+	- 获取目标栈targetStack，并移动到前台
+	- 当前task不是目标task，启动者task在前台。则移动目标task到前台
+	}
+* 是否要创建activity,加入task中。addingToTask //activity可能不存在
+
+
+startActivityUncheckedLocked{
+- 判断是否清除标记START_FLAG_ONLY_IF_NEEDED，//若启动者和被启动者不是同一个activity则清除
+- 判断是否开启新task，FLAG_ACTIVITY_NEW_TASK
+- 调用者sourceRecord不为空，则保存task信息，newTaskInfo
+- 若启动到新task中，则不返回启动结果。设置r.resultTo = null
+- 启动activity到新task中,{ //设置task，移动，清除...
+	- 找到对应task中的最顶部ActivityRecord intentActivity，
+		findTaskLocked //找到对应activity所在栈的栈顶activity
+		findActivityLocked //找到对应的activity
+	- 若找到则继续
+	- 设置目标栈，targetStack = intentActivity.task.stack
+	- 移动homeStack，若要启动的activity在homestack则移到前面。否则移到后面
+	- targetStack不在当前显示的task,则移动到前台targetStack.moveTaskToFrontLocked
+	- 若task的intent为空，则设置为当前的启动intent
+	- activity所在栈不在最前面{
+		- 启动者是在前端？？，立即移动activity到最前端targetStack.moveTaskToFrontLocked
+		}
+	- IF_NEEDED不执行启动，则恢复最上的activity，resumeTopActivitiesLocked
+	- FLAG_ACTIVITY_NEW_TASK|FLAG_ACTIVITY_CLEAR_TASK。使用独立并清空的reuseTask
+	- FLAG_ACTIVITY_CLEAR_TOP,LAUNCH_SINGLE_TASK,LAUNCH_SINGLE_INSTANCE
+	   清除要启动activity之上的其它activity，设置当前task的intent
+	- 启动的activity和目标task中的启动activity一致，并且和task中最上的activity一致
+		，则更新最上activity的intent。
+	- 正常流程，开始新task。//FLAG_ACTIVITY_RESET_TASK_IF_NEEDED==0
+	- 不执行启动，targetStack.resumeTopActivityLocked
+	}
+- 要启动的activity已经在，当前栈，当前task的栈顶。则resumeTopActivitiesLocked
+- activity已经存在(!addingToTask)，移动到另一task中{
+	-获取activity对应的stack(若没有则创建)，adjustStackFocus
+	- 调整home栈和当前栈，moveHomeStack
+	- 创建新task，createTaskRecord
+	- 设置到目的task，setTask
+	}
+- 启动者不为空(启动到启动者task){
+	- activity已经存在，清除其它activity{
+		- performClearTaskLocked
+		- resumeTopActivityLocked
+		}
+	- activity已经存在，移动到前面{
+		- task.moveActivityToFrontLocked(			
+		}
+	- 保存task，r.setTask
+	}
+- 没有启动者，也没有task。//创建新的
+- 启动activity，targetStack.startActivityLocked
+- 设置焦点，mService.setFocusedActivityLocked
+}@ActivityStackSupervisor.java
+
+
+——————————4)
+startActivityLocked{
+- 加入新task，insertTaskAtTop
+- 移动窗口管理器中的task,mWindowManager.moveTaskToTop
+- 若activity不是启动新task，{
+	- 遍历所有task,查找activity对应的task
+	- 不启动activity，{
+		- 移动到栈顶，task.addActivityToTop
+		- 加入到窗口管理器，mWindowManager.addAppToken
+		}
+	- 若其他task中有遮挡屏幕的activity，则启动activity。
+	}
+- 加入到task，task.addActivityToTop(r)
 - 
-- 设置前个activity不可见,mService.mWindowManager.setAppVisibility(prev)
+- 若是第一个activity，则不执行动画。mWindowManager.addAppToken
+- doresume，mStackSupervisor.resumeTopActivitiesLocked
+}@ActivityStack.java
 
-}
-
-resumeTopActivityLocked-->startSpecificActivityLocked-->
-realStartActivityLocked-->(checkConfig为true)mService.mWindowManager.updateOrientationFromAppTokens
-@ActivityStack.java
-
-
-resumeTopActivityLocked-->mService.mWindowManager.updateOrientationFromAppTokens@ActivityStack.java
-
-
-completeResumeLocked{
-- 发送空闲超时消息，防止app没有执行空闲操作。sendMessageDelayed(IDLE_TIMEOUT_MSG)
-- 主栈中，更新组件状态信息(UsageStatsService)，mService.reportResumedActivityLocked
-- 设置焦点应用，mService.setFocusedActivityLocked-->mWindowManager.setFocusedApp
-- 恢复事件分配，next.resumeKeyDispatchingLocked-->service.mWindowManager.resumeKeyDispatching
-- 设置activity确保可见，ensureActivitiesVisibleLocked
-}
-
-
-_____________________________
-pause:(对mResumedActivity执行)
-resumeTopActivityLocked-->startPausingLocked{
-- mResumedActivity为空，启动activity，resumeTopActivityLocked
-- 设置正在暂停activity，mPausingActivity
-- 应用进程不为空，prev.app.thread.schedulePauseActivity
-- 停止事件分发，pauseKeyDispatchingLocked。发送暂停超时，sendMessageDelayed(PAUSE_TIMEOUT_MSG)
-}
-
-
-activity端回调：
-activityPaused{
-- mPausingActivity执行暂停，completePauseLocked{
-		- mPausingActivity不为空{
-			- mPausingActivity状态为finishing，结束actvity。执行finishCurrentActivityLocked
-			- 若是配置改变直接销毁，destroyActivityLocked
-			- 加入到正在结束，mStoppingActivities.add，进入空闲scheduleIdleLocked
+——————————5)
+resumeTopActivitiesLocked-->ActivityStack.resumeTopActivityLocked-->
+startSpecificActivityLocked{
+- 获取进程，mService.getProcessRecordLocked
+- 若进程不为空，realStartActivityLocked
+- 进程没有运行，运行mService.startProcessLocked-->Process.start("android.app.ActivityThread")
+	-->attach@ActivityThread.java-->attachApplication-->attachApplicationLocked{
+	- mStackSupervisor.attachApplicationLocked{
+		- 获取等待启动的activity，topRunningActivityLocked
+		- 启动realStartActivityLocked
 		}
-		- 恢复栈顶activity，resumeTopActivityLocked
-		- 记录cpu使用时间
+	- 将服务关联到进程，mServices.attachApplicationLocked
 	}
-}
+}@ActivityStack.java
 
-_____________________________
-stop:
-activityIdleInternal-->stopActivityLocked{
-- activityRecord状态不是finishing，请求结束requestFinishActivityLocked
-- 设置焦点adjustFocusedActivityLocked，
-- 设置ActivityRecord.state状态为STOPPING,设置窗口不可见setAppVisibility
-  执行activity端stop，r.app.thread.scheduleStopActivity
-- 发送执行超时消息，sendMessageDelayed(STOP_TIMEOUT_MSG)
-}
+realStartActivityLocked{
+- 设置为可见，mWindowManager.setAppVisibility
+- 是否更新配置，updateOrientationFromAppTokens
+- 
+- 启动activity，app.thread.scheduleLaunchActivity@ActivityThread.java
+- 已经执行过resuem，所以minimalResumeActivityLocked
+}@ActivityStackSupervisor.java
 
-activity端回调：
-activityStoppedLocked{
-- 是否stoping状态
-- 非stopped{
-	- 设置状态stoped，
-	- finishing状态，直接清除未处理操作，clearOptionsLocked
-	- 由于配置更改结束，销毁destroyActivityLocked，重启resumeTopActivityLocked
-	- 设置前个app(用户返回该应用？)
+
+//应用线程执行完消息队列后
+activityIdleInternalLocked{
+- 判断launcher所在栈是否在最前，isFrontStack(mHomeStack){
+	- 获取服务中的启动状态，mService.mBooting。并设置启动状态结束
 	}
-}
-_____________________________
-finish:
-
-requestFinishActivityLocked-->finishActivityLocked{
-- 设置activitRecord状态为finishing，r.makeFinishing()
-- 设置task中最前activityRecord，next.frontOfTask = true
-- 暂停要停止的activity的事件，重新设置焦点activity，adjustFocusedActivityLocked
-- 立即结束，则设置结束后结果返resultTo，finishCurrentActivityLocked
-- 若当前activity是mResumedActivity，则准备切换动画prepareAppTransition，设置不可见setAppVisibility
-  执行暂停startPausingLocked
-- 直接结束，finishCurrentActivityLocked
+- 若还是启动状态booting，结束启动finishBooting@ActivityManagerService.java
 }
 
+=====================
+配置改变：
+ensureActivityConfigurationLocked
 
-
-finishCurrentActivityLocked{
-- 要结束的activity可见，则延迟操作。mStoppingActivities不为空进入scheduleIdleLocked
-- 满足销毁条件，销毁destroyActivityLocked
-- 先pause，再finish。加入到mFinishingActivities中
-}
-
-removeActivityFromHistoryLocked{
-- 状态为非销毁状态{
-	- finishActivityResultsLocked
-	- 设置ActivityRecord状态为finish，r.makeFinishing
-	- 从history中移除，mHistory.remove。清楚ActivityRecord的history记录
-	- 从窗口服务中移除窗口，mService.mWindowManager.removeAppToken
-	- 移除该Activity与服务的连接，cleanUpActivityServicesLocked
-} 
-}
-_____________________________
-destory:
-
-destroyActivityLocked{
-- 清除activityRecord，cleanUpActivityLocked
-- 若在一个应用中，{
-		- 从app中移除，r.app.activities.remove
-		- 调用activity中销毁方法，r.app.thread.scheduleDestroyActivity
-		- 发送销毁超时操作防止上步没有成功，sendMessageDelayed(DESTROY_TIMEOUT_MSG)
-	}
-- 不在应用中，从history中移除removeActivityFromHistoryLocked
-}
-
-activity端回调：
-activityDestroyed{
-- 清除消息，DESTROY_TIMEOUT_MSG
-- 从history中移除activityRecord，removeActivityFromHistoryLocked
-- 恢复栈顶activity，resumeTopActivityLocked
-}
-_____________________________
-
-activityIdleInternal-->stopActivityLocked
-
-
-
-_____________________________
+setPackageScreenCompatModeLocked@CompatModePackages.java
+restartPackage@ActivityStack.java
+=====================
 显示：
-mService.mWindowManager.setAppVisibility
+ensureActivitiesVisibleLocked@ActivityStackSupervisor.java-->stack.ensureActivitiesVisibleLocked
+-->isActivityOverHome@ActivityStack.java
 
-ensureActivitiesVisibleLocked{
-- 若栈顶activity不是全屏，使它之下的activity可见。开始遍历{
-		- activity没有启动，则是可见setAppVisibility，并启动startSpecificActivityLocked
-		- 已经可见，停止冻结屏幕stopFreezingScreenLocked
-		- 已启动但不可见，设置可见{
-			- mService.mWindowManager.setAppVisibility
-			- r.app.thread.scheduleWindowVisibility
+=====================
+task:
+startActivityUncheckedLocked{
+- 创建新task，r.setTask(targetStack.createTaskRecord)
+}
+
+移除task：
+destroyActivityLocked-->removeActivityFromHistoryLocked@ActivityStack.java-->
+removeTask@ActivitySupervisor.java
+
+mTaskHistory
+
+=====================
+stack:
+
+//创建
+createStack{
+- 创建栈，mStackSupervisor.createStack-->new ActivityStack@ActivityStackSupervisor.java
+- 创建栈窗口区域，mWindowManager.createStack
+}@ActivityManagerService.java
+
+//移除
+removeTask-->mStacks.remove
+
+//调整
+startActivityUncheckedLocked-->adjustStackFocus(ActivityRecord){
+- 若是应用activity{
+	- 若ActivityRecord.task不为空则返回task.stack。并设置mFocusedStack
+	- ActivityRecord.task为空，但mFocusedStack不为空，则返回mFocusedStack
+	- mFocusedStack为空则遍历mStacks，并返回
+	- 创建新stack，mService.createStack{
+		- 创建stackid，mStackSupervisor.createStack
+		- 创建窗口服务端stack，createStack
 		}
-		- 找到全屏activity，退出遍历
-	
 	}
-- 设置全屏之后的activity不可见{
-		- 设置窗口不可见，mService.mWindowManager.setAppVisibility
-		- 若状态为stopping或stopped。应用不可见r.app.thread.scheduleWindowVisibility
-	}
+- 返回homestack
 }
-_____________________________
-空闲：
-checkReadyForSleepLocked
 
-finishCurrentActivityLocked
 
-completePauseLocked
+//设置非前端栈中，所有activity状态为暂停
+pauseBackStacks
 
-scheduleIdleLocked-->sendMessage(IDLE_NOW_MSG)-->handleMessage-->activityIdleInternal@ActivityStack.java
+//显示top
+resumeTopActivitiesLocked-->(暂停)pauseBackStacks
 
-设置超时处理：
-completeResumeLocked-->sendMessage(IDLE_TIMEOUT_MSG)-->handleMessage-->activityIdleInternal@ActivityStack.java
 
-windowsVisible{
--
-- stack.mHandler.sendMessage(IDLE_NOW_MSG)
-}@ActivityRecord.java
 
-activityIdleInternal{
-- stopActivityLocked
-- destroyActivityLocked
+findTaskToMoveToFrontLocked-->moveTaskToFrontLocked
+
+=====================
+调整焦点栈：
+removeTask
+
+//查找activity对应的栈
+startActivityUncheckedLocked-->adjustStackFocus{
+- 查找并设置，mFocusedStack
 }
+
+
+设置状态：
+//触摸设置焦点栈：
+displayContent.mTapDetector(TAP_OUTSIDE_STACK)@StackTapPointerEventListener.java
+-->setFocusedStack@WindowManagerService.java-->setFocusedStack-->setFocusedActivityLocked
+@WindowManagerService.java-->setFocusedStack{
+- 若不是应用栈，mStackState(若home栈不为in_front,则设为to_front)
+- 若是应用栈，设置mFocusedStack，mStackState(若home栈不为in_back,则设为to_back)
+}@ActivityStackSupervisor.java
+
+//acvitiy启动完成
+allResumedActivitiesComplete{
+- mStackState（若是to_back,则设置in_back）
+- mStackState（若是to_front,则设置in_front）
+}
+
+//移动homestack
+startActivityUncheckedLocked(启动应用时设置)-->moveHomeStack{
+- 设置mStackState
+}@ActivityStackSupervisor.java
+====================
+//焦点应用
+startActivityUncheckedLocked-->setFocusedActivityLocked@ActivityStackSupervisor.java
+
+adjustFocusedActivityLocked-->setFocusedActivityLocked@ActivityStack.java
+
+
+frameworks/base/services/java/com/android/server/am/ActivityStackSupervisor.java
+frameworks/base/services/java/com/android/server/am/ActivityStack.java
+=====================
+总结：
+启动流程：(解析启动的activity信息)startActivityLocked-->(将activity加入到栈中)
+startActivityUncheckedLocked-->(显示栈顶的activity)resumeTopActivitiesLocked
+-->resumeTopActivityLocked
+
+
+
+
+#####################
+执行空闲时的操作：
+ActivityStackSupervisorHandler.handleMessage(IDLE_TIMEOUT_MSG/IDLE_NOW_MSG)-->activityIdleInternal-->activityIdleInternalLocked

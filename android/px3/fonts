@@ -1,5 +1,10 @@
 //
+//android5.0之前
+DroidSansFallback.ttf
 
+//android5.0之后
+NotoSansHans-Regular.otf
+DroidSansFallback.ttf
 __________________
 setToDefaults()
 frameworks/base/core/java/android/content/res/Configuration.java
@@ -13,9 +18,9 @@ static{
 	}
 - DEFAULT-->create-->Typeface(nativeCreateFromTypeface)
 - DEFAULT_BOLD
-}
+}@Typeface.java
 
-创建默认字体：
+创建默认字体：sDefaults
 DEFAULT-->create-->nativeCreate@Typeface.java-->Typeface_create-->SkTypeface::Typeface_create
 @Typeface.cpp-->SkTypeface::CreateFromName(NULL, style)-->(返回默认字体)RefDefault-->
 GetDefaultTypeface@SkTypeface.cpp-->SkFontHost::CreateTypeface-->SkFontMgr::legacyCreateTypeface
@@ -31,11 +36,6 @@ frameworks/base/graphics/java/android/graphics/Typeface.java
 frameworks/base/core/jni/android/graphics/Typeface.cpp
 external/skia/src/core/SkTypeface.cpp
 external/skia/src/core/SkFontHost.cpp
-
-TextView设置字体：
-setTypeface-->mTextPaint.setTypeface(tf)@TextView.java-->(TextPaint继承Paint)
-setTypeface@Paint.java-->native_setTypeface-->SkPaintGlue::setTypeface-->
-SkPaint-->setTypeface@Paint.cpp
 
 
 frameworks/base/core/java/android/widget/TextView.java
@@ -56,12 +56,31 @@ getSingletonInterface{
 
 external/skia/src/ports/SkFontConfigInterface_android.cpp
 external/skia/src/ports/SkFontConfigParser_android.cpp
-==================
-init
 
-"system_fonts.xml"
 
-create-->new FontLoader()
 
-frameworks/base/tools/layoutlib/bridge/src/com/android/layoutlib/bridge/Bridge.java
-frameworks/base/tools/layoutlib/bridge/src/com/android/layoutlib/bridge/impl/FontLoader.java
+
+//================
+//设置字体 setTypeface(Typeface.MONOSPACE,Typeface.ITALIC)
+
+TextView-->setTypefaceFromAttrs-->setTypeface(Typeface,style){
+- Typeface.defaultFromStyle(style)//若typeface则设置默认字体
+- Typeface.create(tf, style)-->create@Typeface.java-->nativeCreateFromTypeface
+	-->Typeface_createFromTypeface@Typeface.cpp-->TypefaceImpl_createFromTypeface
+	-->@TypefaceImpl.cpp
+- setTypeface(Typeface)
+- mTextPaint.setTextSkewX
+}@TextView.java
+
+TypefaceImpl_createFromTypeface(src){
+- src为空创建默认字体，TypefaceImpl_resolveDefault-->getDefaultTypefaceOnce{
+	- makeFontCollection ///system/fonts/Roboto-Regular.ttf创建字符
+	- TypefaceImpl* gDefaultTypeface//返回默认字符
+	}
+- 
+- result->fSkiaStyle = style //设置风格italiy，斜体，粗体
+}@TypefaceImpl.cpp
+
+frameworks/base/graphics/java/android/graphics/Typeface.java
+frameworks/base/core/jni/android/graphics/Typeface.cpp
+frameworks/base/core/jni/android/graphics/TypefaceImpl.cpp

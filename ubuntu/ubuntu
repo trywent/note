@@ -10,7 +10,11 @@ more /etc/passwd
 //增加用户
 sudo adduser username
 
+//查看组
+groupmod <TAB 3次>
+
 sudo adduser username sudo //设置超级用户权限
+adduser username group //添加用户到组group
 
 //======================
 //install downgrade

@@ -1,5 +1,12 @@
 //
 git4种协议：本地(/path/to/dir/)，ssh，Git，HTTP
+
+git clone git://user@server/gitrepo
+git clone ssh://user@server/gitrepo
+git clone http://user@server/gitrepo
+git clone file://user@server/gitrepo
+
+
 服务器端：
 $ cd /srv/git
 $ mkdir project.git

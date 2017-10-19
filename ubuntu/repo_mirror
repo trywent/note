@@ -1,14 +1,15 @@
+//
 repo init -u git://10.0.67.68/android/platform/manifest.git --repo-url=git://10.0.67.68/android/tools/repo.git
 
-ÔÚ.repo/manifest.xml¼ÓÈëkernel
+åœ¨.repo/manifest.xmlåŠ å…¥kernel
 <manifest>
 <project path="kernel" name="kernel/common"/>
 </manifest>
-»¹ĞèÒª¼ÓÈë¾ßÌåµÄrevisionºÅ(Ò²¿ÉÒÔÊÇhash id»òÕßÊÇ¹Ì¶¨µÄtagsºÅrevision="refs/tags/android-2.2_r1.3")
+è¿˜éœ€è¦åŠ å…¥å…·ä½“çš„revisionå·(ä¹Ÿå¯ä»¥æ˜¯hash idæˆ–è€…æ˜¯å›ºå®šçš„tagså·revision="refs/tags/android-2.2_r1.3")
 <project path="kernel" name="kernel/common" revision="android-2.6.38" />
-»òÕß
+æˆ–è€…
 <project path="kernel" name="kernel/common" revision="archive/android-2.6.32" />
-·ñÔòrepo syncÊ±½«»áÌáÊ¾ÈçÏÂ´íÎó
+å¦åˆ™repo syncæ—¶å°†ä¼šæç¤ºå¦‚ä¸‹é”™è¯¯
 Fetching projects: 100% (171/171), done. 
 Syncing work tree: 66% (113/171) error: revision master in kernel/common not found
 
@@ -17,7 +18,7 @@ Syncing work tree: 66% (113/171) error: revision master in kernel/common not fou
 Creating an Android Mirror
 1. Prerequisites/Assumptions
 install repo git http://sites.google.com/a/android.com/opensource/download
-Git¹¤¾ßÊ¹ÓÃºÍ°²×°git·şÎñÆ÷¼´git-daemonÅäÖÃgit://localhost/test.gitÄäÃûÏÂÔØ·şÎñÆ÷
+Gitå·¥å…·ä½¿ç”¨å’Œå®‰è£…gitæœåŠ¡å™¨å³git-daemoné…ç½®git://localhost/test.gitåŒ¿åä¸‹è½½æœåŠ¡å™¨
 2.Setting up a Git Server
 a.sudo apt-get install git-daemon
 b.change iptables, git-daemon use tcp port 9481
@@ -57,7 +58,7 @@ edit config file, add following lines
 uploadpack=true
 uploadarch=true
 receivepack=true
-ÒòÎªÎÒ°´ÕÕÈçÉÏ·½·¨Íê³ÉÖ®ºógit pushÊ±ÈÔÈ»³öÏÖÈçÏÂÎÊÌâ
+å› ä¸ºæˆ‘æŒ‰ç…§å¦‚ä¸Šæ–¹æ³•å®Œæˆä¹‹ågit pushæ—¶ä»ç„¶å‡ºç°å¦‚ä¸‹é—®é¢˜
 Counting objects: 5, done.
 Delta compression using up to 2 threads.
 Compressing objects: 100% (2/2), done.
@@ -67,13 +68,13 @@ error: unpack failed: unpack-objects abnormal exit
 To git://10.0.67.68/android/platform/manifest.git
 ! [remote rejected] master -> master (n/a (unpacker error))
 error: failed to push some refs to 'git://10.0.67.68/android/platform/manifest.git'
-ÄÇÃ´×î¼ò´ğµÄ½â¾ö°ì·¨¾ÍÊÇ½«ÉÏÃæµÄÉèÖÃÈ¥µô»Ö¸´µ½androidÄ¬ÈÏµÄËùÓĞÄÚÈİ
-È»ºóĞŞ¸ÄÈ¨ÏŞÈÃÆäËû×éÓÃ»§¿ÉÒÔĞ´ÄãµÄgit²Ö¿â
+é‚£ä¹ˆæœ€ç®€ç­”çš„è§£å†³åŠæ³•å°±æ˜¯å°†ä¸Šé¢çš„è®¾ç½®å»æ‰æ¢å¤åˆ°androidé»˜è®¤çš„æ‰€æœ‰å†…å®¹
+ç„¶åä¿®æ”¹æƒé™è®©å…¶ä»–ç»„ç”¨æˆ·å¯ä»¥å†™ä½ çš„gitä»“åº“
 luther@gliethttp:/vobs/git_repos/android-pub-mirror$ sudo chmod o+w -R platform/manifest.git
-ÕâÑùÖ®ºó¾Í¿ÉÒÔÕı³£µÄgit pushÁË[luther.gliethttp]
+è¿™æ ·ä¹‹åå°±å¯ä»¥æ­£å¸¸çš„git pushäº†[luther.gliethttp]
 
 6. change manifest.git
-ÆäÊµÖ±½Ógit clone git://10.0.67.68/android/platform/manifest.gitÈ»ºógit push¼´¿É[luther.gliethttp]
+å…¶å®ç›´æ¥git clone git://10.0.67.68/android/platform/manifest.gitç„¶ågit pushå³å¯[luther.gliethttp]
 a.clone manifest.git
 cd ~
 git clone git://android.git.kernel.org/platform/manifest.git
@@ -102,8 +103,33 @@ http://www.kernel.org/pub/software/scm/git/docs/git-daemon.html
 http://sites.google.com/a/android.com/opensource/download
 http://sites.google.com/a/android.com/opensource/download/using-repo
 
-repo mirrorÔÊĞíÉÏ´«£º
+repo mirrorå…è®¸ä¸Šä¼ ï¼š
 repo forall -c 'git config receive.denyNonFastForwards True'
 repo forall -c 'git config daemon.uploadpack true'
 repo forall -c 'git config daemon.uploadarch true'
 repo forall -c 'git config daemon.receivepack true'
+
+
+===============
+//å»ºç«‹é•œåƒrepo
+sofia6.0:
+repo init --repo-urlÂ ssh://git@www.rockchip.com.cn:2222/repo-release/tools/repoÂ -u ssh://gitolite@www.rockchip.com.cn:928/sofia3gr-car-M/manifests -b sofia3gr-car-android-M -m default.xml --mirror
+
+px5:
+repo init -u ssh://git@www.rockchip.com.cn:2222/px5/manifests.git --mirror
+
+px6:
+repo init --repo-url=ssh://git@www.rockchip.com.cn:2222/repo-release/tools/repo.git -u ssh://git@www.rockchip.com.cn:2222/rk3399-nougat/manifests.git -m rk3399_nougat_release.xml --mirror
+
+
+repo sync
+
+//åŒæ­¥repo
+repo init --repo-url=ssh://git@192.168.1.124/home/disk1/px6/repo.git -u ssh://git@192.168.1.124/home/disk1/px6/manifests.git -m rk3399_nougat_release.xml  -b branchname
+
+
+åˆ›å»ºæ–°åˆ†æ”¯ï¼š
+repo forall -c 'git branch fytamster'
+
+éœ€æ”¹åŒæ­¥ï¼š
+1ï¼‰ä¿®æ”¹manifest.xmlä¸­<>

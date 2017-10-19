@@ -27,7 +27,8 @@ AudioRecord::AudioRecord-->set(audio_source_t inputSource,
         audio_channel_mask_t channelMask){
 - 
 - openRecord_l{
-	- AudioSystem::getInputForAttr(根据采样率等参数，创建属性)-->aps->getInputForAttr{//获取流
+	- AudioSystem::getInputForAttr(根据采样率等参数，创建属性)-->aps->getInputForAttr
+		AudioPolicyManager::getInputForAttr{//获取流
 		- config //设置config 采样率，格式，通道
 		- mInputs中查找可用的input，若找到直接返回（实现多应用同时录音）
 		- mpClientInterface->openInput(config)

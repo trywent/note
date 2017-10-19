@@ -1,6 +1,6 @@
 //activity设置当前应用切换类型(task切换，activity切换)，用于加载动画
 prepareAppTransition{
-- mAppTransition.setAppTransition-->赋值mNextAppTransition
+- mAppTransition.setAppTransition-->赋值mNextAppTransition(activity open/close,task open/close...)
 - mAppTransition.prepare -->设置mAppTransitionState= APP_STATE_IDLE
 }
 
@@ -79,8 +79,11 @@ applyAnimationLocked@WindowState.java-->WindowStateAnimator.applyAnimationLocked
 - 获取systemui窗口动画，mPolicy.selectAnimationLw
 - 没有获取到，设置窗口动画(不同的窗口不同动画)
    WindowAnimation_windowEnterAnimation/windowExitAnimation
-- 根据动画资源加载动画，mAppTransition.loadAnimation()-->AnimationUtils.loadAnimation
-	@AppTransition.java-->createAnimationFromXml@AnimationUtils.java
+- 根据动画资源加载动画，mAppTransition.loadAnimation(){
+	//创建自定义动画NEXT_TRANSIT_TYPE_CUSTOM，或者默认动画
+	- loadAnimationRes-->AnimationUtils.loadAnimation-->createAnimationFromXml@AnimationUtils.java
+	- 
+	}@AppTransition.java
 - 设置动画setAnimation
 }@WindowStateAnimator.java
 

@@ -9,6 +9,22 @@ ssh wb@192.168.1.131
 pw:wb
 
 
+//创建ssh key
+ssh-keygen -t rsa
+
+这时可以在主机A上看到生成的秘钥~/.ssh/id_rsa 和公钥 ~/.ssh/id_rsa.pub
+
+拷贝到主机B
+scp -r /root/.ssh/id_rsa.pub 192.168.31.147:/root/.ssh/authorized_keys
+
+
+cat  id_rsa.pub >> ~/.ssh/authorized_keys
+
+如果有修改配置/etc/ssh/sshd_config，需要重启ssh服务器
+
+/etc/init.d/ssh restart
+
+
 ======
 1）将本地文件拷贝到远程
   scp 文件名用户名@计算机IP或者计算机名称:远程路径  

@@ -94,6 +94,7 @@ hardware/rk29/audio/AudioPolicyCompatClient.cpp
 //input 
 
 AudioPolicyManager::getInputForAttr{
+- 设置input，halInputSource
 - mInputs中查找可用的input，若找到直接返回（实现多应用同时录音）
 - mpClientInterface->openInput-->AudioFlinger::openInput-->openInput_l
 }

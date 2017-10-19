@@ -40,6 +40,7 @@ bluetoothInterface.init-->
 //a2dp sink src转换
 -#define BTA_AV_SINK_INCLUDED TRUE
 +#define BTA_AV_SINK_INCLUDED FALSE 
+@include/bt_target.h
 
 
 

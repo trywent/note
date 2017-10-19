@@ -12,3 +12,18 @@ dwc_otg_hc_driver.bus_resume-->hcd_resume-->dwc_otg_hcd_resume@dwc_otg_hcd_linux
 
 
 kernel/drivers/usb/dwc_otg_310/dwc_otg_hcd_linux.c
+
+
+//======================usb mode
+otg20_driver_probe-->dwc_otg_device->core_if->usb_mode
+
+
+
+//mode control /*0 - Normal, 1 - Force Host, 2 - Force Device*/
+DRIVER_ATTR(force_usb_mode, S_IRUGO | S_IWUSR, force_usb_mode_show,force_usb_mode_store)
+
+
+/sys/bus/platform/drivers/usb20_otg/force_usb_mode
+
+
+kernel/drivers/usb/dwc_otg_310/dwc_otg_driver.c

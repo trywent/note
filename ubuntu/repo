@@ -15,7 +15,7 @@ repo diff [ project-list ]
 //下载特定的修改版本到本地
 repo download  target revision
 //创建新的branch分支
-repo start newbranchname
+repo start newbranchname --all//创建分支
 //删除已经merge 的 project
 repo prune [project list]
 //对每一个 project 运行 command 命令       
@@ -41,7 +41,7 @@ http://192.168.1.124/home/
 repo init --repo-url=git://192.168.1.124/home/disk1/px5/repo.git  --repo-branch=stable -u git://192.168.1.124/home/disk1/px5/manifests.git  --mirror
 //repo 建立仓库
 1)
-repo init --repo-url=192.168.1.124:/home/disk1/px5/repo.git --repo-branch=stable -u 192.168.1.124:/home/disk1/px5/manifests.git  --mirror
+repo init --repo-url=ssh:/git@192.168.1.124:/home/disk1/px5/repo.git --repo-branch=stable -u ssh:/git@192.168.1.124:/home/disk1/px5/manifests.git  --mirror
 
 //--repo-url repo.git仓库的路径
 //-u manifest.git 清单仓库(被管理的git仓库的清单)

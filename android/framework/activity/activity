@@ -1,3 +1,4 @@
+//
 activity:
 状态间的转变：
 Created-----started(可见)-----Resumed-----Paused-----sopted-----destoryed

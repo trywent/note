@@ -1,19 +1,38 @@
 //通过HAL层进行操作
 AudioPolicyService::AudioPolicyService{
 - 创建线程，AudioCommandThread
-- audio模块，hw_get_module(AUDIO_POLICY_HARDWARE_MODULE_ID)
-- 打开设备，audio_policy_dev_open(module, &mpAudioPolicyDev)-->module->methods->open@audio_policy.h
-- 传递audioflinger到HAL层，创建policy，mpAudioPolicyDev->create_audio_policy(&aps_ops,&mpAudioPolicy)-->
-	create_legacy_ap@audio_policy_hal.cpp
-- 加载配置，loadPreProcessorConfig(/etc/audio_effects.config)
+- 老方法{
+   - audio模块，hw_get_module(AUDIO_POLICY_HARDWARE_MODULE_ID)
+   - 打开设备，audio_policy_dev_open(module, &mpAudioPolicyDev)-->module->methods->open@audio_policy.h
+   }
+- 新方法{
+   - AudioPolicyClient //实现AudioPolicyClientImpl
+   - createAudioPolicyManager-->AudioPolicyManager	
+   }
+
 }
 
+AudioPolicyManager{
+- 创建默认输出设备，mDefaultOutputDevice
+- 解析配置文件，loadAudioPolicyConfig("audio_policy.conf"){
+	- 解析hw(primary,a2dp)，input，output	
+	}
+- mEngine->initializeVolumeCurves //初始化音量
+- 初始化mHwModules{
+	- mpClientInterface->loadHwModule(name)--> //加载hw库
+	  AudioPolicyService::AudioPolicyClient::loadHwModule-->af->loadHwModule(name)
+	- 
+	}
+- 初始化mAvailableOutputDevices{
 
-加载模块：
-load_hw_module-->aps_load_hw_module-->af->loadHwModule
+	}
+- 初始化mAvailableInputDevices{
+
+	}
+}	
+
 
 frameworks/av/services/audioflinger/AudioPolicyService.cpp
-
 //AudioPolicyService通过audio_policy_hal进行操作
 
 //加载模块

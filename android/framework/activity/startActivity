@@ -119,7 +119,7 @@ startActivityLocked(ActivityRecord r, boolean newTask,
 
 resumeTopActivityLocked(ActivityRecord prev)-->
 resumeTopActivityLocked(ActivityRecord prev, Bundle options){
-- 
+- startSpecificActivityLocked
 }
 
 //设置heavy-weight进程mHeavyWeightProcess
