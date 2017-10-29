@@ -1,0 +1,13 @@
+//
+lowmem_init{
+- register_shrinker(&lowmem_shrinker)
+- raw_notifier_chain_register(&bgtsk_migration_notifier_head,
+					&tsk_migration_nb)
+}
+
+lowmem_shrinker-->lowmem_shrink{
+- 获取内存信息，global_page_state
+- 找出free内存小于lowmem_minfree数组中的对应项，获得min_score_adj(杀进程的阈值)
+- 找到大于阈值的进程， 
+
+}

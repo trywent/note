@@ -1,0 +1,28 @@
+//1，申请内存时不够直接触发回收.  2，周期性检查内存使用情况，少于水位线时触发回收
+kswapd周期性检查内存判断是否回收内存
+
+
+//水位
+cat /proc/zoneinfo
+
+/proc/sys/vm/min_free_kbytes决定了每个zone的watermark[min]的大小，然后根据min的大小和每个zone内存大小分别算出每个zone的low和high水位标记
+
+===========
+//注册shrinker
+register_shrinker-->list_add_tail(&shrinker->list, &shrinker_list);
+
+
+shrink_slab{//遍历shrinker_list
+- 
+}
+
+//kswapd 运行
+kswapd_init-->kswapd_run-->kthread_run(kswapd)-->kswapd{
+
+}
+
+
+
+
+
+mm/vmscan.c
