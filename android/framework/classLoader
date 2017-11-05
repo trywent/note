@@ -1,0 +1,19 @@
+//
+
+createOrUpdateClassLoaderLocked@LoadedApk.java-->getClassLoader
+
+
+//
+public DexClassLoader (String dexPath, String optimizedDirectory, String libraryPath, ClassLoader parent)
+- dexPath 需要装载的APK或者Jar文件的路径。包含多个路径用File.pathSeparator间隔开,在Android上默认是 “:”
+- optimizedDirectory 优化后的dex文件存放目录，不能为null
+- libraryPath 目标类中使用的C/C++库so文件的路径,每个目录用File.pathSeparator间隔开; 可以为null
+- parent 该类装载器的父装载器，一般用当前执行类的装载器
+
+
+PathClassLoader
+加载的是data/app/
+
+
+frameworks/base/core/java/android/app/LoadedApk.java
+frameworks/base/core/java/android/app/ApplicationLoaders.java

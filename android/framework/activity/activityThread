@@ -24,7 +24,12 @@ attachApplication-->attachApplicationLocked(IApplicationThread,pid){
 - 查找对应pid的ProcessRecord，关联thread。app.makeActive(thread, mProcessStats)
 - mStackSupervisor.attachApplicationLocked//是否有activity等待运行
 	-->realStartActivityLocked{
-	- app.thread.scheduleLaunchActivity
+	- app.thread.performLaunchActivity-->handleMessage(LAUNCH_ACTIVITY){
+		- getPackageInfoNoCheck-->getPackageInfo{ //创建LoadedApk
+			-new LoadedApk(this, aInfo)
+			}
+		- handleLaunchActivity//启动
+		}
 	- minimalResumeActivityLocked
 	}@ActivityStackSupervisor.java
 - mServices.attachApplicationLocked{//是否有服务等待运行
@@ -33,6 +38,17 @@ attachApplication-->attachApplicationLocked(IApplicationThread,pid){
 }@ActivityManagerService.java
 
 
+//加载并创建类，执行
+performLaunchActivity{
+- createBaseContextForActivity-->ContextImpl.createActivityContext--> //创建上下文
+	-->ContextImpl{
+		- mPackageInfo //LoadedApk
+		- mClassLoader //ClassLoader
+		}
+- appContext.getClassLoader-->mPackageInfo.getClassLoader@ContextImpl.java-->//loader
+	-->getClassLoader-->createOrUpdateClassLoaderLocked@LoadedApk.java
+- mInstrumentation.newActivity-->cl.loadClass(className).newInstance //加载activity
+}@ActivityThread.java
 //idle状态
 activityIdleInternal-->activityIdleInternalLocked
 
@@ -81,3 +97,5 @@ schedulePauseActivity-->handlePauseActivity{
 
 
 frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/core/java/android/app/Instrumentation.java
+frameworks/base/core/java/android/app/LoadedApk.java
