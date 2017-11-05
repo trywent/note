@@ -1,7 +1,9 @@
 //
 
-createOrUpdateClassLoaderLocked@LoadedApk.java-->getClassLoader
-
+createOrUpdateClassLoaderLocked{
+- makePaths
+- getClassLoader-->new PathClassLoader(path zip)@ApplicationLoaders.java
+}@LoadedApk.java
 
 //
 public DexClassLoader (String dexPath, String optimizedDirectory, String libraryPath, ClassLoader parent)
