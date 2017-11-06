@@ -1,6 +1,6 @@
 //
 
-createOrUpdateClassLoaderLocked{
+createOrUpdateClassLoaderLocked(null){
 - makePaths
 - getClassLoader-->new PathClassLoader(path zip)@ApplicationLoaders.java
 }@LoadedApk.java
@@ -19,3 +19,35 @@ PathClassLoader
 
 frameworks/base/core/java/android/app/LoadedApk.java
 frameworks/base/core/java/android/app/ApplicationLoaders.java
+
+
+/system/app/KeyChain/KeyChain.apk
+at dalvik.system.DexFile.openDexFileNative(Native Method)
+
+at dalvik.system.DexFile.openDexFile(DexFile.java:295)
+
+at dalvik.system.DexFile.<init>(DexFile.java:80)
+
+at dalvik.system.DexFile.<init>(DexFile.java:59)
+
+at dalvik.system.DexPathList.loadDexFile(DexPathList.java:279)
+
+at dalvik.system.DexPathList.makePathElements(DexPathList.java:248)
+
+at dalvik.system.DexPathList.<init>(DexPathList.java:120)
+
+at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:48)
+
+at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:65)
+
+at android.app.ApplicationLoaders.getClassLoader(ApplicationLoaders.java:58)
+
+at android.app.LoadedApk.getClassLoader(LoadedApk.java:376)
+
+at android.app.LoadedApk.makeApplication(LoadedApk.java:568)
+
+at android.app.ActivityThread.handleBindApplication(ActivityThread.java:4680)
+
+at android.app.ActivityThread.-wrap1(ActivityThread.java)
+
+at android.app.ActivityThread$H.handleMessage(ActivityThread.java:1405)

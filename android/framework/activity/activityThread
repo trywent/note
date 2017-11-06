@@ -49,6 +49,19 @@ performLaunchActivity{
 	-->getClassLoader-->createOrUpdateClassLoaderLocked@LoadedApk.java
 - mInstrumentation.newActivity-->cl.loadClass(className).newInstance //加载activity
 }@ActivityThread.java
+
+
+//将activity进程信息关联到ActivityManagerServices
+attach-->mgr.attachApplication(mAppThread)@ActivityThread.java-->attachApplication-->
+attachApplicationLocked-->thread.bindApplication@ActivityManagerService.java-->
+bindApplication-->handleMessage(BIND_APPLICATION)-->handleBindApplication{
+- 创建LoadedApk,getPackageInfoNoCheck-->getPackageInfo(includeCode){
+	- packageInfo = new LoadedApk //创建
+	- includeCode包含代码，保存到mPackages.put
+	}
+- makeApplication-->getClassLoader-->createOrUpdateClassLoaderLocked(null)@LoadedApk.java
+}@ActivityThread.java
+
 //idle状态
 activityIdleInternal-->activityIdleInternalLocked
 
