@@ -1,0 +1,20 @@
+//
+
+getClassLoader-->ApplicationLoaders.getDefault().getClassLoader(zip)@LoaderApk.java
+-->getClassLoader-->new PathClassLoader@ApplicationLoaders.java-->
+BaseDexClassLoader@BaseDexClassLoader.java-->DexPathList@DexPathList.java
+
+
+frameworks/base/core/java/android/app/LoadedApk.java
+frameworks/base/core/java/android/app/ApplicationLoaders.java
+libcore/dalvik/src/main/java/dalvik/system/PathClassLoader.java
+libcore/dalvik/src/main/java/dalvik/system/DexPathList.java
+libcore/dalvik/src/main/java/dalvik/system/BaseDexClassLoader.java
+
+//
+DexFile_openDexFileNative@-->ClassLinker::OpenDexFilesFromOat
+
+
+
+art/runtime/class_linker.cc
+art/runtime/native/dalvik_system_DexFile.cc

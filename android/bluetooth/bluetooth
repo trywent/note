@@ -1,6 +1,18 @@
 //服务：
-startOtherServices-->addService(BLUETOOTH_MANAGER_SERVICE, new BluetoothManagerService)
-@SystemServer.java
+mSystemServiceManager.startService(BluetoothService.class)@SystemServer.java
+BluetoothService-->new BluetoothManagerService@BluetoothService.java-->
+BluetoothManagerService{
+- loadStoredNameAndAddress//加载蓝牙名字地址
+- mEnableExternal //蓝牙是否打开
+}@BluetoothManagerService
+
+mSystemServiceManager.startBootPhase@SystemServer.java-->startBootPhase-->
+service.onBootPhase@SystemServiceManager.java-->onBootPhase(PHASE_SYSTEM_SERVICES_READY)
+-->mBluetoothManagerService.handleOnBootPhase@BluetoothService.java-->
+handleOnBootPhase{
+- sendEnableMsg(mQuietEnableExternal)-->handleEnable-->doBind//打开蓝牙
+- getNameAndAddress-->handleMessage(MESSAGE_GET_NAME_AND_ADDRESS)
+}@BluetoothManagerService.java
 
 
 //adapter初始化
@@ -13,6 +25,9 @@ enable@BluetoothAdapter.java-->mManagerService.enable-->enable{
 }@BluetoothManagerService.java
 
 
+frameworks/base/services/java/com/android/server/SystemServer.java
+frameworks/base/services/core/java/com/android/server/SystemServiceManager.java
+frameworks/base/services/core/java/com/android/server/BluetoothService.java
 frameworks/base/services/core/java/com/android/server/BluetoothManagerService.java
 frameworks/base/core/java/android/bluetooth/BluetoothAdapter.java
 //#################接口

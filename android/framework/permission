@@ -15,7 +15,28 @@ android_ids[] = {
        <group gid="media_rw" />
 </permission>
 @frameworks/base/data/etc/platform.xml
-________________________________
+
+根据权限字符串获取GID：
+Process.getGidForName@Process.java-->android_os_Process_getGidForName
+
+
+frameworks/base/core/java/android/os/Process.java
+frameworks/base/core/jni/android_util_Process.cpp
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+
+
+android.uid.system/phone/...:
+PackageManagerService-->mSettings.addSharedUserLPw@PackageManagerService.java
+
+//自动创建uid
+若AndoridManifest.xml中定义了android:sharedUserId="string"
+readSharedUserLPw-->addSharedUserLPw(name.intern(), userId, pkgFlags))@Settings.java
+
+
+frameworks/base/services/java/com/android/server/pm/PackageManagerService.java
+frameworks/base/services/core/java/com/android/server/pm/Settings.java
+
+===================
 //获取权限
 parsePackage{
 - if (tagName.equals("uses-permission"))-->parseUsesPermission
@@ -45,35 +66,9 @@ AppSecurityPermissions{
 
 frameworks/base/core/java/android/widget/AppSecurityPermissions.java
 frameworks/base/core/java/android/content/pm/PackageParser.java
-___________________
-根据权限字符串获取GID：
-Process.getGidForName@Process.java-->android_os_Process_getGidForName
-
-
-frameworks/base/core/java/android/os/Process.java
-frameworks/base/core/jni/android_util_Process.cpp
-___________________
-revokeUriPermissionLocked@ActivityManagerService.java
-
-
-frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
 
 ===================
-android.uid.system/phone/...:
-PackageManagerService-->mSettings.addSharedUserLPw@PackageManagerService.java
-
-//自动创建uid
-若AndoridManifest.xml中定义了android:sharedUserId="string"
-readSharedUserLPw-->addSharedUserLPw(name.intern(), userId, pkgFlags))@Settings.java
-
-
-frameworks/base/services/java/com/android/server/pm/PackageManagerService.java
-frameworks/base/services/core/java/com/android/server/pm/Settings.java
-
-
-================
 //应用状态服务
-
 startCoreServices-->mSystemServiceManager.startService(UsageStatsService.class)
 @SystemServer.java-->onStart-->publishBinderService(Context.USAGE_STATS_SERVICE)
 @UsageStatsService.java
@@ -87,6 +82,30 @@ frameworks/base/services/usage/java/com/android/server/usage/UsageStatsService.j
 onPreferenceChange-->setHasAccess-->mAppOpsManager.setMode@UsageAccessDetails.java
 -->
 
-
-
 packages/apps/Settings/src/com/android/settings/applications/UsageAccessDetails.java
+
+//===================
+//应用启动后权限请求：
+requestPermissions{
+- intent = getPackageManager().buildRequestPermissionsIntent
+- startActivityForResult(intent)-->GrantPermissionsActivity
+}@Activty.java
+
+
+onCreate{
+- mViewHandler = GrantPermissionsViewHandlerImpl(this).setResultListener(this) //实际UI
+- setContentView(mViewHandler.createView())//设置请求窗口
+- showNextPermissionGroupGrantRequest
+}@GrantPermissionsActivity.java
+
+
+onClick-->mResultListener.onPermissionGrantResult@GrantPermissionsViewHandlerImpl.java-->
+onPermissionGrantResult-->groupState.mGroup.grantRuntimePermissions@GrantPermissionsActivity.java
+
+//检查权限
+checkSelfPermission-->checkPermission@ContextImpl.java
+
+
+PackageInstaller/src/com/android/packageinstaller/permission/ui/GrantPermissionsActivity.java
+PackageInstaller/src/com/android/packageinstaller/permission/ui/handheld/GrantPermissionsViewHandlerImpl.java
+

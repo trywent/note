@@ -1,43 +1,56 @@
-init-->new mKeyguardMediator@PhoneWindowManager.java
+//
+systemReady@PhoneWindowManager.java-->
+-->new KeyguardServiceDelegate@PhoneWindowManager.java-->KeyguardServiceDelegate{
+- 创建窗口，createScrim
+- (绑定服务)bindServiceAsUser("com.android.keyguard.KeyguardService",mKeyguardConnection)
+	-->onCreate-->new KeyguardViewMediator@KeyguardService.java
+}KeyguardServiceDelegate.java
 
 
+显示锁屏：
+systemReady-->mKeyguardDelegate.onSystemReady@PhoneWindowManager.java-->onSystemReady-->
+mKeyguardService.onSystemReady@KeyguardServiceDelegate.java-->onSystemReady-->
+mKeyguardViewMediator.onSystemReady@KeyguardService.java-->onSystemReady-->doKeyguardLocked
+-->showLocked-->mHandler.sendMessage(SHOW)-->handleShow-->mKeyguardDisplayManager.show
+@KeyguardViewMediator.java-->show@
+
+是否锁屏：
+isShowingAndNotHidden@KeyguardServiceDelegate.java-->isShowingAndNotHidden@KeyguardService.java
+-->isShowingAndNotHidden-->mShowing && !mHidden@KeyguardViewMediator.java
 
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
-
-
-frameworks\policies\base\phone\com\android\internal\policy\impl\LockScreen.java
-frameworks\policies\base\phone\com\android\internal\policy\impl\PatternUnlockScreen.java
-frameworks\policies\base\phone\com\android\internal\policy\impl\SimUnlockScreen.java
-frameworks\policies\base\phone\com\android\internal\policy\impl\PasswordUnlockScreen.java
-frameworks\policies\base\phone\com\android\internal\policy\impl\AccountUnlockScreen.java
-
-
-==============================
-4.4
-锁屏服务：
-KeyguardService.onCreate-->new KeyguardViewMediator@KeyguardService.java
-
-
-
-frameworks/base/packages/Keyguard/src/com/android/keyguard/KeyguardService.java
-
-______________________________
-绑定服务：
-KEYGUARD_PACKAGE = "com.android.keyguard";
-KEYGUARD_CLASS = "com.android.keyguard.KeyguardService";
-
-wm.systemReady()@SystemServer.java-->systemReady-->mPolicy.systemReady()@WindowManagerService.java
--->systemReady-->new KeyguardServiceDelegate@PhoneWindowManager.java-->KeyguardServiceDelegate-->
-(绑定服务)context.bindServiceAsUser(intent, mKeyguardConnection..)@KeyguardServiceDelegate.java
-
-服务绑定回调：
-mKeyguardConnection =new ServiceConnection{
-	onServiceConnected{
-	- new KeyguardServiceWrapper
-	}
-}
-
-
 frameworks/base/policy/src/com/android/internal/policy/impl/keyguard/KeyguardServiceDelegate.java
-frameworks/base/policy/src/com/android/internal/policy/impl/keyguard/KeyguardServiceWrapper.java
+frameworks/base/packages/Keyguard/src/com/android/keyguard/KeyguardService.java
+frameworks/base/packages/Keyguard/src/com/android/keyguard/KeyguardViewMediator.java
+frameworks/base/packages/Keyguard/src/com/android/keyguard/KeyguardDisplayManager.java
+___________________
+关闭：
+
+
+
+
+frameworks/base/services/java/com/android/server/LockSettingsService.java
+frameworks/base/core/java/com/android/internal/widget/LockPatternUtils.java
+=========================================
+4.2
+init-->mKeyguardMediator= new KeyguardViewMediator@PhoneWindowManager.java
+
+显示：
+mNotificationTask.run-->policy.screenTurningOn(mScreenOnListener)@PowerManagerService.java-->
+screenTurningOn-->@PhoneWindowManager.java
+
+
+onScreenTurnedOn-->notifyScreenOnLocked-->mHandler.sendMessage-->
+mHandler.handleMessage(NOTIFY_SCREEN_ON)-->
+handleNotifyScreenOn-->mKeyguardViewManager.onScreenTurnedOn@KeyguardViewMediator.java-->
+onScreenTurnedOn-->mKeyguardView.onScreenTurnedOn@KeyguardViewManager.java
+
+隐藏：
+mKeyguardMediator.setHidden
+
+
+
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+frameworks/base/policy/src/com/android/internal/policy/impl/KeyguardViewMediator.java
+frameworks/base/policy/src/com/android/internal/policy/impl/KeyguardViewManager.java
+frameworks/base/packages/Keyguard/src/com/android/keyguard/KeyguardViewMediator.java

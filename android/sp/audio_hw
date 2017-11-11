@@ -46,7 +46,10 @@ outputStrem.set_parameters-->out_set_parameters
 inputStream.set_parameters-->in_set_parameters
 
 //全局参数
-AudioFlinger::setParameters(设置非iohandle参数)-->set_parameters-->adev_set_parameters
+AudioFlinger::setParameters(设置非iohandle参数)-->set_parameters-->adev_set_parameters{
+-
+- "sprd_voip_start"-->设置adev->voip_start
+}
 
 
 

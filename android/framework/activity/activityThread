@@ -62,6 +62,16 @@ bindApplication-->handleMessage(BIND_APPLICATION)-->handleBindApplication{
 - makeApplication-->getClassLoader-->createOrUpdateClassLoaderLocked(null)@LoadedApk.java
 }@ActivityThread.java
 
+
+
+//创建服务
+handleCreateService{
+- packageInfo.getClassLoader()-->getClassLoader@LoadedApk.java
+- cl.loadClass(data.info.name).newInstance()
+}
+
+
+
 //idle状态
 activityIdleInternal-->activityIdleInternalLocked
 

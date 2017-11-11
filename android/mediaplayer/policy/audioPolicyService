@@ -32,6 +32,14 @@ AudioPolicyManager{
 }	
 
 
+//audioService接口实现
+AudioPolicyService::{
+- setDeviceConnectionState
+- createAudioPatch
+}AudioPolicyInterfaceImpl.cpp
+
+
+frameworks/av/services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp
 frameworks/av/services/audioflinger/AudioPolicyService.cpp
 //AudioPolicyService通过audio_policy_hal进行操作
 

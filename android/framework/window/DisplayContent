@@ -1,5 +1,19 @@
+//display service
+onStart-->publishBinderService(Context.DISPLAY_SERVICE)@DisplayManagerService.java
+
+
+//manager
+DisplayManager-->DisplayManagerGlobal.getInstance@DisplayManager.java-->
+getInstance{
+- IBinder b = ServiceManager.getService(Context.DISPLAY_SERVICE)
+- new DisplayManagerGlobal(b)
+}
+
+
+
 getDisplay-->getOrCreateDisplayLocked@DisplayManager.java-->getCompatibleDisplay-->
-new Display(/*屏信息*/getDisplayInfo())@DisplayManagerGlobal.java-->getDisplayInfo
+new Display(/*屏信息*/getDisplayInfo())@DisplayManagerGlobal.java-->mDm.getDisplayInfo
+-->getDisplayInfo-->getDisplayInfoInternal@DisplayManagerService.java
 
 
 frameworks/base/core/java/android/hardware/display/DisplayManager.java
@@ -38,16 +52,39 @@ setStackBoxSizes{
 frameworks/base/services/java/com/android/server/wm/DisplayContent.java
 frameworks/base/services/java/com/android/server/wm/TaskStack.java
 frameworks/base/services/java/com/android/server/wm/StackBox.java
-
-
-===================
-DisplayMagnifier:
-setMagnificationCallbacks
-
-
-
-
-
-
 frameworks/base/services/java/com/android/server/accessibility/ScreenMagnifier.java
 frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+
+//===================
+//android5.1
+ActivityContainer.attachToDisplayLocked-->mWindowManager.attachStack@ActivityStackSupervisor.java
+-->attachStack{
+- new TaskStack //创建对应activityService stackId的window端stack
+- stack.attachDisplayContent(displayContent)-->updateDisplayInfo(设置栈的大小为display)@TaskStack.java
+- displayContent.attachStack
+}WindowManagerService.java
+
+
+//设置displayContent大小(栈大小)
+performLayoutLockedInner-->displayContent.resize(mPolicy.getContentRectLw)@WindowManagerService.java
+-->mContentRect.set@DisplayContent.java
+
+
+
+
+moveTaskToStackLocked@ActivityStackSupervisor.java-->mWindowManager.addTask-->addTask
+@WindowManagerService.java
+
+
+removeTask@ActvityStack.java-->mWindowManager.removeTask-->removeTask@WindowManagerService.java
+
+//重新设置栈
+resizeStack-->setBounds
+
+
+
+//虚拟显示？
+createVirtualDisplay
+
+
+

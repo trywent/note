@@ -1,0 +1,16 @@
+//
+setup_vmstat{
+- proc_create("vmstat",&proc_vmstat_file_operations);
+- proc_create("zoneinfo",&proc_zoneinfo_file_operations);
+}
+
+static const struct seq_operations zoneinfo_op = {
+	.start	= frag_start,  //这个函数返回show的第二个参数
+	.show	= zoneinfo_show,
+};
+
+proc_zoneinfo_file_operations-->zoneinfo_open-->zoneinfo_op.show-->
+zoneinfo_show-->walk_zones_in_node-->zoneinfo_show_print@vmstat.c
+
+
+kernel/mm/vmstat.c

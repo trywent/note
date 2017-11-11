@@ -1,0 +1,41 @@
+//
+createAudioPatch@AudioManager.java-->createAudioPatch@AudioSystem.java-->
+android_media_AudioSystem_createAudioPatch(传入AudioPatch的handle值)@android_media_AudioSystem.cpp
+-->aps->createAudioPatch@AudioSystem.cpp-->mAudioPolicyManager->createAudioPatch
+@AudioPolicyInterfaceImpl.cpp-->
+createAudioPatch{
+- mAudioPatches.valueAt(index)//是否已经存在patch
+- AUDIO_PORT_TYPE_MIX{
+	- 获取source，mOutputs.getOutputFromId
+	- 获取sink，
+	}
+
+- AUDIO_PORT_TYPE_DEVICE{
+
+	}
+
+}@AudioPolicyManager.cpp
+
+
+
+createAudioPatch@PatchPanel.cpp-->
+sendCreateAudioPatchConfigEvent-->sendConfigEvent_l(new CreateAudioPatchConfigEvent)
+-->AudioFlinger::ThreadBase::processConfigEvents_l(CFG_EVENT_CREATE_AUDIO_PATCH)-->
+createAudioPatch_l@Threads.cpp
+
+
+
+
+
+
+
+frameworks/base/media/java/android/media/AudioManager.java
+frameworks/base/media/java/android/media/AudioPatch.java
+frameworks/base/media/java/android/media/AudioSystem.java
+frameworks/base/core/jni/android_media_AudioSystem.cpp
+frameworks/av/media/libmedia/AudioSystem.cpp
+frameworks/av/services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp
+frameworks/av/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
+frameworks/av/services/audioflinger/PatchPanel.cpp
+frameworks/av/services/audioflinger/Threads.cpp
+

@@ -65,7 +65,7 @@ start{
 }@AudioTrack.cpp
 
 stop{
-- mAudioTrack->stop@AudioTrack.cpp-->(服务端Track)mTrack->stop@TrackHandle@-->stop
+- mAudioTrack->stop@AudioTrack.cpp-->(服务端Track)mTrack->stop@TrackHandle-->stop
 	-->设置状态mState = STOPPED@Track.cpp
 }@AudioTrack.cpp
 
