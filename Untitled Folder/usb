@@ -1,0 +1,193 @@
+USB Request Block(URB) :
+URB包含相关信息，用来进行usb传输数据和状态。
+usb_submit_urb(urb) 将请求加入队列后立即返回。urb的传输可以被usb_unlink_urb(urb) 取消
+
+________________
+struct bus_type{
+	...
+struct kset drivers,//驱动链表
+struct kset devices,//设备链表
+	...
+}
+
+usb core将设备扫描到并加入到链表，驱动自己注册到链表usb_register
+
+struct usb_device_id 赋值到驱动中.id_table。用于驱动与设备的匹配
+
+usb device属性：
+device descriptor,configuration descriptor,interface descriptor,endpoint descriptor
+
+
+usb_interface usb设备的一种功能，与驱动对应
+_________________
+驱动注册：
+usb_register_device_driver@/usb/core/driver.c-->driver_register-->
+(调用driver_find，判断是否已经注册)@driver.c-->bus_add_driver@bus.c-->driver_attach@dd.c-->
+bus_for_each_dev（遍历bus上的device，调用传入的匹配函数__driver_attach）@bus.c-->
+__driver_attach@dd.c-->(是否匹配driver_match_device-->drv->bus->match(dev, drv)@base.h）-->
+(若匹配)driver_probe_device-->really_probe-->drv->probe@dd.c(调用probe函数)
+
+usb驱动中bus.match=usb_device_match
+usb_device_match-->usb_match_id-->usb_match_one_id-->usb_match_device（只匹配interface，操作的对象不是device
+）@/usb/core/driver.c
+
+—————————————————
+USB Host Controller Driver (HCD):
+
+(probe时执行)usb_add_hcd-->usb_hcd_request_irqs@hcd.c-->request_irq
+
+mstar的usb驱动流程：
+module_init(all_ehci_hcd_init)-->ehci_hcd_init@ehci-hcd.c--> platform_driver_register(&PLATFORM_DRIVER)
+(PLATFORM_DRIVER不同的平台定义#define PLATFORM_DRIVER ehci_hcd_mstar_driver)-->驱动匹配设备-->
+probe-->ehci_hcd_mstar_drv_probe-->usb_ehci_mstar_probe@ehci-mstar.c-->usb_add_hcd-->
+usb_hcd_request_irqs@hcd.c-->request_irq
+
+
+
+
+处理中断：
+usb_hcd_irq-->hcd->driver->irq@hcd.c-->ehci_irq@ehci-ehci-hcd.c
+
+==========================
+usb热插拔：
+当配置内核时选择了CONFIG_HOTPLUG，你将会获得一个内核属性/proc/sys/kernel/hotplug，
+这里一般记录一个路径"/sbin/hotplug"。任何子系统在特定事件发生时，都可调用/sbin/hotplug
+并会传入该子系统的名字，子系统定义的一些环境变量也会传入。
+
+当usb设备插入或拔出时，usb子系统会调用/sbin/hotplug。调用由 kernel hub daemon thread [khubd]或则init进程进行。
+传送的环境变量值：
+    ACTION ... "add", "remove"
+    PRODUCT ... USB vendor, product, and version codes (hex)
+    TYPE ... device class codes (decimal)
+    INTERFACE ... interface 0 class codes (decimal)
+___________________________
+module-init-tools会创建"modules.usbmap"文件，文件中包含驱动的MODULE_DEVICE_TABLE。
+热插拔的处理函数将会使用这个文件,确保处理usb设备时，加载正确的驱动。
+
+MODULE_DEVICE_TABLE中的表项，用来匹配驱动和设备。每个表项定义的一个或
+多个属性需要验证。可以使用宏来构建匹配表项，也可使用driver_info加入信息。
+
+    USB_DEVICE (vendorId, productId)
+	... matching devices with specified vendor and product ids
+    USB_DEVICE_VER (vendorId, productId, lo, hi)
+	... like USB_DEVICE with lo <= productversion <= hi
+    USB_INTERFACE_INFO (class, subclass, protocol)
+	... matching specified interface class info
+    USB_DEVICE_INFO (class, subclass, protocol)
+	... matching specified device class info
+
+一个支持多个设备的驱动的示例，它的MODULE_DEVICE_TABLE类似：
+
+    static const struct usb_device_id mydriver_id_table = {
+	{ USB_DEVICE (0x9999, 0xaaaa), driver_info: QUIRK_X },
+	{ USB_DEVICE (0xbbbb, 0x8888), driver_info: QUIRK_Y|QUIRK_Z },
+	...
+	{ } /* end with an all-zeroes entry */
+    }
+    MODULE_DEVICE_TABLE (usb, mydriver_id_table);
+
+大部分驱动会将这些表传到USB子系统和模块管理子系统.
+
+
+USB子系统中的驱动应该声明以下形式的结构:
+
+    static struct usb_driver mydriver = {
+	.name		= "mydriver",
+	.id_table	= mydriver_id_table,
+	.probe		= my_probe,
+	.disconnect	= my_disconnect,
+
+	/*
+	if using the usb chardev framework:
+	    .minor		= MY_USB_MINOR_START,
+	    .fops		= my_file_ops,
+	if exposing any operations through usbdevfs:
+	    .ioctl		= my_ioctl,
+	*/
+    }
+
+驱动会根据id_table中定义匹配设备，匹配成功调用probe()。若没有定义id_table
+任一usb设备都会执行probe。
+___________________________
+(定义一些设备的id)struct usb_device_id@include/linux/mod_devicetable.h
+
+static struct us_unusual_dev us_unusual_dev_list[]@usb.c
+struct usb_device_id usb_storage_usb_ids[]@usual-tables.c
+
+usb_device_id
+
+id_talbe赋值为usb_storage_usb_ids。与us_unusual_dev_list内容相同。UNUSUAL_DEV在前面先比较，
+USUAL_DEV在表后面。UNUSUAL_DEV比USUAL_DEV多厂商信息和初始化函数
+
+
+struct us_unusual_dev {
+	const char* vendorName;
+	const char* productName;
+	__u8  useProtocol;
+	__u8  useTransport;
+	int (*initFunction)(struct us_data *);
+};
+
+###########################################################
+=================
+usb:
+(子系统初始化)subsys_initcall(usb_init)-->usb_init-->bus_register(注册总线usb_bus_type)
+--usb_register(注册驱动usbfs_driver)@usb.c
+
+总线类型：
+struct bus_type usb_bus_type = {
+	.name =		"usb",
+	.match =	usb_device_match,
+	.uevent =	usb_uevent,
+};
+
+_________________
+HCD(USB Host Controller Driver):
+创建HCD：
+usb_create_hcd-->usb_create_shared_hcd@hcd.c
+
+添加HCD：
+usb_add_hcd-->usb_alloc_dev(创建root hub)@hcd.c
+
+
+subsys_initcall(usb_init)-->usb_init@usb.c-->usb_hub_init-->hub_thread(开始线程处理事件)-->hub_events
+-->hub_port_connect_change@hub.c-->usb_alloc_dev@usb.c
+
+中断初始化：
+usb_add_hcd-->usb_hcd_request_irqs-->request_irq(irqnum, &usb_hcd_irq...)@hcd.c
+中断处理：
+usb_hcd_irq-->hcd->driver->irq(该driver在usb_create_hcd时传入)@hcd-->ehci_irq@ehci-hcd.c
+
+
+drivers/usb/core/usb.c
+drivers/usb/core/hcd.c
+drivers/usb/host/ehci-hcd.c
+_________________
+usb storage：
+驱动注册：
+module_init(usb_stor_init)-->usb_stor_init-->usb_register(&usb_storage_driver)@usb.c-->
+usb_register_driver@usb.h-->usb_register_driver(设置总线类型usb_bus_type)-->driver_register
+@driver.c
+
+设备注册：
+hub_thread(开始线程处理事件)-->hub_events
+-->(连接状态改变)hub_port_connect_change@hub.c-->usb_alloc_dev@usb.c
+
+判断是否匹配：
+usb_bus_type.match-->usb_device_match(判断usb设备，usb接口是否与相应的驱动匹配)-->usb_match_id
+(查找驱动id_table)-->usb_match_one_id-->usb_match_device@driver.c
+
+匹配调用probe:
+new_driver->drvwrap.driver.probe-->usb_probe_interface@driver.c
+
+初始化：
+storage_probe-->usb_stor_probe2-->usb_stor_acquire_resources-->(调用自定义的初始函数)
+us->unusual_dev->initFunction@usb.c
+
+drivers/usb/storage/usb.c
+include/linux/usb.h
+drivers/usb/core/driver.c
+drivers/usb/core/usb.c
+
+
+

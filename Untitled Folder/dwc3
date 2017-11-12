@@ -1,0 +1,68 @@
+//
+module_platform_driver(dwc3_driver)-->dwc3_probe{
+- 初始化dwc
+- dwc3_host_init-->platform_device_add(xhci)@host.c//注册xhci-hcd设备
+- 
+}@core.c
+
+//xhci-hcd设备的驱动
+xhci_plat_probe{
+- platform_get_irq //获取中断
+- usb_create_hcd(/*设置hcd驱动*/xhci_plat_xhci_driver)-->usb_create_shared_hcd{
+	- init_timer(&hcd->rh_timer) //设置timer
+	- rh_timer_func//设置timer函数
+	}
+- 初始化struct xhci_hcd	 *xhci
+- usb_add_hcd{
+	- usb_hcd_request_irqs-->request_irq(irqnum, &usb_hcd_irq)-->//中断处理
+		usb_hcd_irq-->hcd->driver->irq-->xhci_irq{
+		- xhci_handle_event{
+		}@xhci-ring.c
+	
+	- hcd->driver->start-->xhci_run@xhci.c
+	- register_root_hub //加入root hub
+	}@hcd.c
+}@xhci-plat.c
+
+//urb
+usb_hcd_submit_urb{
+- rh_urb_enqueue{ //root hub
+	- rh_queue_status //中断类型
+	- rh_call_control //控制类型 
+	}
+ 
+- hcd->driver->urb_enqueue-->xhci_urb_enqueue@xhci.c //非root hub设备
+}@hcd.c
+
+______________
+//hub
+usb_init@usb.c-->usb_hub_init-->kthread_run(hub_thread){
+- hub_events-->hub_port_connect_change{
+	- usb_alloc_dev
+	- usb_detect_quirks //特殊usb设备
+	- usb_new_device
+	}
+- wait_event_freezable(khubd_wait)
+}@hub.c
+
+hub_probe-->hub_configure-->usb_fill_int_urb(hub_irq/*complete_fn请求结束处理*/)//中断传输
+-->hub_irq{
+- kick_khubd-->wake_up(&khubd_wait)//状态有变化，唤醒处理进程
+- usb_submit_urb //提交hub的状态查询
+}@hub.c
+
+//host中断处理
+xhci_handle_event{
+- case TRB_TYPE(TRB_COMPLETION)
+- case TRB_TYPE(TRB_PORT_STATUS)-->handle_port_status-->
+	usb_hcd_poll_rh_status{
+	- hcd->driver->hub_status_data-->xhci_hub_status_data@xhci-plat.c
+	}@hcd.c
+}@xhci-ring.c
+
+
+drivers/usb/dwc3/core.c
+drivers/usb/dwc3/host.c
+drivers/usb/host/xhci-plat.c
+drivers/usb/core/hcd.c
+drivers/usb/host/xhci-ring.c

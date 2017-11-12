@@ -1,0 +1,28 @@
+//dtb
+
+
+
+
+
+
+
+
+
+
+===========
+//kernel
+
+setup_arch{
+- setup_machine_fdt@devtree.c//获取machine，bootcmd，meminfo信息
+- 
+- unflatten_device_tree-->unflatten_dt_node
+- 
+- machine_desc //返回machine的指针
+}@setup.c
+
+//从dtb中生成platform_device
+arch_initcall(customize_machine)-->__define_initcall("3")-->
+customize_machine-->machine_desc->init_machine@setup.c-->of_platform_populate@platform.c
+
+arch/arm/kernel/setup.c
+drivers/of/fdt.c
