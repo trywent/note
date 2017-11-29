@@ -1,9 +1,27 @@
 //dumpdata
 
-dump_data{
+adev_open@audio_hw.c-->dump_parse_xml{
+- dump_start_tag{
+	- dump_open_file //创建保存的文件
+	}
+- dump_end_tag
+}@dumpdata.c
 
-}
 
+//保存DUMP_MUSIC_HWL_BEFORE_EXPRESS
+out_write{
+    dump_info.buf = (void *)buffer;
+    dump_info.buf_len = bytes;
+    dump_info.dump_switch_info = DUMP_MUSIC_HWL_BEFORE_EXPRESS;
+    dump_data(dump_info);
+
+
+
+    dump_info.buf = buf;
+    dump_info.buf_len = out_frames * frame_size;
+    dump_info.dump_switch_info = DUMP_MUSIC_HWL_BEFOORE_VBC;
+    dump_data(dump_info);
+}@audio_hw.c
 
 
 //录音

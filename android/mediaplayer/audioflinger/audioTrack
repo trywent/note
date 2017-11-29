@@ -74,11 +74,15 @@ stop{
 setStereoVolume-->native_setVolume@AudioTrack.java-->android_media_AudioTrack_set_volume
 @android_media_AudioTrack.cpp-->setVolume-->mProxy->setVolumeLR@AudioTrack.cpp
 mCblk->mVolumeLR@AudioTrackShared.h
+=============
+//mixer
 
-
+FastMixer::onWork-->AudioMixer::setParameter
 
 frameworks/base/media/java/android/media/AudioTrack.java
 frameworks/base/core/jni/android_media_AudioTrack.cpp
 frameworks/av/media/libmedia/AudioTrackShared.cpp
 frameworks/av/media/libmedia/AudioTrack.cpp
 frameworks/av/services/audioflinger/Tracks.cpp
+frameworks/av/services/audioflinger/FastMixer.cpp
+frameworks/av/services/audioflinger/AudioMixer.cpp

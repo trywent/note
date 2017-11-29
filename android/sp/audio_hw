@@ -125,7 +125,7 @@ start_input_stream{
      }else{
      - in->config.channels//声道数
      - in->config.rate //采样率
-     - pcm_open(s_tinycard/*声卡号3 sprdphone*/,PORT_MM_C/*设备号2 AuxRecord codec-i2s-ext-2*/)
+     - pcm_open(s_tinycard/*声卡号3 sprdphone*/,PORT_MM_C/*设备号2 AuxRecord codec-i2s-ext-2*/,&in->config)
      
      }
    }   
@@ -133,6 +133,10 @@ start_input_stream{
 }
 
 external/tinyalsa/pcm.c
+
+=============
+//音量
+AudioFlinger::setMasterVolume-->adev_set_master_volume
 =============
 //debug
 audiodebug_process

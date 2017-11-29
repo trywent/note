@@ -1,32 +1,44 @@
-//
+//tinymix -D 1/2/3 查看sprdphone对应的声卡是哪个
+tinycap /data/afe_in.wav -D 3 -d 2 -c 2 -r 48000 -p 320 -n 2
+
+adb shell cat /proc/asound/sprdphone/sprd-codec > sprd-codec.txt
+adb shell cat /proc/asound/sprdphone/vbc > vbc.txt
+
+cat /proc/asound/card3/pcm2c/sub0/hw_params
+cat /proc/asound/card3/pcm2c/sub0/sw_params
+//查看设备
+cat proc/asound/devices
+
+//声卡状态
+/proc/asound/card0/pcm0p/sub0
+cat hw_params
+cat sw_params
+
+//抓取dump
+adb root
+setprop media.dump.path /data/local/media/ 
+setprop media.dump.switch 0x300
+//media播放
+setprop media.dump.switch 0x3 
+
+
+//设备
 tinymix -D 0
 
 tinymix -D num "SPKL Mixer DACLSPKL Switch" 1 
 tinymix -D num "SPKL Mixer DACRSPKL Switch" 1
 tinymix -D num "Speaker Function" 1
 
+
+
 logcat -s MediaPlayerFyt audio_hw_primary
-//抓取录制数据
-adb root
-setprop media.dump.path /data/local/media/ 
-setprop media.dump.switch 0x300
-
-
 logcat -s DUMP.DATA
 logcat -s audio_hw_primary
-
-//media播放
-setprop media.dump.switch 0x3 
 
 
 //audioDebug
 setenforce 0
 
-//tinymix -D 1/2/3 查看sprdphone对应的声卡是哪个
-tinycap /data/afe_in.wav -D 3 -d 2 -c 2 -r 48000 -p 320 -n 2
-
-adb shell cat /proc/asound/sprdphone/sprd-codec > sprd-codec.txt
-adb shell cat /proc/asound/sprdphone/vbc > vbc.txt
 
 <dumpmusic  num="16"  dump_switch = "0x0" dump_path="/data/local/media/" total_switch="ON">
 	<dump_play  index="0" item_name ="music.dump0"  dump_file_name ="dump_music_before_express.pcm"  switch="0" />

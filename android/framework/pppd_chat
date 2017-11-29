@@ -1,3 +1,4 @@
+//
 pppd:ppp是用来建立点对点连接的协议。pppd守护程序和内核ppp驱动，用来建立和维护一个ppp连接
 
 
@@ -16,8 +17,8 @@ pppd 通过connect来执行命令（chat），并把命令的输入输出重定�
 连接前的命令。
 
 
-          # pppd connect "chat -f dial-c3po" /dev/cua3 38400 -detach \
-             crtscts modem defaultroute
+# pppd connect "chat -f dial-c3po" /dev/cua3 38400 -detach \
+   crtscts modem defaultroute
  
-
+============
    

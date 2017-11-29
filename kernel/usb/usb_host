@@ -1,45 +1,34 @@
-//host
-(子系统初始化)subsys_initcall(usb_init)-->usb_init-->bus_register(注册总线usb_bus_type)
---usb_register(注册驱动usbfs_driver)@usb.c
-
-总线类型：
-struct bus_type usb_bus_type = {
-	.name =		"usb",
-	.match =	usb_device_match,
-	.uevent =	usb_uevent,
-	struct kset drivers,//驱动链表
-	struct kset devices,//设备链表
-};
-
-_________________
+//usb host
 HCD(USB Host Controller Driver):
 创建HCD：
-usb_create_hcd-->usb_create_shared_hcd@hcd.c
+xxxusb_probe{
+ //创建hcd
+- otg20_hcd_init/host20_hcd_init-->usb_create_hcd(/*设置驱动*/&dwc_otg_hc_driver)@hcd.c
+- usb_add_hcd //加入hcd
+}@xxxusb_otg/host_driver.c
 
 添加HCD：
-usb_add_hcd-->usb_alloc_dev(创建root hub)@hcd.c
-
-
-subsys_initcall(usb_init)-->usb_init@usb.c-->usb_hub_init-->hub_thread(开始线程处理事件)-->hub_events
--->hub_port_connect_change@hub.c-->usb_alloc_dev@usb.c
+usb_add_hcd{
+- hcd_buffer_create
+- usb_register_bus //
+- usb_alloc_dev //创建
+- usb_hcd_request_irqs-->request_irq(irqnum, &usb_hcd_irq)-->//中断处理
+	usb_hcd_irq-->hcd->driver->irq-->xhci_irq{
+	- xhci_handle_event{
+	}@xhci-ring.c	
+- hcd->driver->start-->xhci_run@xhci.c
+- register_root_hub //加入root hub
+}@hcd.c
 
 中断初始化：
 usb_add_hcd-->usb_hcd_request_irqs-->request_irq(irqnum, &usb_hcd_irq...)@hcd.c
+
 中断处理：
 usb_hcd_irq-->hcd->driver->irq(该driver在usb_create_hcd时传入)@hcd-->ehci_irq@ehci-hcd.c
 
 
-
 drivers/usb/core/usb.c
 drivers/usb/core/hcd.c
-
-________________
-
-usb device属性：
-device descriptor,configuration descriptor,interface descriptor,endpoint descriptor
-
-
-usb_interface usb设备的一种功能，与驱动对应
 
 //==========================
 usb热插拔：
@@ -53,7 +42,7 @@ usb热插拔：
     PRODUCT ... USB vendor, product, and version codes (hex)
     TYPE ... device class codes (decimal)
     INTERFACE ... interface 0 class codes (decimal)
-___________________________
+_______________
 module-init-tools会创建"modules.usbmap"文件，文件中包含驱动的MODULE_DEVICE_TABLE。
 热插拔的处理函数将会使用这个文件,确保处理usb设备时，加载正确的驱动。
 

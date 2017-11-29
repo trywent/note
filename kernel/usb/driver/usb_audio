@@ -50,6 +50,37 @@ sound/usb/endpoint.c
 sound/usb/stream.c
 
 
+=====================
+//usb_audio
+
+snd_usb_init_substream@endpoint.c
+
+
+//play
+snd_pcm_f_opssnd_pcm_playback_ioctl-->snd_pcm_playback_ioctl1@pcm_native.c-->
+snd_pcm_lib_write-->snd_pcm_lib_write1{
+- transfer-->snd_pcm_lib_write_transfer //传输用户空间数据
+- snd_pcm_start-->snd_pcm_action(snd_pcm_action_start){//开始处理数据(播放)
+	- snd_pcm_pre_start
+	- snd_pcm_do_start-->substream->ops->trigger
+	} 
+}@pcm_lib.c
+
+sound/core/pcm_native.c
+sound/core/pcm_lib.c
+
+
+snd_pcm_prepare-->snd_pcm_action_prepare
+snd_pcm_action_prepare.do_action
+snd_pcm_do_prepare-->
+snd_usb_playback_ops.prepare-->
+snd_usb_pcm_prepare@pcm.c-->snd_usb_substream_prepare-->start_urbs-->usb_submit_urb
+@endpoint.c
+
+sound/usb/pcm.c
+sound/usb/endpoint.c
+
+
 [15012.586423] usb 1-1: new full-speed USB device number 12 using dwc2
 [15012.793430] usb 1-1: device v05f0 p0101 is not supported
 [15012.817155] usb 1-1: Warning! Unlikely big volume range (=10240), cval->res is probably wrong.

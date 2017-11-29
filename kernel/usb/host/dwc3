@@ -61,6 +61,14 @@ xhci_handle_event{
 }@xhci-ring.c
 
 
+//dwc3_otg中断处理
+usb_hcd_irq-->hcd->driver->irq(该driver在usb_create_hcd时传入)@hcd-->ehci_irq@ehci-hcd.c-->
+dwc_otg_hc_driver.irq-->dwc_otg_hcd_irq@dwoc_otg_hcd_linux.c-->dwc_otg_hcd_handle_intr
+-->dwc_otg_hcd_handle_port_intr@dwc_otg_hcd_intr.c
+
+
+
+
 drivers/usb/dwc3/core.c
 drivers/usb/dwc3/host.c
 drivers/usb/host/xhci-plat.c

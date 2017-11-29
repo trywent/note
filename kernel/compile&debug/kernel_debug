@@ -44,6 +44,8 @@ addr2line 将地址转换为库中的函数
 
 
 
+addr2line -e vmlinux ffffffc000744068
+
 kernel panic
 
 px3/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-objdump

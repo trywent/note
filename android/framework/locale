@@ -1,0 +1,17 @@
+//-D传入属性
+
+startVm-->(-Duser.locale=)@AndroidRuntime.cpp-->JNI_CreateJavaVM@java_vm_ext.cc
+-->Runtime::Create-->Init-->ReleaseOrDefault(Opt::PropertiesList/*默认的属性*/)@runtime.cc
+
+frameworks/base/core/jni/AndroidRuntime.cpp
+art/runtime/java_vm_ext.cc
+art/runtime/runtime.cc
+
+//java 系统属性初始化
+initUnchangeableSystemProperties
+
+Locale.getDefault()-->getDefaultLocaleFromSystemProperties-->System.getProperty("user.locale", "")
+@Locale.java-->systemProperties.getProperty(/*从默认属性中获取*/)@System.java
+
+libcore/luni/src/main/java/java/util/Locale.java
+libcore/luni/src/main/java/java/lang/System.java

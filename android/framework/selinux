@@ -36,3 +36,7 @@ rule_name:allow,dontaudit,auditallow,neverallow
 
 object_class:定义某一类型可执行的操作
 
+
+=============
+adb shell "cat /proc/kmsg | grep avc" > avc_log.txt
+audit2allow -i avc_log.txt

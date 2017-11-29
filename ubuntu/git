@@ -90,7 +90,7 @@ git reset HEAD <file>  //取消对文件的暂存
 git checkout -- <file> //撤销对文件的修改(返回到原来的版本)
 git reset xxxxxxxxxxx <file> //恢复到特定版本
 git checkout xxxhashnum  file
-
+git revert <commit log string> //撤销某次提交
 //合并冲突
 git checkout --ours   //保留本地的
 git checkout --theirs //保留远程的
@@ -172,6 +172,8 @@ git checkout master
 git pull origin master
 git merge test
 git push origin master
+
+git merge branchname commitid
 
 合并部分文件：
 git checkout B_branch

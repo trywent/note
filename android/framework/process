@@ -128,7 +128,21 @@ lowmem_scan{
 }
 
 drivers/staging/android/lowmemorykiller.c
-############################
+=======================
+//setting 后台进程，不保留活动...
+
+//立即结束activity
+writeImmediatelyDestroyActivitiesOptions-->ActivityManagerNative.getDefault().setAlwaysFinish
+@DevelopmentSettings.java-->setAlwaysFinish(mAlwaysFinishActivities)@ActivityManagerService.java
+
+//设置进程限制数
+writeAppProcessLimitOptions-->ActivityManagerNative.getDefault().setProcessLimit
+@DevelopmentSettings.java-->setProcessLimit(mProcessLimit)@ActivityManageService.java
+
+
+packages/apps/Settings/src/com/android/settings/DevelopmentSettings.java
+packages/apps/Settings/res/xml/development_prefs.xml
+=======================
 //cpu管理
 
 update@ProcessCpuTracker.java-->

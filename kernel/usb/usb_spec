@@ -1,3 +1,4 @@
+//
 Default Address:
 当usb设备第一次上电或复位后使用的地址，默认值是00H。
 
@@ -89,4 +90,60 @@ Bus Enumeration：(枚举设备状态)
 8.根据配置信息和设备将要如何使用，host向设备设置一个新的配置信息。这是设备处于Configured状态
 ，所有的端点都已经被设置。这时是可使用状态。
 
+
+//usb USB-IF(USB Implementers Forum)
+
+请求的格式：
+bmRequestType | bRequest |  wValue | wIndex | wLength
+
+device{
+- configuration{
+	- interface{     //代表设备的功能，包含接口的编号(0-n)，设置信息
+		- endpoint
+		}
+	- 
+	- 
+	}
+
+}
+
+设备识别：
+插入：host查询hub状态(hub有状态位显示接口有设备)
+- hub通过状态改变管道回复host的状态查询结果，设备插入
+- host分配设备唯一地址
+- host获取设备configuration信息
+- host分配configuration值
+
+移除：hub上报设备状态给host
+
+
+
+配置：通过设备0号端口的通道进行控制
+______________
+//命令，接口函数
+SetAddress()
+GetInterface() //获取接口的当前设置
+SetInterface() //选择接口的一个设置
+
+//设备功能
+FUNCTION_SUSPEND
+DEVICE_REMOTE_WAKEUP
+
+==============
+数据传输：host 和device interface的端点
+
+I/O Request Packets (IRPs)
+
+
+流
+消息 //有结构(usb设备地址，端口，数据)
+
+host:
+1 tocken packet
+
+数据传输类型：
+控制数据传输：设备设置
+批量数据传输：大量数据
+中断数据传输：中断传输(usb触摸)
+同步传输：同步传输(视频，音频)
 

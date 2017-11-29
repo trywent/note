@@ -1,6 +1,16 @@
-make 
+//make 
+//include 只执行包含的makefile。call inherit将会继承定义的变量
+android/Makefile-->build/core/main.mk{
+- include $(BUILD_SYSTEM)/config.mk{
+	- envsetup.mk-->product_config.mk-->product.mk{
+		- $(SRC_TARGET_DIR)/product/AndroidProducts.mk{
+			- xxx.mk//平台的makefile
+			}
+		}
+	}
+- include $(BUILD_SYSTEM)/Makefile
+}
 
-build/core/dumpvar.mk
 __________
 config.mk:
 ANDROID_BUILDSPEC := $(TOPDIR)buildspec.mk 
@@ -35,18 +45,6 @@ INTERNAL_PRODUCT(决定编译目标)
 确定编译目标后，查找目标依赖的文件(在device中的设置PRODUCT_PACKAGES等)。如何生成依赖文件在Android.mk中定义。
 
 ====================================
-build目录：
-Makefile
-|
-build/core/main.mk
-|
-build/core/config.mk
-|
-build/core/envsetup.mk
-|
-build/core/product_config.mk
-|
-build/core/product.mk
 
 相关文件：
 base_rules.mk：

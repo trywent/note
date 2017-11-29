@@ -1,0 +1,3 @@
+//
+
+cat /sys/devices/system/cpu/cpufreq/all_time_in_state

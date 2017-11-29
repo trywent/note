@@ -236,8 +236,8 @@ __________________________________
 程序crashed:
 dvmDetachCurrentThread-->threadExitUncaughtException-->dvmCallMethod(..uncaughtHandler...)
 @Thread.cpp-->Thread.getDefaultUncaughtExceptionHandler().uncaughtException
-@RemoteViewsService.java-->UncaughtHandler.uncaughtException-->ActivityManagerNative.getDefault().handleApplicationCras@RuntimeInit.java-->handleApplicationCrash-->crashApplication
-@ActivityManagerService.java
+@RemoteViewsService.java-->UncaughtHandler.uncaughtException-->ActivityManagerNative.getDefault().
+handleApplicationCrash@RuntimeInit.java-->handleApplicationCrash-->crashApplication@ActivityManagerService.java
 
 日志中调用：
 wtf(String tag, String msg, Throwable tr)-->
