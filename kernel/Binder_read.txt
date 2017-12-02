@@ -110,4 +110,7 @@ binder_deferred_release{
 
 driver/staging/android/binder.c
 
+======================
+//debug信息
+/sys/kernel/debug/binder/
 

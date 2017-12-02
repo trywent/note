@@ -1,6 +1,6 @@
 //No response to an input event (such as key press or screen touch events) within 5 seconds.
 //A BroadcastReceiver hasn't finished executing within 10 seconds.
-kill -3 <pid>  
+kill  -s 3 <pid>  
 
 //按键5s
 handleTargetsNotReadyLocked-->onANRLocked-->doNotifyANRLockedInterruptible

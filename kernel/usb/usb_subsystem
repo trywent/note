@@ -1,7 +1,9 @@
 //
 subsys_initcall(usb_init)-->usb_init{
 - bus_register(&usb_bus_type)
-- usb_devio_init
+- usb_devio_init{//io接口
+	- 
+	}
 - usb_hub_init//启动hub线程
 - usb_register_device_driver(&usb_generic_driver)//通用驱动
 }

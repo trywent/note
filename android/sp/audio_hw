@@ -1,5 +1,57 @@
 //audio
 
+dev_names_digitalfm[] = {
+    { AUDIO_DEVICE_OUT_SPEAKER | AUDIO_DEVICE_OUT_FM_SPEAKER, "speaker" },
+    { AUDIO_DEVICE_OUT_WIRED_HEADSET | AUDIO_DEVICE_OUT_WIRED_HEADPHONE |AUDIO_DEVICE_OUT_FM_HEADSET,
+        "headphone" },
+    { AUDIO_DEVICE_OUT_EARPIECE, "earpiece" },
+    /* ANLG for voice call via linein*/
+    { AUDIO_DEVICE_OUT_FM, "digital-fm" },
+    { AUDIO_DEVICE_IN_COMMUNICATION, "comms" },
+    { AUDIO_DEVICE_IN_AMBIENT, "ambient" },
+    { AUDIO_DEVICE_IN_BUILTIN_MIC, "builtin-mic" },
+    { AUDIO_DEVICE_IN_WIRED_HEADSET, "headset-in" },
+    { AUDIO_DEVICE_IN_AUX_DIGITAL, "digital" },
+    { AUDIO_DEVICE_IN_BACK_MIC, "back-mic" },
+    { SPRD_AUDIO_IN_DUALMIC_VOICE, "dual-mic-voice" },
+}
+
+//设备配置结构体
+struct tiny_dev_cfg {
+    int mask;
+
+    struct route_setting *on; //path on 包含ctl控制
+    unsigned int on_len;
+
+    struct route_setting *off;//path off 包含ctl控制
+    unsigned int off_len;
+}
+
+//解析配置 支持的设备在结构体dev_names_digitalfm  
+adev_open-->adev_config_parse{
+- 文件tiny_hw.xml
+- adev_config_start{//解析配置，并保存到adev.dev_cfgs中
+	- 解析默认path //不带device的path。一些默认音量值
+	- adev_config_parse_private{//sprd私有控制接口vbc，eq
+		- vbc_switch
+		- vbc_eq_switch....
+		}
+	- 解析device{//output，input设备
+		- realloc(s->adev->dev_cfgs)//分配设备空间
+		- 解析path，ctl
+		}
+	}
+- adev_config_end{
+	- set_route_by_array //设置adev_config_start解析的默认path
+	- 
+	}
+}
+
+
+
+
+
+_______________
 //开一个线程处理设备选择
 hal_module_methods.open-->adev_open{
 - 创建tiny_audio_device adev
@@ -19,23 +71,26 @@ hal_module_methods.open-->adev_open{
 - audio_bt_sco_thread_create //bt 
 }
 
-//解析配置
-adev_open-->adev_config_parse{
-- 文件tiny_hw.xml
-- adev_config_start//解析配置，并保存到adev.dev_cfgs中
-}
 
 //选择路径
-adev_set_parameters-->
-select_devices_signal/select_devices_signal_asyn-->
-do_select_devices{
-- 
+adev_set_parameters-->select_devices_signal/select_devices_signal_asyn(发出设置信号)-->
+stream_routing_thread_entry(等待设置)-->do_select_devices{
+- cur_in = adev->in_devices //当前输入设备
+- cur_out = adev->out_devices //当前输出设备
+- 遍历设备路径，打开路径{
+	- 设置output路径，set_route_by_array
+	- 设置input路径，set_route_by_array
+	}
+- 遍历设备路径，关闭路径{
+	- 设置output路径，set_route_by_array
+	- 设置input路径，set_route_by_array
+	}
 }
 
 
+adev_set_parameters-->do_select_devices_static
 ____________
 //参数设置
-AudioSystem::setParameters-->
 
 //stream 参数
 AudioFlinger::setParameters-->AudioFlinger::ThreadBase::setParameters-->
@@ -49,6 +104,7 @@ inputStream.set_parameters-->in_set_parameters
 AudioFlinger::setParameters(设置非iohandle参数)-->set_parameters-->adev_set_parameters{
 -
 - "sprd_voip_start"-->设置adev->voip_start
+- "hfp_enable"//蓝牙电话processAudioEvent(AUDIO_STATE_CONNECTED)
 }
 
 
@@ -176,7 +232,10 @@ vbc_ctrl_open{
  }
 }
 
-SetParas_Route_Incall-->SetCall_ModePara
+SetParas_Route_Incall-->SetCall_ModePara{
+- 根据mode_gain_paras设置开关
+- 根据开关设置设备，//蓝牙电话mic1 s_call_ul_devices |= AUDIO_DEVICE_IN_BACK_MIC;
+}
 
 
 vbc_ctrl_voip_open-->

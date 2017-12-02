@@ -1,0 +1,13 @@
+//interface
+usbdev_file_operations{
+- unlocked_ioctl-->usbdev_ioctl
+- compat_ioctl-->usbdev_compat_ioctl
+}
+
+
+usbdev_ioctl/usbdev_compat_ioctl-->
+usbdev_do_ioctl-->proc_submiturb(USBDEVFS_SUBMITURB)/proc_submiturb_compat(USBDEVFS_SUBMITURB32)
+-->proc_do_submiturb@devio.c
+
+
+kernel/drivers/usb/core/devio.c
