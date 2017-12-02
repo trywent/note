@@ -9,13 +9,24 @@ apt-get install vim vim-scripts vim-doc
 :tabp
 
 //窗口中打开文件
-:sp <filepath>. //打开文件
+:sp <filepath>. //横分打开文件
+:vs <filepath>  //竖分打开文件
 Ctrl+W j/k//切换窗口
 
 //窗口最大最小化
 ctrl+super+上
 ctrl+super+下
 
+绝对值调整如下：
+:resize num "将窗口的高度调整为num行
+:res num "resize的缩写模式 与resize实现同样的功能 　　
+:vertical resize num "将窗口的宽度调整为num列
+:verticalres num "verticalresize的缩写模式 与verticalresize实现同样的功能
+增量式调整如下：
+:resize+num "将窗口的高度增加num行
+:resize-num "将窗口的高度减少num行
+:vertical resize+num "将窗口的宽度增加num列
+:vertical resize-num "将窗口的宽度减少num列 
 
 ==================
 //格式化

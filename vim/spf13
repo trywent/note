@@ -1,0 +1,13 @@
+//
+nerdTree  <c-e> 
+Ctrlp     <c-p>
+NERDCommenter  <leader>c<space>
+Tagbar <leader>tt
+
+
+ctrl+w+w切换窗口
+
+ctrl ] //跳转定义
+
+
+,ig//缩进显示开关
