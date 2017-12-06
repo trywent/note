@@ -1,25 +1,21 @@
 //
-
-_____________
-//codec
-
-//dai
-snd_soc_register_codec/snd_soc_register_component-->snd_soc_register_dai{
-- snd_soc_dai *dai //创建dai
-- list_add(&dai->list, &dai_list);
-}
+dai_link将codec_dai,cpu_dai关联起来。
 
 
-//codec
-snd_soc_register_codec{
+//==============注册codec驱动
+//codec 
+snd_soc_register_codec(){
 - 加入到链表，list_add(&codec->list, &codec_list) 
-- snd_soc_register_dais   
+- snd_soc_register_dais{
+	- list_add(&dai->list, &dai_list);
+	}
 }
 
 //platfrom
 snd_soc_add_platform-->list_add(&platform->list, &platform_list)
-______________
-//soc card device 各soc平台实现
+
+
+//============注册soc驱动
 audio_card_init{
 - 创建，platform_device_alloc("soc-audio", -1)
 - 设置设备数据(用于注册声卡设备)，platform_set_drvdata(snd_soc_card)
@@ -44,9 +40,13 @@ soc_probe{
 
 //初始化所有soc_card
 snd_soc_instantiate_cards(遍历所有card)-->snd_soc_instantiate_card{
-- soc_bind_dai_link{//将声卡card中的dai_link，和codec注册的codec_dai,cpu_dai关联起来，保存到rtd->cpu_dai和rtd->codec_dai
-	- 遍历list_for_each_entry(dai_list)，找到并设置card->rtd  //若dai_link中有和dai_list匹配，加入cpu_dai@dai_list
-	- 遍历list_for_each_entry(codec_list),找到并设置rtd->codec，rtd->codec_dai //若dai_list有和codec_list匹配项，加入codec_dai@dai_list
+//将声卡card中的dai_link，和codec注册的codec_dai,cpu_dai关联起来，保存到rtd->cpu_dai和rtd->codec_dai
+- soc_bind_dai_link{
+	- 初始化snd_soc_pcm_runtime rtd
+	  //若dai_link中有和dai_list匹配，加入cpu_dai@dai_list
+	- 遍历list_for_each_entry(dai_list)，找到并设置cpu_dai,rtd->cpu_dai
+	  //若dai_link有和codec_list匹配项，加入codec_dai@dai_list
+	- 遍历list_for_each_entry(codec_list),找到并设置codec,rtd->codec_dai 
 	- 遍历list_for_each_entry(platform_list),设置rtd->platform  //平台驱动，，，主要操作函数
 	}
 - 创建card，snd_card_create{
@@ -54,38 +54,68 @@ snd_soc_instantiate_cards(遍历所有card)-->snd_soc_instantiate_card{
 	- snd_info_card_create
 	}@init.c
 
-- 初始dai，soc_probe_link_components{//创建接口
-	- soc_probe_codec(card, cpu_dai->codec)
-	- soc_probe_codec(card, codec_dai->codec){
-		- snd_soc_add_controls //创建ctl设备
+//创建接口
+- 初始dai，soc_probe_link_components{
+	//创建codec设备
+	- soc_probe_codec(card, cpu_dai->codec){
+		- snd_soc_add_codec_controls
+		- 加入到list_add(card->codec_dev_list)
 		}
+	//创建ctl设备
+	- soc_probe_codec(card, codec_dai->codec){
+		- snd_soc_add_controls 
+		- 加入到list_add(card->codec_dev_list)
+		}
+	- soc_probe_platform
 	}
-- soc_probe_link_dais{//根据card.dai_link创建pcm节点
-	- soc_new_pcm-->platform->driver->pcm_new
+//根据card.dai_link创建pcm节点
+- soc_probe_link_dais{
+	- cpu_dai{
+		- cpu_dai->driver->probe
+		- list_add(card->dai_dev_list)
+		}
+	- codec_dai{
+		- cpu_dai->driver->probe
+		- list_add(card->dai_dev_list)
+		}		
+	- 创建pcm或者ctl。soc_new_pcm-->platform->driver->pcm_new
 	}
-- snd_soc_add_card_controls{//根据card.control
+//根据card.control
+- snd_soc_add_card_controls{
 
 	}
+
 - 注册声卡snd_card,snd_card_register{
 	- 创建card0/1，device_create(sound_class)
-	- 注册声卡上的设备，snd_device_register_all-->dev->ops->dev_register
+	  //创建pcm节点
+	- 注册声卡上的设备，snd_device_register_all(遍历card->devices){
+		- 遍历card->devices
+		- dev->ops->dev_register-->snd_pcm_dev_register@pcm.c-->
+			snd_register_device_for_dev(创建文件节点)-->device_create@sound.c
+		}
 	}@device.c
 }@soc-core.c
 
 
 
-=============
-//ctl设备节点
+//=============
+//ctl设备
 snd_ctl_create-->snd_ctl_dev_register@control.c
 
 
-//pcm设备节点
+//pcm设备
 soc_new_pcm{
-- snd_pcm_new
+- snd_pcm_new-->_snd_pcm_new@pcm.c-->snd_device_new{
+	- 创建snd_device
+	- 加入到list_add(&card->devices)
+	}@device.c
 - rtd->pcm = pcm //设置rtd (runtime data)
 - rtd //初始化rtd
 }@pcm.c
 
+//创建pcm节点
+snd_device_register/snd_device_register_all-->ops.dev_register-->snd_pcm_dev_register@device.c
+-->snd_register_device_for_dev(创建文件节点)-->device_create@sound.c
 
 snd_soc_dapm_new_pcm
 

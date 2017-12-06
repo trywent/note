@@ -92,9 +92,13 @@ PlaybackThread::threadLoop-->prepareTracks_l{
 
 (猜测是在这里)mFastMixer->run-->FastMixer::threadLoop(fastTrack->mVolumeProvider->getVolumeLR)
 
-setMasterVolume@System.java-->
-android_media_AudioSystem_setMasterVolume-->AudioSystem::setMasterVolume-->
-setMasterVolume-->dev->hwDevice()->set_master_volume@AudioFlinger.cpp
+setMasterVolume@System.java-->android_media_AudioSystem_setMasterVolume-->AudioSystem::setMasterVolume
+-->setMasterVolume-->dev->hwDevice()->set_master_volume@AudioFlinger.cpp
+
+//设置muster mute
+AudioSystem::setMasterMute
+AudioFlinger::setMasterMute-->dev->hwDevice()->set_master_mute@AudioFlinger.cpp
+
 
 ===============
 /*input

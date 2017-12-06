@@ -150,7 +150,7 @@ adev_open_input_stream{
 - in->requested_channels = channel_count //请求的通道
 }
 
-in_read{
+in_read(buffer,size){
   //audiopolicy.startOutput判断设置了AUDIO_STREAM_VOICE_CALL，就为voip状态
 - 若是voip_start，则设置is_voip=true //蓝牙从设备通话状态，
 - start_input_stream//若是standby则重新开始
@@ -193,6 +193,12 @@ external/tinyalsa/pcm.c
 =============
 //音量
 AudioFlinger::setMasterVolume-->adev_set_master_volume
+
+//电话音量
+AudioPolicyManager::checkAndSetVolume-->
+AudioPolicyService::setVoiceVolume-->AudioSystem::setVoiceVolume-->AudioFlinger::setVoiceVolume
+-->(hw层设置)dev->set_voice_volume-->adev_set_voice_volume
+
 =============
 //debug
 audiodebug_process
@@ -262,3 +268,11 @@ vbc_ctl_modem_monitor_routine{
 	}
 }
 vendor/sprd/modules/audio/normal/vb_control_parameters.c
+
+
+
+============
+alsa
+pcm_read{
+- ioctl(pcm->fd, SNDRV_PCM_IOCTL_READI_FRAMES,&x)
+}

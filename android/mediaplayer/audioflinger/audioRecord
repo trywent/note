@@ -39,16 +39,17 @@ AudioRecord::AudioRecord-->set(audio_source_t inputSource,
 		- bufferMem //flinger端mBuffer地址
 		} //
 	- buffers //设置buffer地址
-	- new AudioRecordClientProxy(buffer) //创建proxy，用来读取数据	
+	- mProxy = new AudioRecordClientProxy(buffer) //创建proxy，用来读取数据	
 	}
 }@AudioRecord.cpp
 
 
-//read数据
-read@AudioRecord.java-->native_read_in_byte_array-->android_media_AudioRecord_readInArray
-lpRecorder->read@android_media_AudioRecord.cpp-->read{
+//read数据,读取数据拷贝到 buffer中
+read@AudioRecord.java-->native_read_in_short_array(/*byte,short,float数据格式不同*/)-->
+android_media_AudioRecord_readInArray-->lpRecorder->read@android_media_AudioRecord.cpp-->
+read(buffer,size){
   //获取数据
-- obtainBuffer-->obtainBuffer-->proxy->obtainBuffer-->
+- obtainBuffer(Buffer* audioBuffer,const struct timespec )-->obtainBuffer-->proxy->obtainBuffer-->
 	obtainBuffer(判断是读取还是写入，将mBuffers返回)@AudioTrackShared.cpp
 - memcpy(buffer, audioBuffer.i8)//拷贝到用户buffer中
 }@AudioRecord.cpp

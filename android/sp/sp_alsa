@@ -75,15 +75,8 @@ vbc_drv_probe@vbc.c-->snd_soc_register_component
 sprd_codec_probe@sprd-codec.c-->snd_soc_register_codec
 
 ______________
-//codec
-sprd_codec_codec_driver("sprd-codec")-->
-sprd_codec_probe{
-- request_irq
-- snd_soc_register_codec(soc_codec_dev_sprd_codec,sprd_codec_dai)
-}@sprd-codec.c
-
-
 //codec dai
+
 sprd_codec_dai{
 	{
 	 .name = "sprd-codec-i2s",
@@ -129,7 +122,14 @@ sprd_codec_dai{
 		      },
 	 .ops = &sprd_codec_dai_ops,
 	 },
-}
+}@sprd-codec.c
+
+
+sprd_codec_codec_driver("sprd-codec")-->
+sprd_codec_probe{
+- request_irq
+- snd_soc_register_codec(soc_codec_dev_sprd_codec,sprd_codec_dai)
+}@sprd-codec.c
 
 //pcm 的操作，dma函数  platform
 sprd_pcm_driver("sprd-pcm-audio")-->sprd_soc_platform_probe-->
@@ -144,15 +144,6 @@ sprd_pcm_mmap{
 //irq
 sci_dma_register_irqhandle(sprd_pcm_dma_irq_ch)@sprd-pcm.c-->snd_pcm_period_elapsed
 snd_pcm_update_hw_ptr0-->substream->ops->pointer@pcm_lib.c
-______________
-//widget
-soc_codec_dev_sprd_codec{
-- sprd_codec_dapm_widgets //widget
-- sprd_codec_intercon
-- sprd_codec_snd_controls
-}@sprd-codec.c
-
-
 ______________
 //vbc
 
@@ -201,9 +192,25 @@ vbc_dai{
 		      },
 	 .ops = &dfm_dai_ops,
 	 }
-}
+}@vbc.c
+
+sprd_vbc_driver_init-->vbc_driver-->vbc_drv_probe@vbc.c-->
+sprd_vbc_codec_probe-->snd_soc_register_codec@vbc-codec.c
+
+
+______________
+//widget
+soc_codec_dev_sprd_codec{
+- sprd_codec_dapm_widgets //widget
+- sprd_codec_intercon
+- sprd_codec_snd_controls
+}@sprd-codec.c
+
+
+
 
 
 kernel/sound/soc/sprd/dai/vbc/r2p0/vbc.c
 kernel/sound/soc/sprd/codec/sprd/v4/sprd-codec.c
-/home/build/6025/kernel/sound/soc/sprd/dai/sprd-pcm.c
+kernel/sound/soc/sprd/dai/vbc/r2p0/vbc-codec.c
+kernel/sound/soc/sprd/dai/sprd-pcm.c
