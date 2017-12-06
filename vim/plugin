@@ -4,7 +4,23 @@
 ~/.vim/syntax
 
 将plugin目录下文件放入~/.vim/plugin
+==================
+//已经配置好的vim spf13
+sudo apt install scope
+sudo apt install ctags
+curl https://j.mp/spf13-vim3 -L > spf13-vim.sh && sh spf13-vim.sh
 
+==================
+//插件管理工具vundle
+git clone http://github.com/gmarik/vundle.git ~/.vim/bundle/vundle  
+
+:BundleList             -列举列表(也就是.vimrc)中配置的所有插件  
+:BundleInstall          -安装列表中的全部插件  
+:BundleInstall!         -更新列表中的全部插件  
+:BundleSearch foo       -查找foo插件  
+:BundleSearch! foo      -刷新foo插件缓存  
+:BundleClean            -清除列表中没有的插件  
+:BundleClean!           -清除列表中没有的插件  
 ==================
 ctags:
 ctags -R *
@@ -27,6 +43,11 @@ ctags -R --c++-kinds=+p --fields=+iaS --extra=+q
 
 --extra=+q:强制要求ctags做如下操作—如果某个语法元素是类的一个成员，ctags默认会给其记录一行，可以要求ctags对同一个语法元斯屹记一行，这样可以保证在VIM中多个同名函数可以通过路径不同来区分。
 
+
+
+ctrl ] //跳转到定义
+ctrl t //跳转回来
+
 ==================
 cscop:
 cscope -Rbkq
@@ -48,12 +69,10 @@ t:Find assignments to //查找指定的字符串
 例如：使用cscope查找do_fork函数的定义,在vim命令行下执行 :cs f g do_fork
 
 
-==================
-nerdTree:
-
-#自动打开树结构窗口
-autocmd VimEnter * NERDTree
-
+//============
+nerdTree: 打开树结构窗口
+<c-e> //打开nerdTree
+ 
 o 打开关闭文件或者目录
 t 在标签页中打开
 T 在后台标签页中打开
@@ -67,3 +86,33 @@ m 显示文件系统菜单（添加、删除、移动操作）
 ? 帮助
 q 关闭
 
+//============
+Ctrlp： 打开文件
+
+
+//============
+surround：该插件就是用来快速添加，修改和删除结对符。避免了缓慢移动光标修改的方式
+
+cs " '   //替换 " 为 '
+
+
+//============
+NERDCommenter:允许你快速注释代码段
+
+[count]<leader>cc   在可视模式下注释当前行或选定的文本
+[count]<leader>cu   取消选定行的注释
+
+//============
+NEOsnippet:补全代码段
+
+
+//============
+Tagbar浏览当前文件的索引
+
+//============
+EasyMotion 提供了一种在vim中使用移动的交互方式
+
+<leader><leader>w                      从光标位置起，往前（往下）在单词之间移动光标
+<leader><leader>b                       从光标位置起，往后（往上）在单词之间移动光标
+<leader><leader>s                       从光标位置起，同时往前往后，在单词之间移动光标
+<leader><leader>f｛char｝          从光标位置起，往前（往下）在单个字符之间移动光标
