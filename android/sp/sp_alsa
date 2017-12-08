@@ -1,33 +1,56 @@
 //soc dts配置
-vbc_sound0: sound@0 {
-            compatible = "sprd,vbc-r2p0-sprd-codec";
+
+sprd平台又4card，"saudio_lte" "saudio_voip" "all-i2s" "sprdphone"(多媒体使用) 
+===================
+//注册声卡saudiolte和saudiovoip
+saudio_lte{
+	compatible = "sprd,saudio";
+};
+saudio_voip{
+	compatible = "sprd,saudio";
+}@sprd-sharkl-modem-volte.dtsi
+//sprd sound
+module_init()-->alsa_card_saudio_init-->platform_driver_register(&snd_saudio_driver)
+-->snd_saudio_driver.driver.name("saudio")@saudio.c
+
+snd_saudio_probe-->saudio_ctrl_thread-->saudio_snd_init_card-->snd_card_register@saudio.c
+
+kernel/sound/drivers/saudio.c
+
+______________
+//注册声卡all_i2s_card    i2s-null-codec
+i2s_sound: sound@2 {
+compatible = "sprd,i2s-null-codec";
+sprd,model = "all-i2s";
 };
 
-kernel/arch/arm/boot/dts/sprd-sound.dtsi
+late_initcall_sync(sprd_asoc_i2s_init)-->sprd_asoc_i2s_probe-->snd_soc_register_card(all_i2s_card)
+@i2s-r0p0-null-codec.c
 
-
-//card设备
+_____________
+//注册声卡 vbc_r2p0_codec_card
 static struct snd_soc_card vbc_r2p0_codec_card = {
 	.name = "sprdphone",
 	.dai_link = vbc_r2p0_codec_dai,       //pcm 
 	.controls = vbc_r2p0_codec_controls,  //control
 	.dapm_widgets = sprd_codec_dapm_widgets,
-	.dapm_routes = vbc_r2p0_codec_map,
+	.dapm_routes = vbc_r2p0_codec_map,0
 }
 
 //soc设备注册
-vbc_r2p0_codec_driver()-->vbc_r2p0_codec_probe(/*card设备*/vbc_r2p0_codec_card)@vbc-r2p0-sprd-codec-v4.h-->
-sprd_asoc_probe{
+vbc_sound0: sound@0 {
+            compatible = "sprd,vbc-r2p0-sprd-codec";
+}@kernel/arch/arm/boot/dts/sprd-sound.dtsi
+
+late_initcall_sync(vbc_r2p0_codec_init)-->vbc_r2p0_codec_driver()-->vbc_r2p0_codec_probe
+(/*card设备*/vbc_r2p0_codec_card)@vbc-r2p0-sprd-codec-v4.h-->
+sprd_asoc_probe(vbc_r2p0_codec_card){
 - 设置dai_link{
 	- card->dai_link[i].platform_of_node = pcm_node
 	- card->dai_link[i].codec_of_node = codec_node
 	}
-- snd_soc_register_card
+- snd_soc_register_card(vbc_r2p0_codec_card)
 }@sprd-asoc-card.c
-
-kernel/sound/soc/sprd/vbc-r2p0-sprd-codec-v4.h
-kernel/sound/soc/sprd/sprd-asoc-card.c
-
 
 //dai link
 vbc_r2p0_codec_dai{
@@ -66,18 +89,25 @@ vbc_r2p0_codec_dai{
 	 },
 }@vbc-r2p0-sprd-codec-v4.h
 
-//cpu_dai   vbc_dai
-vbc_drv_probe@vbc.c-->snd_soc_register_component
+
+kernel/sound/soc/sprd/vbc-r2p0-sprd-codec-v4.h
+kernel/sound/soc/sprd/sprd-asoc-card.c
 
 
+//==============
+//platform
+sprd_pcm: sprd-pcm-audio {
+	compatible = "sprd,sprd-pcm";
+};
 
-//codec_dai sprd_codec_dai
-sprd_codec_probe@sprd-codec.c-->snd_soc_register_codec
+//pcm 的操作，dma函数  platform
+platform_driver_register(&sprd_pcm_driver"sprd-pcm")-->sprd_soc_platform_probe
+-->snd_soc_register_platform(sprd_soc_platform)@sprd-pcm.c
 
 ______________
-//codec dai
+//codec模块。和dai接口
 
-sprd_codec_dai{
+snd_soc_dai_driver sprd_codec_dai{
 	{
 	 .name = "sprd-codec-i2s",
 	 .playback = {
@@ -125,15 +155,21 @@ sprd_codec_dai{
 }@sprd-codec.c
 
 
-sprd_codec_codec_driver("sprd-codec")-->
+//驱动 设备
+&sprd_codec {
+	status = "okay";
+}
+
+sprd_codec_codec_driver(sprd_codec_codec_driver"sprd-codec")-->
 sprd_codec_probe{
 - request_irq
-- snd_soc_register_codec(soc_codec_dev_sprd_codec,sprd_codec_dai)
+- snd_soc_register_codec(soc_codec_dev_sprd_codec,sprd_codec_dai)-->
+	snd_soc_register_dais{
+	
+	}
 }@sprd-codec.c
 
-//pcm 的操作，dma函数  platform
-sprd_pcm_driver("sprd-pcm-audio")-->sprd_soc_platform_probe-->
-snd_soc_register_platform(&sprd_soc_platform)@sprd-pcm.c
+
 
 
 sprd_pcm_mmap{
@@ -145,10 +181,10 @@ sprd_pcm_mmap{
 sci_dma_register_irqhandle(sprd_pcm_dma_irq_ch)@sprd-pcm.c-->snd_pcm_period_elapsed
 snd_pcm_update_hw_ptr0-->substream->ops->pointer@pcm_lib.c
 ______________
-//vbc
+//vbc模块
 
-//cpu dai
-vbc_dai{
+//cpu dai driver
+snd_soc_dai_driver vbc_dai{
 	{
 	 .name = "vbc-r2p0",
 	 .id = 0,
@@ -194,9 +230,46 @@ vbc_dai{
 	 }
 }@vbc.c
 
-sprd_vbc_driver_init-->vbc_driver-->vbc_drv_probe@vbc.c-->
-sprd_vbc_codec_probe-->snd_soc_register_codec@vbc-codec.c
+//驱动 设备
+&vbc_r2p0 {
+	status = "okay";
+};
 
+platform_driver_register(&vbc_driver"vbc-r2p0")-->vbc_drv_probe{
+- sprd_vbc_codec_probe{
+	- snd_soc_register_codec(&soc_codec_dev_vbc_codec)
+	}@vbc-codec.c
+- snd_soc_register_component(&sprd_vbc_component,vbc_dai)
+}@vbc.c
+______________
+//vaudio driver
+vaudio: vaudio {
+	compatible = "sprd,vaudio";
+};
+
+module_platform_driver(sprd_vaudio_driver)-->sprd_vaudio_drv_probe-->
+snd_soc_register_component(sprd_vaudio_dai)@vaudio.c
+______________
+//i2s driver
+&i2s 1/2/3/4 {
+	status = "okay";
+};
+
+module_platform_driver(i2s_driver)-->i2s_drv_probe-->snd_soc_register_component
+(&sprd_i2s_component,i2s->i2s_dai_driver)@i2s.c
+
+
+snd_soc_register_component(&sprd_compr_component,sprd_compr_dai)
+
+
+______________
+//i2s-null-codec
+null_codec: null-codec {
+compatible = "sprd,null-codec";
+};
+
+module_platform_driver(null_codec_codec_driver"null-codec")-->null_codec_codec_probe-->
+snd_soc_register_codec(&soc_codec_dev_null_codec，null_codec_dai)@null-codec.c
 
 ______________
 //widget
@@ -214,3 +287,7 @@ kernel/sound/soc/sprd/dai/vbc/r2p0/vbc.c
 kernel/sound/soc/sprd/codec/sprd/v4/sprd-codec.c
 kernel/sound/soc/sprd/dai/vbc/r2p0/vbc-codec.c
 kernel/sound/soc/sprd/dai/sprd-pcm.c
+kernel/sound/soc/sprd/dai/vaudio/vaudio.c
+kernel/sound/soc/sprd/dai/i2s/i2s.c
+kernel/sound/soc/sprd/codec/null-codec/null-codec.c
+kernel/sound/soc/sprd/i2s-r0p0-null-codec.c
