@@ -280,6 +280,19 @@ soc_codec_dev_sprd_codec{
 }@sprd-codec.c
 
 
+=====================
+//dma
+sprd_pcm_new-->sprd_pcm_preallocate_dma_buffer{
+- struct snd_dma_buffer *buf = &substream->dma_buffer
+- 设置buf
+- dma_alloc_coherent
+}
+
+
+sprd_pcm_ops.mmap-->sprd_pcm_mmap{
+- 
+}@sprd-pcm.c
+
 
 
 
@@ -291,3 +304,4 @@ kernel/sound/soc/sprd/dai/vaudio/vaudio.c
 kernel/sound/soc/sprd/dai/i2s/i2s.c
 kernel/sound/soc/sprd/codec/null-codec/null-codec.c
 kernel/sound/soc/sprd/i2s-r0p0-null-codec.c
+kernel/sound/soc/sprd/dai/sprd-dmaengine-pcm.c

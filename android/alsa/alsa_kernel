@@ -1,4 +1,0 @@
-//
-major = CONFIG_SND_MAJOR
-
-subsys_initcall(init_soundcore)-->class_create("sound")@sound_core.c

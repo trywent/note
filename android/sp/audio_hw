@@ -157,7 +157,10 @@ in_read(buffer,size){
 - 读取数据{
 	- SprdSrc_To_44K，是否要重采样
 	- AudioRecordNr_Proc
-	- read_pcm_data-->pcm_read-->ioctl(pcm->fd, SNDRV_PCM_IOCTL_READI_FRAMES)@pcm.c
+	- read_pcm_data-->pcm_read(buffer,bytes){
+		- 将bytes装化为frames
+		- ioctl(pcm->fd, SNDRV_PCM_IOCTL_READI_FRAMES)@pcm.c
+		}
 	}
 - 
 - 若有错误执行do_input_standby

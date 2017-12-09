@@ -147,29 +147,36 @@ snd_ctl_create-->snd_ctl_dev_register@control.c
 soc_new_pcm(rtd,num){
 - snd_pcm_new-->_snd_pcm_new{
 	- 设置snd_device_ops //注册创建pcm文件节点接口
-	- 创建pcm
-	- snd_pcm_new_stream //创建stream(录制，播放)
+	- 创建struct snd_pcm pcm
+	- snd_pcm_new_stream{ //创建stream(录制，播放的操作函数)
+		- 初始化pcm->streams
+		- 创建snd_pcm_substream substream
+		- 
+		}@pcm.c
 	- snd_device_new{
 		- 创建snd_device
 		- 加入到list_add(&card->devices)
 		}@device.c
 	}@pcm.c
-- rtd->pcm = pcm //设置rtd (runtime data)
+- rtd->pcm = pcm //设置rtd (runtime device)
 - rtd //初始化rtd
+- 设置stream.substeam的操作函数，snd_pcm_set_ops(&rtd->ops)
+- 平台驱动不为空，platform->driver->pcm_new(rtd)
 }@soc-pcm.c
 
 //创建pcm节点。注册声卡时调用
-snd_device_register/snd_device_register_all-->ops.dev_register-->snd_device_ops.dev_register
-@device.c-->snd_pcm_dev_register{
+snd_device_register/snd_device_register_all(card->device/*card中的设备，snd_pcm_new加入*/)-->
+ops.dev_register-->snd_device_ops.dev_register@device.c-->snd_pcm_dev_register(device){
 - 
 - 创建名字pcmC%iD%ip（card->number,device）
 - snd_register_device_for_dev(snd_pcm_f_ops,pcm){
-	- 设置操作函数f_ops，snd_pcm_f_ops
-	- device_create@sound.c
+	- 设置操作函数f_ops，snd_pcm_f_ops //节点操作函数
+	- device_create(pcm/*作为private_data*/)@sound.c
 	- 
 	}
 - 
 }@pcm.c
+
 
 sound/soc/soc-core.c
 sound/core/init.c
@@ -177,4 +184,44 @@ sound/core/control.c
 sound/core/info.c
 sound/core/device.c
 sound/core/pcm.c
+sound/core/pcm_lib.c
+=========================
+//节点操作函数
+
+open:
+snd_pcm_f_ops.open(capture)-->snd_pcm_capture_open(snd_lookup_minor_data/*获取snd_pcm pcm*/)-->snd_pcm_open-->
+snd_pcm_open_file(file,pcm,stream/*录制，或播放*/){
+- 创建snd_pcm_substream，snd_pcm_open_substream{
+	- snd_pcm_attach_substream{
+		- 若是半双工则返回（只能capture和play单独工作）
+		- snd_pcm_runtime *runtime//创建runtime	
+		}
+	- snd_pcm_hw_constraints_init
+	}
+- 创建snd_pcm_file *pcm_file。设置substream
+- 设置为file->private_data = pcm_file
+}@pcm_native.c
+
+
+//读取数据
+ioctl:
+snd_pcm_f_ops.unlocked_ioctl-->snd_pcm_capture_ioctl{
+- 获取snd_pcm_file *pcm_file = file->private_data //是一个snd_pcm_file pcm
+- snd_pcm_capture_ioctl1(pcm_file->substream)
+}@pcm_native.c
+
+snd_pcm_capture_ioctl1(SNDRV_PCM_IOCTL_READI_FRAMES)@pcm_native.c-->snd_pcm_lib_read
+-->snd_pcm_lib_read1(buffer,frames,snd_pcm_lib_read_transfer)-->tarnsfer-->
+snd_pcm_lib_read_transfer(stream,hwoff/*dma的偏移*/,buffer,offset/*已经读取的frames*/，frames/*本次需读取的frame*/){
+- 根据buffer和offset，计算目标保存地址位置
+- 若stream又copy函数，substream->ops->copy
+- 没有copy函数{
+	- 计算源地址的位置，runtime->dma_area + frames_to_bytes(runtime, hwoff)
+	- unalign_copy_to_user
+	}
+}@pcm_lib.c
+
+
+
+
 //============ dapm ALSA SoC Dynamic Audio Power Management
