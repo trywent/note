@@ -146,7 +146,7 @@ snd_ctl_create-->snd_ctl_dev_register@control.c
 //pcm设备
 soc_new_pcm(rtd,num){
 - snd_pcm_new-->_snd_pcm_new{
-	- 设置snd_device_ops //注册创建pcm文件节点接口
+	- 设置snd_device_ops //注册创建pcm文件节点操作函数
 	- 创建struct snd_pcm pcm
 	- snd_pcm_new_stream{ //创建stream(录制，播放的操作函数)
 		- 初始化pcm->streams
@@ -159,7 +159,10 @@ soc_new_pcm(rtd,num){
 		}@device.c
 	}@pcm.c
 - rtd->pcm = pcm //设置rtd (runtime device)
-- rtd //初始化rtd
+- 初始化rtd{//设置操作函数
+	- soc_pcm_open,soc_pcm_hw_params
+	- 设置copy,mmap为platform.ops  //数据传输平台相关？
+	}
 - 设置stream.substeam的操作函数，snd_pcm_set_ops(&rtd->ops)
 - 平台驱动不为空，platform->driver->pcm_new(rtd)
 }@soc-pcm.c
@@ -170,7 +173,7 @@ ops.dev_register-->snd_device_ops.dev_register@device.c-->snd_pcm_dev_register(d
 - 
 - 创建名字pcmC%iD%ip（card->number,device）
 - snd_register_device_for_dev(snd_pcm_f_ops,pcm){
-	- 设置操作函数f_ops，snd_pcm_f_ops //节点操作函数
+	- 设置操作函数f_ops，snd_pcm_f_ops //pcm节点操作函数
 	- device_create(pcm/*作为private_data*/)@sound.c
 	- 
 	}
@@ -221,7 +224,11 @@ snd_pcm_lib_read_transfer(stream,hwoff/*dma的偏移*/,buffer,offset/*已经读�
 	}
 }@pcm_lib.c
 
-
-
+//mmap
+snd_pcm_f_ops.mmap-->snd_pcm_mmap{
+- snd_pcm_mmap_status
+- snd_pcm_mmap_control
+- snd_pcm_mmap_data-->substream->ops->mmap()-->platform->driver->mmap
+}@pcm_native.c
 
 //============ dapm ALSA SoC Dynamic Audio Power Management
