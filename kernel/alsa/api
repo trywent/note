@@ -1,8 +1,34 @@
 //user space 
-pcm_open
+pcm_open(card,device,flags,config){
+- 创建struct pcm，打开"/dev/snd/pcmC%uD%u%c"
+- 获取snd_pcm_info,ioctl(SNDRV_PCM_IOCTL_INFO)
+- 初始化并设置hw参数{// struct snd_pcm_hw_params params
+	- param_init(&params)
+	- 设置采样率，格式，声道数，period size,period count
+	- 设置ioctl( SNDRV_PCM_IOCTL_HW_PARAMS, &params)
+	}
+- 获取kernel适配的period_size，period_count。计算buffer
+- mmap_buffer=mmap(pcm->fd)
+- 设置software参数{
+	- ioctl(pcm->fd, SNDRV_PCM_IOCTL_SW_PARAMS)
+	}
+- pcm_hw_mmap_status
+}
 
 
 
+snd_pcm_common_ioctl1(SNDRV_PCM_IOCTL_HW_PARAMS)-->snd_pcm_common_ioctl1
+-->snd_pcm_hw_params{
+- 调整参数，snd_pcm_hw_refine
+- 设置substream->runtime{
+	- 
+	}
+}@pcm_navite.c
+
+
+
+android/external/tinyalsa/pcm.c
+kernel/sound/cor/pcm_native.c
 =============
 debug
 

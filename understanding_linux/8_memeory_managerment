@@ -1,10 +1,35 @@
-//memory managerment
-页描述符(数据结构page)：记录页框的状态
+//memory managerment（主要介绍内核分配自己使用的内存）
+
 mem_map数组存放页描述符(描述符32byte)
 virt_to_page(addr):获取线性地址addr对应的页框描述符
 pfn_to_page(pfn):页框号pfn对应的页框描述符
 
+页描述符(数据结构page)：记录页框的状态
+struct page{
+- _count //-1时没有被使用，>=0时被分配
+- flags //page的使用状态
+}
 
-内存节点(memory node) //系统中内存分为多个节点
 
-内存区域(memory zone)
+
+Non-Uniform Memory Access (NUMA)//有些多核cpu架构（Alpha,MIPS）访问内存花费时间不同
+ibm系cpu使用UMA，
+
+内存节点(memory node) //linux只使用一个node。
+pgdat_list->pg_data_t{//node结构体
+- struct zone [ ] node_zones
+}
+
+//为了兼容老的ISA总线(只能访问16M内存)，和32位cpu访问的地址限制。内存分为多个zone
+内存区域(memory zone){
+- ZONE_DMA      //包含16M一下的页
+- ZONE_NORMAL   //16M-896M
+- ZONE_HIGH     //896以上的页。不能被kernel的线性地址访问到
+}
+
+struct zone{
+- free_pages
+- pages_min  //zone最低保留页表数
+- pages_low  //内存回收的最低水位
+- pages_high //内存回收的最高水位
+}
