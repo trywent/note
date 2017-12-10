@@ -1,3 +1,72 @@
+//电量信息  通过广播发出ACTION_BATTERY_CHANGED
+startCoreServices-->mSystemServiceManager.startService(BatteryService.class)@SystemServer.java
+-->onStart{
+- batteryPropertiesRegistrar.registerListener(new BatteryListener()) //注册监听
+- publishBinderService("battery", new BinderService())
+- publishLocalService(BatteryManagerInternal.class, new LocalService())
+}
+
+//
+public static abstract class Uid   //用户进程类
+public static abstract class Proc  //进程信息类 cpu使用时间
+public final static class HistoryItem //
+
+frameworks/base/core/java/android/os/BatteryStats.java
+____________________
+//应用电池使用信息
+
+
+
+apps/Settings/src/com/android/settings/fuelgauge/PowerUsageDetail.java
+
+frameworks/base/services/core/java/com/android/server/am/BatteryStatsService.java
+
+
+frameworks/base/core/java/com/android/internal/os/BatteryStatsHelper.java
+
+====================
+//daemon
+service healthd /sbin/healthd
+main{
+- 初始化，healthd_mode_ops
+- healthd_init{
+	- healthd_mode_ops->init-->healthd_mode_android_init{
+			- 创建服务BatteryPropertiesRegistrar
+			}
+	- wakealarm_init  
+	- uevent_init //监听kernel中的POWER事件
+	- BatteryMonitor->init(&healthd_config) //电池状态获取电量，温度..
+	}
+- healthd_mainloop //等待并处理事件
+}
+
+periodic_chores-->healthd_battery_update-->
+BatteryMonitor::update{
+- 读取电池信息，batteryStatus，batteryHealth
+- healthd_mode_ops->battery_update-->healthd_mode_android_battery_update//通知listerner
+}
+
+
+healthd_mode_android_battery_update-->gBatteryPropertiesRegistrar->notifyListeners-->
+BatteryPropertiesRegistrar::notifyListeners-->
+
+
+
+system/core/healthd/healthd.cpp
+system/core/healthd/healthd_mode_android.cpp
+system/core/healthd/BatteryPropertiesRegistrar.cpp
+
+
+
+
+
+
+
+
+
+
+
+
 register_android_server_BatteryService(在onload.cpp中调用，设置电池状态路径，关联service中状态变量)
 @com_android_server_BatteryService.cpp
 
