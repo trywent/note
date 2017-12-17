@@ -1,3 +1,18 @@
+//
 sudo apt-get remove libreoffice-common  thunderbird //办公软件  雷鸟
 
 Flatabulous主题
+
+
+//隐藏顶部栏
+1.安装 gnome-tweak-tool
+
+$ sudo apt-get install gnome-tweak-tool
+
+2.安装 hidetopbar扩展
+
+$ sudo apt-get install gnome-shell-extension-autohidetopbar
+3.重启电脑
+$ sudo reboot
+4.启动 gnome-tweak-tool
+
