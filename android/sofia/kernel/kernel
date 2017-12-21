@@ -1,3 +1,4 @@
+//
 makefile
 MAKECMDGOALS  //命令行传入的目标
 
@@ -9,3 +10,15 @@ panic-->emergency_restart@panic.c
 
 kernel/panic.c
 
+================
+usb
+kernel/debug/intel_otg/
+
+
+//err
+cat sys/kernel/debug/intel_otg/chg_type                   
+USB_DCP_CHARGER                                                                 
+cat sys/kernel/debug/intel_otg/mode                       
+host                                
+cat sys/kernel/debug/intel_otg/otg_state                  
+b_idle           

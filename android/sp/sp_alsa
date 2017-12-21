@@ -104,6 +104,16 @@ sprd_pcm: sprd-pcm-audio {
 platform_driver_register(&sprd_pcm_driver"sprd-pcm")-->sprd_soc_platform_probe
 -->snd_soc_register_platform(sprd_soc_platform)@sprd-pcm.c
 
+//pointer 返回dma内存中当前帧的偏移值
+sprd_pcm_pointer{
+- 获取声道0的dma偏移值，sprd_pcm_dma_get_addr()-dma_addr
+- 获取声道1的dma偏移值，sprd_pcm_dma_get_addr()-dma_addr-dma_addr_offset/*声道的偏移值*/
+- 偏移位置确保包含两个声道的有效数据/*选择两个声道最少数据的那个*/{
+	- 数据没有循环超出buffer，或者都超出buffer。选择偏移小的声道 //保证两个声道都是有效数据
+	- 只有一个声道超出循环buffer选择偏移大的那个声道//大的基本没有超过buffer，属于数据小的
+	}
+- 返回dma内存中有效数据位置的偏移值
+}@sprd-pcm.c
 ______________
 //codec模块。和dai接口
 
@@ -169,13 +179,6 @@ sprd_codec_probe{
 	}
 }@sprd-codec.c
 
-
-
-
-sprd_pcm_mmap{
-- pgprot_writecombine
-- remap_pfn_range
-}
 
 //irq
 sci_dma_register_irqhandle(sprd_pcm_dma_irq_ch)@sprd-pcm.c-->snd_pcm_period_elapsed
@@ -281,19 +284,99 @@ soc_codec_dev_sprd_codec{
 
 
 =====================
-//dma
+//dma位置 大小 VBC_BUFFER_BYTES_MAX 		(48* 1024)
+//CONFIG_SND_SOC_SPRD_AUDIO_BUFFER_USE_IRAM not set
 sprd_pcm_new-->sprd_pcm_preallocate_dma_buffer{
 - struct snd_dma_buffer *buf = &substream->dma_buffer
-- 设置buf
-- dma_alloc_coherent
+- 设置buf{
+	- area //dma的内存空间虚拟地址
+	- addr //物理地址
+	- size //大小
+	}
+- dma_alloc_coherent(一个宏定义)-->dma_alloc_attrs()
+}@sprc-pcm.c
+
+
+//open
+sprd_pcm_ops.open-->sprd_pcm_open{
+
 }
 
 
-sprd_pcm_ops.mmap-->sprd_pcm_mmap{
-- 
+//设置参数
+sprd_pcm_hw_params{
+- totsize = params_buffer_bytes(params)//buffer
+- period = params_period_bytes(params)
+- periods = params_periods(params)
+- snd_soc_dai_get_dma_data //获取dma设备地址 vbc.c设置
+- params_channels//获取声道
+- dma->desc.src_step = 4//根据声道设置dma步进，双声道步进数4。单声道2
+- rtd->uid_cid_map = sci_dma_request(FULL_DMA_CHN) //设置dma id
+- snd_pcm_set_runtime_buffer{//赋值dma信息到runtime
+	- runtime->dma_area，dma_addr，dma_bytes
+	}
+- 设置runtime->dma_bytes
+- sprd_dma_desc dma_cfg_array= kzalloc//创建dma描述信息
+- dma_buff_phys //左右声道的数据保存的arm物理地址 dam_addr dma_addr+2
+- 初始化dma_desc{
+	- block_len //一个period中一个声道数据
+	- src_step //源数据的步进
+	- des_step //目标数据的步进
+	- 播放{
+		- src_addr = dma_buff_phys //源数据地址为dma
+		- des_addr = dma->dev_paddr //目的地址为设备地址
+		}
+	- 录制{
+		- src_addr = dma->dev_paddr //目的地址为设备地址
+		- des_addr = dma_buff_phys //源数据地址为dma
+		}
+	}
+ //配置声道0的dma
+- dma_reg_addr[0].phys_addr = (u32) (rtd->dma_desc_array_phys)//设置dma的设备物理地址
+- dma_reg_addr[0].virt_addr = rtd->dma_desc_array//设置dma的设备虚拟地址
+- sci_dma_config(params_periods(params)，dma_reg_addr)//配置
+- sci_dma_register_irqhandle(sprd_pcm_dma_irq_ch) //注册dma中断处理
+	-->sprd_pcm_dma_irq_ch{
+	- 双声道时要两个声道数据都准备好，才允许读取
+	- snd_pcm_period_elapsed//数据准备好
+	}
+ //配置声道1的dma
+- sprd_pcm_proc_init //设置proc
+}@sprc-pcm.c
+
+
+//pointer
+snd_pcm_period_elapsed-->snd_pcm_update_hw_ptr0-->substream->ops->pointer@pcm_lib.c
+
+sprd_pcm_ops.mmap-->sprd_pcm_mmap(substream,vma){
+- 获取runtime
+  //dma_area dma_addr dma_bytes 为dma_alloc_attrs请求到的参数
+- dma_mmap_writecombine(dev,vma,runtime->dma_area,dma_addr,dma_bytes)
+	-->dma_mmap_attrs(device){
+	- get_dma_ops(dev)->mmap //device 的操作函数有mmap
+	- dma_common_mmap //木有
+	}
+   
 }@sprd-pcm.c
 
 
+
+sprd_pcm_dma_irq_ch-->snd_pcm_period_elapsed@sprd-pcm.c
+
+//读取数据
+snd_pcm_lib_read1{
+
+- transfer(substream, appl_ofs, data, offset, frames)//dma中的偏移值
+}
+
+transfer-->
+snd_pcm_lib_read_transfer(stream,hwoff/*dma的偏移*/,buffer,offset/*已经读取的frames*/，frames/*本次需读取的frame*/){
+- 目标地址，buf = (char __user *) data + frames_to_bytes(runtime, off)
+- 没有copy函数{
+	- 计算源地址的位置，runtime->dma_area + frames_to_bytes(runtime, hwoff)
+	- unalign_copy_to_user
+	}
+}@pcm_lib.c
 
 
 kernel/sound/soc/sprd/dai/vbc/r2p0/vbc.c

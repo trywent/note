@@ -64,6 +64,17 @@ _________________
 sendCreateAudioPatchConfigEvent-->processConfigEvents_l(CFG_EVENT_CREATE_AUDIO_PATCH)-->
 RecordThread::createAudioPatch_l-->set_parameters@Threads.cpp
 
+=================
+//record
+AudioFlinger::RecordThread::start
+
+
+
+AudioFlinger::RecordThread::threadLoop{
+- 
+- mInput->stream->read(mInput->stream,mRsmpInBuffer)
+}
+
 frameworks/av/services/audioflinger/Threads.cpp
 frameworks/av/services/audioflinger/Threads.h
 frameworks/av/services/audioflinger/AudioMixer.cpp

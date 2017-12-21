@@ -106,7 +106,9 @@ AudioFlinger::setMasterMute-->dev->hwDevice()->set_master_mute@AudioFlinger.cpp
 * IMemory 进程间拷贝数据。
 */
 AudioFlinger::openInput-->openInput_l{
-- inHwHal->open_input_stream
+- inHwHal->open_input_stream{//打开input流，设置input的配置
+
+	}
 - new AudioStreamIn //创建流
 - new RecordThread  //创建线程
 - mRecordThreads.add(*input, thread) //加入容器
@@ -138,7 +140,7 @@ AudioFlinger::RecordThread::threadLoop{
 	- mServerProxy->obtainBuffer
 	- 
 	}@Tracks.cpp
-- mInput->stream->read(mInput->stream,mRsmpInBuffer) //读取数据
+- mInput->stream->read(mInput->stream,mRsmpInBuffer) //读取数据，hw->read start_input
 - activeTrack->mRecordBufferConverter->convert //重采样,将数据拷贝到客户端buffer中
 }@Threads.cpp
 

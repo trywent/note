@@ -173,8 +173,8 @@ git pull origin master
 git merge test
 git push origin master
 
-git merge branchname commitid
-
+#git merge branchname commitid
+git cherry-pick commitd
 合并部分文件：
 git checkout B_branch
 git checkout A_branch files

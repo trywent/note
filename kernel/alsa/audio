@@ -1,0 +1,36 @@
+Digital high-pass filters
+
+digital gain
+SRC
+ALC
+NGC
+side tone //本地说话声音？
+
+
+- 采样率转换器——Sample Rate Converter(SRC)
+
+- 数字滤波器——Digital Filter  
+
+- 可编程增益放大器(PGA) 
+PGA的增益可以设置。它有两种工作模式：固定增益模式、自动增益调节
+模式。如果使用录音的ALC功能，则PGA必须工作在自动增益调节模式。
+
+- 输入增益BOOST PGA
+的增益是步进值很小的增益，可用于细调。而BOOST是用于粗调的增益，如果PGA
+的增益足够大仍然音量不够，就可以使用BOOST。但是使用了BOOST，噪声会稍稍变大。
+
+ 
+- ADC Digital Filter 
+主要作用是将超取样（Oversampling）的数据转换为正常的采样率的数据。很多
+ADC都是Σ∆ADC，一般使用×4倍或×8倍超取样，而数字音频接口传输的数据是正常
+的采样率的音频数据，所以要使用数字滤波器进行采样率的转换。
+
+ 
+- 自动电平控制——Automatic Lever Control (ALC)
+该模块使用一个电平适时检测电路来对ADC的输出信号幅度进行测量，然后根据它来控制可编程增益放大器
+(PGA)，改变其增益来使来实现录音音量的平衡。录音的时候音源可能会时远时近，声音可能会时大时小。
+预先设定一个目标电平（target lever），我们希望录音的电平总是等于目标电平。当输入的声音信号幅度太大，
+超过目标电平时，就降低PGA增益；当输入的声音信号幅度太小，低于目标电平时，就提高PGA的增益。输入PGA
+INPUT BOOST ADC
+
+

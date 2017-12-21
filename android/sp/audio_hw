@@ -143,10 +143,12 @@ RECORD_NR  //定义
 
 //record
 hw_device.open_input_stream@AudioFlinger.cpp-->
-adev_open_input_stream{
+adev_open_input_stream(audio_config){
 - in->stream初始化{
+	- 设置stream的接口
 	- in_read
 	}
+- in->config初始化,设置采样率，period_size，
 - in->requested_channels = channel_count //请求的通道
 }
 
@@ -166,8 +168,17 @@ in_read(buffer,size){
 - 若有错误执行do_input_standby
 }@audio_hw.c
 
+
+struct pcm_config pcm_config_mm_ul = {
+    .channels = 2,
+    .rate = 48000,
+    .period_size = 160 * 8, //1280
+    .period_count = 3,
+    .format = PCM_FORMAT_S16_LE,
+};
 //打开pcm设备
 start_input_stream{
+- adev->in_devices |= in->device//设置input device
 - 非adev->call_start，选择i2s，选择设备{
 	- i2s_pin_mux_sel
 	- select_devices_signal-->stream_routing_thread_entry.do_select_devices
@@ -179,7 +190,7 @@ start_input_stream{
    }else(adev->call_start){//电话
 
    }else{
-   - if(adev->fm_open && adev->fm_record){
+     - if(adev->fm_open && adev->fm_record){
 
      }else{
      - in->config.channels//声道数

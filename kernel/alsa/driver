@@ -3,7 +3,12 @@ dai_link(接口信息)将codec_dai(关联到codec的驱动),cpu_dai(驱动)关�
 
 codec和dai基本同时注册（同一个dev上的codec和dai）
 
-
+//操作流程
+substream-->rtd{
+- platform
+- cpu_dai
+- codec_dai	
+}
 
 
 
@@ -198,6 +203,8 @@ snd_pcm_open_file(file,pcm,stream/*录制，或播放*/){
 	- snd_pcm_attach_substream{
 		- 若是半双工则返回（只能capture和play单独工作）
 		- snd_pcm_runtime *runtime//创建runtime	
+		- runtime->status //status初始值设置为0
+		- runtime->control //control初始值设置为0
 		}
 	- snd_pcm_hw_constraints_init
 	}
@@ -206,7 +213,53 @@ snd_pcm_open_file(file,pcm,stream/*录制，或播放*/){
 }@pcm_native.c
 
 
+________________
+//codec-->dma-->driver read to userbuffer
+
+//codec到dma。。prt以boundary为界
+/*
+   boundary 能够整除buffer_size的最大数(long 类型)
+ runtime->status->hw_ptr      初始值为0 snd_pcm_attach_substream
+ runtime->hw_ptr_base         codec写到dma的有效数据(未读)起始位置，初始值为0，以boundary为界
+ runtime->hw_ptr_interrupt    初始值0
+*/
+snd_pcm_period_elapsed(dma中断中调用)/snd_pcm_update_hw_ptr(读写数据时主动调用)
+-->snd_pcm_update_hw_ptr0{
+- old_hw_ptr = runtime->status->hw_ptr//记录老位置
+- 获取dma内存中有效数据位置末尾偏移值，pos = substream->ops->pointer
+- hw_base = runtime->hw_ptr_base
+- new_hw_ptr = runtime->hw_ptr_base + pos //偏移位置。runtime->hw_ptr_base有效数据的起始位置
+- 处理多个中断情况{
+	- hw_base += runtime->buffer_size
+	}
+- new_hw_ptr < old_hw_ptr{ //超出buffer
+	- hw_base += runtime->buffer_size
+	- new_hw_ptr = hw_base + pos
+	}
+//时间检查
+- 计算获取数据的时间，这些数据需要的时间大于当前时间{//一段时间内获取的数据多了。采样率下固定数据量
+
+	}
+//更新位置值
+- runtime->hw_ptr_interrupt //中断后获取的数据位置(boundary为界)，period_size的整数倍
+- runtime->hw_ptr_base = hw_base //新数据的起始位置
+- runtime->status->hw_ptr = new_hw_ptr //新数据的结束位置
+- runtime->status->audio_tstamp//时间
+- snd_pcm_update_state //唤醒等待的进程
+}@pcm_lib.c
 //读取数据
+/*
+- 目标地址：用户空间传入的buffer
+- 源地址：dma的位置+偏移值
+源：
+ runtime->dma_area dma的虚拟地址
+当前dma有效数据指针：
+ runtime->control->appl_ptr 
+dma总大小：frame个数，
+ runtime->buffer_size = params_buffer_size(params)
+偏移位置：
+ runtime->control->appl_ptr % runtime->buffer_size 
+*/
 ioctl:
 snd_pcm_f_ops.unlocked_ioctl-->snd_pcm_capture_ioctl{
 - 获取snd_pcm_file *pcm_file = file->private_data //是一个snd_pcm_file pcm
@@ -214,20 +267,77 @@ snd_pcm_f_ops.unlocked_ioctl-->snd_pcm_capture_ioctl{
 }@pcm_native.c
 
 snd_pcm_capture_ioctl1(SNDRV_PCM_IOCTL_READI_FRAMES)@pcm_native.c-->snd_pcm_lib_read
--->snd_pcm_lib_read1(buffer,frames,snd_pcm_lib_read_transfer)-->tarnsfer-->
-snd_pcm_lib_read_transfer(stream,hwoff/*dma的偏移*/,buffer,offset/*已经读取的frames*/，frames/*本次需读取的frame*/){
-- 根据buffer和offset，计算目标保存地址位置
-- 若stream又copy函数，substream->ops->copy
-- 没有copy函数{
-	- 计算源地址的位置，runtime->dma_area + frames_to_bytes(runtime, hwoff)
-	- unalign_copy_to_user
+-->snd_pcm_lib_read1(buffer,frames,snd_pcm_lib_read_transfer){
+- snd_pcm_update_hw_ptr
+- snd_pcm_capture_avail{ //获取有效数据
+	- runtime->status->hw_ptr - runtime->control->appl_ptr不为0
 	}
+- 若当前没有数据则等待，wait_for_avail{
+	- add_wait_queue(&runtime->tsleep, &wait) //初始化并设置可中断等待
+	- schedule_timeout(wait_time)
+	}
+- frames //要读取的帧数
+- tarnsfer(stream,appl_ofs, data, offset,frames)-->
+  snd_pcm_lib_read_transfer(stream,hwoff/*dma的偏移*/,buffer,offset/*已经读取的frames*/，frames/*本次需读取的frame*/){
+	- 根据buffer和offset，计算目标保存地址位置
+	- 若stream又copy函数，substream->ops->copy
+	- 没有copy函数{
+		- 计算源地址的位置，runtime->dma_area + frames_to_bytes(runtime, hwoff)
+		- unalign_copy_to_user
+		}
+	}
+- runtime->control->appl_ptr +=frames //更新读取后的buffer位置
 }@pcm_lib.c
 
-//mmap
-snd_pcm_f_ops.mmap-->snd_pcm_mmap{
-- snd_pcm_mmap_status
-- snd_pcm_mmap_control
+//stream的操作函数在此设置，snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &rtd->ops)@soc-pcm.c
+snd_pcm_lib_read1-->snd_pcm_update_hw_ptr-->snd_pcm_update_hw_ptr0-->substream->ops->pointer@pcm_lib.c
+rtd->ops.pointer-->soc_pcm_pointer{
+- 获取offset，platform->driver->ops->pointer
+- 计算各个驱动的delay{
+	- cpu_dai->driver->ops->delay
+	- codec_dai->driver->ops->delay
+	- platform->driver->delay
+	}
+- 
+}
+
+
+//设置hw_params
+snd_pcm_common_ioctl1(SNDRV_PCM_IOCTL_HW_PARAMS)-->snd_pcm_common_ioctl1
+-->snd_pcm_hw_params_user-->snd_pcm_hw_params{
+- 调整参数，snd_pcm_hw_refine
+- substream->ops->hw_params//设置参数
+- 设置substream->runtime{
+	- format
+	- channel
+	- rate //采样率
+	- period_size = params_period_size(params)
+	- periods = params_periods(params)
+	- buffer_size= params_buffer_size(params)
+	- boundary= buffer_size
+	}
+}@pcm_navite.c
+
+
+substream.hw_params-->rtd->ops.hw_params-->soc_pcm_hw_params{
+- rtd->dai_link->ops->hw_params
+- codec_dai->driver->ops->hw_params
+- cpu_dai->driver->ops->hw_params
+- platform->driver->ops->hw_params{
+	- 
+	- snd_pcm_set_runtime_buffer(bufp/*substream->dma_buffer*/){
+		runtime->dma_buffer_p = bufp
+		runtime->dma_area = bufp->area
+		runtime->dma_addr = bufp->addr
+		runtime->dma_bytes = bufp->bytes
+		}
+	}
+}@soc-pcm.c
+
+//mmap 应用层传入的参数构造了vm_area_struct
+snd_pcm_f_ops.mmap(file,vm_area_struct)-->snd_pcm_mmap{
+- snd_pcm_mmap_status //状态
+- snd_pcm_mmap_control //control
 - snd_pcm_mmap_data-->substream->ops->mmap()-->platform->driver->mmap
 }@pcm_native.c
 

@@ -1,6 +1,14 @@
 //tinymix -D 1/2/3 查看sprdphone对应的声卡是哪个
 tinycap /data/afe_in.wav -D 3 -d 2 -c 2 -r 48000 -p 320 -n 2
 
+echo 4 > /proc/sys/kernel/printk
+//mainmic
+/proc/asound/sprdphone/pcm0c/info
+
+//auxmic 默认多媒体mic
+/proc/asound/sprdphone/pcm2c/info
+
+
 adb shell cat /proc/asound/sprdphone/sprd-codec > sprd-codec.txt
 adb shell cat /proc/asound/sprdphone/vbc > vbc.txt
 
@@ -50,3 +58,16 @@ setenforce 0
 	<dump_record index="8" item_name ="record.dump0" dump_file_name ="dump_record_after_vbc.pcm" switch="0" />
 	<dump_record index="9" item_name ="record.dump1" dump_file_name ="dump_record_after_express" switch="0" />
 </dumpmusic>
+
+
+
+===========
+16k采样率下。80ms的数据重复。16 x 80=160 x 8=1280 words
+
+
+
+channels: 2
+rate: 16000 (16000/1)
+period_size: 320 frame    1280 bytes  320ms
+buffer_size: 960 frame    3840 bytes  960ms  60ms
+boundary: 2013265920      

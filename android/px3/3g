@@ -1,4 +1,10 @@
-handleUsb-->get_tty_id
+//
+
+setRadioState-->onSIMReady
+
+add_to_match_modem_list
 
 
-system/vold/G3Dev.cpp
+
+
+hardware/ril/ril-rk29-dataonly/ril-rk29-dataonly.c
