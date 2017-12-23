@@ -60,6 +60,8 @@ setenforce 0
 </dumpmusic>
 
 
+dd if=/sdcard/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16000
+
 
 ===========
 16k采样率下。80ms的数据重复。16 x 80=160 x 8=1280 words

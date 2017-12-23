@@ -299,11 +299,24 @@ sprd_pcm_new-->sprd_pcm_preallocate_dma_buffer{
 
 //open
 sprd_pcm_ops.open-->sprd_pcm_open{
-
+- snd_soc_set_runtime_hwparams
+- dma_alloc_coherent()
 }
 
+//vbc cpu dai设置参数
+vbc_hw_params{
+- dma_data[VBC_IDX_MAX] = {//dma的设备地址
+		&vbc_pcm_stereo_out,
+		&vbc_pcm_stereo_in,
+		&vbc_pcm23_stereo_in,
+  }
+- snd_soc_dai_set_dma_data{//设置播放，录制的dmadata信息
+	- playback_dma_data
+	- capture_dma_data
+	}
+}@vbc.c
 
-//设置参数
+//platform设置参数
 sprd_pcm_hw_params{
 - totsize = params_buffer_bytes(params)//buffer
 - period = params_period_bytes(params)
@@ -323,18 +336,21 @@ sprd_pcm_hw_params{
 	- src_step //源数据的步进
 	- des_step //目标数据的步进
 	- 播放{
-		- src_addr = dma_buff_phys //源数据地址为dma
+		- src_addr = dma_buff_phys //源数据地址为dma内存
 		- des_addr = dma->dev_paddr //目的地址为设备地址
 		}
 	- 录制{
-		- src_addr = dma->dev_paddr //目的地址为设备地址
-		- des_addr = dma_buff_phys //源数据地址为dma
+		- src_addr = dma->dev_paddr //源数据地址为设备地址
+		- des_addr = dma_buff_phys //目的地址为dma内存
 		}
 	}
- //配置声道0的dma
-- dma_reg_addr[0].phys_addr = (u32) (rtd->dma_desc_array_phys)//设置dma的设备物理地址
-- dma_reg_addr[0].virt_addr = rtd->dma_desc_array//设置dma的设备虚拟地址
-- sci_dma_config(params_periods(params)，dma_reg_addr)//配置
+ //配置声道0的dma配置，以上的配置会转化为dma_reg_addr的配置
+- dma_reg_addr[0].phys_addr = (u32) (rtd->dma_desc_array_phys)//设置dma配置的物理地址，偏移32位
+- dma_reg_addr[0].virt_addr = rtd->dma_desc_array//设置dma配置的虚拟地址
+- sci_dma_config(params_periods(params)，dma_reg_addr){//配置
+	- 
+	- __dma_cfg_check_and_convert //将cfg_list中配置转换到dma_reg_addr
+	}@dma_r4p0.c
 - sci_dma_register_irqhandle(sprd_pcm_dma_irq_ch) //注册dma中断处理
 	-->sprd_pcm_dma_irq_ch{
 	- 双声道时要两个声道数据都准备好，才允许读取
@@ -360,7 +376,7 @@ sprd_pcm_ops.mmap-->sprd_pcm_mmap(substream,vma){
 }@sprd-pcm.c
 
 
-
+//period中断
 sprd_pcm_dma_irq_ch-->snd_pcm_period_elapsed@sprd-pcm.c
 
 //读取数据
