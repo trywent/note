@@ -299,7 +299,7 @@ rtd->ops.pointer-->soc_pcm_pointer{
 	- platform->driver->delay
 	}
 - 
-}
+}@soc-pcm.c
 
 
 //设置hw_params

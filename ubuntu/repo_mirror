@@ -118,6 +118,9 @@ repo init --repo-url ssh://git@www.rockchip.com.cn:2222/repo-release/tools/repo
 px5:
 repo init -u ssh://git@www.rockchip.com.cn:2222/px5/manifests.git --mirror
 
+8.0
+repo init --repo-url=ssh://git@www.rockchip.com.cn:2222/repo-release/tools/repo.git -u ssh://git@www.rockchip.com.cn:2222/px5-orce/manifests.git -m px5_orce_release.xml --mirror
+
 px6:
 repo init --repo-url=ssh://git@www.rockchip.com.cn:2222/repo-release/tools/repo.git -u ssh://git@www.rockchip.com.cn:2222/rk3399-nougat/manifests.git -m rk3399_nougat_release.xml --mirror
 

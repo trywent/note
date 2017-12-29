@@ -1,0 +1,7 @@
+//同时录音
+
+
+
+
+AudioManager.isAudioRecording-->AudioSystem::isAudioRecording-->AudioPolicyManager::isAudioRecording//是否正在录音
+

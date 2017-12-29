@@ -1,0 +1,80 @@
+//
+vbc_drv_probe{
+ //设置寄存器地址信息
+- vbc_pcm_stereo_out.dev_paddr[0] = PHYS_VBDA0 + sprd_vbc_phy_base
+- vbc_pcm_stereo_out.dev_paddr[1] = PHYS_VBDA1 + sprd_vbc_phy_base
+- vbc_pcm_stereo_in.dev_paddr[0] = PHYS_VBAD0 + sprd_vbc_phy_base
+- vbc_pcm_stereo_in.dev_paddr[1] = PHYS_VBAD1 + sprd_vbc_phy_base
+- vbc_pcm23_stereo_in.dev_paddr[0] = PHYS_VBAD2 + sprd_vbc_phy_base
+- vbc_pcm23_stereo_in.dev_paddr[1] = PHYS_VBAD3 + sprd_vbc_phy_base
+ //设置dma信息
+- arch_audio_vbc_da_dma_info 
+}
+
+//设置dma
+vbc_dai_ops.hw_params-->vbc_hw_params{
+- dma_data[VBC_IDX_MAX] = {//dma的设备地址
+		&vbc_pcm_stereo_out,
+		&vbc_pcm_stereo_in,
+		&vbc_pcm23_stereo_in,
+  }
+- snd_soc_dai_set_dma_data{//设置播放，录制的dmadata信息
+	- playback_dma_data
+	- capture_dma_data
+	}
+}@vbc.c
+
+
+//获取dma
+sprd_pcm_ops.hwparams-->sprd_pcm_hw_params{
+- snd_soc_dai_get_dma_data
+
+}@sprd-pcm.c
+
+
+
+soc/sprd/dai/vbc/r2p0/vbc.c
+
+===============
+//DMA
+
+
+
+//返回chan id 
+sci_dma_request(dev_name, chn_type){//pcm  FULL_DMA_CHN
+- STD_DMA_CHN/FULL_DMA_CHN,不同类型的DMA有不同的chan
+- 遍历dma_chns，找到第一个可用的chan
+}
+
+
+
+sci_dma_config
+//注册dma中断处理
+sci_dma_register_irqhandle(dma_chn, irq_handle ,data){
+- __dma_set_int_type
+- dma_chns[dma_chn].irq_handler = irq_handle
+- dma_chns[dma_chn].data = data
+}
+
+
+//中断处理
+__dma_irq_handle(dev_id){
+- dma_chip = (struct sci_dma_chip*)dev_id
+- irq_status = dma_glb_reg->int_msk_sts//irq状态
+- 计算dma_chn
+- dma_chns[dma_chn].irq_handler
+}
+
+//释放dma
+sci_dma_free(chan_id){}
+
+
+//dump  CHN1 Configure Registers 
+sprd_pcm_proc_dump_reg(chan_ID){
+- sci_dma_dump_reg//获取地址
+}@sprd-pcm.c
+
+
+
+kernel/drivers/platform/sprd/dma_r4p0.c
+

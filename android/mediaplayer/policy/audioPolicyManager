@@ -21,7 +21,7 @@ create_legacy_ap@audio_policy_hal.cpp-->createAudioPolicyManager@AudioPolicyMana
 		- 输入配置，loadInput		
 		- 将模块加入到，mHwModules
 		}
-	}
+	}@ConfigParsingUtils.cpp
 - 若加载不成功则加载默认配置defaultAudioPolicyConfig
 - 初始化所有的模块（设置可用的设备），打开attach设备的输出流{
 	- 初始模块的mHandle，intentInterface->loadHwModule  //audioFlinger 对应的库的编号

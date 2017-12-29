@@ -1,7 +1,11 @@
 //tinymix -D 1/2/3 查看sprdphone对应的声卡是哪个
 tinycap /data/afe_in.wav -D 3 -d 2 -c 2 -r 48000 -p 320 -n 2
 
+echo 6 > /proc/sys/kernel/printk
+echo 1 > /proc/sys/kernel/printk
 echo 4 > /proc/sys/kernel/printk
+echo -n 1  > /sys/fytver/resetGPS
+echo -n 0  > /sys/fytver/resetGPS
 //mainmic
 /proc/asound/sprdphone/pcm0c/info
 
@@ -11,9 +15,15 @@ echo 4 > /proc/sys/kernel/printk
 
 adb shell cat /proc/asound/sprdphone/sprd-codec > sprd-codec.txt
 adb shell cat /proc/asound/sprdphone/vbc > vbc.txt
+adb shell cat /proc/asound/sprdphone/pcm2c/DMA > dma.txt
 
-cat /proc/asound/card3/pcm2c/sub0/hw_params
-cat /proc/asound/card3/pcm2c/sub0/sw_params
+cat /proc/asound/sprdphone/pcm2c/sub0/hw_params
+cat /proc/asound/sprdphone/pcm2c/sub0/sw_params
+cat /proc/asound/sprdphone/pcm2c/sub0/status
+cat /proc/asound/sprdphone/pcm2c/sub0/info
+cat /proc/asound/sprdphone/pcm2c/info
+
+dd if=/sdcard/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16000
 //查看设备
 cat proc/asound/devices
 
@@ -60,7 +70,7 @@ setenforce 0
 </dumpmusic>
 
 
-dd if=/sdcard/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16000
+
 
 
 ===========
@@ -73,3 +83,69 @@ rate: 16000 (16000/1)
 period_size: 320 frame    1280 bytes  320ms
 buffer_size: 960 frame    3840 bytes  960ms  60ms
 boundary: 2013265920      
+
+
+一个buffer(960)中pos出现减小现象：
+interrupt:1 hw:902080 new:902400 pos:  0 base:902400 ptr_base:901440 fyt1:0 fyt2:1
+interrupt:0 hw:902400 new:902560 pos:160 base:902400 ptr_base:902400 fyt1:0 fyt2:0
+interrupt:1 hw:902560 new:902880 pos:480 base:902400 ptr_base:902400 fyt1:0 fyt2:0
+interrupt:0 hw:902880 new:903680 pos:320 base:903360 ptr_base:902400 fyt1:0 fyt2:1
+interrupt:1 hw:903680 new:904000 pos:640 base:903360 ptr_base:903360 fyt1:0 fyt2:0
+interrupt:0 hw:904000 new:904160 pos:800 base:903360 ptr_base:903360 fyt1:0 fyt2:0
+interrupt:1 hw:904160 new:904320 pos:  0 base:904320 ptr_base:903360 fyt1:0 fyt2:1
+____________
+[ 1205.059448] c0 :0  interrupt:1 hw:4976800 new:4977120 pos:480 base:4976640 ptr_base:4976640 fyt1:0 fyt2:0
+[ 1205.069213] c3 :1  interrupt:0 hw:4977120 new:4977920 pos:320 base:4977600 ptr_base:4976640 fyt1:0 fyt2:1
+[ 1205.078887] c3 :2  interrupt:0 hw:4977920 new:4978080 pos:480 base:4977600 ptr_base:4977600 fyt1:0 fyt2:0
+[ 1205.088409] c0 :3  interrupt:1 hw:4978080 new:4978240 pos:640 base:4977600 ptr_base:4977600 fyt1:0 fyt2:0
+[ 1205.098114] c3 :4  interrupt:0 hw:4978240 new:4978400 pos:800 base:4977600 ptr_base:4977600 fyt1:0 fyt2:0
+[ 1205.107696] c0 :5  interrupt:1 hw:4978400 new:4978560 pos:  0 base:4978560 ptr_base:4977600 fyt1:0 fyt2:1
+[ 1205.117370] c3 :6  interrupt:0 hw:4978560 new:4978880 pos:320 base:4978560 ptr_base:4978560 fyt1:0 fyt2:0
+[ 1205.126892] c0 :7  interrupt:1 hw:4978880 new:4978880 pos:320 base:4978560 ptr_base:4978560 fyt1:0 fyt2:0
+[ 1205.136474] c3 :8  interrupt:0 hw:4978880 new:4979040 pos:480 base:4978560 ptr_base:4978560 fyt1:0 fyt2:0
+[ 1205.145996] c3 --:1920/128
+[ 1212.140075] c0 :0  interrupt:1 hw:5202400 new:5202720 pos:480 base:5202240 ptr_base:5202240 fyt1:0 fyt2:0
+[ 1212.149963] c0 :1  interrupt:0 hw:5202720 new:5203520 pos:320 base:5203200 ptr_base:5202240 fyt1:0 fyt2:1
+[ 1212.160064] c0 :2  interrupt:1 hw:5203520 new:5203840 pos:640 base:5203200 ptr_base:5203200 fyt1:0 fyt2:0
+[ 1212.173004] c0 :3  interrupt:0 hw:5203840 new:5204000 pos:800 base:5203200 ptr_base:5203200 fyt1:0 fyt2:0
+[ 1212.182586] c0 :4  interrupt:1 hw:5204000 new:5204160 pos:  0 base:5204160 ptr_base:5203200 fyt1:0 fyt2:1
+[ 1212.196350] c0 :5  interrupt:0 hw:5204160 new:5204480 pos:320 base:5204160 ptr_base:5204160 fyt1:0 fyt2:0
+[ 1212.205963] c0 :6  interrupt:1 hw:5204480 new:5204480 pos:320 base:5204160 ptr_base:5204160 fyt1:0 fyt2:0
+[ 1212.218627] c0 :7  interrupt:0 hw:5204480 new:5204640 pos:480 base:5204160 ptr_base:5204160 fyt1:0 fyt2:0
+[ 1212.228210] c0 :8  interrupt:1 hw:5204640 new:5204800 pos:640 base:5204160 ptr_base:5204160 fyt1:0 fyt2:0
+[ 1212.237701] c0 --:2080/144
+[ 1219.240692] c0 :0  interrupt:1 hw:5429120 new:5429440 pos:640 base:5428800 ptr_base:5428800 fyt1:0 fyt2:0
+[ 1219.250579] c0 :1  interrupt:0 hw:5429440 new:5429440 pos:640 base:5428800 ptr_base:5428800 fyt1:0 fyt2:0
+[ 1219.260681] c0 :2  interrupt:1 hw:5429440 new:5429760 pos:  0 base:5429760 ptr_base:5428800 fyt1:0 fyt2:1
+[ 1219.270629] c0 :3  interrupt:0 hw:5429760 new:5429920 pos:160 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
+[ 1219.280670] c0 :4  interrupt:1 hw:5429920 new:5430240 pos:480 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
+[ 1219.291229] c0 :5  interrupt:0 hw:5430240 new:5430240 pos:480 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
+[ 1219.300781] c0 :6  interrupt:1 hw:5430240 new:5430400 pos:640 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
+[ 1219.313964] c0 :7  interrupt:0 hw:5430400 new:5430560 pos:800 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
+[ 1219.323577] c0 :8  interrupt:1 hw:5430560 new:5430720 pos:  0 base:5430720 ptr_base:5429760 fyt1:0 fyt2:1
+[ 1219.333099] c0 --:1280/128
+[ 1226.321289] c0 :0  interrupt:1 hw:5654720 new:5655040 pos:640 base:5654400 ptr_base:5654400 fyt1:0 fyt2:0
+[ 1226.331146] c0 :1  interrupt:0 hw:5655040 new:5655040 pos:640 base:5654400 ptr_base:5654400 fyt1:0 fyt2:0
+[ 1226.341278] c0 :2  interrupt:1 hw:5655040 new:5655360 pos:  0 base:5655360 ptr_base:5654400 fyt1:0 fyt2:1
+[ 1226.350952] c0 :3  interrupt:0 hw:5655360 new:5655520 pos:160 base:5655360 ptr_base:5655360 fyt1:0 fyt2:0
+[ 1226.361297] c0 :4  interrupt:1 hw:5655520 new:5655840 pos:480 base:5655360 ptr_base:5655360 fyt1:0 fyt2:0
+[ 1226.371002] c0 :5  interrupt:0 hw:5655840 new:5656640 pos:320 base:5656320 ptr_base:5655360 fyt1:0 fyt2:1
+[ 1226.380798] c0 :6  interrupt:0 hw:5656640 new:5656800 pos:480 base:5656320 ptr_base:5656320 fyt1:0 fyt2:0
+[ 1226.390350] c0 :7  interrupt:1 hw:5656800 new:5656960 pos:640 base:5656320 ptr_base:5656320 fyt1:0 fyt2:0
+[ 1226.401306] c0 :8  interrupt:1 hw:5656960 new:5657280 pos:  0 base:5657280 ptr_base:5656320 fyt1:0 fyt2:1
+
+
+//
+[ 1226.371002] c0 :5  interrupt:0 hw:5655840 new:5656640 pos:320 base:5656320 ptr_base:5655360 fyt1:0 fyt2:1
+new_hw_ptr < old_hw_ptr=runtime->status->hw_ptr
+(ptr_base + pos)5655360 + 320= 5655680 < 5655840 //why
+5656640-960 = 5655680 //新指针增加一个buffer_size 
+
+//DMA
+FULL_CHN_PAUSE	  FULL_CHN_REQ	     FULL_CHN_CFG	FULL_CHN_INT
+
+FULL_CHN_SRC_ADDR FULL_CHN_DEST_ADDR FULL_CHN_FRAG_LEN  FULL_CHN_BLK_LEN
+
+FULL_CHN_TRSC_LEN FULL_CHN_TRSF_STEP FULL_CHN_WRAP_PTR  FULL_CHN_WRAP_TO
+
+FULL_CHN_LLIST_PTR FULL_CHN_FRAG_STEP FULL_CHN_SRC_BLK_STEP FULL_CHN_DEST_BLK_STEP
