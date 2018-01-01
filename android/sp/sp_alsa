@@ -300,7 +300,9 @@ sprd_pcm_new-->sprd_pcm_preallocate_dma_buffer{
 //open
 sprd_pcm_ops.open-->sprd_pcm_open{
 - snd_soc_set_runtime_hwparams
-- dma_alloc_coherent()
+- rtd->dma_desc_array_orig= dma_alloc_coherent(hw_chan),分配上双声道的内存
+- rtd->dma_desc_array_phys,对齐32
+- rtd->dma_desc_array，dma描述数组（包含32+dma_desc）
 }
 
 //vbc cpu dai设置参数
@@ -331,7 +333,7 @@ sprd_pcm_hw_params{
 - 设置runtime->dma_bytes
 - sprd_dma_desc dma_cfg_array= kzalloc//创建dma描述信息
 - dma_buff_phys //左右声道的数据保存的arm物理地址 dam_addr dma_addr+2
-- 初始化dma_desc{
+- 初始化dma_desc{//每个声道有periods个数的配置
 	- block_len //一个period中一个声道数据
 	- src_step //源数据的步进
 	- des_step //目标数据的步进

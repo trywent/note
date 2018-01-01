@@ -36,8 +36,17 @@ sprd_pcm_ops.hwparams-->sprd_pcm_hw_params{
 soc/sprd/dai/vbc/r2p0/vbc.c
 
 ===============
-//DMA
+//DMA AP_DMA_CHN_NUM	32
 
+module_init(dma_new_init)-->dma_new_init{
+- dma_reg_base  = (void __iomem *)SPRD_DMA0_BASE //寄存器基地址
+- dma_chips[0],初始化chip0
+- 初始化dma_chns{//总共32个chn
+	- 设置chip
+	- 设置基地址
+	- 初始化chns_desc[i].chn_lock)
+	}
+}
 
 
 //返回chan id 
@@ -48,7 +57,14 @@ sci_dma_request(dev_name, chn_type){//pcm  FULL_DMA_CHN
 
 
 
-sci_dma_config
+sci_dma_config(chn/*id号*/,cfg_list/配置值/,node_size/*配置数，period数*/，reg_cfg_addrs){
+- 
+- __dma_cfg_check_and_convert(dma_chn,cfg,dma_reg_addr){
+	- 检查cfg的配置值
+	- 将cfg配置值写入到dma_reg_addr
+	}
+}
+
 //注册dma中断处理
 sci_dma_register_irqhandle(dma_chn, irq_handle ,data){
 - __dma_set_int_type
@@ -77,4 +93,27 @@ sprd_pcm_proc_dump_reg(chan_ID){
 
 
 kernel/drivers/platform/sprd/dma_r4p0.c
+
+
+//sprd
+FULL_CHN_CFG[0x8]
+CHN_PRIORITY[13:12]:2’b01 : Secondary lowest priority.
+LLIST_CFG_VALID[8]
+LLIST_EN[4]:Enable the link list.
+CHN_EN[0]:Enable the channel.
+
+FULL_CHN_INT[0xc]
+CHN_FRAGMENT_INT_RAW_STATUS[8]:Fragment done Raw interruptstatus.
+CHN_LLIST_INT_EN[4]:Link list done interrupt enable
+CHN_BLK_INT_EN[1]:Block done interrupt enable
+
+FULL_CHN_FRAG_LEN[0x1c]
+REQ_MODE [25:24]:fragment模式
+SRC_SIZE:Half Word 2bytes
+DEST_SIZE:Half Word 2bytes
+ADDR_FIX_EN[20]:Address Fix Enable:
+FRG_LEN[16:0]:framgment 320bytes
+
+FULL_CHN_BLK_LEN[0x17]
+BLK_LEN[16:0] :block 640bytes
 
