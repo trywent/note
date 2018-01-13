@@ -3,7 +3,7 @@ tinycap /data/afe_in.wav -D 3 -d 2 -c 2 -r 48000 -p 320 -n 2
 
 echo 6 > /proc/sys/kernel/printk
 echo 1 > /proc/sys/kernel/printk
-echo 4 > /proc/sys/kernel/printk
+echo 4 > /proc/sys/kernel/printk &
 echo -n 1  > /sys/fytver/resetGPS
 echo -n 0  > /sys/fytver/resetGPS
 //mainmic
@@ -23,7 +23,15 @@ cat /proc/asound/sprdphone/pcm2c/sub0/status
 cat /proc/asound/sprdphone/pcm2c/sub0/info
 cat /proc/asound/sprdphone/pcm2c/info
 
+dd if=/storage/USB0/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16000
 dd if=/sdcard/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16000
+
+61      BOOL    1       ADC1-DAC Digital Loop switch             Off
+62      BOOL    1       ADC-DAC Digital Loop switch              Off
+63      BOOL    1       ADC1-DAC Adie Loop switch                Off
+64      BOOL    1       ADC-DAC Adie Loop switch                 Off
+tinymix -D 3  61 1
+tinymix -D 3 63 1
 //查看设备
 cat proc/asound/devices
 
@@ -54,7 +62,7 @@ logcat -s DUMP.DATA
 logcat -s audio_hw_primary
 
 
-//audioDebug
+//audioDebug apk
 setenforce 0
 
 
@@ -79,9 +87,9 @@ setenforce 0
 
 
 channels: 2
-rate: 16000 (16000/1)
-period_size: 320 frame    1280 bytes  320ms
-buffer_size: 960 frame    3840 bytes  960ms  60ms
+rate: 16000 (16000/1)     16000 frames/s
+period_size: 320 frame    1280 bytes  20ms
+buffer_size: 960 frame    3840 bytes  60ms
 boundary: 2013265920      
 
 

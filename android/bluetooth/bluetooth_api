@@ -37,6 +37,9 @@ createBondNative@com_android_bluetooth_btservice_AdapterService.cpp-->/*stack*/-
 -->p->p_cb@btif_core.c-->btif_dm_generic_evt(BTIF_DM_CB_CREATE_BOND)-->btif_dm_cb_create_bond@btif_dm.c
 -->btif_hh_connect@btif_hh.c
 
+//pin
+sendDisplayPinIntent@BondStateMachine.java
+
 
 
 packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothSettings.java

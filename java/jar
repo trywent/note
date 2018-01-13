@@ -1,0 +1,27 @@
+//打包
+我的目录结构
+d:/test/
+          ../ src
+          ../build
+
+src下面放java源文件
+build下面放编译好的classes
+
+下面是我的操作,我在test目录下执行下面的命令
+set JAVA_FILES=src/org/midi/smart/*.java
+javac -d build %JAVA_FILES%
+
+在test目录下面编写MANIFEST.MF文件，指定启动类：
+Main-Class: org.midi.smart.ScreenSaver
+
+打包
+jar cvfm ScreenSaver.jar MANIFEST.MF -C build .
+
+运行
+java -jar ScreenSaver.jar
+或者是双击jar包
+
+
+javac -sourcepath src src/cn/relyn/jump/JumpMain.java -d my
+jar -cvmf mymanifest -C my
+java -jar jump.jar

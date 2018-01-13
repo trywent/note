@@ -1,4 +1,25 @@
-//
+//新建一个repo仓库
+1,安装repo
+2,创建manifest.git仓库
+$ mkdir manifest.git; cd manifest.git
+$ git init --bare
+# 创建并编辑default.xml //包含要管理的仓库信息
+
+3,
+4,
+5,
+6,
+
+
+修改repo路径时：需要指定ssh指定默认端口22。。ssh://wb@192.168.1.131:22/work/wb/px5_8_0/
+
+==============
+//android repo
+
+
+
+
+
 repo init -u git://10.0.67.68/android/platform/manifest.git --repo-url=git://10.0.67.68/android/tools/repo.git
 
 在.repo/manifest.xml加入kernel

@@ -1,0 +1,23 @@
+//
+
+Notification noti = new Notification.Builder(mContext)
+         .setContentTitle("New mail from " + sender.toString())
+         .setContentText(subject)
+         .setSmallIcon(R.drawable.new_mail)
+         .setLargeIcon(aBitmap)
+         .build();
+
+
+setFullScreenIntent(PendingIntent intent, boolean highPriority)//启动一个activity
+
+notify-->service.enqueueNotificationWithTag@NotificationManager.java
+notifyPosted-->listener.onNotificationPosted@NotificationManagerService.java-->
+onNotificationPosted-->addNotification@BaseStatusBar.java
+
+
+
+
+frameworks/base/core/java/android/app/Notification.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/BaseStatusBar.java
+frameworks/base/core/java/android/app/NotificationManager.java
+frameworks/base/services/core/java/com/android/server/notification/NotificationManagerService.java

@@ -297,7 +297,7 @@ sprd_pcm_new-->sprd_pcm_preallocate_dma_buffer{
 }@sprc-pcm.c
 
 
-//open
+//open 分配配置参数的空间
 sprd_pcm_ops.open-->sprd_pcm_open{
 - snd_soc_set_runtime_hwparams
 - rtd->dma_desc_array_orig= dma_alloc_coherent(hw_chan),分配上双声道的内存
@@ -376,6 +376,9 @@ sprd_pcm_ops.mmap-->sprd_pcm_mmap(substream,vma){
 	}
    
 }@sprd-pcm.c
+
+//触发读取数据
+sprd_pcm_ops.trigger-->sprd_pcm_trigger
 
 
 //period中断

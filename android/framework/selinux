@@ -27,7 +27,7 @@ allow：赋予某项权限
 - neverallow { appdomain -unconfineddomain } self:capability2 *;
 绝对不允许除了unconfineddomain以外的app对self类型的capability2进行任何的操作
 
-//规则：
+//规则：Access vectors (AVs) <av_kind> <source_type(s)> <target_type(s)>:<class(es)> <permission(s)>
 rule_name source_type target_type : object_class perm_set;
 
 rule_name:allow,dontaudit,auditallow,neverallow

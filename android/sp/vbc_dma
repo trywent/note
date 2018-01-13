@@ -1,4 +1,15 @@
 //
+static struct sprd_pcm_dma_params vbc_pcm23_stereo_in = {
+	.name = "VBC PCM23 Stereo in",
+	.irq_type = BLK_DONE,
+	.desc = {
+		 .datawidth = SHORT_WIDTH,
+		 .fragmens_len = VBC_FIFO_FRAME_NUM * 2,
+		 .src_step = 0,
+		 .des_step = 2,
+		 },
+};
+
 vbc_drv_probe{
  //设置寄存器地址信息
 - vbc_pcm_stereo_out.dev_paddr[0] = PHYS_VBDA0 + sprd_vbc_phy_base
@@ -73,7 +84,7 @@ sci_dma_register_irqhandle(dma_chn, irq_handle ,data){
 }
 
 
-//中断处理
+//中断处理,数据接收
 __dma_irq_handle(dev_id){
 - dma_chip = (struct sci_dma_chip*)dev_id
 - irq_status = dma_glb_reg->int_msk_sts//irq状态
@@ -96,24 +107,30 @@ kernel/drivers/platform/sprd/dma_r4p0.c
 
 
 //sprd
-FULL_CHN_CFG[0x8]
+//FULL_CHN_CFG[0x8] 1111
 CHN_PRIORITY[13:12]:2’b01 : Secondary lowest priority.
-LLIST_CFG_VALID[8]
+LLIST_CFG_VALID[8]                //这位有效时，FULL_CHN_TRSC_LEN，FULL_CHN_TRSC_STEP有效
 LLIST_EN[4]:Enable the link list.
 CHN_EN[0]:Enable the channel.
 
-FULL_CHN_INT[0xc]
+//FULL_CHN_INT[0xc] 112
 CHN_FRAGMENT_INT_RAW_STATUS[8]:Fragment done Raw interruptstatus.
 CHN_LLIST_INT_EN[4]:Link list done interrupt enable
 CHN_BLK_INT_EN[1]:Block done interrupt enable
 
-FULL_CHN_FRAG_LEN[0x1c]
-REQ_MODE [25:24]:fragment模式
+//FULL_CHN_FRAG_LEN[0x18]
+REQ_MODE [25:24]:fragment模式 FRAG_REQ_MODE
 SRC_SIZE:Half Word 2bytes
 DEST_SIZE:Half Word 2bytes
 ADDR_FIX_EN[20]:Address Fix Enable:
-FRG_LEN[16:0]:framgment 320bytes
+FRG_LEN[16:0]:framgment 320 bytes  //device的fifo的固定值
 
-FULL_CHN_BLK_LEN[0x17]
-BLK_LEN[16:0] :block 640bytes
+//FULL_CHN_BLK_LEN[0x1c]
+BLK_LEN[16:0] :block 640 bytes  //period_bytes/channel 两个声道320frames
 
+
+//FULL_CHN_TRSC_LEN[0x20] 140
+TRSC_LEN 320 bytes
+
+//FULL_CHN_TRSC_STEP[0x24]
+DEST_TRSF_STEP 4 bytes
