@@ -5,14 +5,6 @@ PlaybackThread(AudioFlinger,AudioStreamOut){
 - mOutput = AudioStreamOut
 }
 
-//加入track(每一个要播放的客户端对应一个track)
-PlaybackThread::Track::start@Tracks.cpp-->addTrack_l{
-- 开始播放，AudioSystem::startOutput
-- mActiveTracks.add
-}
-
-//客户端写入播放数据
-
 
 //thread = new MixerThread
 AudioFlinger::PlaybackThread::onFirstRef-->run-->threadLoop{
@@ -29,41 +21,71 @@ AudioFlinger::PlaybackThread::onFirstRef-->run-->threadLoop{
 		- 若有mNormalSink
 		- 若没有则直接写hardware，mOutput->stream->write
 		}
-	- 获取混合的数据，threadLoop_drain-->mOutput->stream->drain
 	}
 
 - 移除要移除的tracks，threadLoop_removeTracks
 }
 
-AudioFlinger::MixerThread::prepareTracks_l{
+AudioFlinger::MixerThread::checkForNewParameter_l{
 - 
+- mAudioMixer = new AudioMixer()//创建mixer
+}
+
+
+AudioFlinger::MixerThread::prepareTracks_l{
+ //遍历所有的mActiveTracks，设置audiomix的buffer，参数，
+- mAudioMixer->setBufferProvider(name, track) 
+- mAudioMixer->setParameter
 }@Threads.cpp
 
+//mix
+AudioFlinger::MixerThread::threadLoop_mix-->mAudioMixer->process-->
+mState.hook(&mState)-->process__validate{
+- mStates->tracks{ //遍历所有track，记录enabled 的track
+	- 判断track是否要doesResample，NEEDS_RESAMPLE
+	- 需要NEEDS_RESAMPLE，t.hook = getTrackHook(TRACKTYPE_RESAMPLE){
+		- track__Resample
+		}
+	- 不需要NEEDS_RESAMPLE,channel=1， getTrackHook(TRACKTYPE_NORESAMPLEMONO)
+	- 不需要NEEDS_RESAMPLE,channel>2，getTrackHook(TRACKTYPE_NORESAMPLE){
+		- track__NoResample
+		}
+	}
+- countActiveTracks>0/*存在正在播音的track*/{
+	- 需要resampling，state->hook = process__genericResampling
+	- 不需要resampling，state->hook = process__genericNoResampling
+	}
+- state->hook-->process__genericResampling/process__genericNoResampling
 
+}@AudioMixer.cpp
+
+process__genericNoResampling{
+- track__NoResample
+}
+
+
+//write到hal
 PlaybackThread::threadLoop_write{
 - mOutput->stream->write-->AudioStreamOut.stream-->write@audioFlinger-->
 	AudioStreamOutALSA.write@AudioHardware.cpp
 }
 
-________________
-AudioMixer::AudioMixer{
-- mState.hook         = process__nop
-}
 
-//mix
-MixerThread::threadLoop_mix-->mAudioMixer->process-->mState.hook@AudioMixer.cpp
-
-
-mFastMixer->run-->FastMixer::threadLoop{
-- 好多，
-}@FastMixer.cpp
-
-
-_________________
 //
 sendCreateAudioPatchConfigEvent-->processConfigEvents_l(CFG_EVENT_CREATE_AUDIO_PATCH)-->
 RecordThread::createAudioPatch_l-->set_parameters@Threads.cpp
 
+
+//track
+AudioFlinger::PlaybackThread::createTrack_l{
+- track = new Track(this, client)
+- mTracks.add(track)
+}
+//加入Active track(每一个要播放的客户端对应一个track)
+PlaybackThread::Track::start@Tracks.cpp-->addTrack_l{
+- 开始播放，AudioSystem::startOutput
+- mActiveTracks.add
+}
 =================
 //record
 AudioFlinger::RecordThread::start

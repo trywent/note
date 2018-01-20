@@ -82,6 +82,9 @@ git log --pretty=oneline  file  //列出文件的修改
 git log --stat         //列出修改的文件名
 git log -p filename   //内容
 git log --all --grep="xxx" //查看修改的标记
+git config log.date iso   //显示时间格式
+git log --before="Fri Mar 24"
+git log --author=""
 
 撤销修改：
 git reset --hard commit_id //撤销提交

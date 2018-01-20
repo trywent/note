@@ -1,3 +1,4 @@
+//
 RIL会接收底层传来的消息，再调用已经注册的registrant，通过handler发送消息通知到每个注册者。
 同样也可发送消息到底层。
 
@@ -124,13 +125,50 @@ processSolicited-->onError(输出错误消息，REQUEST_NOT_SUPPORTED)@RIL.java
 
 hardware/ril/reference-ril/reference-ril.c
 =================================
-数据链接跟踪：
+//网络状态获取
+
+//networkAttributes@config.xml定义了网络监听类型。
+new ConnectivityService{
+- 遍历mPriorityList{
+	- tracker = netFactory.createTracker //创建track
+	- mNetTrackers[targetNetworkType] =tracker //初始化track 
+	}
+
+}
+
+//开始监听网络状态
 new ConnectivityService(初始化各种数据链接，装入mNetTrackers)@SystemServer.java-->
 mNetTrackers[netType].startMonitoring(开始监听各种网络链接)@ConnectivityService.java
--->MobileDataStateTracker.startMonitoring-->mContext.registerReceiver(注册监听数据链接的广播)
--->MobileDataStateReceiver.onReceive-->setDetailedState-->msg.sendToTarget(EVENT_STATE_CHANGED)
--->
-@MobileDataStateTracker.java
+-->MobileDataStateTracker.startMonitoring{
+- INetworkManagementService.registerObserver(InterfaceObserver) //监听
+- mContext.registerReceiver(注册监听数据链接的广播)-->MobileDataStateReceiver.onReceive
+	-->setDetailedState-->msg.sendToTarget(EVENT_STATE_CHANGED)
+}@MobileDataStateTracker.java
+
+//网络返回网络状态，回调注册的监听器
+netd-->main-->NetlinkManager.start-->NetlinkHandler.start
+NetworkManagementService{//接收netd的消息
+- new NativeDaemonConnector(new NetdCallbackReceiver())
+- new Thread(NativeDaemonConnector)-->handleMessage@NativeDaemonConnector.java
+	-->NetdCallbackReceiver.onEvent{
+	- notifyInterfaceAdded
+	- notifyInterfaceRemoved
+	- notifyInterfaceStatusChanged
+	- notifyInterfaceLinkStateChanged
+	}
+}NetworkManagementService.java
+
+//ether 以太网处理监听
+NetworkStateTrackerHandler.handleMessage{
+- EVENT_STATE_CHANGED{
+	- state = info.getState()
+	- (state==DISCONNECTED)handleDisconnect
+	- (state==CONNECTED)handleDisconnect
+	}
+- EVENT_CONFIGURATION_CHANGED-handleConnectivityChange-->mClat.requiresClat
+}
+
+handleDisconnect/handleDisconnect-->handleConnectivityChange
 
 
 几种网络：
@@ -163,6 +201,8 @@ frameworks/base/core/java/android/net/NetworkStateTracker.java
 frameworks/base/core/java/android/net/MobileDataStateTracker.java
 frameworks/base/services/java/com/android/server/TelephonyRegistry.java
 frameworks/base/telephony/java/com/android/internal/telephony/CallManager.java
+frameworks/base/services/java/com/android/server/NetworkManagementService.java
+frameworks/base/services/java/com/android/server/NativeDaemonConnector.java
 _______________________________
 CDMA(电信)，GSM(移动，联通)
 

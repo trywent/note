@@ -1,0 +1,36 @@
+//network
+startOtherServices{
+- new ConnectivityService
+- NetworkStatsService.bindConnectivityManager
+- NetworkPolicyManagerService.bindConnectivityManager
+}@systemServer.java
+
+
+ConnectivityService{
+- mHandler = new InternalHandler  //
+- mTrackerHandler = new NetworkStateTrackerHandler 
+- new Tethering          //通过android设备访问网络
+- new SettingsObserver   //监听设置
+- new DataConnectionStats //监听数据网络
+- mMultinetworkPolicyTracker = createMultinetworkPolicyTracker //监听广播ACTION_CONFIGURATION_CHANGED
+}@ConnectivityService.java
+
+
+connectivityF.systemReady-->ConnectivityService.systemReady{
+
+}@ConnectivityService.java
+
+
+
+frameworks/base/services/core/java/com/android/server/ConnectivityService.java
+frameworks/base/services/net/java/android/net/util/MultinetworkPolicyTracker.java
+================
+//mobile
+MobileDataStateReceiver.onReceive{
+- 
+}
+
+
+
+/home/build/px3/frameworks/base/core/java/android/net/MobileDataStateTracker.java
+

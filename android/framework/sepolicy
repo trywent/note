@@ -1,18 +1,19 @@
-//sepolicy
+//sepolicy  te(Type Enforcement)?
 ps -Z //查看进程
 ls -Z //查看文件
-
 
 //每个对象（进程和文件）被赋予安全属性(Security Context)
 u:r:type[:range]
 
 u:user
-r:role //角色 android中进程为r，文件为object_r
+r:role //角色 object_r
 type/domain://类型（主要描述文件）/标签（描述进程）
 s0:Multi-Level Security(MLS)//安全级别
-
 attribute: domain/type //类型集合
 
+
+/system/bin/vold	u:object_r:vold_exec:s0 //vold文件是vold_exec（domain）
+______________
 //type拥有的权限 	
 type httpd_user_content_t, file_type, httpdcontent;
 声明一个httpd_user_content_t的类型，具有file_type和httpdcontent的属性
@@ -28,15 +29,20 @@ allow：赋予某项权限
 绝对不允许除了unconfineddomain以外的app对self类型的capability2进行任何的操作
 
 //规则：Access vectors (AVs) <av_kind> <source_type(s)> <target_type(s)>:<class(es)> <permission(s)>
-rule_name source_type target_type : object_class perm_set;
+rule_name source_type target_type:object_class perm_set;
 
 rule_name:allow,dontaudit,auditallow,neverallow
 其实neverallow的存在是在生成（编译）安全策略文件时检查allow语句是否违反了neverallow，防止由于开发人员的失误导致某些域权限过高
 
 
 object_class:定义某一类型可执行的操作
+=============
+//根据log生成规则
+adb shell "cat /proc/kmsg | grep avc" > avc_log.txt
+audit2allow -i avc_log.txt
+
 
 
 =============
-adb shell "cat /proc/kmsg | grep avc" > avc_log.txt
-audit2allow -i avc_log.txt
+//编译
+

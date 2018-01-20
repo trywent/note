@@ -1,39 +1,17 @@
 //audioTrack通过audioFlinger进行操作
 
 
-1.new AudioTrack
+//new AudioTrack
 AudioTrack@AudioTrack.java-->native_setup-->android_media_AudioTrack_native_setup
-@android_media_AudioTrack.cpp-->AudioTrack{
+{
 - 创建，new AudioTrack
-- 设置，set{
-	- 配置流，采用率等参数
-	- 获取output，AudioSystem::getOutput
-	- createTrack_l(创建mAudioTrack)-->audioFlinger->createTrack
-	}
-}@AudioTrack.cpp
-
-2.write
-write@AudioTrack.java-->native_write_byte-->android_media_AudioTrack_native_write_byte
--->writeToTrack{
-- sharedBuffer为0，直接写入AudioTrack.write
-- sharedBuffer不为0，拷贝数据到sharedBuffer
+- lpJniStorage = new AudioTrackJniStorage()
+- 设置，lpJniStorage.set//MODE_STREAM模式没有共享内存，MODE_STATIC(只写一次数据)使用共享内存
+	
 }@android_media_AudioTrack.cpp
 
 
-3.play
-play@AudioTrack.java-->native_start-->android_media_AudioTrack_start-->
-lpTrack->start@android_media_AudioTrack.cpp-->start-->mAudioTrack->start@AudioTrack.cpp
--->AudioFlinger::TrackHandle::start@AudioFlinger.cpp-->mTrack->start@Tracks.cpp-->
-start-->playbackThread->addTrack_l@Track.cpp-->AudioSystem::startOutput@Threads.cpp
-
-
-4.stop
-stop@AudioTrack.java-->native_stop-->android_media_AudioTrack_stop
-lpTrack->stop@android_media_AudioTrack.cpp-->stop@AudioTrack.cpp
-
-==========================
-创建：
-AudioTrack::AudioTrack-->set{
+AudioTrack::AudioTrack-->set(sharedBuffer){
 - 检查参数，获取参数
 - 获取output，AudioSystem::getOutput-->aps->getOutput
 - 设置采样率，格式，channel
@@ -41,11 +19,20 @@ AudioTrack::AudioTrack-->set{
 - 创建，createTrack_l{
 	- 获取flinger，AudioSystem::get_audio_flinger
 	- 获取各种参数，AudioSystem::getxxxx(output, streamType, &xxxx)
-	- 创建mAudioTrack，audioFlinger->createTrack
-	- 更新proxy，
+	- 创建mAudioTrack，audioFlinger->createTrack //audioFlinger端返回一个TrackHandle
+	- sp<IMemory> mCblkMemory = track->getCblk() //返回mCblkMemory
+	- mCblk = iMemPointer //audioFlinger端的回调
+	- mProxy = new AudioTrackClientProxy(cblk, buffers/*audioFlinger端创建的buffer*/
 	}
 - 赋值流类型，mStreamType = streamType
 }@AudioTrack.cpp
+
+//write
+write@AudioTrack.java-->native_write_byte-->android_media_AudioTrack_native_write_byte
+-->writeToTrack{
+- sharedBuffer为0，直接写入write
+- sharedBuffer不为0，拷贝数据到sharedBuffer
+}@android_media_AudioTrack.cpp
 
 
 AudioTrack::write{
@@ -53,9 +40,19 @@ AudioTrack::write{
 	- 若服务对象dead，重建AudioTrack，restoreTrack_l
 	- 通过代理从获取buffer，proxy->obtainBuffer-->ClientProxy::obtainBuffer
 	}
-- 拷贝数据，memcpy
+- 拷贝数据，memcpy(audioBuffer.i8, buffer)
+- releaseBuffer-->mProxy->releaseBuffer
 }@AudioTrack.cpp
 
+
+//play
+play@AudioTrack.java-->native_start-->android_media_AudioTrack_start-->
+lpTrack->start@android_media_AudioTrack.cpp-->start-->mAudioTrack->start@AudioTrack.cpp
+-->AudioFlinger::TrackHandle::start@AudioFlinger.cpp-->mTrack->start@Tracks.cpp-->
+start-->playbackThread->addTrack_l@Track.cpp-->AudioSystem::startOutput@Threads.cpp
+
+
+//
 start{
 - 设置状态，mState
 - 设置播放位置，mNewPosition
@@ -64,11 +61,14 @@ start{
 	
 }@AudioTrack.cpp
 
+//stop
+stop@AudioTrack.java-->native_stop-->android_media_AudioTrack_stop
+lpTrack->stop@android_media_AudioTrack.cpp-->stop@AudioTrack.cpp
+
 stop{
 - mAudioTrack->stop@AudioTrack.cpp-->(服务端Track)mTrack->stop@TrackHandle-->stop
 	-->设置状态mState = STOPPED@Track.cpp
 }@AudioTrack.cpp
-
 
 //音量
 setStereoVolume-->native_setVolume@AudioTrack.java-->android_media_AudioTrack_set_volume

@@ -18,3 +18,20 @@ external/libphonenumber/java/src/com/android/i18n/phonenumbers/ShortNumberUtil.j
 
 
 setting中设置mobileNetworkSetting会使用phone中mobileNetworkSetting.java
+
+
+
+//
+//加入服务
+makeDefaultPhone@PhoneFactory.java-->PhoneProxy-->new PhoneSubInfoProxy@PhoneProxy.java
+PhoneSubInfoProxy-->ServiceManager.addService("iphonesubinfo", this)@PhoneSubInfoProxy.java
+
+//获取id
+getDeviceId-->getSubscriberInfo().getDeviceId-->(通过服务iphonesubinfo获取)@TelephonyManager.java
+
+
+
+frameworks/opt/telephony/src/java/com/android/internal/telephony/PhoneFactory.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/PhoneProxy.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/PhoneSubInfoProxy.java
+frameworks/base/telephony/java/android/telephony/TelephonyManager.java

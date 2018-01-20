@@ -1,1 +1,19 @@
+//
+dwc_otg_driver.probe-->dwc_otg_driver_probe{
+- dwc_otg_core_init
+- dwc_otg_hcd_init
+
+}
+
+
+host20_driver.probe-->host20_driver_probe{
+- dwc_otg_core_init
+- host20_hcd_init
+}
+
+
+dwc_otg_force_host{
+- dwc_otg_core_init
+}
+
 /sys/bus/platform/drivers/usb20_otg/force_usb_mode

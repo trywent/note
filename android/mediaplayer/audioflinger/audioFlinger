@@ -51,22 +51,41 @@ setParameters@AudioHardware.cpp
 
 ============
 //output
+AudioPolicyService::getOutput-->....-->openOutput-->
+openOutput_l{//创建播放线程
+- outHwDev->openOutputStream(&outputStream)
+- new MixerThread(outputStream) //创建thread
+- mPlaybackThreads.add(*output, thread)
+}@AudioFlinger.cpp
 
+
+//在Thread中有多个tracks对应着client。通过tracks中的数据混合后写到hal层
 //1,创建audioTrack  audioPolicy创建应用端的audioTrack
 AudioFlinger::createTrack(output){
 - 检查参数，检查格式audio_is_linear_pcm
-- 根据output获取playbackThread，checkPlaybackThread_l
-- 根据进程id，创建client。registerPid_l
-- 创建track，thread->createTrack_l-->AudioFlinger::PlaybackThread::createTrack_l
-- 创建TrackHandle，并返回
+- 根据output获取playbackThread，checkPlaybackThread_l //获取output对应的thread
+- 根据进程id，创建client。registerPid_l{
+		- client = new Client-->new MemoryDealer//用于分配内存，heap由ro.af.client_heap_size_kbyte定义
+		- mClients.add(client)		
+		}
+- 创建track，thread->createTrack_l-->AudioFlinger::PlaybackThread::createTrack_l(client){
+	- new Track()@Tracks.cpp
+	}@Threads.cpp
+- 创建new TrackHandle(track)，并返回
 }
 
 PlaybackThread::createTrack_l{
-- 创建，new Track(StreamType)
+- 创建，new Track(StreamType，client){
+	- 计算需要的memory大小，audio_track_cblk_t+buffersize
+	- mCblk = mCblkMemory = client->heap()->allocate-->MemoryDealer->allocate
+	- 设置mBuffer的位置 //ALLOC_CBLK mBuffer = mCblk + audio_track_cblk_t
+	}
 - 加入容器，mTracks.add
 }@Threads.cpp
 
-
+//创建imem 用于写数据
+AudioFlinger::TrackHandle::getCblk-->mTrack->getCblk@Tracks.cpp
+--mCblkMemory@Trackbase.h
 
 //3,play
 start(跨进程)：
