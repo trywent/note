@@ -1,0 +1,11 @@
+//
+
+dd if=/mnt/media_rw/CEE6-11F3/recovery_w.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/recovery bs=1024 count=32708
+dd if=/mnt/media_rw/CEE6-11F3/boot.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/boot bs=1024 count=16354
+
+
+/sys/bus/platform/drivers/usb20_otg/force_usb_mode
+
+echo 1 > /proc/sys/kernel/printk
+
+logcat -s myservice RemoteToolkitBsp

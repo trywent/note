@@ -1,0 +1,115 @@
+//进程开始       c库实现：bionic  java实现：libcore/luni
+zygote开始:
+service zygote /system/bin/app_process -Xzygote /system/bin --zygote --start-system-server
+
+app_process编译时链接的库包含libandroid_runtime.so，
+
+service zygote /system/bin/app_proces@init.rc-->main-->runtime.start("com.android.internal.os.ZygoteInit")
+@app_main.cpp-->AndroidRuntime::start{//开始虚拟机，注册函数
+- startVm //启动虚拟机
+- 初始启动startClass //com.android.internal.os.ZygoteInit
+- 查找mian方法并执行，env->CallStaticVoidMethod-->
+	mian{
+	- registerZygoteSocket(socketName)//注册socket "zygote" 用于监听命令启动进程
+	- startSystemServer-->handleSystemServerProcess-->Zygote.forkAndSpecialize//启动系统服务
+	- runSelectLoop{//接收命令并执行,等待启动app进程
+		- acceptCommandPeer
+		- runOnce{
+			- readArgumentList//参数
+			- pid==0,Zygote.forkAndSpecialize //fork进程
+			- handleChildProc-->RuntimeInit.zygoteInit
+			}@ZygoneConnction.java
+		} 
+	}@ZygoteInit.java
+}@AndroidRuntime.cpp
+
+//fork进程
+forkAndSpecialize-->nativeForkAndSpecialize@Zygote.java-->com_android_internal_os_Zygote_nativeForkAndSpecialize
+-->ForkAndSpecializeCommon-->fork@com_android_internal_os_Zygote.cpp
+
+//进程初始化
+RuntimeInit.zygoteInit{
+- commonInit{
+	- Thread.setDefaultUncaughtExceptionHandler(UncaughtHandler)//设置未捕获异常处理
+	- TimeZone.setDefault
+	}
+- nativeZygoteInit
+- applicationInit(com.android.server.SystemServer)-->invokeStaticMain(className){
+	- Class.forName(className)//class
+	- throw new ZygoteInit.MethodAndArgsCaller-->MethodAndArgsCaller.run-->mMethod.invoke
+	}@ZygoteInit.java	
+}@RuntimeInit.java
+
+
+//加载"libandroid_servers.so":包含服务的jni，其他应用不能调用
+main-->System.loadLibrary("android_servers")@SystemServer.java-->loadLibrary@System.java-->
+loadLibrary-->nativeLoad@Runtime.java-->nativeLoad@InternalNative.cpp-->dvm_java_lang_Runtime-->
+Dalvik_java_lang_Runtime_nativeLoad@java_lang_Runtime.cpp-->dvmLoadNativeCode-->dlsym@Native.cpp
+
+//加载"android_runtime.so":运行时的jni,所有程序可用
+AndroidRuntime::start-->startReg-->register_jni_procs-->array[i].mProc(env)
+@AndroidRuntime.cpp-->register_android_xxxxx(env)-->
+registerNativeMethods@AndroidRuntime.cpp-->jniRegisterNativeMethods@JNIHelp.cpp
+
+
+frameworks/base/cmds/app_process/app_main.cpp
+frameworks/base/core/jni/AndroidRuntime.cpp
+frameworks/base/core/java/com/android/internal/os/ZygoteInit.java 
+frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
+frameworks/base/core/java/com/android/internal/os/ZygoteConnection.java
+frameworks/base/core/jni/com_android_internal_os_Zygote.cpp
+libcore/dalvik/src/main/java/dalvik/system/ZygoteHooks.java
+________________________________________________
+开始应用进程：
+startProcessLocked-->Process.start("android.app.ActivityThread")@ActivityManagerService.java-->
+start-->startViaZygote-->zygoteSendArgsAndGetResult{
+- openZygoteSocketIfNeeded{//打开socket"zygote"
+	- primaryZygoteState = ZygoteState.connect(ZYGOTE_SOCKET)
+	}
+ //写入启动命令
+- sZygoteWriter.flush
+ //读取启动结果
+- ProcessStartResult
+- inputStream.readInt //启动进程id
+}@Process.java
+
+
+
+
+dalvik/vm/Native.cpp
+libnativehelper/JNIHelp.cpp
+
+frameworks/base/services/jni/Android.mk
+frameworks/base/core/jni/AndroidRuntime.cpp
+===============
+//uncatchException Thread.setDefaultUncaughtExceptionHandler
+UncaughtHandler.uncaughtException-->ActivityManagerNative.getDefault().handleApplicationCrash
+@RunttimeInit.java-->handleApplicationCrash-->handleApplicationCrashInner-->
+crashApplication{
+- makeAppCrashingLocked
+- createAppErrorIntentLocked
+- startActivityAsUser //弹框？
+}@ActivityManagerService.java
+
+
+makeAppCrashingLocked-->handleAppCrashLocked
+
+===============
+//sginal
+android4.4中处理信号signal：
+start-->startVm@AndroidRuntime.cpp-->JNI_CreateJavaVM@Jni.cpp-->dvmStartup-->
+dvmInitAfterZygote@Init.cpp-->dvmSignalCatcherStartup-->dvmCreateInternalThread
+-->signalCatcherThreadStart(等待并处理信号)-->(收到SIGQUIT)handleSigQuit@SignalCatcher.cpp
+
+dalvik/vm/Jni.cpp
+dalvik/vm/Init.cpp
+dalvik/vm/SignalCatcher.cpp
+fameworks/base/core/jni/AndroidRuntime.cpp
+
+____________
+android5.1以上
+
+
+//查看进程信息，group
+ cat proc/pid/status 
+

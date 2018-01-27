@@ -52,3 +52,19 @@ system/core/lmkd/lmkd.c
 //android4.4.4 写文件
 /sys/module/lowmemorykiller/parameters/adj
 /sys/module/lowmemorykiller/parameters/minfree
+
+
+=========================
+//crash
+dvmDetachCurrentThread-->threadExitUncaughtException-->dvmCallMethod(..uncaughtHandler...)
+@Thread.cpp-->Thread.getDefaultUncaughtExceptionHandler().uncaughtException
+@RemoteViewsService.java-->uncaughtException@RuntimeInit.javahandleApplicationCrash-->
+handleApplicationCrashInner/handleApplicationWtf-->crashApplication{
+- 
+- 是否记录，makeAppCrashingLocked-->handleAppCrashLocked
+}@ActivityManagerService.java
+
+
+wtf-->ActivityManagerNative.getDefault().handleApplicationWtf
+
+

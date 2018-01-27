@@ -1,4 +1,4 @@
-bootable/recovery/recovery.cpp
+//bootable/recovery/recovery.cpp
 
 主系统通过/cache中文件与recovery传递数据.
 工厂复位(Factory reset):主系统写"--wipe_data"到 /cache/recovery/command。并重启
@@ -91,7 +91,11 @@ sdtool_main-->install_rkimage
 update:
 
 install_package-->really_install_package{
-- 验证升级文件load_keys，verify_file
+- load_keys{//加载/res/keys
+	- cert.key_type //类型KEY_TYPE_RSA
+	- cert.hash_len
+	} 
+- verify_file-->RSA_verify
 - try_update_binary{
 	- 查找升级包中升级文件，mzFindZipEntry("update-binary")
 	- 将文件解压到"/tmp/update_binary"
@@ -103,14 +107,13 @@ install_package-->really_install_package{
 bootable/recovery/install.cpp
 
 
-
-
-
-
-
 #######################
 ota：
 make otapackage-->ota_from_target_files BUILT_TARGET_FILES_PACKAGE(源文件) zip(目标)
+
+
+
+build-recoveryimage-target@Makefile
 
 build/core/Makefile
 build/tools/releasetools/ota_from_target_files

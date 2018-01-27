@@ -11,7 +11,6 @@ type/domain://类型（主要描述文件）/标签（描述进程）
 s0:Multi-Level Security(MLS)//安全级别
 attribute: domain/type //类型集合
 
-
 /system/bin/vold	u:object_r:vold_exec:s0 //vold文件是vold_exec（domain）
 ______________
 //type拥有的权限 	
@@ -36,12 +35,25 @@ rule_name:allow,dontaudit,auditallow,neverallow
 
 
 object_class:定义某一类型可执行的操作
+_____________
+//编译 主要生成上下文(进程和文件的类型)，策略(*.te)
+file_contexts 编译生成file_contexts.bin
+security_classes​，*.te,其它文件生成​ policy.conf
 =============
 //根据log生成规则
 adb shell "cat /proc/kmsg | grep avc" > avc_log.txt
 audit2allow -i avc_log.txt
 
 
+//更新policy
+1. Modify the required policy source files including the relevant device policy
+modules. Rebuild the kernel policy file by:
+make sepolicy
+2. Copy the policy file to the device (it copies the new policy to the alternate
+directory so that it is picked up by the reload property):
+adb push out/target/product/<device>/root/sepolicy /data/security/current
+3. Then load the new policy by:
+adb shell su setprop selinux.reload_policy 1
 
 =============
 //编译

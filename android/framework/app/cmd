@@ -10,7 +10,7 @@ am start -e "com.fyt.window" "second" com.android.launcher2/com.android.launcher
 am start -->runStart-->makeIntent(构建intent)
 
 am startservice -n com.syu.ms/.ServiceMain
-
+am startservice -n com.syu.ms/app.ModuleService
 
 px3:
 am start -e "com.syu.fyt" "fytSecond" com.syu.music/.MAct
