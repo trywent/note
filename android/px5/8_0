@@ -1,11 +1,17 @@
 //
 
-dd if=/mnt/media_rw/CEE6-11F3/recovery_w.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/recovery bs=1024 count=32708
-dd if=/mnt/media_rw/CEE6-11F3/boot.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/boot bs=1024 count=16354
-
+dd if=/mnt/media_rw/USB0/recovery_w.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/recovery bs=1024 count=32708
+dd if=/mnt/media_rw/USB0/boot.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/boot bs=1024 count=16354
+dd if=/mnt/media_rw/USB0/resource.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/resource bs=1024 count=8177
 
 /sys/bus/platform/drivers/usb20_otg/force_usb_mode
 
 echo 1 > /proc/sys/kernel/printk
 
 logcat -s myservice RemoteToolkitBsp
+
+busybox setserial -a /dev/ttyS0
+
+dumpsys window windows
+
+com.android.settings/com.android.settings.FallbackHome

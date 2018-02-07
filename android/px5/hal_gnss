@@ -1,0 +1,113 @@
+//hardware
+
+
+//=============hwservicemanager
+start hwservicemanager@init.rc-->/system/bin/hwservicemanager@hwservicemanager.rc
+-->main{
+- new ServiceManager()
+- new BnHwServiceManager(manager)
+}@service.cpp
+
+//加入服务
+ServiceManager::add{
+- service->interfaceChain //获取调用者的标识descripter
+- ifaceMap = mServiceMap[fqName] //获取对应的服务map
+- ifaceMap.insertService //加入到map
+}
+
+//=============hal servcice
+service gnss_service /vendor/bin/hw/android.hardware.gnss@1.0-service//服务启动
+-->main-->defaultPassthroughServiceImplementation<IGnss>@service.cpp-->
+defaultPassthroughServiceImplementation{
+- registerPassthroughServiceImplementation{
+	- Interface::getService("default")-->IGnss::getService(stub=true){//获取stub，本地服务
+		- sm->getTransport-->ServiceManager::getTransport-->vintf::Transport getTransport //获取服务类型hwbinder
+		- 
+		}
+	- service->registerAsService-->IGnss::registerAsService-->sm->add@IGnssAll.cpp
+	}
+- joinRpcThreadpool //开始服务binder线程
+}
+
+//获取hal类型,当前是hwbinder
+vintf::Transport getTransport{
+- vintf::VintfObject::GetFrameworkHalManifest{//获取配置"/system/manifest.xml"
+	- Get()
+	}@VintfObject.cpp
+- vintf::VintfObject::GetDeviceHalManifest{
+
+	}
+}@Vintf.cpp
+
+//获取服务
+IGnss::getService{//stub==true则是获取本地服务
+- stub==false{
+
+	}
+- stub==true{//从当前进程的本地服务获取BsGnss,用于注册到serviceManager
+	- baseInterface= getPassthroughServiceManager().get-->
+	  IServiceManager.get("android.hardware.gnss@1.0::IGnss","default"){
+		//"/system/lib64/hw/" "/vendor/lib64/hw/""/odm/lib64/hw/"
+		- 遍历打开库dlopen("android.hardware.gnss@1.0-impl.so") 
+		- generator = dlsym(handle, "HIDL_FETCH_IGNSS")//查找符号HIDL_FETCH_IGNSS
+		- interface = generator("default")-->HIDL_FETCH_IGnss{
+			- hw_get_module(GPS_HARDWARE_MODULE_ID)//加载本地库
+			- module->methods->open(module, GPS_HARDWARE_MODULE_ID,&device)
+			- new Gnss(device)
+			}@Gnss.cpp
+		- registerReference{//加入到
+			- defaultServiceManager().registerPassthroughClient
+			}
+		- 返回interface//实现的接口函数
+		}@ServiceManagement.cpp
+	- 返回new BsGnss(IGnss::castFrom(baseInterface))
+	}
+}
+
+system/hwservicemanager/service.cpp
+system/libhidl/transport/ServiceManager.cpp
+system/hwservicemanager/Vintf.cpp
+system/libhidl/transport/include/hidl/LegacySupport.h
+system/hwservicemanager/Vintf.cpp
+system/libvintf/VintfObject.cpp
+system/libhidl/transport/ServiceManagement.cpp
+hardware/interfaces/gnss/1.0/default/service.cpp
+hardware/interfaces/gnss/1.0/default/Gnss.cpp
+/etc/init/android.hardware.gnss@1.0-service.rc
+//hidl生成@out/soong/.intermediates/hardware
+interface/gnss/1.0/android.hardware.gnss@1.0_genc++/gen/android/hardware/gnss/1.0/IGnss.h
+interface/gnss/1.0/android.hardware.gnss@1.0_genc++/gen/android/hardware/gnss/1.0/GnssAll.cpp
+
+
+
+
+
+//=============client 使用服务（android framework）
+class_init_native@GnssLocationProvider.java-->
+android_location_GnssLocationProvider_class_init_native{
+- 初始化java层回调函数
+- gnssHal = IGnss::getService()
+- gnssXtraIface = gnssHal->getExtensionXtra()
+- agnssIface = gnssHal->getExtensionAGnss()
+}@com_android_server_location_GnssLocationProvider.cpp
+
+native_init@GnssLocationProvider.java-->android_location_GnssLocationProvider_init{
+- gnssHal->setCallback(new GnssCallback())//设置回调
+- gnssXtraIface->setCallback(gnssXtraCbIface)
+- agnssIface->setCallback(aGnssCbIface)
+}@com_android_server_location_GnssLocationProvider.cpp
+
+frameworks/base/services/core/java/com/android/server/location/GnssLocationProvider.java
+frameworks/base/services/core/jni/com_android_server_location_GnssLocationProvider.cpp
+
+
+//卫星编号
+GLONASS_SVID_OFFSET = 64
+GLONASS_SVID_COUNT = 24
+BEIDOU_SVID_OFFSET = 200
+BEIDOU_SVID_COUNT = 35
+
+
+
+
+

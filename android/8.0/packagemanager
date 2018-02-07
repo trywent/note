@@ -1,0 +1,29 @@
+//
+PackageManagerService{
+-
+- getSetupWizardPackageName//获取CATEGORY_SETUP_WIZARD应用
+}
+
+
+final class ActivityIntentResolver{
+- addActivity
+- adjustPriority
+}
+
+addActivity-->adjustPriority
+
+
+
+=============
+getActivityInfo
+
+resolveIntent-->resolveIntentInternal-->queryIntentActivitiesInternal{
+-
+- applyPostResolutionFilter//过滤出短命app
+}
+
+getPersistentApplicationsInternal
+
+
+
+frameworks/base/services/core/java/com/android/server/pm/PackageManagerService.java

@@ -1,0 +1,62 @@
+//启动完成
+enableScreenIfNeeded-->enableScreenIfNeededLocked
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/WindowManagerService.java
+//================
+mSystemServiceManager.startService(LOCK_SETTINGS_SERVICE_CLASS)-->Lifecycle
+@LockSettingsService.java
+
+
+
+"ro.lockscreen.disable.default"
+
+
+performEnableScreen@WindowManagerService.java-->bootAnimationComplete-->finishBooting@ActivityManagerService.java
+-->sendBootCompletedLocked(查找所有的mStartedUsers，执行finishUserboot)-->finishUserBoot{
+- uss.setState(STATE_BOOTING, STATE_RUNNING_LOCKED)//更改状态
+- maybeUnlockUser-->unlockUserCleared-->finishUserUnlocking{
+	- uss.setState(STATE_RUNNING_LOCKED, STATE_RUNNING_UNLOCKING)
+	}
+}@UserController.java
+
+//结束
+finishUserUnlocking-->mHandler.obtainMessage(SYSTEM_USER_UNLOCK_MSG)@UserController.java-->
+MainHandler.(SYSTEM_USER_UNLOCK_MSG)-->mUserController.finishUserUnlocked{
+- uss.setState(STATE_RUNNING_UNLOCKING, STATE_RUNNING_UNLOCKED)
+}@ActivityManagerService.java
+
+
+frameworks/base/services/core/java/com/android/server/policy/PhoneWindowManager.java
+frameworks/base/services/core/java/com/android/server/LockSettingsService.java
+frameworks/base/services/core/java/com/android/server/am/UserController.java
+
+//=================
+UserManagerService{
+- mUserStates.put(UserHandle.USER_SYSTEM, UserState.STATE_BOOTING)
+}@UserManagerService.java
+
+
+//Android is starting  
+maybeFinish{
+- getSystemService(UserManager.class).isUserUnlocked() //获取是否解锁状态
+- getPackageManager().resolveActivity(homeIntent) //查找home应用
+- finish()
+}@FallbackHome.java
+
+isUserUnlocked@UserManager.java-->isUserUnlocked-->LocalService.isUserUnlockingOrUnlocked{
+- state == UserState.STATE_RUNNING_UNLOCKING
+- state == UserState.STATE_RUNNING_UNLOCKED
+}@UserManagerService.java
+
+packages/apps/Settings/src/com/android/settings/FallbackHome.java
+frameworks/base/core/java/android/os/UserManager.java
+frameworks/base/services/core/java/com/android/server/pm/UserManagerService.java
+
+
+//关闭非核心服务
+config.disable_noncore@SystemServer.java
+
+
+
