@@ -24,8 +24,11 @@ repo forall -c command，对所有项目执行一个command
 //查看状态
 repo status
 
-
-
+//tsinghua源
+repo init -u https://aosp.tuna.tsinghua.edu.cn/platform/manifest
+修改路径：
+.repo/manifest.xml：<remote  name="aosp">
+.repo/manifests.git/config
 ===========
 ssh:
 wb@192.168.1.131
