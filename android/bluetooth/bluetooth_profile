@@ -1,45 +1,51 @@
-//bluetooth HAL
-bt_interface_t bluetoothInterface //蓝牙接口
-
-bt_stack_module_methods = {
-    .open = open_bluetooth_stack,
-}
-
-//协议栈中profile接口
-get_profile_interface{
-- BT_PROFILE_HANDSFREE_ID
-- BT_PROFILE_HANDSFREE_CLIENT_ID
-}
+//==========================
+BluetoothProfile：
 
 
-system/bt/btif/src/bluetooth.c
+- 获取adapter 
+- 通过getProfileProxy()建立连接 
+- 设置BluetoothProfile.ServiceListener.监听服务的连接和断开 
+- onServiceConnected()返回profile proxy对象 
+- 执行操作
+________________
 
-//bluetooth profile package/app/com.android.bluetooth
-classInitNative()@AdapterService.java-->classInitNative{
-- 设置并初始化回调函数，JniCallbacks
-- hw_get_module(BT_STACK_MODULE_ID),获取蓝牙模块
-- module->methods->open ，打开蓝牙设备//协议栈
-- sBluetoothInterface-->bluetoothInterface@bluetooth.c //蓝牙接口
-}@com_android_bluetooth_btservice_AdapterService.cpp
 
-packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
-packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
-============================
+getProfileProxy{
+- new BluetoothHeadset
+- new BluetoothA2dp
+- new BluetoothA2dpSink
+- new BluetoothHeadsetClient
+- ....
+
+}@BluetoothAdapter.java
+
+
+frameworks/base/core/java/android/bluetooth/BluetoothAdapter.java
+
+
 HEADSET_CLIENT  ---- BluetoothHeadsetClient ---- HeadsetClientService
 AVRCP_CONTROLLER  ---- BluetoothAvrcpController ---- AvrcpControllerService
 A2DP_SINK  ---- BluetoothA2dpSink ---- A2dpSinkService
 
+//============接口
+定义各种profile：
 
-###############
-headsetClient:
+BluetoothAdapter.getProfileProxy(AVRCP_CONTROLLER)@BluetoothAdapter.java-->
+new BluetoothAvrcpController-->doBind(连接到activiton为IBluetoothAvrcpController的服务)
+-->bindServiceAsUser@BluetoothAvrcpController.java
 
--->(底层栈消息)@com_android_bluetooth_hfpclient.cpp
--->创建栈事件sendMessage(STACK_EVENT, event)@HeadsetClientStateMachine.java
+frameworks/base/core/java/android/bluetooth/BluetoothAdapter.java
+frameworks/base/core/java/android/bluetooth/
+frameworks/base/core/java/android/bluetooth/BluetoothAvrcpController.java
 
+================
+hfpclient:
 
 HeadsetClientStateMachine{
-- RingtoneManager.getRingtone(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
-- 
+- addState(mDisconnected)
+- addState(mConnecting)
+- addState(mConnected)
+- addState(mAudioOn, mConnected) //audioOn父状态为mConnect
 }
 
 call栈命令:
@@ -62,20 +68,55 @@ Connected.processMessage{
 }
 
 
+//进入/退出设置STREAM_BLUETOOTH_SCO
+AudioOn.processMessgae{
+- DISCONNECT_AUDIO
+- STACK_EVENT
+	- processConnectionEvent
+	- processAudioEvent
+}
 
-onCallSetup
+stack设置音量：
+volume_change_cb-->CallVoidMethod(method_onVolumeChange)@com_android_bluetooth_hfpclient.cpp
+-->onVolumeChange-->sendMessage(STACK_EVENT)@HeadsetClientStateMachine.java
 
-updateClip-->addCall(BluetoothHeadsetClientCall.CALL_STATE_INCOMING)
-
-waitForIndicators-->addCall(BluetoothHeadsetClientCall.CALL_STATE_INCOMING)
-
+mBroadcastReceiver.onReceive-->mStateMachine.sendMessage(SET_SPEAKER_VOLUME)
+@HeadsetClientService.java-->Connected.processMessage(若是协议栈操作)-->
+(本地操作)setVolumeNative-->@HeadsetClientStateMachine.java
 
 Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientService.java
 Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientStateMachine.java
 Bluetooth/jni/com_android_bluetooth_hfpclient.cpp
 
-====================
-music:
+==============
+//a2dp
+a2dpSinkStateMachine{
+- addState(mDisconnected)
+- addState(mPending)
+- addState(mConnected)
+- setInitialState(mDisconnected)  //初始状态
+- mIntentBroadcastHandler
+}
+
+//栈事件
+bta2dp_connection_state_callback-->sCallbackEnv->CallVoidMethod(method_onConnectionStateChanged)
+@com_android_bluetooth_a2dp_sink.cpp-->onAudioStateChanged@A2dpSinkStateMachine.java
+
+//Disconnect
+connect-->mStateMachine.sendMessage(CONNECT)@A2dpSinkService.java-->
+Disconnected.processMessage(connect){
+- 广播消息，broadcastConnectionState(STATE_DISCONNECTED,STATE_CONNECTING)
+- transitionTo(mPending)-->Pending.enter
+}@A2dpSinkStateMachine.java
+
+
+
+//Pending
+processMessage-->processConnectionEvent(CONNECTION_STATE_CONNECTED)-->
+transitionTo(mConnected)@A2dpSinkStateMachine.java
+
+
+//Connected
 Connected.processMessage{
 - CONNECT
 - STACK_EVENT
@@ -85,4 +126,48 @@ Connected.processMessage{
 		- 
 		}
 }
+
+
+//广播
+broadcastConnectionState-->mIntentBroadcastHandler.sendMessageDelayed-->
+IntentBroadcastHandler.handleMessage
+
+
+Bluetooth/src/com/android/bluetooth/a2dp/A2dpSinkStateMachine.java
+Bluetooth/src/com/android/bluetooth/a2dp/A2dpSinkService.java
+Bluetooth/jni/com_android_bluetooth_a2dp_sink.cpp
+
+=================
+//pbap(phone book access profile)
+BluetoothPbapClient{
+- 设置，mClientHandler
+- new BluetoothPbapSession(device, mSessionHandler)
+}
+
+connect@BluetoothPbapClient.java-->start/makeRequest-->RfcommConnectThread.run
+-->handleMessage(RFCOMM_CONNECTED)-->startObexSession@BluetoothPbapSession.java
+BluetoothPbapObexSession.start-->ObexClientThread.start-->run{
+- mRequest.execute(mClientSession)
+- mSessionHandler.obtainMessage(OBEX_SESSION_REQUEST_COMPLETED
+}@BluetoothPbapObexSession.java
+
+//执行命令
+pullVcardListing/pullPhoneBook-->mSession.makeRequest@BluetoothPbapClient.java-->
+mObexSession.schedule-->notify(唤醒等待)
+ObexClientThread.run{
+- this.wait() //等待notify
+- mRequest.execute(mClientSession)
+- mSessionHandler.obtainMessage(OBEX_SESSION_REQUEST_COMPLETED)
+}@BluetoothPbapObexSession.java
+
+//接收请求结果
+handleMessage(OBEX_SESSION_REQUEST_COMPLETED)-->mParentHandler.obtainMessage(REQUEST_COMPLETED)
+@BluetoothPbapSession.java-->SessionHandler.handleMessage(SessionHandler)-->client.sendToClient
+-->mClientHandler.obtainMessage().sendToTagert@BluetoothPbapClient.java-->
+
+
+
+frameworks/opt/bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapClient.java
+frameworks/opt/bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapSession.java
+frameworks/opt/bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapObexSession.java
 

@@ -1,12 +1,17 @@
 //bluetooth stack
 
 //1.
+static{classInitNative}@AdapterService.java-->
 classInitNative{
-- hw_get_module(BT_STACK_MODULE_ID) //加载模块 bluetooth
-- module->methods->open(module, id, &abstraction) //获取接口
+- jniCallbackClass = env->FindClass("com/android/bluetooth/btservice/JniCallbacks")//获取回调类
+- method_stateChangeCallback，method_adapterPropertyChangedCallback//初始化一些回调方法
+- hal_util_load_bt_library(sBluetoothInterface))//初始化接口
+- dlopen("libbluetooth.so")//加载库
+- dlsym(handle, "bluetoothInterface")//找到方法bluetoothInterface
 }
 
 //2.
+onCreate@AdapterService.java-->
 initNative{
 - sBluetoothInterface->init(sBluetoothCallbacks)  //设置协议栈回调
 - sBluetoothInterface->set_os_callouts            //系统相关回调
@@ -27,17 +32,62 @@ hw_module_t HAL_MODULE_INFO_SYM = {
 get_bluetooth_interface@com_android_bluetooth_btservice_AdapterService.cpp-->
 bluetooth__get_bluetooth_interface-->bluetoothInterface@bluetooth.c //接口
 
+//接口
+static const bt_interface_t bluetoothInterface = {
+    sizeof(bluetoothInterface),
+    init,
+    enable,
+    cleanup,
+    get_adapter_properties,
+    get_adapter_property,
+    set_adapter_property,
+    get_remote_device_properties,
+    get_remote_device_property,
+    set_remote_device_property,
+    get_remote_service_record,
+    get_remote_services,
+    start_discovery,
+    cancel_discovery,
+    create_bond,
+    remove_bond,
+    cancel_bond,
+}
+
 //enable bluetooth
 interface.start_up_stack_async-->thread_post(management_thread, event_start_up_stack)-->
 event_start_up_stack@stack_manager.c-->bte_main_enable@bte_main.c-->BTU_StartUp@btu_init.c
 
-
-
 //JNI
-bluetoothInterface.init-->
+bluetoothInterface.init(callbacks){
+- bt_hal_cbacks = callbacks //设置回调
+- stack_manager_get_interface()->init_stack()
+}
 
 ===========
-//a2dp sink src转换
+//扫描 device manager
+startDiscovery@Bluetooth.c-->btif_dm_start_discovery(mode=BTA_DM_GENERAL_INQUIRY)@btif_dm.c-->
+BTA_DmSearch@bta_dm_api.c-->bta_sys_sendmsg@bta_sys_main.c-->fixed_queue_enqueue-->
+list_append(queue->list, data)/*加入队列*/@fixed_queue.c
+
+
+//返回设备信息
+remote_device_properties_cb
+
+//扫描到设备
+device_found_cb
+
+
+
+btif_dm_search_devices_evt{
+- BTA_DM_DISC_RES_EVT-->remote_device_properties_cb
+- BTA_DM_INQ_RES_EVT-->device_found_cb
+}
+===========
+//连接
+setPin
+
+===========
+//sprd  a2dp sink src转换
 -#define BTA_AV_SINK_INCLUDED TRUE
 +#define BTA_AV_SINK_INCLUDED FALSE 
 @include/bt_target.h
@@ -48,3 +98,7 @@ system/bt/btif/src/bluetooth.c
 system/bt/btif/src/stack_manager.c
 system/bt/main/bte_main.c
 system/bt/stack/btu/btu_init.c
+btif/src/btif_dm.c
+bta/dm/bta_dm_api.c
+bta/sys/bta_sys_main.c
+osi/src/fixed_queue.c

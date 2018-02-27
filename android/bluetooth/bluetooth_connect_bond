@@ -1,0 +1,105 @@
+//设置中连接蓝牙
+//加入扫描的设备
+DeviceFoundHandler(BluetoothDevice.ACTION_FOUND){
+- cachedDevice = mDeviceManager.addDevice-->addDevice{
+	- new CachedBluetoothDevice
+	- mCachedDevices.add
+	}@CachedBluetoothDeviceManager.java
+- cachedDevice.setNewName //初始化扫描的设备
+}BluetoothEventManager.java
+
+
+frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/BluetoothEventManager.java
+frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/LocalBluetoothManager.java
+frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/CachedBluetoothDeviceManager.java
+//设置中显示设备
+updateContent(BluetoothAdapter.STATE_ON)-->addDeviceCategory(mAvailableDevicesCategory)@BluetoothSettings.java-->
+addCachedDevices{
+- mLocalManager.getCachedDeviceManager().getCachedDevicesCopy//获取扫描到的设备
+- onDeviceAdded{
+	- mFilter.matches //判断是否符合需要的设备（已经配对，可用的设备）
+	- createDevicePreference
+	}
+}@DeviceListPreferenceFragment.java
+======================
+/*开始扫描
+BluetoothDevice.ACTION_DISCOVERY_STARTED 
+BluetoothDevice.ACTION_DISCOVERY_FINISHED 
+BluetoothDevice.ACTION_FOUND 接受广播找到设备
+*/
+startDiscovery@AdapterService.java-->startDiscovery@Bluetooth.c
+
+discovery_state_changed_callback@com_android_bluetooth_btservice_AdapterService.cpp-->discoveryStateChangeCallback
+@AdapterProperties.java
+
+//扫描到设备,创建设备，设置设备信息
+remote_device_properties_callback-->method_devicePropertyChangedCallback@luetooth_btservice_AdapterService.cpp
+-->devicePropertyChangedCallback@JniCallbacks.java-->devicePropertyChangedCallback{
+- addDeviceProperties(address)-->mDevices.put
+- device.mName,device.mAddress,device.mBluetoothClass...//设置设备信息
+}@RemoteDevices.java
+
+//加入设备
+device_found_callback-->method_deviceFoundCallbac@@com_android_bluetooth_btservice_AdapterService.cppk-->
+deviceFoundCallback@JniCallbacks.java-->deviceFoundCallback(address/*发送广播ACTION_FOUND*/)@RemoteDevices.java
+
+======================
+/*
+安全简易配对SSP（Secure simple pairing）,蓝牙2.0之后配对方式，简易安全配对一共有四种，其中Out of Band很少使用到，具体如下： 
+Numeric Comparison 
+配对双方都显示一个6位的数字，由用户来核对数字是否一致，并输入Yes/No，两端Yes表示一致即可配对,可以防止中间人攻击。 
+使用场景：两端设备可以弹出6位十进制数，并且有yes和no按钮。
+
+：A发起配对--->A显示6位数，并发送到B--->B显示接收的6位数，确认后可配对成功
+
+Passkey Entry 
+配对目标输入一个在本地设备上显示的6位数字，输入正确即可配对，并可以防止中间人攻击。 
+使用场景：一端设备可以显示，另一端设备可以输入。
+
+：A发起配对--->A显示6位数--->B输入对应的6位数，确认后可配对成功
+
+Just Works 
+不会进行鉴权,不能防止中间人攻击用于配对没有显示没有输入的设备，主动发起连接即可配对，用户看不到配对过程，不可以防止中间人攻击，例如连接蓝牙耳机。 
+使用场景：用于即不能显示6位随机数，也不能输入的设备。
+
+Out of Band 
+两设备的通过别的途径交换配对信息，例如一些NFC蓝牙音箱。*/
+//请求配对
+onPreferenceTreeClick-->onDevicePreferenceClick-->btPreference.onClicked@DeviceListPreferenceFragment.java
+-->onClicked-->pair@BluetoothDevicePreference.java-->mCachedDevice.startPairing-->startPairing-->
+mDevice.createBond-->sService.createBond(TRANSPORT_AUTO)@BluetoothDevice.java-->mBondStateMachine.sendMessage
+@AdapterService.java-->processMessage(CREATE_BOND)-->createBond-->mAdapterService.createBondNative
+@BondStateMachine.java-->createBondNative@com_android_bluetooth_btservice_AdapterService.cpp-->/*stack*/
+-->create_bond@bluetooth.c-->btif_dm_create_bond(btif_dm_generic_evt)@btif_dm.c-->btif_transfer_context-->
+btif_sendmsg-->/*命令在另一个thread执行*/thread_post(bt_jni_msg_ready)-->bt_jni_msg_ready-->
+btif_context_switched(p_msg)-->p->p_cb@btif_core.c-->btif_dm_generic_evt(BTIF_DM_CB_CREATE_BOND)
+-->btif_dm_cb_create_bond@btif_dm.c-->btif_hh_connect@btif_hh.c
+
+//接收到配对请求
+PendingCommandState(SSP_REQUEST/PIN_REQUEST)-->sendDisplayPinIntent@BondStateMachine.java
+ACTION_PAIRING_REQUES
+
+//pin
+sendDisplayPinIntent@BondStateMachine.java
+
+//连接profile
+mCachedDevice.connect@BluetoothDevicePreference.java-->connect(连接所有的profile)-->connectWithoutResettingTimer
+BondStateMachine.java
+
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothSettings.java
+packages/apps/Settings/src/com/android/settings/bluetooth/DeviceListPreferenceFragment.java
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothDevicePreference.java
+frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/CachedBluetoothDevice.java
+frameworks/base/core/java/android/bluetooth/BluetoothDevice.java
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/BondStateMachine.java
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/JniCallbacks.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterProperties.java
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/RemoteDevices.java
+//stack
+system/bt/btif/src/bluetooth.c
+system/bt/btif/src/btif_dm.c
+system/bt/btif/src/btif_core.c
+system/bt/btif/src/btif_hh.c
+
