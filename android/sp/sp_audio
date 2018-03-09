@@ -77,6 +77,108 @@ setenforce 0
 	<dump_record index="9" item_name ="record.dump1" dump_file_name ="dump_record_after_express" switch="0" />
 </dumpmusic>
 
+//蓝牙声音
+    加入车载蓝牙补丁
+
+diff --git a/idh.code/vendor/sprd/modules/audio/normal/at_commands_generic.c b/idh.code/vendor/sprd/modules/audio/normal/at_commands_generic.c
+index 0c83e2c..158cbc8 100644
+--- a/idh.code/vendor/sprd/modules/audio/normal/at_commands_generic.c
++++ b/idh.code/vendor/sprd/modules/audio/normal/at_commands_generic.c
+@@ -89,6 +89,16 @@ static void do_voice_command(struct tiny_audio_device *adev)
+     ALOGE("do_voice_command: X");
+ }
+ 
++static void do_voice_command_direct(const char * at_cmd)
++{
++    int ret;
++#ifdef ANDROID5X
++    ret = sendAt(st_vbc_ctrl_thread_para->adev->cp_type, android_sim_num, at_cmd);
++#else
++    ret = sendCmd(android_sim_num, at_cmd);
++#endif
++    ALOGD("do_voice_command_direct: X:%d", ret);
++}
+ static void voice_command_signal(struct tiny_audio_device *adev,const  char* at_cmd,int index)
+ {
+     ALOGV("voice_command_signal: E");
+diff --git a/idh.code/vendor/sprd/modules/audio/normal/audio_hw.c b/idh.code/vendor/sprd/modules/audio/normal/audio_hw.c
+index 327c446..be1d81d 100644
+--- a/idh.code/vendor/sprd/modules/audio/normal/audio_hw.c
++++ b/idh.code/vendor/sprd/modules/audio/normal/audio_hw.c
+@@ -706,6 +706,7 @@ struct tiny_private_ctl private_ctl;
+     char* cp_nbio_pipe;
+     struct mixer *i2s_mixer;
+     int i2sfm_flag;
++    int hfp_start;
+ #ifdef NXP_SMART_PA
+     fm_handle fmRes; //for smartpa fm
+     nxp_pa_handle callHandle;//for smartpa call
+@@ -4966,6 +4967,18 @@ static int adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs)
+               fm_gain |= fm_headset_volume_tbl[i]<<16;
+               SetAudio_gain_fmradio(adev,fm_gain);
+            }
++         }
++    }
++    ret = str_parms_get_str(parms, "hfp_enable", value, sizeof(value));//add for bt client,withch iis channel
++    if( ret >= 0 ){
++        if(strcmp(value, "true") == 0) {
++            char *at_cmd = NULL;
++            at_cmd="AT+SPTEST=31,1";
++            do_voice_command_direct(at_cmd);
++        } else if (strcmp(value, "false") == 0) {
++            char *at_cmd = NULL;
++            at_cmd="AT+SPTEST=31,0";
++            do_voice_command_direct(at_cmd);
+         }
+     }
+ 
+diff --git a/idh.code/vendor/sprd/modules/audio/normal/vb_control_parameters.c b/idh.code/vendor/sprd/modules/audio/normal/vb_control_parameters.c
+index 4749133..97bf964 100644
+--- a/idh.code/vendor/sprd/modules/audio/normal/vb_control_parameters.c
++++ b/idh.code/vendor/sprd/modules/audio/normal/vb_control_parameters.c
+@@ -962,6 +962,11 @@ int SetParas_OpenHal_Incall(struct tiny_audio_device *adev, int fd_pipe)   //Get o
+         ALOGE("Error, read %s ret(%d) failed(%s).",__func__,ret,strerror(errno));
+     }
+     android_sim_num = hal_open_param.sim_card;
++    if(android_sim_num&0x100) {
++        android_sim_num&=~0x100;
++        adev->hfp_start = 1;
++        ALOGI("Open hal device do as hfp!");
++    }
+     MY_TRACE("%s successfully,sim card number(%d)",__func__,android_sim_num);
+     return ret;
+ }
+@@ -1985,6 +1990,15 @@ RESTART:
+                    else if( adev->cp_type == CP_CSFB)
+                        i2s_pin_mux_sel(adev,CP_CSFB);
+                }
++               if(adev->hfp_start){
++                   FILE * i2s_ctrl;
++                   char * i2s_ctrl_value="1";
++                   i2s_ctrl = fopen("/proc/pin_switch/iis0_sys_sel/cp1_iis0","wb");
++                   if(i2s_ctrl != NULL) {
++                       fputs(i2s_ctrl_value,i2s_ctrl);
++                       fclose(i2s_ctrl);
++                   }
++               }
+                voip_forbid(adev, true);
+                adev->call_start = 1;
+                if (adev->cache_mute = 1) {
+@@ -2030,6 +2044,17 @@ RESTART:
+ 
+                vbc_call_end_process(adev,false);
+                MY_TRACE("voice:VBC_CMD_RSP_CLOSE IN.");
++               if(adev->hfp_start) {
++                   FILE * i2s_ctrl;
++                   char * i2s_ctrl_value="1";
++                   ALOGI("set hfp_start to 0!");
++                   i2s_ctrl = fopen("/proc/pin_switch/iis0_sys_sel/ap_iis0","wb");
++                   if(i2s_ctrl  != NULL) {
++                       fputs(i2s_ctrl_value,i2s_ctrl);
++                       fclose(i2s_ctrl);
++                   }
++                   adev->hfp_start = 0;
++               }
 
 
 
@@ -91,56 +193,6 @@ rate: 16000 (16000/1)     16000 frames/s
 period_size: 320 frame    1280 bytes  20ms
 buffer_size: 960 frame    3840 bytes  60ms
 boundary: 2013265920      
-
-
-一个buffer(960)中pos出现减小现象：
-interrupt:1 hw:902080 new:902400 pos:  0 base:902400 ptr_base:901440 fyt1:0 fyt2:1
-interrupt:0 hw:902400 new:902560 pos:160 base:902400 ptr_base:902400 fyt1:0 fyt2:0
-interrupt:1 hw:902560 new:902880 pos:480 base:902400 ptr_base:902400 fyt1:0 fyt2:0
-interrupt:0 hw:902880 new:903680 pos:320 base:903360 ptr_base:902400 fyt1:0 fyt2:1
-interrupt:1 hw:903680 new:904000 pos:640 base:903360 ptr_base:903360 fyt1:0 fyt2:0
-interrupt:0 hw:904000 new:904160 pos:800 base:903360 ptr_base:903360 fyt1:0 fyt2:0
-interrupt:1 hw:904160 new:904320 pos:  0 base:904320 ptr_base:903360 fyt1:0 fyt2:1
-____________
-[ 1205.059448] c0 :0  interrupt:1 hw:4976800 new:4977120 pos:480 base:4976640 ptr_base:4976640 fyt1:0 fyt2:0
-[ 1205.069213] c3 :1  interrupt:0 hw:4977120 new:4977920 pos:320 base:4977600 ptr_base:4976640 fyt1:0 fyt2:1
-[ 1205.078887] c3 :2  interrupt:0 hw:4977920 new:4978080 pos:480 base:4977600 ptr_base:4977600 fyt1:0 fyt2:0
-[ 1205.088409] c0 :3  interrupt:1 hw:4978080 new:4978240 pos:640 base:4977600 ptr_base:4977600 fyt1:0 fyt2:0
-[ 1205.098114] c3 :4  interrupt:0 hw:4978240 new:4978400 pos:800 base:4977600 ptr_base:4977600 fyt1:0 fyt2:0
-[ 1205.107696] c0 :5  interrupt:1 hw:4978400 new:4978560 pos:  0 base:4978560 ptr_base:4977600 fyt1:0 fyt2:1
-[ 1205.117370] c3 :6  interrupt:0 hw:4978560 new:4978880 pos:320 base:4978560 ptr_base:4978560 fyt1:0 fyt2:0
-[ 1205.126892] c0 :7  interrupt:1 hw:4978880 new:4978880 pos:320 base:4978560 ptr_base:4978560 fyt1:0 fyt2:0
-[ 1205.136474] c3 :8  interrupt:0 hw:4978880 new:4979040 pos:480 base:4978560 ptr_base:4978560 fyt1:0 fyt2:0
-[ 1205.145996] c3 --:1920/128
-[ 1212.140075] c0 :0  interrupt:1 hw:5202400 new:5202720 pos:480 base:5202240 ptr_base:5202240 fyt1:0 fyt2:0
-[ 1212.149963] c0 :1  interrupt:0 hw:5202720 new:5203520 pos:320 base:5203200 ptr_base:5202240 fyt1:0 fyt2:1
-[ 1212.160064] c0 :2  interrupt:1 hw:5203520 new:5203840 pos:640 base:5203200 ptr_base:5203200 fyt1:0 fyt2:0
-[ 1212.173004] c0 :3  interrupt:0 hw:5203840 new:5204000 pos:800 base:5203200 ptr_base:5203200 fyt1:0 fyt2:0
-[ 1212.182586] c0 :4  interrupt:1 hw:5204000 new:5204160 pos:  0 base:5204160 ptr_base:5203200 fyt1:0 fyt2:1
-[ 1212.196350] c0 :5  interrupt:0 hw:5204160 new:5204480 pos:320 base:5204160 ptr_base:5204160 fyt1:0 fyt2:0
-[ 1212.205963] c0 :6  interrupt:1 hw:5204480 new:5204480 pos:320 base:5204160 ptr_base:5204160 fyt1:0 fyt2:0
-[ 1212.218627] c0 :7  interrupt:0 hw:5204480 new:5204640 pos:480 base:5204160 ptr_base:5204160 fyt1:0 fyt2:0
-[ 1212.228210] c0 :8  interrupt:1 hw:5204640 new:5204800 pos:640 base:5204160 ptr_base:5204160 fyt1:0 fyt2:0
-[ 1212.237701] c0 --:2080/144
-[ 1219.240692] c0 :0  interrupt:1 hw:5429120 new:5429440 pos:640 base:5428800 ptr_base:5428800 fyt1:0 fyt2:0
-[ 1219.250579] c0 :1  interrupt:0 hw:5429440 new:5429440 pos:640 base:5428800 ptr_base:5428800 fyt1:0 fyt2:0
-[ 1219.260681] c0 :2  interrupt:1 hw:5429440 new:5429760 pos:  0 base:5429760 ptr_base:5428800 fyt1:0 fyt2:1
-[ 1219.270629] c0 :3  interrupt:0 hw:5429760 new:5429920 pos:160 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
-[ 1219.280670] c0 :4  interrupt:1 hw:5429920 new:5430240 pos:480 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
-[ 1219.291229] c0 :5  interrupt:0 hw:5430240 new:5430240 pos:480 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
-[ 1219.300781] c0 :6  interrupt:1 hw:5430240 new:5430400 pos:640 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
-[ 1219.313964] c0 :7  interrupt:0 hw:5430400 new:5430560 pos:800 base:5429760 ptr_base:5429760 fyt1:0 fyt2:0
-[ 1219.323577] c0 :8  interrupt:1 hw:5430560 new:5430720 pos:  0 base:5430720 ptr_base:5429760 fyt1:0 fyt2:1
-[ 1219.333099] c0 --:1280/128
-[ 1226.321289] c0 :0  interrupt:1 hw:5654720 new:5655040 pos:640 base:5654400 ptr_base:5654400 fyt1:0 fyt2:0
-[ 1226.331146] c0 :1  interrupt:0 hw:5655040 new:5655040 pos:640 base:5654400 ptr_base:5654400 fyt1:0 fyt2:0
-[ 1226.341278] c0 :2  interrupt:1 hw:5655040 new:5655360 pos:  0 base:5655360 ptr_base:5654400 fyt1:0 fyt2:1
-[ 1226.350952] c0 :3  interrupt:0 hw:5655360 new:5655520 pos:160 base:5655360 ptr_base:5655360 fyt1:0 fyt2:0
-[ 1226.361297] c0 :4  interrupt:1 hw:5655520 new:5655840 pos:480 base:5655360 ptr_base:5655360 fyt1:0 fyt2:0
-[ 1226.371002] c0 :5  interrupt:0 hw:5655840 new:5656640 pos:320 base:5656320 ptr_base:5655360 fyt1:0 fyt2:1
-[ 1226.380798] c0 :6  interrupt:0 hw:5656640 new:5656800 pos:480 base:5656320 ptr_base:5656320 fyt1:0 fyt2:0
-[ 1226.390350] c0 :7  interrupt:1 hw:5656800 new:5656960 pos:640 base:5656320 ptr_base:5656320 fyt1:0 fyt2:0
-[ 1226.401306] c0 :8  interrupt:1 hw:5656960 new:5657280 pos:  0 base:5657280 ptr_base:5656320 fyt1:0 fyt2:1
 
 
 //

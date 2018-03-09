@@ -45,6 +45,7 @@ AudioTrack::write{
 }@AudioTrack.cpp
 
 
+
 //play
 play@AudioTrack.java-->native_start-->android_media_AudioTrack_start-->
 lpTrack->start@android_media_AudioTrack.cpp-->start-->mAudioTrack->start@AudioTrack.cpp
@@ -69,6 +70,9 @@ stop{
 - mAudioTrack->stop@AudioTrack.cpp-->(服务端Track)mTrack->stop@TrackHandle-->stop
 	-->设置状态mState = STOPPED@Track.cpp
 }@AudioTrack.cpp
+
+//回调通知AudioTrack.java
+AudioTrack::AudioTrackThread::threadLoop-->AudioTrack::processAudioBuffer
 
 //音量
 setStereoVolume-->native_setVolume@AudioTrack.java-->android_media_AudioTrack_set_volume

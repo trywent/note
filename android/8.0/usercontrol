@@ -5,12 +5,13 @@ enableScreenIfNeeded-->enableScreenIfNeededLocked
 
 frameworks/base/services/core/java/com/android/server/wm/WindowManagerService.java
 //================
+//锁屏状态控制
 mSystemServiceManager.startService(LOCK_SETTINGS_SERVICE_CLASS)-->Lifecycle
 @LockSettingsService.java
 
 
 
-"ro.lockscreen.disable.default"
+"ro.lockscreen.disable.default"@systemui
 
 
 performEnableScreen@WindowManagerService.java-->bootAnimationComplete-->finishBooting@ActivityManagerService.java
@@ -18,15 +19,19 @@ performEnableScreen@WindowManagerService.java-->bootAnimationComplete-->finishBo
 - uss.setState(STATE_BOOTING, STATE_RUNNING_LOCKED)//更改状态
 - maybeUnlockUser-->unlockUserCleared-->finishUserUnlocking{
 	- uss.setState(STATE_RUNNING_LOCKED, STATE_RUNNING_UNLOCKING)
+	-  mHandler.obtainMessage(SYSTEM_USER_UNLOCK_MSG)-->finishUserUnlocked
 	}
 }@UserController.java
 
-//结束
+//解锁完成
 finishUserUnlocking-->mHandler.obtainMessage(SYSTEM_USER_UNLOCK_MSG)@UserController.java-->
 MainHandler.(SYSTEM_USER_UNLOCK_MSG)-->mUserController.finishUserUnlocked{
 - uss.setState(STATE_RUNNING_UNLOCKING, STATE_RUNNING_UNLOCKED)
+- 发送广播ACTION_USER_UNLOCKED
 }@ActivityManagerService.java
 
+
+//强制
 
 frameworks/base/services/core/java/com/android/server/policy/PhoneWindowManager.java
 frameworks/base/services/core/java/com/android/server/LockSettingsService.java
@@ -38,17 +43,32 @@ UserManagerService{
 }@UserManagerService.java
 
 
+isUserUnlocked@UserManager.java-->isUserUnlocked-->LocalService.isUserUnlockingOrUnlocked{
+- state == UserState.STATE_RUNNING_UNLOCKING
+- state == UserState.STATE_RUNNING_UNLOCKED
+}@UserManagerService.java
+
+//=============android.intent.category.HOME android:priority="-1000"
 //Android is starting  
+onCreate{
+- registerReceiver(mReceiver, new IntentFilter(Intent.ACTION_USER_UNLOCKED))//监听ACTION_USER_UNLOCKED
+- maybeFinish//判断是否要结束
+}
+
+//开始动画
+onResume-->mHandler.postDelayed(mProgressTimeoutRunnable)-->
+mProgressTimeoutRunnable{
+- setContentView
+- v.animate().start()
+}
+//结束
+onPause-->mHandler.removeCallbacks(mProgressTimeoutRunnable)
+
 maybeFinish{
 - getSystemService(UserManager.class).isUserUnlocked() //获取是否解锁状态
 - getPackageManager().resolveActivity(homeIntent) //查找home应用
 - finish()
 }@FallbackHome.java
-
-isUserUnlocked@UserManager.java-->isUserUnlocked-->LocalService.isUserUnlockingOrUnlocked{
-- state == UserState.STATE_RUNNING_UNLOCKING
-- state == UserState.STATE_RUNNING_UNLOCKED
-}@UserManagerService.java
 
 packages/apps/Settings/src/com/android/settings/FallbackHome.java
 frameworks/base/core/java/android/os/UserManager.java

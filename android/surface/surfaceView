@@ -1,6 +1,7 @@
+//
 surface: 代表一个被屏幕合成器操作的原始数据
 _________________________
-SurfaceHolder:
+SurfaceHolder://SurfaceView.getHolder() 设置surface的属性。。设置回调函数可以监听surface的变化，
 用来显示surface的抽象接口。允许控制surface的大小，格式，编辑surface中像素，监控surface的改变。
 该接口通常通过SurfaceView调用。
 _________________________
@@ -59,17 +60,16 @@ frameworks/base/core/jni/android_view_Surface.cpp
 //通过SurfaceHolder来操作Surface
 
 SurfaceView{
- getHolder()//获取 SurfaceHolder 
+- getHolder()//获取 SurfaceHolder 
 }
 
+//操作surface
 SurfaceHolder{
-/*操作surface*/
 SurfaceHolder.addCallback() //加入回调函数
 }
 
-
+//surface 变化的回调函数
 SurfaceHolder.Callback{
-/*surface 变化的回调函数*/
 surfaceChanged(SurfaceHolder holder, int format, int width, int height)
 surfaceCreated(SurfaceHolder holder)
 surfaceDestroyed(SurfaceHolder holder)

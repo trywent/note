@@ -21,6 +21,29 @@ addCachedDevices{
 	- createDevicePreference
 	}
 }@DeviceListPreferenceFragment.java
+
+
+//配对
+BluetoothPairingRequest.onReceive(ACTION_PAIRING_REQUEST)-->startActivity(pairingIntent)@BluetoothPairingRequest.java
+-->onCreate{
+- mType= intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT)//获取连接类型
+- PAIRING_VARIANT_PIN或PAIRING_VARIANT_PASSKEY //需要输入
+	-createUserEntryDialog-->createPinEntryView-->(点击确认)onClick-->onPair{
+		- PAIRING_VARIANT_PIN: mDevice.setPin
+		- PAIRING_VARIANT_PASSKEY: mDevice.setPasskey
+		- PAIRING_VARIANT_PASSKEY_CONFIRMATION: mDevice.setPairingConfirmation
+		}
+- PAIRING_VARIANT_PASSKEY_CONFIRMATION//passkey确认
+	-createConfirmationDialog
+- PAIRING_VARIANT_DISPLAY_PASSKEY或PAIRING_VARIANT_DISPLAY_PIN //只显示pin或passkey。发起端
+	-createDisplayPasskeyOrPinDialog 
+
+}@BluetoothPairingDialog.java
+
+
+
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothPairingRequest.java
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothPairingDialog.java
 ======================
 /*开始扫描
 BluetoothDevice.ACTION_DISCOVERY_STARTED 
@@ -66,8 +89,8 @@ Out of Band
 两设备的通过别的途径交换配对信息，例如一些NFC蓝牙音箱。*/
 //请求配对
 onPreferenceTreeClick-->onDevicePreferenceClick-->btPreference.onClicked@DeviceListPreferenceFragment.java
--->onClicked-->pair@BluetoothDevicePreference.java-->mCachedDevice.startPairing-->startPairing-->
-mDevice.createBond-->sService.createBond(TRANSPORT_AUTO)@BluetoothDevice.java-->mBondStateMachine.sendMessage
+-->onClicked-->pair@BluetoothDevicePreference.java-->mCachedDevice.startPairing-->startPairing@CachedBluetoothDevice.java
+-->mDevice.createBond-->sService.createBond(TRANSPORT_AUTO)@BluetoothDevice.java-->mBondStateMachine.sendMessage
 @AdapterService.java-->processMessage(CREATE_BOND)-->createBond-->mAdapterService.createBondNative
 @BondStateMachine.java-->createBondNative@com_android_bluetooth_btservice_AdapterService.cpp-->/*stack*/
 -->create_bond@bluetooth.c-->btif_dm_create_bond(btif_dm_generic_evt)@btif_dm.c-->btif_transfer_context-->
@@ -75,12 +98,26 @@ btif_sendmsg-->/*命令在另一个thread执行*/thread_post(bt_jni_msg_ready)--
 btif_context_switched(p_msg)-->p->p_cb@btif_core.c-->btif_dm_generic_evt(BTIF_DM_CB_CREATE_BOND)
 -->btif_dm_cb_create_bond@btif_dm.c-->btif_hh_connect@btif_hh.c
 
+createBond-->mAdapterService.createBondNative@BondStateMachine.java-->(/*收到回调*/)pinRequestCallback
+
 //接收到配对请求
 PendingCommandState(SSP_REQUEST/PIN_REQUEST)-->sendDisplayPinIntent@BondStateMachine.java
 ACTION_PAIRING_REQUES
 
+
 //pin
 sendDisplayPinIntent@BondStateMachine.java
+
+
+02-28 10:04:20.814  2416  2458 I BluetoothBondStateMachine: Bond address is:80:13:82:A6:3E:1F
+02-28 10:04:20.814  2416  2458 I BluetoothBondStateMachine: Entering PendingCommandState State
+02-28 10:04:20.815  2416  2442 I BluetoothBondStateMachine: bondStateChangeCallback: Status: 0 Address: 80:13:82:A6:3E:1F newState: 1
+02-28 10:04:20.816  2416  2458 I BluetoothBondStateMachine: Bond State Change Intent:80:13:82:A6:3E:1F OldState: 10 NewState: 11
+02-28 10:04:21.422  2416  2442 I BluetoothBondStateMachine: pinRequestCallback: [B@78d1394 name:[B@b809e3d cod:5898764
+
+02-28 10:04:29.417  2416  2458 I BluetoothBondStateMachine: Bond State Change Intent:80:13:82:A6:3E:1F OldState: 11 NewState: 12
+02-28 10:04:29.418  2416  2458 I BluetoothBondStateMachine: StableState(): Entering Off State
+
 
 //连接profile
 mCachedDevice.connect@BluetoothDevicePreference.java-->connect(连接所有的profile)-->connectWithoutResettingTimer
@@ -97,9 +134,18 @@ packages/apps/Bluetooth/src/com/android/bluetooth/btservice/JniCallbacks.java
 packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterProperties.java
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/RemoteDevices.java
+================
 //stack
+smp_sm_event-->(*smp_sm_action[action])@smp_main.c-->
+smp_proc_pair_cmd@smp_act.c-->smp_select_association_model@smp_utils.c
+
 system/bt/btif/src/bluetooth.c
 system/bt/btif/src/btif_dm.c
 system/bt/btif/src/btif_core.c
 system/bt/btif/src/btif_hh.c
+system/bt/stack/smp/smp_utils.c
+system/bt/stack/smp/smp_act.c
+system/bt/stack/smp/smp_main.c
+
+
 

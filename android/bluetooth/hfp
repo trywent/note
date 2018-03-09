@@ -1,0 +1,84 @@
+//client
+static{ classInitNative}//设置jni回调函数
+{
+onConnectionStateChanged
+onAudioStateChanged
+onCall-->sendMessage(EVENT_TYPE_CALL)
+onCallSetup-->sendMessage(EVENT_TYPE_CALLSETUP)
+}
+
+HeadsetClientStateMachine{
+- initializeNative //获取接口设置回调
+- addState(mDisconnected)
+- addState(mConnecting)
+- addState(mConnected)
+- addState(mAudioOn, mConnected)
+- setInitialState(mDisconnected)
+}@HeadsetClientStateMachine.java 
+
+initializeNative{
+- getBluetoothInterface
+- sBluetoothHfpClientInterface =btInf->get_profile_interface(BT_PROFILE_HANDSFREE_CLIENT_ID)//hfpclient接口
+- sBluetoothHfpClientInterface->init(&sBluetoothHfpClientCallbacks) //设置回调
+}@com_android_bluetooth_hfpclient.cpp
+===============
+//电话
+waitForIndicators
+
+updateCallSetupIndicator
+
+
+//声音状态回调
+audio_state_cb-->method_onAudioStateChanged@com_android_bluetooth_hfpclient.cpp-->
+onAudioStateChanged{
+- StackEvent event = new StackEvent(EVENT_TYPE_AUDIO_STATE_CHANGED)//AUDIO_STATE_DISCONNECTED 0 AUDIO_STATE_CONNECTED 2
+- sendMessage(STACK_EVENT)
+}@HeadsetClientStateMachine.java 
+
+
+//Connected state
+Connected.processMessage{
+- ACCEPT_CALL-->acceptCall{ //acceptCall/rejectCall@HeadsetClientService.java
+	- getCall(CALL_STATE_INCOMING|CALL_STATE_WAITING)//获取要处理的call
+	- action =CALL_ACTION_ATA //设置对应的action
+	- handleCallActionNative//发送命令，接听
+	- 接听成功，addQueuedAction-->mQueuedActions.add(ACCEPT_CALL,action)//用于命令返回时处理
+	}
+- REJECT_CALL-->rejectCall
+- STACK_EVENT{
+	- EVENT_TYPE_CALL-->updateCallIndicator
+	- EVENT_TYPE_CALLSETUP-->updateCallSetupIndicator
+	- EVENT_TYPE_CALLHELD-->updateCallHeldIndicator
+	- EVENT_TYPE_CMD_RESULT{//发送蓝牙命令后，返回结果
+		- 获取发送过的命令数据，mQueuedActions.poll()
+		- ACCEPT_CALL{
+			- 接听成功，mPendingAction = queuedAction
+			}
+		}
+	}
+}
+
+packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientStateMachine.java 
+packages/apps/Bluetooth/jni/com_android_bluetooth_hfpclient.cpp
+
+//=================
+//stack
+btif_hf_client_upstreams_evt{
+- BTA_HF_CLIENT_OPEN_EVT{//连接
+	- btif_hf_client_cb.state = BTHF_CLIENT_CONNECTION_STATE_CONNECTED
+	- HAL_CBACK(bt_hf_client_callbacks, connection_state_cb)//回调
+	}
+- BTA_HF_CLIENT_IND_EVT:process_ind_evt{//电话状态
+	- HAL_CBACK(bt_hf_client_callbacks, call_cb)
+	- HAL_CBACK(bt_hf_client_callbacks, callsetup_cb
+	}
+- BTA_HF_CLIENT_AUDIO_OPEN_EVT://接听
+	- HAL_CBACK(bt_hf_client_callbacks, audio_state_cb, BTHF_CLIENT_AUDIO_STATE_CONNECTED)
+	
+- BTA_HF_CLIENT_AUDIO_CLOSE_EVT://声音断开
+	- HAL_CBACK(bt_hf_client_callbacks, audio_state_cb, BTHF_CLIENT_AUDIO_STATE_DISCONNECTED)
+
+}
+
+

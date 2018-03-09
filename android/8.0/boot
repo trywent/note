@@ -1,0 +1,13 @@
+//
+
+notifyLockedProfile-->startHomeActivityLocked@ActivityManagerService.java
+
+systemReady-->startHomeActivityLocked("systemReady")@ActivityManagerService.java
+
+
+
+bootAnimationComplete-->finishBooting@ActivityManagerService.java-->
+mUserController.sendBootCompletedLocked@UserController.java
+
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/core/java/com/android/server/am/UserController.java

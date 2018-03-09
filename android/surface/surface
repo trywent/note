@@ -1,4 +1,8 @@
-//
+//SurfaceSession 应用client端到surfaceflinger的一个连接(一个用于创建surface的接口)
+//创建mSurfaceSession-->SurfaceComposerClient  
+addWindow@WindowManagerService.java-->attach@WindowState.java-->windowAddedLocked
+-->new SurfaceSession@Session.java-->nativeCreate@SurfaceSession.java-->
+new SurfaceComposerClient@android_view_SurfaceSession.cpp
 
 //获取surfaceflinger服务接口mClient
 SurfaceComposerClient(创建Composer)-->onFirstRef{
@@ -8,38 +12,35 @@ SurfaceComposerClient(创建Composer)-->onFirstRef{
 - 创建mClient(服务端接口)，sm->createConnection-->(服务端)new Client@SurfaceFlinger
 }
 
-//创建SurfaceComposerClient
-addWindow@WindowManagerService.java-->attach@WindowState.java-->windowAddedLocked
--->new SurfaceSession@Session.java-->nativeCreate@SurfaceSession.java-->
-new SurfaceComposerClient@android_view_SurfaceSession.cpp
 
-
-/*
+/* 绘制数据用的surface
  * 应用端创建surfaceControl
  * 1，绘制数据 lockCanvas-->
  * 2，提交数据 unlockCanvasAndPost-->
  */
 relayoutWindow{
-- createSurfaceLocked@WindowStateAnimator.java-->new SurfaceControl
+- createSurfaceLocked@WindowStateAnimator.java-->new WindowSurfaceController(mSurfaceSession)
+	-->new SurfaceControl(mSurfaceSession)
 	-->nativeCreate@SurfaceControl.java-->client->createSurface
 	@android_view_SurfaceControl.cpp-->{
-	- (SurfaceComposerClient)mClient->createSurface //获取bufferQueue
-	- new SurfaceControl(bufferQueue)-->new Surface(mGraphicBufferProducer)//传入bufferQueue
+	- (SurfaceComposerClient)mClient->createSurface(&IGraphicBufferProducer) //获取bufferQueue
+	- new SurfaceControl(bufferQueue)-->new Surface(IGraphicBufferProducer)//传入bufferQueue
 	- 返回SurfaceControl
 	}@SurfaceComposerClient.cpp
 - outSurface.copyFrom(surfaceControl) //返回到ViewRootImpl，供绘制使用
 }@WindowManagerService.java
 
-//surfaceFlinger创建对应的layer，用来获取bufferQueue
+//surfaceFlinger创建对应的layer(包行producer，consumer)，用来获取bufferQueue
 Client::createSurface-->flinger->createLayer@client.cpp-->createLayer-->
 createNormalLayer(或者createDimLayer){
 - 创建outLayer，new Layer(设置当前状态mCurrentState)-->onFirstRef{
-	- mBufferQueue = new SurfaceTextureLayer //用于创建surface，mGraphicBufferProducer
+	- createBufferQueue(&producer, &consumer)//用于创建surface，mGraphicBufferProducer
+	- mProducer = new MonitoredProducer(producer, mFlinger
 	- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(mBufferQueue)
 	- mSurfaceFlingerConsumer.setFrameAvailableListener(this)
-	}
+	}@Layer.cpp
 - 设置handle,(*outLayer)->getHandle
-- 设置bufferQueue,(*outLayer)->getBufferQueue  //mBufferQueue 
+- 设置bufferQueue,(*outLayer)->getProducer  //producer 
 }@SurfaceFlinger.cpp
 
 ______________
@@ -71,12 +72,12 @@ closeGlobalTransactionImpl{
 - 保存mComposerStates,mDisplayStates
 - 设置flag，eSynchronous/eAnimation
 - sm->setTransactionState-->setTransactionState@SrufaceFlinger.cpp
-}
+}SurfaceComposerClient.cpp
 
 
 
 
-//提交设置
+//surfaceFlinger设置
 setTransactionState{
 - 设置display，setDisplayStateLocked
 - 设置layer状态，setClientStateLocked{
@@ -86,7 +87,7 @@ setTransactionState{
 		- 设置更新标识，setTransactionFlags
 		}
 	}
-}@SurfaceControl.java
+}@Surfaceflinger.cpp
 
 
 

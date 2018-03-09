@@ -91,43 +91,7 @@ ____________________________________
 packages/apps/Settings/src/com/android/settings/wifi/WifiEnabler.java
 frameworks/base/services/java/com/android/server/WifiService.java
 frameworks/base/wifi/java/android/net/wifi/WifiStateMachine.java
-===========================
-状态机:
-发送消息
-|
-当前state处理消息----->(不能处理)由父state处理
-|
-执行状态切换(或结束)
 
-state{
-  public void enter()
-  public void exit() 
-  public boolean processMessage(Message msg) 
-  ...
-}
-----------
-构成StateMachine流程：
-new StateMachine-->addState(sun,parent)-->setInitialState(设置初始state)-->start@StateMachine.java-->
-enter(从初始化state的层次结构中，最高父state开始)-->enter(子state)@State.java
-
-----------
-处理消息：
-StateMachine.sendMessage(StateMachine.obtainMessage)-->SmHandler.handleMessage{
-- processMsg{
-	- 当前状态处理消息，curStateInfo.state.processMessage
-	- 若没有处理，设置当前状态为父状态
-	- 没有状态处理该消息，unhandledMessage
-	}
-- 执行状态转换，performTransitions
-}
-
-
-deferMessage将消息延迟到下个状态中处理
-
-退出状态机：quit(不再处理消息)
-
-frameworks/base/services/java/com/android/server/wifi/WifiController.java
-frameworks/base/core/java/com/android/internal/util/StateMachine.java
 =============================
 hardware:
 加载驱动：

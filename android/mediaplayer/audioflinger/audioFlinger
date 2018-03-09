@@ -87,17 +87,20 @@ PlaybackThread::createTrack_l{
 AudioFlinger::TrackHandle::getCblk-->mTrack->getCblk@Tracks.cpp
 --mCblkMemory@Trackbase.h
 
-//3,play
+//3,play  加入到mActiveTracks
 start(跨进程)：
 AudioFlinger::TrackHandle::start-->mTrack->start-->AudioFlinger::PlaybackThread::Track::start{
 - mThread.promote
 - 更新状态mState
-- playbackThread->addTrack_l(this)@Tracks.cpp-->addTrack_l{
+- playbackThread->addTrack_l(this)@Tracks.cpp-->addTrack_l{//加入到mActiveTracks
 	- 若mActiveTracks中没有加入
 	- AudioSystem::startOutput //开始播放？
 	- 加入mActiveTracks.add
 	}@Threads.cpp
 }@Tracks.cpp
+
+//移除mActiveTracks
+AudioFlinger::MixerThread::prepareTracks_l-->removeTracks_l-->mActiveTracks.remove(track)
 
 
 //设置音量

@@ -5,6 +5,7 @@ commitTransaction{
 handleMessageInvalidate-->handlePageFlip{
 - latchBuffer
 - invalidateLayerStack
-}
+}@SurfaceFlinger.cpp
 
 frameworks/native/services/surfaceflinger/Layer.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp

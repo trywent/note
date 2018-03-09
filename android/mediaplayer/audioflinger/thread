@@ -26,25 +26,36 @@ AudioFlinger::PlaybackThread::onFirstRef-->run-->threadLoop{
 - 移除要移除的tracks，threadLoop_removeTracks
 }
 
-//处理配置事件
-setParameters-->sendSetParameterConfigEvent_l-->sendSetParameterConfigEvent_l@Threads.cpp-->
-SetParameterConfigEvent.SetParameterConfigEvent(CFG_EVENT_SET_PARAMETER)@Threads.h
+//设置参数
+processConfigEvents_l(CFG_EVENT_SET_PARAMETER)-->
+AudioFlinger::MixerThread::checkForNewParameter_l{
+- AudioParameter param = AudioParameter(keyValuePair)//创建参数
+-  mOutput->stream->common.set_parameters
+- mAudioMixer = new AudioMixer()//创建mixer
+}
 
-AudioFlinger::PlaybackThread::threadLoop-->
-AudioFlinger::ThreadBase::processConfigEvents_l{
-- 
-- CFG_EVENT_SET_PARAMETER-->AudioFlinger::MixerThread::checkForNewParameter_l
-	mAudioMixer = new AudioMixer()//创建mixer
-}@Threads.cpp
-
-
-
-
+//设置audioMixer中mState.tracks[name]对应的track
 AudioFlinger::MixerThread::prepareTracks_l{
  //遍历所有的mActiveTracks，设置audiomix的buffer，参数，
+- track = mActiveTracks[i].promote().get()
+- fastTrack{
+
+ }
+- {//(track->isReady() &&!track->isPaused() && !track->isTerminated()) 
 - mAudioMixer->setBufferProvider(name, track) 
+- mAudioMixer->enable(name)
 - mAudioMixer->setParameter
+-
+- }else{
+
+- mAudioMixer->disable(name)
+ }
 }@Threads.cpp
+
+//==================mixer
+//设置处理函数
+mAudioMixer->setParameter-->invalidateState-->mState.hook = process__validate@AudioMixer.cpp
+
 
 //mix
 AudioFlinger::MixerThread::threadLoop_mix@Threads.cpp-->mAudioMixer->process-->
@@ -79,7 +90,7 @@ PlaybackThread::threadLoop_write{
 }
 
 
-//
+//设置参数
 sendCreateAudioPatchConfigEvent-->processConfigEvents_l(CFG_EVENT_CREATE_AUDIO_PATCH)-->
 RecordThread::createAudioPatch_l-->set_parameters@Threads.cpp
 

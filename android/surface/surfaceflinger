@@ -7,7 +7,6 @@ main{
 }@main_surfaceflinger.cpp
 
 
-
 //消息队列
 SurfaceFlinger::onFirstRef-->(MessageQueue)mEventQueue.init{
 - 保存surfaceFlinger，mFlinger
@@ -19,12 +18,7 @@ SurfaceFlinger::onFirstRef-->(MessageQueue)mEventQueue.init{
 SurfaceFlinger::init{
 - 
 - 创建HAL层接口mHwc,new HWComposer
-- 初始化displays{//创建三种类型,DISPLAY_PRIMARY
-	- 创建bq,BufferQueue
-	- 创建fbs,FramebufferSurface(mHwc)
-	- 创建DisplayDevice(fbs,bq)
-	- 设置屏幕可操作,acquireScreen
-	}
+- 初始化displays，createDefaultDisplayDevice
 - getDefaultDisplayDevice()->makeCurrent //将displayDevice的surface关联到当前EGL上下文
 - vsyncSrc = new DispSyncSource //创建同步源
 - 创建，new EventThread(sfVsyncSrc) //传入同步源
@@ -35,15 +29,10 @@ SurfaceFlinger::init{
 - 
 }@SurfaceFlinger.cpp
 
-__________________
-SurfaceFlinger::onTransact{
-- 创建/销毁surface，BnSurfaceComposer::onTransact
-- 1002(SHOW_UPDATES)Surface更新时闪烁界面,mDebugRegion
-- 
-}
 
 
-__________________
+
+===================
 //循环等待消息DISPLAY_EVENT_VSYNC
 SurfaceFlinger::run-->waitForEvent-->mEventQueue.waitMessage{
 - while循环{
@@ -57,7 +46,8 @@ SurfaceFlinger::run-->waitForEvent-->mEventQueue.waitMessage{
 }@MessageQueue.cpp
 
 
-
+eventReceiver-->Handler::dispatchInvalidate@MessageQueue.cpp-->
+onMessageReceived(INVALIDATE)-->
 
 //接收到同步事件
 onVSyncReceived{
@@ -68,16 +58,14 @@ onVSyncReceived{
 
 
 frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
+frameworks/native/libs/gui/ISurfaceComposer.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 frameworks/native/services/surfaceflinger/MessageQueue.cpp
 
 
 ============
-//刷新
-repaintEverything-->
-
 //(应用提交绘制数据)layer更新
-signalTransaction/signalLayerUpdate@SurfaceFlinger.cpp-->
+repaintEverything-->signalTransaction/signalLayerUpdate@SurfaceFlinger.cpp-->
 invalidate-->mEvents->requestNextVsync-->mHandler->dispatchInvalidate
 -->Handler::handleMessage@MessageQueue.cpp-->
 onMessageReceived(INVALIDATE){
@@ -86,11 +74,21 @@ onMessageReceived(INVALIDATE){
 - signalRefresh
 }
 
+
+//
+handleMessageTransaction-->handleTransaction-->
+handleTransactionLocked-->onHotplugReceived-->createDefaultDisplayDevice{
+- BufferQueue::createBufferQueue(&producer, &consumer)
+- fbs = new FramebufferSurface(*mHwc, type, consumer)
+- new DisplayDevice(fbs,producer)
+}@SurfaceFlinger.cppp
+
 //
 signalRefresh-->MessageQueue::refresh-->mHandler->dispatchRefresh-->
 sendMessage(REFRESH)@MessageQueue.cpp-->onMessageReceived(REFRESH)-->
 handleMessageRefresh{
 - preComposition
+- rebuildLayerStacks
 - setUpHWComposer
 - doDebugFlashRegions
 - doComposition
@@ -151,7 +149,27 @@ postComposition{
 - mAnimFrameTracker.advanceFrame
 }
 
-//======== 显示
+
+
+==================
+//surfaceFlinger 提供的接口 ISurfaceComposer.cpp
+ISurfaceComposer{//提供的接口
+- createConnection
+- createDisplayEventConnection
+- createDisplay
+- destroyDisplay
+- setTransactionState
+}
+
+
+SurfaceFlinger::onTransact{
+- 创建/销毁surface，BnSurfaceComposer::onTransact
+- 1002(SHOW_UPDATES)Surface更新时闪烁界面,mDebugRegion
+- 
+}
+
+===================
+//显示
 FramebufferSurface::onFrameAvailable-->HWComposer::fbPost
 
 
