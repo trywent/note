@@ -20,7 +20,7 @@ SurfaceFlinger::init-->HWComposer{
 - 若没有硬件脉冲则需要模拟，new VSyncThread-->onFirstRef-->run-->threadLoop
 }
 
-//同步事件，hal回调
+//屏步刷新同步事件，hal回调....mEventHandler为surfaceFlinger
 注册回调mHwc->registerProcs-->(读取到同步信息)hook_vsync{
 - 将hwc_procs_t强制转换为cb_context //在结构体的第一个成员
 - cb_context->hwc->vsync-->HWComposer::vsync-->mEventHandler.onVSyncReceived@HWComposer.cpp
@@ -39,7 +39,7 @@ createWorkList{
 
 
 ====================== HAL
-//================== gralloc
+//gralloc
 gralloc_device_open{
 - 打开GRALLOC_HARDWARE_GPU0{
 	- 创建，gralloc_context_t
@@ -59,7 +59,7 @@ gralloc_device_open{
 
 HWComposer::fbPost-->mFbDev->post(/*写入位置fb地址保存在module中*/, /*要写入的数据*/buffer->handle)
 @HWComposer.cpp-->fb_post@framebuffer.cpp
-//================== hwcomposer
+// hwcomposer
 hwc_device_open{
 - 打开，HWC_HARDWARE_COMPOSER{
 	- 创建，hwc_context_t
@@ -76,17 +76,12 @@ queryDisplayProperties{
 }
 
 
-
-
 frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
 hardware/libhardware/include/hardware/fb.h
-/home/build/px3/hardware/libhardware/include/hardware/hwcomposer.h
+hardware/libhardware/include/hardware/hwcomposer.h
 hardware/libhardware/modules/gralloc/gralloc.cpp
 hardware/libhardware/modules/gralloc/framebuffer.cpp
 hardware/libhardware/modules/hwcomposer/hwcomposer.cpp
-
-
-
 
 ===============
 //qcom

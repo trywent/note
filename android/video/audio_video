@@ -1,4 +1,4 @@
-==============================
+//==============================
 mediaPlayer服务：
 service media-->mediaserver@init.rc-->main@main_mediaserver.cpp-->instantiate-->addService(String16("media.player"),)@MediaPlayerService.cpp
 

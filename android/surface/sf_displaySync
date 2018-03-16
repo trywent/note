@@ -1,0 +1,92 @@
+//DispSyncSource从hal层读取同步信号，给到EventThread
+
+//hardware提供硬件同步时间戳
+vsync@HWComposer.cpp-->onVSyncReceived@SurfaceFlinger.cpp-->addResyncSample(timsStamp)
+@DispSync.cpp
+
+
+//传入的fence用于验证同步事件
+SurfaceFlinger::postComposition-->addPresentFence
+
+//设置间隔
+DispSync::setPeriod{
+- mPeriod
+- mThread->updateModel
+}
+
+//加入监听器
+DispSyncSource::setVSyncEnabled-->DispSync::addEventListener(this)
+-->mThread->addEventListener-->
+DispSyncThread.addEventListener{
+- 初始化listener.mLastEventTime 
+- 加入到mEventListeners
+- 触发判断mCond.signal()
+}
+
+//移除监听
+DispSync::removeEventListener-->mThread->removeEventListener
+
+//触发监听器回调
+DispSync::DispSync-->DispSyncThread.threadLoop{
+- 计算下一次触发时间，computeNextEventTimeLocked
+- 等待mCond.waitRelative
+- 时间到了
+- 收集回调，gatherCallbackInvocationsLocked{
+	- 计算监听器的触发时间(上一次触发时间+mPeriod)computeListenerNextEventTimeLocked
+	- 如果可以触发，加入到回调callbackInvocations.push
+	}
+- 触发回调，fireCallbackInvocations-->callbacks[i].mCallback->onDispSyncEvent
+	-->DispSyncSource::onDispSyncEvent-->callback->onVSyncEvent@SurfaceFlinger.cpp-->
+	onVSyncEvent@EventThread.cpp
+	
+}@DispSync.cpp
+//EventThread中设置DispSyncSource的回调
+EventThread::enableVSyncLocked-->mVSyncSource->setCallback@EventThread.cpp
+
+DispSyncSource::onDispSyncEvent-->callback->onVSyncEvent@SurfaceFlinger
+-->EventThread::onVSyncEvent
+
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/DispSync.cpp
+==================
+//EventThread读取同步事件，通知app，sf执行对应的操作
+//使能，设置回调
+EventThread::enableVSyncLocked{
+- mVSyncSource->setCallback(this)
+- mVSyncSource->setVSyncEnabled
+}
+
+//注册client
+eventThread->createEventConnection-->Connection::onFirstRef-->
+registerDisplayEventConnection
+
+
+//接收到display的同步事件
+onVSyncEvent{
+- mVSyncEvent //设置事件
+- mCondition.broadcast ，通知等待进程
+}
+
+//等待事件
+EventThread::onFirstRef-->run-->
+threadLoop{
+- 等待事件，waitForEvent{
+	- 遍历所有硬件屏幕，获取带有时间戳的事件(同步事件)，timestamp,mVSyncEvent
+	- timestamp时间戳不为空，获取事件等待者signalConnections	
+	- 等待条件返回事件并设置mVSyncEvent，mCondition.waitRelative //onVSyncEvent唤醒等待
+	- 返回事件监听的client，signalConnections
+	}
+- 通知事件监听的client，signalConnections。发送事件，conn->postEvent-->DisplayEventReceiver::sendEvents
+}
+
+//请求事件
+invalidate-->mEvents->requestNextVsync-->mEventThread->requestNextVsync
+-->mCondition.broadcast
+
+//发送模拟的屏同步事件(非硬件)
+DisplayEventReceiver::sendEvents(DISPLAY_EVENT_VSYNC)
+
+frameworks/native/services/surfaceflinger/EventThread.cpp
+
+
+

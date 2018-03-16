@@ -1,3 +1,10 @@
+//setenforce 0 设置为permissive
+# enforcing - SELinux security policy is enforced.
+# permissive - SELinux prints warnings instead of enforcing.允许操作，但记录操作信息
+# disabled - SELinux is fully disabled.
+
+
+
 //sepolicy  te(Type Enforcement)?
 ps -Z //查看进程
 ls -Z //查看文件
@@ -6,7 +13,7 @@ ls -Z //查看文件
 u:r:type[:range]
 
 u:user
-r:role //角色 object_r
+r:role //角色 文件是object_r
 type/domain://类型（主要描述文件）/标签（描述进程）
 s0:Multi-Level Security(MLS)//安全级别
 attribute: domain/type //类型集合
@@ -33,9 +40,18 @@ rule_name source_type target_type:object_class perm_set;
 rule_name:allow,dontaudit,auditallow,neverallow
 其实neverallow的存在是在生成（编译）安全策略文件时检查allow语句是否违反了neverallow，防止由于开发人员的失误导致某些域权限过高
 
+=============
+//操作文件。Scontext的定义(文件，进程)
+/file/path u:object_r:type_id:s0 //定义文件/dev/
+type type_id [alias alias_id,] [attribute_id] //定义类型
+attribute attribute_id                        //定义attribute
 
-object_class:定义某一类型可执行的操作
-_____________
+
+//操作类型
+//Perm set指得是某种Object class所拥有的操作。class:定义某一类型可执行的操作
+common common_name { permission_name ... } common定义的perm set能
+class class_name [ inherits common_name ] { permission_name ... }
+=============
 //编译 主要生成上下文(进程和文件的类型)，策略(*.te)
 file_contexts 编译生成file_contexts.bin
 security_classes​，*.te,其它文件生成​ policy.conf
@@ -58,3 +74,5 @@ adb shell su setprop selinux.reload_policy 1
 =============
 //编译
 
+
+system/sepolicy/private/access_vectors //定义操作集

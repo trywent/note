@@ -99,6 +99,21 @@ frameworks/native/libs/gui/SurfaceControl.cpp
 frameworks/base/core/jni/android_view_SurfaceControl.cpp
 frameworks/base/core/java/android/view/SurfaceControl.java
 =============
+//layer
+commitTransaction{
+- mDrawingState= mCurrentState
+}@Layer.cpp
+
+handleMessageInvalidate-->handlePageFlip{
+- latchBuffer
+- invalidateLayerStack
+}@SurfaceFlinger.cpp
+
+
+
+frameworks/native/services/surfaceflinger/Layer.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+=============
 //应用端绘制和提交数据
 
 //lockCanvas 返回一个canvas用于绘制，传入inOutDirty指定绘制大小(可能会被改变)
@@ -122,7 +137,7 @@ Surface::lock(outBuffer,dirtyRectPtr){
 - fence->waitForever("Surface::lock")
 - 设置新脏区域为大小newDirtyRegion，设置为指定大小否则设置为buffer大小
 - 是否能服用前一个buffer的数据mPostedBuffer(绘制部分脏区域时可用){
-	- 若可复用，则拷贝数据copyBlt
+	- 若可复用，则拷贝数据copyBit
 	- 不能复用，设置脏区域为整个buffer，newDirtyRegion.set(bounds)
 	}
 - backBuffer->lock

@@ -1,4 +1,4 @@
-====================================
+//====================================
 camera:
 
 JNI
@@ -140,7 +140,7 @@ setupMPEG4Recording-->writer->addSource@StagefrightRecorder.cpp-->addSource-->
 new Tracks--mTracks.push_back@MPEG4Writer.cpp
 
 设置声音：
-startMPEG4Recording-->setupMPEG4Recording-->etupAudioEncoder-->createAudioSource
+startMPEG4Recording-->setupMPEG4Recording-->setupAudioEncoder-->createAudioSource
 @StagefrightRecorder.cpp-->initCheck@AudioSource.cpp
 
 start(开始)@MediaRecorder.java-->android_media_MediaRecorder_start-->getMediaRecorder().start()
