@@ -25,7 +25,7 @@ relayoutWindow{
 	@android_view_SurfaceControl.cpp-->{
 	- (SurfaceComposerClient)mClient->createSurface(&IGraphicBufferProducer) //获取bufferQueue
 	- new SurfaceControl(bufferQueue)-->new Surface(IGraphicBufferProducer)//传入bufferQueue
-	- 返回SurfaceControl
+	- Surface.get
 	}@SurfaceComposerClient.cpp
 - outSurface.copyFrom(surfaceControl) //返回到ViewRootImpl，供绘制使用
 }@WindowManagerService.java
@@ -34,10 +34,10 @@ relayoutWindow{
 Client::createSurface-->flinger->createLayer@client.cpp-->createLayer-->
 createNormalLayer(或者createDimLayer){
 - 创建outLayer，new Layer(设置当前状态mCurrentState)-->onFirstRef{
-	- createBufferQueue(&producer, &consumer)//用于创建surface，mGraphicBufferProducer
-	- mProducer = new MonitoredProducer(producer, mFlinger
-	- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(mBufferQueue)
-	- mSurfaceFlingerConsumer.setFrameAvailableListener(this)
+	- createBufferQueue(&producer, &consumer,true/*to surfaceflinger*/)//
+	- mProducer = new MonitoredProducer(producer, mFlinger)
+	- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)
+	- mSurfaceFlingerConsumer.setFrameAvailableListener(this) //bufferqueu监听器回调
 	}@Layer.cpp
 - 设置handle,(*outLayer)->getHandle
 - 设置bufferQueue,(*outLayer)->getProducer  //producer 
@@ -113,6 +113,12 @@ handleMessageInvalidate-->handlePageFlip{
 
 frameworks/native/services/surfaceflinger/Layer.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+
+//consumer
+Layer::onFirstRef()-->new SurfaceFlingerConsumer(IGraphicBufferConsumer)
+
+
+frameworks/native/services/surfaceflinger/SurfaceFlingerConsumer.cpp
 =============
 //应用端绘制和提交数据
 
@@ -160,8 +166,6 @@ surface->unlockAndPost{
 	}
 }@Surface.cpp
 
-
-________________
 //layer提交数据到flinger
 queueBuffer@BufferQueue.cpp-->Layer::onFrameAvailable@Layer.cpp-->
 mFlinger->signalLayerUpdate@Layer.cpp-->mEventQueue.invalidate@SurfaceFlinger

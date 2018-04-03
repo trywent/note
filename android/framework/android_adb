@@ -1,3 +1,4 @@
+//
 transport_socket_events@transport.c-->handle_packet@adb.c-->parse_banner@adb.c
 ====================
 adb协议：
@@ -132,3 +133,9 @@ I/USB3G ( 829): usb 3g monitor v0.1 start
 I/USB3G ( 829): event { 'add', '/devices/platform/Mstar-ehci-2.1/usb1', 'usb', '', 189, 0 }
 I/USB3G ( 829): event { 'add', '/devices/platform/Mstar-ehci-3.2/usb2', 'usb', '', 189, 128 }
 
+//wifi
+adb connect ip-addr
+
+//拒绝连接
+用adb tcpip模式重启adb
+adb tcpip 5555

@@ -37,7 +37,8 @@ decorView.setSystemUiVisibility(uiOptions);
 ===========================服务端：
 View.STATUS_BAR_TRANSIENT		    //切换
 View.STATUS_BAR_UNHIDE                      //隐藏标识
-View.STATUS_BAR_TRANSLUCENT                 //透明标识
+View.STATUS_BAR_TRANSLUCENT                 //半透明标识
+View.STATUS_BAR_TRANSPARENT		    //透明标识
 StatusBarManager.WINDOW_STATUS_BAR          //窗口标识
 WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS //透明标识
 
@@ -47,8 +48,11 @@ beginLayoutLw-->
 updateSystemUiVisibilityLw{
 - 若是锁屏窗口且即将隐藏则不操作
 - 获取窗口的标识位，getSystemUiVisibility
--updateSystemBarsLw{
+-updateSystemBarsLw{//设置systemui窗口
 	- 获取是否透明状态条和导航条的标记，applyTranslucentFlagLw
+	- 计算状态条是否需要透明{
+		- fullscreenDrawsStatusBarBackground&&dockedDrawsStatusBarBackground//两窗口为空时系统设置为透明
+		}
 	- 防止状态条窗口清除其它窗口的标记，statusBarHasFocus
 	- 是否允许透明，areTranslucentBarsAllowed
 	- 更新状态条mStatusBarController.updateVisibilityLw
@@ -56,7 +60,7 @@ updateSystemUiVisibilityLw{
 	}	
 - 设置systemui，mHandler.post-->statusbar.setSystemUiVisibility 
 	//设置到bar后，再回掉系统接口adjustSystemUiVisibilityLw
-}
+}@PhoneWindowManager.java
 
 
 //设置可见/隐藏
@@ -71,9 +75,37 @@ reevaluateStatusBarVisibility@WindowManagerService.java-->adjustSystemUiVisibili
 
 //布局完成设置窗口
 finishPostLayoutPolicyLw-->setBarShowingLw
+____________________________
+//StatusBar服务（连接到systemui，systemui注册到当期服务mBarService.registerStatusBar(mCommandQueue)）
 
+setSystemUiVisibility@PhoneWindowManager.java-->updateUiVisibilityLocked-->mBar.setSystemUiVisibility
+@StatusBarManagerService.java
+
+
+frameworks/base/services/core/java/com/android/server/statusbar/StatusBarManagerInternal.java
+frameworks/base/services/core/java/com/android/server/statusbar/StatusBarManagerService.java
+____________________________
+//Barcotorler: phonewindowmanager直接控制systemui的显示，隐藏
+mStatusBarController.setWindow(mStatusBar)
+mNavigationBarController.setWindow(mNavigationBar)
+
+//setTransientBarState
+//更新状态值，并返回计算脏后的值
+updateVisibilityLw{
+- isTransientShowing
+- isTransientShowRequested
+- 设置状态setTransientBarState
+- 赋值vis
+}
+
+//直接设置窗口，windowState
+setBarShowingLw-->mWin.showLw
+
+frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+frameworks/base/policy/src/com/android/internal/policy/impl/BarController.java
+frameworks/base/services/core/java/com/android/server/policy/StatusBarController.java
 ___________________
-
 //手势可见
 SystemGesturesPointerEventListener.onSwipeFromTop-->requestTransientBars{
 - mStatusBarController.showTransient-->设置状态TRANSIENT_BAR_SHOW_REQUESTED
@@ -99,23 +131,6 @@ setSystemUiVisibility{
 beginLayoutLw--> mNavigationBarController.setBarShowingLw
 
 finishPostLayoutPolicyLw-->mStatusBarController.setBarShowingLw
-____________________________
-
-
-____________________________
-barcotorler:
-
-(更新状态值)updateVisibilityLw{
-- isTransientShowing
-- isTransientShowRequested
-- 设置状态setTransientBarState
-- 赋值vis
-}
-
-
-frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
-frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
-frameworks/base/policy/src/com/android/internal/policy/impl/BarController.java
 
 ============================systemUI:
 start{
@@ -124,6 +139,12 @@ start{
 - 注册到服务mBarService.registerStatusBar(mCommandQueue)
 }
 
+//setSystemUiVisibility
+setSystemUiVisibility-->H.handleMesssage(MSG_SET_SYSTEMUI_VISIBILITY/MSG_SHOW_RECENT_APPS)-->mCallbacks.get(i)
+@CommandQueue.java-->setSystemUiVisibility{
+- computeStatusBarMode
+- notifyUiVisibilityChanged
+}@StatusBar.java
 
 //调用systemui接口
 (获取服务StatusBarManagerService)-->setIcon-->mBar.setIcon@StatusBarManagerService.java-->

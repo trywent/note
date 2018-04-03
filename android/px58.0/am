@@ -1,0 +1,8 @@
+//
+
+handleApplicationCrash-->handleApplicationCrashInner@ActivityManagerService.java
+-->crashApplication-->crashApplicationInner@AppError.java-->
+
+
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/core/java/com/android/server/am/AppErrors.java

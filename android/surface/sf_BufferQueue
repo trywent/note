@@ -22,10 +22,22 @@ BufferQueue::queueBuffer{
 	- 设置listener为mConsumerListener
 	}
 
-- 监听不为空，listener->onFrameAvailable
+- listener->onFrameAvailable
 - 装入返回参数output->inflate
 }
+==============
+//producer
+BufferQueueProducer::queueBuffer{
+- frameAvailableListener = mCore->mConsumerListener-->frameAvailableListener->onFrameAvailable
+}
 
+
+
+BufferQueueProducer::setSidebandStream@BufferQueueProducer.cpp-->
+onSidebandStreamChanged@SurfaceFlingerConsumer.cpp-->onSidebandStreamChanged@Layer.cpp
+
+
+frameworks/native/libs/gui/BufferQueueProducer.cpp
 
 ==============
 //consumer
@@ -46,17 +58,35 @@ handleTransactionLocked-->onHotplugReceived-->createDefaultDisplayDevice{
 - new DisplayDevice(fbs,producer)
 }
 
-_______________
+//layer创建
+onFirstRef{
+- createBufferQueue(&producer, &consumer,true/*to surfaceflinger*/)
+- mProducer = new MonitoredProducer(producer, mFlinger)
+- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)
+- mSurfaceFlingerConsumer.setFrameAvailableListener(this)
+}@Layer.cpp
+
+
+//consumer连接到bufferqueue
+ConsumerBase(mConsumer)-->mConsumer->consumerConnect@ConsumerBase.cpp-->consumerConnect
+-->connect-->(consumerListener)-->mCore->mConsumerListener = consumerListener
+@BufferQueueConsumer.cpp
+________________
 ConsumerBase
 |
 GLConsumer   //GL_TEXTURE_EXTERNAL_OES 从bufferQueue中消耗数据
 |
-SurfaceFlingerConsumer //Layer使用
+SurfaceFlingerConsumer@Layer.cpp //Layer使用
 
 
 
 ConsumerBase
 |
-FramebufferSurface
+FramebufferSurface@SurfaceFlinger::createDefaultDisplayDevice
 
+
+frameworks/native/libs/gui/ConsumerBase.cpp
+frameworks/native/libs/gui/BufferQueue.cpp
+frameworks/native/libs/gui/BufferQueueProducer.cpp
+frameworks/native/libs/gui/BufferQueueConsumer.cpp
 

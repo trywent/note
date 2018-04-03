@@ -114,20 +114,6 @@ modules_to_install := \
 
 ALL_DEFAULT_INSTALLED_MODULES := $(modules_to_install) //是编译system等的依赖文件
 ====================================
-device中定义要编译的模块，要拷贝的文件。
-用来赋值一些变量：
-PRODUCT_MAKEFILES，PRODUCT_PACKAGES，PRODUCT_COPY_FILES
-
-device中的makefile包含层次
-device/mstar/mstarcedric3/AndroidProducts.mk (赋值PRODUCT_MAKEFILES)
-|
-device/mstar/mstarcedric3/full_mstarcedric3.mk
-|
-device/mstar/common/full_base.mk
-|
-device/mstar/common/generic_no_telephony.mk
-|
-device/mstar/common/core.mk
 
 
 PRODUCT_MAKEFILES :=(配置文件的地址)@AndroidProduct.mk
@@ -363,4 +349,10 @@ Android.mk语法:
 
 ====================================
 编译sdk：
+1:
+. build/envsetup.sh
+lunch xx
+make sdk
+
+2:
 make -j8 PRODUCT-sdk-sdk showcommands dist

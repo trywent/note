@@ -1,0 +1,41 @@
+//hardwaredevice
+HAL_MODULE_INFO_SYM-->legacy_audio_module_methods-->legacy_adev_open{
+- ladev->device.open_output_stream = adev_open_output_stream
+- ladev->device.open_input_stream = adev_open_input_stream
+- ladev->hwif = createAudioHardware()-->new AudioHardware()
+- 返回ladev->device //audioflinger通过device接口操作
+}@audio_hw_hal.cp
+
+
+hardware/rk29/audio/audio_hw_hal.cp
+===============
+//output
+adev_open_output_stream-->ladev->hwif->openOutputStream@audio_hw_hal.cp-->
+openOutputStream-->new AudioStreamOutALSA()@AudioHardware.cpp
+
+
+//写数据
+AudioStreamOutALSA::write{
+
+}
+
+
+
+===============
+//input
+adev_open_input_stream-->ladev->hwif->openInputStream@audio_hw_hal.cp-->
+openInputStream-->new AudioStreamInALSA@AudioHardware.cpp
+
+
+//读数据
+AudioStreamInALSA::read{
+- 若standby状态，先open_l()-->AudioStreamInALSA::open_l{
+	- route_pcm_open(mHardware->getRouteFromDevice)
+	- route_set_controls
+	}
+- pcm_read
+}
+
+hardware/rk29/audio/AudioHardware.cpp
+hardware/rk29/audio/alsa_route.c
+

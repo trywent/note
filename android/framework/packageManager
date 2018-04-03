@@ -160,6 +160,16 @@ copyResource-->copyFile-->copyToFile@DefaultContainerService.java
 params.startCopy(拷贝完调用handleReturnCode)-->InstallParams.handleReturnCode-->processPendingInstall
 -->installPackageLI(调用args.doRename将拷贝的文件，重命名为包名)-->setApplicationInfoPaths(设置路径)
 --installNewPackageLI(扫描指定文件)-->scanPackageLI(package)-->
+
+
+//8.0
+installPackage-->installCommon@ApplicationPackageManager.java-->
+installPackageAsUser{
+- 
+}@PackageManagerService.java
+
+frameworks/base/core/java/android/app/ApplicationPackageManager.java
+frameworks/base/services/core/java/com/android/server/pm/PackageManagerService.java
 ___________________________________
 安装在外部sd卡：创建/mnt/secure/asec/xxx.asec文件,通过/mnt/secure/asec能够访问sd卡中.android_secure文件夹内容。
 获取容器id：

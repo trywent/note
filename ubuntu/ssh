@@ -5,11 +5,11 @@ git_wb@192.168.1.95
 pw:12342234
 
 //android自己服务器
-ssh wb@192.168.1.131   
+ssh wb@192.168.1.230   
 pw:wb
 
 
-//创建ssh key
+//创建ssh key 使A登录到B无需密码
 ssh-keygen -t rsa
 
 这时可以在主机A上看到生成的秘钥~/.ssh/id_rsa 和公钥 ~/.ssh/id_rsa.pub
@@ -20,6 +20,12 @@ scp -r /root/.ssh/id_rsa.pub 192.168.31.147:/root/.ssh/authorized_keys
 
 cat  id_rsa.pub >> ~/.ssh/authorized_keys
 
+或者ssh-copyid user@host即可
+
+
+拷贝A中.ssh到C中.ssh。C可免密登录
+//server
+sudo apt-get install openssh-server
 如果有修改配置/etc/ssh/sshd_config，需要重启ssh服务器
 
 /etc/init.d/ssh restart

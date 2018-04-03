@@ -78,6 +78,24 @@ frameworks/native/libs/gui/ISurfaceComposer.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 frameworks/native/services/surfaceflinger/MessageQueue.cpp
 
+===================
+//producer
+createDefaultDisplayDevice-->new DisplayDevice(fbs,producer)-->new Surface(producer)@DisplayDevice.cpp
+-->
+
+
+//consumer显示到fb
+createDefaultDisplayDevice-->new FramebufferSurface(consumer)
+
+FramebufferSurface::onFrameAvailable-->HWComposer::fbPost
+
+
+
+
+
+frameworks/native/services/surfaceflinger/DisplayDevice.cpp
+frameworks/native/services/surfaceflinger/MonitoredProducer.cpp
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
 ============
 //(应用提交绘制数据)layer更新
 repaintEverything-->signalTransaction/signalLayerUpdate@SurfaceFlinger.cpp-->
@@ -133,15 +151,12 @@ setUpHWComposer{
 }@SurfaceFlinger
 
 doComposition{
-- 获取脏区域,dirtyRegion
-- doDisplayComposition(dirtyRegion){
-	- 计算新的脏区,dirtyRegion
+//遍历所有显示器
+- 计算新的脏区,dirtyRegion(hw->getDirtyRegion())
+- doDisplayComposition(hw,dirtyRegion){	
 	- doComposeSurfaces
-	- hw->swapBuffers
+	- displayDevice->swapBuffers
 	}
-- hw->compositionComplete@SurfaceFlinger-->
-	mDisplaySurface->compositionComplete@DisplayDevice.cpp-->mHwc.fbCompositionComplete
-	@FramebufferSurface.cpp-->fbCompositionComplete@HWCompser.cpp
 - postFramebuffer
 }
 
@@ -182,13 +197,6 @@ SurfaceFlinger::onTransact{
 - 1002(SHOW_UPDATES)Surface更新时闪烁界面,mDebugRegion
 - 
 }
-
-===================
-//显示
-FramebufferSurface::onFrameAvailable-->HWComposer::fbPost
-
-
-frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
 
 
 //=======

@@ -1,0 +1,40 @@
+//共享目录https://help.ubuntu.com/community/How%20to%20Create%20a%20Network%20Share%20Via%20Samba%20Via%20CLI%20(Command-line%20interface/Linux%20Terminal)%20-%20Uncomplicated,%20Simple%20and%20Brief%20Way!
+
+
+//install Samba
+    sudo apt-get update
+    sudo apt-get install samba
+
+//Set a password for your user in Samba //最好和已有用户同名
+
+    sudo smbpasswd -a <user_name>
+
+
+//创建共享文件夹
+mkdir /home/<user_name>/<folder_name>
+
+//编辑 "/etc/samba/smb.conf"
+sudo nano /etc/samba/smb.conf
+//增加
+    [<folder_name>]
+    path = /home/<user_name>/<folder_name>
+    valid users = <user_name>
+    read only = no
+
+
+//重启samba:
+sudo service smbd restart
+
+//测试smb.conf是否正确:"
+testparm
+
+//访问:
+      sudo apt-get install smbclient
+      # List all shares:
+      smbclient -L //<HOST_IP_OR_NAME>/<folder_name> -U <user>
+      # connect:
+      smbclient //<HOST_IP_OR_NAME>/<folder_name> -U <user>
+
+
+//挂载
+sudo mount -t cifs //192.168.1.230/open_src /mnt -o username=api,password=api

@@ -1,0 +1,4 @@
+rk3368-px5-evb-android.dts{
+#include "rk3368.dtsi"
+#include "rk3368-android.dtsi"
+}

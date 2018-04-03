@@ -1,0 +1,14 @@
+//
+SurfaceFlinger::init
+
+
+
+
+//
+native_surface = session()->createSurface()//创建本地surface
+EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+eglInitialize(display, 0, 0);//初始化display
+eglChooseConfig(display, attribs, &config, 1, &numConfigs);//参数配置
+surface = eglCreateWindowSurface(display, config, native_surface.get());
+context = eglCreateContext(display, config);
+eglSwapBuffers(display, surface)

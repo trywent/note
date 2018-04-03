@@ -41,7 +41,6 @@ com.android.internal.R.string.config_ntpServer= "2.android.pool.ntp.org"
 frameworks/base/services/java/com/android/server/NetworkTimeUpdateService.java
 frameworks/base/core/java/android/util/NtpTrustedTime.java
 frameworks/base/core/java/android/net/SntpClient.java
-frameworks/base/services/java/com/android/server/NetworkTimeUpdateService.java
 
 ===========================
 NITZ时间更新通过gsm，cdma网络：

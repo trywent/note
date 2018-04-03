@@ -1,0 +1,19 @@
+//查看当前window Manager
+echo $DESKTOP_SESSION
+
+//GDM(GNOME Desktop Manager)
+ls /usr/bin/*session
+-> in GNOME returns /usr/bin/gnome-session (and more)
+-> in MATE returns /usr/bin/mate-session (and more)
+-> in LXDE returns /usr/bin/lxsession (and more)
+-> in JWM returns /usr/bin/icewm-session (should be jwm-session, not?!)
+
+
+
+//重装untiy
+sudo apt-get install ubuntu-desktop
+sudo apt-get install unity
+sudo apt-get install unity-common
+sudo apt-get install unity-lens*
+sudo apt-get install unity-services
+sudo apt-get install unity-asset-pool

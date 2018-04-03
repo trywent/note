@@ -46,3 +46,6 @@ mkdir objdir  //创建obj目录
 ================
 关闭jack
 LOCAL_JACK_ENABLED = disabled
+
+//package_whitelist
+build/core/tasks/check_boot_jars/package_whitelist.txt
