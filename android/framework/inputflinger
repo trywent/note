@@ -1,0 +1,160 @@
+//===========================
+EventHub从设备文件读取事件:DEVICE_PATH = "/dev/input";//监听文件夹中的输入设备
+
+初始时要扫描设备：
+getEvents(判断mNeedToScanDevices，只扫描一次)-->scanDevicesLocked-->scanDirLocked(扫描/dev/input目录下设备)-->openDeviceLocked-->addDeviceLocked@EventHub(增加设备)
+
+读取监听mEpollFd中的事件：
+EventHub::getEvents(设备改变事件，唤醒事件，输入事件)-->epoll_wait@EventHub.cpp
+
+----------------------------
+设备事件处理：
+EventHub::readNotifyLocked(读取事件)-->(设备增加)openDeviceLocked(获取输入设备的信息多点触摸，触摸球...
+,将设备加入监听mEpollFd)--(创建new Device，加载键值表loadKeyMapLocked)addDeviceLocked@EventHub.cpp
+
+EventHub::readNotifyLocked(读取事件)-->(设备移除)closeDeviceByPathLocked-->closeDeviceLocked
+(从设备列表中移除设备)@EventHub.cpp
+
+加载键值表：
+loadKeyMapLocked-->device->keyMap.load@EventHub.cpp-->KeyMap::load-->
+probeKeyMap(deviceIdenfifier, String8("Generic")-->probeKeyMap(查找文件/usr/Generic.kl)-->
+KeyLayoutMap::load@Keyboard.cpp-->parser.parse(处理key，axis)-->parseKey(将Genelric.kl中的键值对加入
+到map中)@KeyLayoutMap.cpp-->getKeyCodeByLabel(传入android中的键字符,KEYCODES)-->lookupValueByLabel
+(在KEYCODES中查找对应的键值)@Keyboard.cpp
+
+
+frameworks/base/libs/androidfw/Keyboard.cpp
+frameworks/base/libs/androidfw/KeyLayoutMap.cpp
+frameworks/native/libs/utils/Tokenizer.cpp
+frameworks/base/include/androidfw/KeycodeLabels.h
+____________________________
+加入输入设备：
+loopOnce(eventHub中读取设备)-->processEventsLocked-->addDeviceLocked【createDeviceLocked创建device，根
+据classes不同创建不同mapper device->addMapper(new MultiTouchInputMapper(device))】-->mDevices.add
+@inputReader.cppopenDeviceLocked(设备是多点出屏device->classes |= INPUT_DEVICE_CLASS_TOUCH | INPUT_DEVICE_CLASS_TOUCH_MT)-->addDeviceLocked@EventHub.cpp-->addDeviceLocked-->createDeviceLocked(
+创建new InputDevice(context为InputReader))-->device->addMapper(加入对应的mapper)@InputReader.cpps
+
+kenerl和android键值映射:
+EventHub::mapKey-->(mKeyCharacterMap)kcm->mapKey--()device->keyMap.keyLayoutMap->mapKey
+(设置对应的键值)@EventHub.cpp-->mapKey-->getKey-->(一个map)mKeysByScanCode.valueAt@KeyLayoutMap.cpp
+
+====================================
+inputReader读取事件:  将EventHub读取的事件传到inputDispatcher
+
+threadLoop-->mReader->loopOnce-->mEventHub->getEvent获取事件--处理事件--processEventsLocked(循环处理
+buffer中事件)-->processEventsForDeviceLocked(处理输入事件,从mDevice中取得对应的输入设备)-->device->process-->InputDevice::process-->mapper->process-->KeyboardInputMapper(以按键为例)-->KeyboardInputMapper::process
+【这里应该会进行扫描的按键值与按键值表的映射getEventHub()->mapKey】-->KeyboardInputMapper::processKey(
+处理转换后的keyCode)@InputReader.cpp-->getListener()->notifyKey(&args)-->InputReader::ContextImpl::getListener
+-->mReader->mQueuedListener.get(返回一个mDispatcher，在创建时传入)-->(到分发处理)InputDispatcher::notifyKey-->
+---------------------------------------------------
+---------处理预先截获的按键（power home）-----------
+mPolicy->interceptKeyBeforeQueueing(截获要处理的按键.mPolicy由InputManager构造方法传入到InputDispatcher,
+是一个NativeInputManager实例)@InputDispatcher.cpp-->NativeInputManager::interceptKeyBeforeQueueing-->
+interceptKeyBeforeQueueing@InputManagerServcie.java-->mCallbacks.interceptKeyBeforeQueueing
+(mCallbacks是在构造时传入的mInputMonitor)-->interceptKeyBeforeQueueing@InputMonitor.java-->
+mService.mPolicy.interceptKeyBeforeQueueing(mPolicy是makeNewWindowManager@PolicyManager.java,)-->
+interceptKeyBeforeQueueing@PhoneWindowManager.java
+---------------------------------------------------
+将事件加入到dispatcher的队列中：
+(notifyMotion,injectInputEvent)notifyKey-->enqueueInboundEventLocked-->mInboundQueue.enqueueAtTail
+
+====================================
+触摸事件：
+(加入触摸设备)addDeviceLocked-->createDeviceLocked-->device->addMapper(new MultiTouchInputMapper(device))
+@InputReader.cpp
+
+保存事件：
+InputDevice::process-->mapper->process-->MultiTouchInputMapper::process-->
+mMultiTouchMotionAccumulator.process-->MultiTouchMotionAccumulator::process(将坐标值加入mSlots)
+@InputReader.cpp
+
+同步事件：
+MultiTouchInputMapper::process-->TouchInputMapper::process-->sync-->syncTouch-->
+MultiTouchInputMapper::syncTouch-->mMultiTouchMotionAccumulator.getSlot(读出数据)-->
+mCurrentRawPointerData(保存数据)@InputReader.cpp
+
+调整坐标值：
+TouchInputMapper::process-->sync-->cookPointerData(根据比例调整输入的坐标值){
+-
+
+}@InputReader.cpp
+
+
+
+分发触摸事件：
+TouchInputMapper::sync-->syncTouch--TouchInputMapper::dispatchTouches(判断是滑动，按下，提起)-->
+TouchInputMapper::dispatchMotion(分发滑动，按下，提起事件)-->getListener()->notifyMotion-->
+InputReader::ContextImpl::getListener()->notifyMotion-->mQueuedListener.get()->notifyMotion
+@InputReader.cpp-->notifyMotion-->enqueueInboundEventLocked@InputDispatcher.cpp
+
+查找窗口：
+dispatchOnceInnerLocked()-->dispatchMotionLocked-->findTouchedWindowTargetsLocked{
+-查找状态为windowInfo->visible的窗口，是否包含触摸坐标
+-检查窗口的状态是否是暂停，若是则不会处理事件
+
+}-->findTouchedWindowAtLocked@InputDispatcher.cpp
+
+分发触摸事件处理：
+dispatchOnceInnerLocked()-->dispatchMotionLocked-->dispatchEventLocked
+____________________________
+触摸坐标根据屏幕比例进行缩放，使触摸坐标(x,y)与屏幕坐标(x1,y1)能够对应。
+
+设置输入配置信息：
+NativeInputManager::setDisplayOrientation-->(更新读取器信息)mInputManager->getReader()->
+requestRefreshConfiguration
+
+获取输入配置信息：
+InputReader::refreshConfigurationLocked-->mPolicy->getReaderConfiguration@InputReader.cpp
+-->NativeInputManager::getReaderConfiguration@com_android_server_input_InputManagerService.cpp
+
+InputReader::addDeviceLocked-->InputDevice::configure-->mapper->configure
+TouchInputMapper::configure(设置mConfig)@InputReader.cpp
+
+获取触摸设备的信息：
+InputMapper::getAbsoluteAxisInfo-->getEventHub->getAbsoluteAxisInfo@InputReader.cpp-->
+EventHub::getAbsoluteAxisInfo(deviceID){
+- 获取对应设备，getDeviceLocked(deviceID)
+- 获取信息，ioctl(EVIOCGABS(axis))
+- 填充信息
+}@EventHub.cpp
+
+TouchInputMapper::configure-->configureParameters(获取参数信息)-->configureSurface-->
+TouchInputMapper::configureSurface(若屏幕比例与触摸比例不同，则计算触摸坐标转换比例)-->
+mConfig.getDisplayInfo(获取屏幕信息)
+
+TouchInputMapper::configureSurface{
+- 判断输入设备类型，是鼠标，触摸屏，触摸板？
+- 获取屏幕方位，尺寸
+- 保存屏幕属性值
+	- 根据触摸属性值，计算x，y坐标的转换比例
+	- 配置虚拟按键，设置虚拟按键的位置坐标。configureVirtualKeys
+
+- 设置转换方位后，x，y轴的范围值，与转换比例
+}@InputReader.cpp
+
+//input事件
+nativeInit-->new NativeInputManager-->new InputManager(EventHub(),this,this)-->
+InputManager{
+- mDispatcher = new InputDispatcher(dispatcherPolicy)
+- mReader = new InputReader(eventHub, readerPolicy, mDispatcher)
+}
+
+NativeInputManager::notifySwitch@
+notifySwitch{
+- mWindowManagerCallbacks.notifyLidSwitchChanged
+- mWindowManagerCallbacks.notifyCameraLensCoverSwitchChanged
+- mWiredAccessoryCallbacks.notifyWiredAccessoryChanged
+}
+
+
+
+
+
+frameworks/base/services/core/jni/com_android_server_input_InputManagerService.cpp
+frameworks/base/services/core/java/com/android/server/input/InputManagerService.java
+============
+addDeviceLocked-->createDeviceLocked
+
+
+
+frameworks/native/services/inputflinger/InputReader.cpp

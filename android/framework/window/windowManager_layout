@@ -1,4 +1,4 @@
-
+//
 ___________________________________
 更新配置信息：
 
@@ -128,6 +128,7 @@ relayoutWindow(Session session, IWindow client, int seq,
 - 找到服务端窗口windowState，设置窗口长宽值
 - 该布局会销毁窗口surface，但surface在客户端被使用则延迟销毁
 	winAnimator.mSurfaceDestroyDeferred 
+- setRequestedSize//设置窗口请求大小
 - 保存传入的attr属性值到windowState
 - 判断布局是否进行长宽缩放，是否可以接收输入法，焦点是否变化
 - 更新窗口可视状态，win.mViewVisibility = viewVisibility;

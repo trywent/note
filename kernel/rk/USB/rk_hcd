@@ -1,4 +1,4 @@
-
+//
 host驱动注册:
 dwc_otg_driver_init{
 - platform_driver_register(&dwc_otg_driver)
@@ -68,4 +68,7 @@ kernel/drivers/usb/dwc_otg/dwc_otg_hcd.c
 kernel/drivers/usb/dwc_otg/dwc_otg_driver.c
 kernel/drivers/usb/core/hcd.c
 kernel/drivers/usb/core/usb.c
-
+===============
+//sleep
+dwc_otg_hcd_connect_detect-->schedule_delayed_work(&dwc_otg_hcd->host_enable_work)
+-->dwc_otg_hcd_enable@dwc_otg_hcd.c

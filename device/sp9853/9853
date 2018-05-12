@@ -1,0 +1,164 @@
+//
+
+UiHandler.handleMessage(SHOW_FINGERPRINT_ERROR_UI_MSG)-->setMessage(R.string.system_error_manufacturer)
+
+
+
+//audio
+mic ---main mic(mic0)
+3702 ---aux mic(mic1)
+
+
+0       ENUM    1       VBC Switch                               AP
+1       ENUM    1       VBC INT Switch                           AP
+2       ENUM    1       VBC DMA Switch                           AP_AON
+3       BOOL    1       VBC DA EQ Switch                         On
+4       BOOL    1       VBC AD01 EQ Switch                       Off
+5       BOOL    1       VBC AD02 EQ Switch                       Off
+6       ENUM    1       VBC EQ FW Name                           vbc_eq
+7       ENUM    1       VBC EQ Update                            loaded
+8       INT     2       VBC DAC01 MIXERDG                        0 0
+9       INT     2       VBC DAC23 MIXERDG                        0 0
+10      INT     1       VBC MIXERDG STEP                         1
+11      INT     1       VBC DACL DG Set                          26
+12      INT     1       VBC DACR DG Set                          26
+13      INT     1       VBC ADCL DG Set                          24
+14      INT     1       VBC ADCR DG Set                          24
+15      INT     1       VBC ADC23L DG Set                        24
+16      INT     1       VBC ADC23R DG Set                        24
+17      INT     1       VBC STL DG Set                           24
+18      INT     1       VBC STR DG Set                           24
+19      BOOL    1       VBC DACL DG Switch                       On
+20      BOOL    1       VBC DACR DG Switch                       On
+21      BOOL    1       VBC ADCL DG Switch                       Off
+22      BOOL    1       VBC ADCR DG Switch                       Off
+23      BOOL    1       VBC ADC23L DG Switch                     Off
+24      BOOL    1       VBC ADC23R DG Switch                     Off
+25      BOOL    1       VBC STL HPF Switch                       Off
+26      BOOL    1       VBC STR HPF Switch                       Off
+27      INT     1       VBC STL HPF Set                          3
+28      INT     1       VBC STR HPF Set                          3
+29      BOOL    1       VBC AD0 DG Mux                           Off
+30      BOOL    1       VBC AD1 DG Mux                           Off
+31      BOOL    1       VBC AD2 DG Mux                           Off
+32      BOOL    1       VBC AD3 DG Mux                           Off
+33      ENUM    1       VBC DA IIS Mux                           AUDIIS0
+34      INT     1       VBC DA EQ Profile Select                 -1
+35      INT     1       VBC AD01 EQ Profile Select               -1
+36      INT     1       VBC AD23 EQ Profile Select               -1
+37      INT     1       VBC_DA_SRC                               0
+38      BOOL    1       VBC_FM_MUTE_DIRECT                       Off
+39      BOOL    1       VBC_FM_UNMUTE_SMOOTH                     Off
+40      BOOL    1       VBC_IIS_WIDTH_SEL                        Off
+41      BOOL    1       VBC_DA_IIS_LRMOD_SEL                     Off
+42      BOOL    1       VBC_AD01_IIS_LRMOD_SEL                   Off
+43      BOOL    1       VBC_AD23_IIS_LRMOD_SEL                   Off
+44      ENUM    1       SYS_IIS0                                 vbc_iis1
+45      ENUM    1       SYS_IIS1                                 vbc_iis1
+46      ENUM    1       SYS_IIS2                                 vbc_iis1
+47      ENUM    1       SYS_IIS3                                 vbc_iis1
+48      ENUM    1       SYS_IIS4                                 vbc_iis1
+49      BOOL    1       IIS_BT_FM_LOOP                           Off
+50      BOOL    1       vbc_access_en                            Off
+51      ENUM    1       VBC DAC0 Mixer Mux Sel                   by eq
+52      ENUM    1       VBC DAC1 Mixer Mux Sel                   by eq
+53      ENUM    1       VBC ST0 Mixer Mux Sel                    by eq
+54      ENUM    1       VBC ST1 Mixer Mux Sel                    by eq
+55      ENUM    1       VBC DAC0 Mixer Out Sel                   by eq
+56      ENUM    1       VBC DAC1 Mixer Out Sel                   by eq
+57      ENUM    1       VBC ST0 Mixer Out Sel                    by eq
+58      ENUM    1       VBC ST1 Mixer Out Sel                    by eq
+59      INT     1       SPKL Playback Volume                     2
+60      INT     1       SPKR Playback Volume                     0
+61      INT     1       HPL Playback Volume                      11
+62      INT     1       HPR Playback Volume                      11
+63      INT     1       EAR Playback Volume                      13
+64      INT     1       ADCL Capture Volume                      5
+65      INT     1       ADCR Capture Volume                      5
+66      INT     1       DACL Playback Volume                     3
+67      INT     1       DACR Playback Volume                     3
+68      INT     1       DACS Playback Volume                     3
+69      BOOL    1       MIC Boost                                Off
+70      BOOL    1       AUXMIC Boost                             Off
+71      BOOL    1       HEADMIC Boost                            Off
+72      BOOL    1       Linein Boost                             Off
+73      INT     1       Inter PA Config                          2
+74      INT     1       Inter HP PA Config                       78151
+75      BOOL    1       DACL Switch                              On
+76      BOOL    1       DACR Switch                              On
+77      BOOL    1       MIC Bias Switch                          Off
+78      BOOL    1       AUXMIC Bias Switch                       Off
+79      BOOL    1       HEADMIC Bias Switch                      Off
+80      BOOL    1       Linein Mute Switch                       Off
+81      BOOL    1       DACLSPKL Enable                          On
+82      BOOL    1       DACRSPKL Enable                          On
+83      ENUM    1       Aud Codec Info                           2731S
+84      ENUM    1       DAC LRCLK Select                         normal
+85      ENUM    1       ADC LRCLK Select                         normal
+86      ENUM    1       ADC1 LRCLK Select                        normal
+87      BOOL    1       Codec Digital Access Disable             Off
+88      INT     1       PCM_TOTAL_NORMAL                         0
+89      INT     1       PCM_TOTAL_DEEPBUF                        0
+90      BOOL    1       Speaker Function                         Off
+91      BOOL    1       Speaker1 Function                        Off
+92      BOOL    1       Earpiece Function                        Off
+93      BOOL    1       HeadPhone Function                       Off
+94      BOOL    1       Line Function                            Off
+95      BOOL    1       Mic Function                             Off
+96      BOOL    1       Aux Mic Function                         Off
+97      BOOL    1       HP Mic Function                          Off
+98      BOOL    1       DMic Function                            Off
+99      BOOL    1       DMic1 Function                           Off
+100     BOOL    1       Digital FM Function                      Off
+101     BOOL    1       Speaker Mute                             Off
+102     BOOL    1       Speaker2 Mute                            Off
+103     BOOL    1       HeadPhone Mute                           Off
+104     BOOL    1       Earpiece Mute                            Off
+105     ENUM    1       SmartAmp Boost                           Bypass
+106     ENUM    1       ST0 CHAN MUX                             AD01
+107     ENUM    1       ST1 CHAN MUX                             AD01
+108     ENUM    1       ST0 INMUX                                AD0(2)ST0
+109     ENUM    1       ST1 INMUX                                AD1(3)ST1
+110     ENUM    1       AD0 INMUX                                IIS0AD0
+111     ENUM    1       AD1 INMUX                                IIS1AD1
+112     ENUM    1       AD2 INMUX                                IIS2AD2
+113     ENUM    1       AD3 INMUX                                IIS3AD3
+114     ENUM    1       AD IISMUX                                AUDIIS0
+115     ENUM    1       AD23 IISMUX                              AUDIIS1
+116     ENUM    1       DA0 ADDFM MUX                            BYPASS(ST)
+117     ENUM    1       DA1 ADDFM MUX                            BYPASS(ST)
+118     ENUM    1       DA0 ADDST MUX                            BYPASS(ST)
+119     ENUM    1       DA1 ADDST MUX                            BYPASS(ST)
+120     BOOL    1       Aud Loop in VBC Switch                   Off
+121     BOOL    1       Aud1 Loop in VBC Switch                  Off
+122     BOOL    1       HPL Mixer DACLHPL Switch                 Off
+123     BOOL    1       HPL Mixer DACRHPL Switch                 Off
+124     BOOL    1       HPL Mixer ADCLHPL Switch                 Off
+125     BOOL    1       HPL Mixer ADCRHPL Switch                 Off
+126     BOOL    1       HPR Mixer DACLHPR Switch                 Off
+127     BOOL    1       HPR Mixer DACRHPR Switch                 Off
+128     BOOL    1       HPR Mixer ADCLHPR Switch                 Off
+129     BOOL    1       HPR Mixer ADCRHPR Switch                 Off
+130     BOOL    1       SPKL Mixer DACLSPKL Switch               Off
+131     BOOL    1       SPKL Mixer ADCLSPKL Switch               Off
+132     BOOL    1       SPKL Mixer ADCRSPKL Switch               Off
+133     BOOL    1       SPKR Mixer ADCLSPKR Switch               Off
+134     BOOL    1       SPKR Mixer ADCRSPKR Switch               Off
+135     BOOL    1       EAR Mixer DACLEAR Switch                 Off
+136     BOOL    1       ADCL Mixer AILADCL Switch                Off
+137     BOOL    1       ADCL Mixer AIRADCL Switch                Off
+138     BOOL    1       ADCL Mixer MainMICADCL Switch            Off
+139     BOOL    1       ADCL Mixer AuxMICADCL Switch             Off
+140     BOOL    1       ADCL Mixer HPMICADCL Switch              Off
+141     BOOL    1       ADCR Mixer AILADCR Switch                Off
+142     BOOL    1       ADCR Mixer AIRADCR Switch                Off
+143     BOOL    1       ADCR Mixer MainMICADCR Switch            Off
+144     BOOL    1       ADCR Mixer AuxMICADCR Switch             Off
+145     BOOL    1       ADCR Mixer HPMICADCR Switch              Off
+146     BOOL    1       ADC-DAC Adie Loop switch                 Off
+147     BOOL    1       ADC1-DAC Adie Loop switch                Off
+148     BOOL    1       ADC-DAC Digital Loop switch              Off
+149     BOOL    1       ADC1-DAC Digital Loop switch             Off
+150     BOOL    1       Virt VBC Master Clock Mixer IIS0 Switch  Off
+151     BOOL    1       Virt VBC Master Clock Mixer Loop Switch  Off
+

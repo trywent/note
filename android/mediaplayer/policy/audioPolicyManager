@@ -52,6 +52,13 @@ AudioPolicyManagerBase::getOutput{
 - 若创建不成功，则在mOutputs中查找所有支持的设备并选择最优的outputs
 }
 
+//android8.0
+AudioPolicyManager::getOutputForAttr(&output,selectedDeviceId){
+- strategy = getStrategyForAttr //获取策略
+- device = getDeviceForStrategy(strategy)//获取设备
+- getOutputForDevice(device)
+}
+
 _____________________
 volume:
 ap_set_stream_volume_index_for_device@audio_policy_hal.cpp-->setStreamVolumeIndex{

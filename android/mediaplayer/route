@@ -1,3 +1,22 @@
+//监听耳机，hdmi的连接状态更新
+WiredAccessoryObserver-->makeObservedUEventList{
+- new UEventInfo(NAME_H2W)
+- new UEventInfo(NAME_USB_AUDIO)
+- new UEventInfo(NAME_HDMI)
+}
+
+//开始监听
+onSystemReady-->mObserver.init-->startObserving()
+
+
+notifySwitch@InputManagerService.java-->mWiredAccessoryCallbacks.notifyWiredAccessoryChanged
+
+//监听到事件
+onUEvent-->updateLocked-->mHandler.handleMessage(MSG_NEW_DEVICE_STATE)-->setDevicesState
+-->setDeviceStateLocked@WiredAccessoryManager.java
+
+
+==============
 //设置连接状态
 setDeviceStateLocked@WiredAccessoryManager.java-->setWiredDeviceConnectionState
 -->queueMsgUnderWakeLock(MSG_SET_WIRED_DEVICE_CONNECTION_STATE)-->onSetWiredDeviceConnectionState

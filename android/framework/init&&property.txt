@@ -71,6 +71,13 @@ service_start-->fork--execve@@init.c--notify_service_state-->(设置系统属性
 proterty_set好像通过unix domain socket设置，不知道原理。有时间看看
 main@init.c-->handle_property_set_fd@property_service.c
 
+
+handle_property_set@property_service.cpp-->handle_control_message{
+- ServiceManager::GetInstance().FindServiceByName(name)
+- svc->Start/stop/restart-->StopOrReset(SVC_DISABLED)@service.cpp
+}@init.cpp
+
+
 --------------------------
 创建socket：
 start_service@init.c-->create_socket@util.c

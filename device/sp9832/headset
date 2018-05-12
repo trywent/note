@@ -1,0 +1,29 @@
+//headset
+headset_sprd_sc2723 {
+compatible = "sprd,headset_sprd_sc2723";
+}
+
+late_initcall(headset_init)-->platform_driver_register(headset_detect_driver)-->probe-->
+headset_detect_probe{
+//设置探测脚
+- ht->irq_detect = gpio_to_irq(pdata->gpio_detect);
+- ht->irq_button = gpio_to_irq(pdata->gpio_button)
+- ht->irq_detect_mic = gpio_to_irq(pdata->gpio_detect_mic)
+//设置探测函数
+- INIT_WORK(&ht->work_button, headset_button_work_func)
+- INIT_DELAYED_WORK(&ht->work_detect, headset_detect_work_func)//耳机侦测
+//设置探测脚中断处理
+- request_irq(ht->irq_detect, headset_detect_irq_handler)
+
+}
+
+
+headset_detect_irq_handler/headset_detect_mic_irq_handler-->
+queue_delayed_work(ht->detect_work_queue, &ht->work_detect)-->
+headset_detect_work_func{
+- headset_type_detect//根据当前状态获取耳机类型
+- switch_set_state(&ht->sdev, ht->type)
+}@headset_sprd_sc2723.c
+
+
+kernel/drivers/input/misc/headset_sprd_sc2723.c

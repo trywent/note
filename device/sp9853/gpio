@@ -1,0 +1,18 @@
+//device
+ap_gpio: gpio-controller@e4280000 {
+	compatible = "sprd,ap-gpio";
+}@iwhale3.dtsi
+
+//driver
+ap_gpio_init-->platform_driver_register(&ap_gpio_driver)@gpio-ap.c
+
+
+//output/input
+gpio_direction_input/gpio_direction_output@gpio.h-->
+sprd_gpio_direction_output/sprd_gpio_direction_input-->sprd_gpio_write(写对应寄存器, REG_GPIO_DATA)
+
+//setvalue/getvalue 这种设置会根据open drain或open source设置成输入或输出
+set/get-->sprd_gpio_get/sprd_gpio_set-->sprd_gpio_read/sprd_gpio_write(REG_GPIO_DATA)
+
+kernel/arch/x86/boot/dts/iwhale2.dtsi
+kernel/drivers/gpio/sprd/gpio-ap.c

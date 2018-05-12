@@ -1,4 +1,12 @@
-//
+//view
+
+
+//大小
+measure(widthMeasureSpec,heightMeasureSpec/*父view的范围*/)-->setMeasuredDimensionRaw{
+- mMeasuredWidth //设置宽高
+- mMeasuredHeight
+}@view.java
+
 performTraversals(第一次布局)@ViewRootImpl.java-->dispatchAttachedToWindow{
 - 设置mAttachInfo
 - ViewRootimpl获取View的属性，performCollectViewAttributes

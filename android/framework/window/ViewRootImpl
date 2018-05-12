@@ -39,10 +39,10 @@ _________________
 scheduleTraversals-->TraversalRunnable.run-->doTraversal
 performTraversals{
 - mFirst{
-	- 设置desiredWindowWidth/height为屏幕大小
+	- 设置desiredWindowWidth/height为屏幕大小//设置view的布局大小为configuration大小，mContext.getResources().getConfiguration()
 	- 设置attachInfo，并dispatchAttachedToWindow(attachInfo)
 	}
-- 非第一次，设置desiredWindowWidth/height为帧大小
+- 非第一次，设置desiredWindowWidth/height为帧大小//设置view的布局大小为计算后的值
 - 需要布局，layoutRequested{
 	- 测量设置子View大小，measureHierarchy
 	
@@ -56,15 +56,16 @@ performTraversals{
 =====================
 measure:
 
-performTraversals-->measureHierarchy{
-- 若是对话框窗口限制对话框布局成全屏，{
-	- com.android.internal.R.dimen.config_prefDialogWidth
-	- 将值和模式值合并在一个变量中，getRootMeasureSpec
+performTraversals-->measureHierarchy(LayoutParams,desiredWindowWidth,desiredWindowHeight){
+- 布局为WRAP_CONTENT{
+	- com.android.internal.R.dimen.config_prefDialogWidth//若是对话框窗口限制对话框布局成全屏
+	- 计算baseSize
+	- 将值和模式值合并在一个变量中，getRootMeasureSpec(basesize,LayoutParams.width)
 	- performMeasure
 	}
 
 - 普通窗口{
-	- 将值和模式值合并在一个变量中，getRootMeasureSpec	
+	- 将值和模式值合并在一个变量中，getRootMeasureSpec(desiredWindowWidth,desiredWindowHeight)
 	- performMeasure(childWidthMeasureSpec, childHeightMeasureSpec)-->
 	performMeasure-->measure{
 		- 创建缓存，LongSparseLongArray
@@ -108,7 +109,8 @@ dispatchResized{
 
 scheduleTraversals-->TraversalRunnable.run-->doTraversal-->performTraversals{
 - 
-- 第一次布局或窗口大小,可见变化，relayoutWindow{	
+- 第一次布局或窗口大小,可见变化，relayoutWindow{
+	- mView.getMeasuredWidth/getMeasuredHeight //获取请求布局的宽高
 	- 获取帧大小并设置surface，mWindowSession.relayout(requestedWidth,requestedHeight,mSurface)
 	- 通知绘制完成，mWindowSession.finishDrawing
 	}

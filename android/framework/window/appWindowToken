@@ -1,4 +1,4 @@
-作用应该是与ActivityManagerService中activityRecord桥梁
+//作用应该是与ActivityManagerService中activityRecord桥梁
 
 ====================
 mService.mWindowManager.addAppToken@ActivityStack.java-->
@@ -69,3 +69,19 @@ ______________________________
 getTasks@ActivityManagerService.java
 
 We have pending thumbnails
+
+
+//android 8.1
+
+createWindowContainer-->new AppWindowContainerController@ActivityRecord.java-->
+AppWindowContainerController(token){
+- mToken = token
+- createAppWindow-->new AppWindowToken
+}
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/AppWindowContainerController.java
+
+
+

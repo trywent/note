@@ -210,7 +210,7 @@ r.receivers
 receivers中获取BroadcastFilter
 
 ==================================
-输入响应超时：
+输入响应超时：anr
 InputDispatcher::handleTargetsNotReadyLocked-->onANRLocked-->postCommandLocked(& InputDispatcher::doNotifyANRLockedInterruptible)-->doNotifyANRLockedInterruptible-->
 mPolicy->notifyANR@InputDispatcher.cpp-->NativeInputManager::notifyANR-->
 env->CallLongMethod(notifyANR)@com_androd_server_input_inputManagerService.cpp-->

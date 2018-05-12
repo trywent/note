@@ -1,0 +1,17 @@
+//
+"sp9853i-1h10-vmm"{
+- "sp9853i-1h10"{
+	- "sp9853i-common.dtsi"{
+		- "sc9853i.dtsi"{
+			- "iwhale2.dtsi"
+			- "sc9853-clocks.dtsi"
+			}
+		- "sc2731.dtsi"
+	}
+	- "sp9853i-memory.dtsi"
+	- "sprd-sound-isharkl2.dtsi"
+	}
+}
+
+
+dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/boot bs=1024 count=16000

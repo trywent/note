@@ -16,10 +16,16 @@ new Display(/*屏信息*/getDisplayInfo())@DisplayManagerGlobal.java-->mDm.getDi
 -->getDisplayInfo-->getDisplayInfoInternal@DisplayManagerService.java
 
 
+updateConfiguration@ActivityManagerService.java-->
+computeNewConfigurationLocked@WindowManagerService.java-->
+computeScreenConfiguration{
+
+}@DisplayContent.java
+
 frameworks/base/core/java/android/hardware/display/DisplayManager.java
 frameworks/base/core/java/android/hardware/display/DisplayManagerGlobal.java
 frameworks/base/services/java/com/android/server/display/DisplayManagerService.java
-
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
 =====================
 createStack@WindowManagerService.java-->
 createStack(/*activityStack的id号*/，/*依靠栈id*/){

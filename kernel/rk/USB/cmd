@@ -1,2 +1,4 @@
 check speed:
 /sys/bus/usb/devices/usb?/speed
+
+sys/bus/platform/drivers/usb20_otg/force_usb_mode

@@ -341,3 +341,14 @@ startActivityUncheckedLocked-->(显示栈顶的activity)resumeTopActivitiesLocke
 #####################
 执行空闲时的操作：
 ActivityStackSupervisorHandler.handleMessage(IDLE_TIMEOUT_MSG/IDLE_NOW_MSG)-->activityIdleInternal-->activityIdleInternalLocked
+
+
+
+
+
+
+
+
+//==================
+createStackOnDisplay-->
+ActivityContainer-->createStack-->new ActivityStack@ActivityStackSupervisor.java

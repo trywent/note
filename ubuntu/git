@@ -94,6 +94,28 @@ git checkout -- <file> //撤销对文件的修改(返回到原来的版本)
 git reset xxxxxxxxxxx <file> //恢复到特定版本
 git checkout xxxhashnum  file
 git revert <commit log string> //撤销某次提交
+
+git stach    //save uncommitted changes
+git stash pop  apply last stash and remove it from the list
+
+撤销add：
+git rm -r --cached <added_file_to_undo>
+
+______________________________
+合并：
+How I would do this
+
+git checkout master
+git pull origin master
+git merge test
+git push origin master
+
+#git merge branchname commitid
+git cherry-pick commitd //合并某次提交
+合并部分文件：
+git checkout B_branch
+git checkout A_branch files
+git add files
 //合并冲突
 git checkout --ours   //保留本地的
 git checkout --theirs //保留远程的
@@ -167,21 +189,7 @@ git reset --hard origin/master
 
 
 git pull --all  //更新所有分支
-______________________________
-合并：
-How I would do this
 
-git checkout master
-git pull origin master
-git merge test
-git push origin master
-
-#git merge branchname commitid
-git cherry-pick commitd
-合并部分文件：
-git checkout B_branch
-git checkout A_branch files
-git add files
 ______________________________
 git补丁：
 git diff > xx.patch

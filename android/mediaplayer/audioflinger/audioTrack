@@ -27,6 +27,21 @@ AudioTrack::AudioTrack-->set(sharedBuffer){
 - 赋值流类型，mStreamType = streamType
 }@AudioTrack.cpp
 
+//android8.0
+AudioTrack::set{
+- 
+- AudioTrackThread
+- createTrack_l{
+	- AudioSystem::getOutputForAttr(&output)-->aps->getOutputForAttr{//获取output
+		- 
+		}
+	- audioFlinger->createTrack
+	}
+}
+
+//设置outputdevice
+AudioTrack::setOutputDevice
+
 //write
 write@AudioTrack.java-->native_write_byte-->android_media_AudioTrack_native_write_byte
 -->writeToTrack{

@@ -32,4 +32,6 @@ hardware/rk29/audio/AudioHardware.cpp
 
 =============
 //input
-
+open_input_stream -->adev_open_input_stream{
+- 
+}@audio_hw.c

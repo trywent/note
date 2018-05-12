@@ -84,3 +84,12 @@ TypefaceImpl_createFromTypeface(src){
 frameworks/base/graphics/java/android/graphics/Typeface.java
 frameworks/base/core/jni/android/graphics/Typeface.cpp
 frameworks/base/core/jni/android/graphics/TypefaceImpl.cpp
+
+
+=============
+//修改默认汉字字体
+    <family>
+        <fileset>
+            <file lang="zh-Hans">youyuan.TTF</file>
+        </fileset>
+    </family>

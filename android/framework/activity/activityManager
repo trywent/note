@@ -108,3 +108,7 @@ mStackSupervisor.resumeTopActivitiesLocked
 
 frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
 frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
+
+
+anr:
+notifyANR@InputMonitor.java-->saveANRState@ActivityManagerService.java

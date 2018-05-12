@@ -1,4 +1,11 @@
 //通过HAL层进行操作
+/*audioPolicyService创建audioPolicyManager
+
+选择打开的output，input设备
+
+*/
+
+
 AudioPolicyService::AudioPolicyService{
 - 创建线程，AudioCommandThread
 - 老方法{

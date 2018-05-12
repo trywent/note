@@ -1,0 +1,36 @@
+//初始化 @Document/driver.txt linux/gpio/driver.h
+
+
+struct gpio_chip //gpio控制器
+gpiochip_add()//加入控制器
+gpiochip_remove()//移除控制器
+
+
+//
+gpio_direction_output-->gpiod_direction_output_raw@gpio.h-->_gpiod_direction_output_raw
+chip->direction_output@gpiolib.c
+
+
+gpio_direction_input-->gpiod_direction_input@gpio.h-->chip->direction_input@gpiolib.c
+
+
+//
+gpio_get_value-->__gpio_get_value@gpio.h-->gpiod_get_raw_value@asm-generic/gpio.h
+-->_gpiod_get_raw_value-->chip->get@gpiolib.c
+
+
+gpiod_set_raw_value-->_gpiod_set_raw_value(value){
+- _gpio_set_open_drain_value{
+	- chip->direction_input//high
+	- chip->direction_output(chip, offset, 0)//low
+	}
+- _gpio_set_open_source_value{
+	- chip->direction_output(chip, offset, 1)//high
+	- chip->direction_input //low
+	}
+- chip->set(value)
+}
+
+kernel/include/linux/gpio.h
+kernel/include/asm-generic/gpio.h
+kernel/drivers/gpio/gpiolib.c
