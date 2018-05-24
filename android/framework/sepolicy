@@ -72,7 +72,7 @@ adb push out/target/product/<device>/root/sepolicy /data/security/current
 adb shell su setprop selinux.reload_policy 1
 
 =============
-//编译
+//编译 平台sepolicy device/xxx/common/plat_sepoliy
 
 
 system/sepolicy/private/access_vectors //定义操作集

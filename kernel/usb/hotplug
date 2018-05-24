@@ -1,0 +1,91 @@
+//==========================
+usb热插拔：
+当配置内核时选择了CONFIG_HOTPLUG，你将会获得一个内核属性/proc/sys/kernel/hotplug，
+这里一般记录一个路径"/sbin/hotplug"。任何子系统在特定事件发生时，都可调用/sbin/hotplug
+并会传入该子系统的名字，子系统定义的一些环境变量也会传入。
+
+当usb设备插入或拔出时，usb子系统会调用/sbin/hotplug。调用由 kernel hub daemon thread [khubd]或则init进程进行。
+传送的环境变量值：
+    ACTION ... "add", "remove"
+    PRODUCT ... USB vendor, product, and version codes (hex)
+    TYPE ... device class codes (decimal)
+    INTERFACE ... interface 0 class codes (decimal)
+_______________
+module-init-tools会创建"modules.usbmap"文件，文件中包含驱动的MODULE_DEVICE_TABLE。
+热插拔的处理函数将会使用这个文件,确保处理usb设备时，加载正确的驱动。
+
+MODULE_DEVICE_TABLE中的表项，用来匹配驱动和设备。每个表项定义的一个或
+多个属性需要验证。可以使用宏来构建匹配表项，也可使用driver_info加入信息。
+
+    USB_DEVICE (vendorId, productId)
+	... matching devices with specified vendor and product ids
+    USB_DEVICE_VER (vendorId, productId, lo, hi)
+	... like USB_DEVICE with lo <= productversion <= hi
+    USB_INTERFACE_INFO (class, subclass, protocol)
+	... matching specified interface class info
+    USB_DEVICE_INFO (class, subclass, protocol)
+	... matching specified device class info
+
+一个支持多个设备的驱动的示例，它的MODULE_DEVICE_TABLE类似：
+
+    static const struct usb_device_id mydriver_id_table = {
+	{ USB_DEVICE (0x9999, 0xaaaa), driver_info: QUIRK_X },
+	{ USB_DEVICE (0xbbbb, 0x8888), driver_info: QUIRK_Y|QUIRK_Z },
+	...
+	{ } /* end with an all-zeroes entry */
+    }
+    MODULE_DEVICE_TABLE (usb, mydriver_id_table);
+
+大部分驱动会将这些表传到USB子系统和模块管理子系统.
+
+
+USB子系统中的驱动应该声明以下形式的结构:
+
+    static struct usb_driver mydriver = {
+	.name		= "mydriver",
+	.id_table	= mydriver_id_table,
+	.probe		= my_probe,
+	.disconnect	= my_disconnect,
+
+	/*
+	if using the usb chardev framework:
+	    .minor		= MY_USB_MINOR_START,
+	    .fops		= my_file_ops,
+	if exposing any operations through usbdevfs:
+	    .ioctl		= my_ioctl,
+	*/
+    }
+
+驱动会根据id_table中定义匹配设备，匹配成功调用probe()。若没有定义id_table
+任一usb设备都会执行probe。
+___________________________
+(定义一些设备的id)struct usb_device_id@include/linux/mod_devicetable.h
+
+static struct us_unusual_dev us_unusual_dev_list[]@usb.c
+struct usb_device_id usb_storage_usb_ids[]@usual-tables.c
+
+usb_device_id
+
+id_talbe赋值为usb_storage_usb_ids。与us_unusual_dev_list内容相同。UNUSUAL_DEV在前面先比较，
+USUAL_DEV在表后面。UNUSUAL_DEV比USUAL_DEV多厂商信息和初始化函数
+
+
+struct us_unusual_dev {
+	const char* vendorName;
+	const char* productName;
+	__u8  useProtocol;
+	__u8  useTransport;
+	int (*initFunction)(struct us_data *);
+};
+
+
+
+//操作 USB Request Block(URB) :
+URB包含相关信息，用来进行usb传输数据和状态。
+usb_submit_urb(urb) 将请求加入队列后立即返回。urb的传输可以被usb_unlink_urb(urb) 取消
+
+usb_submit_urb@urb.c-->usb_hcd_submit_urb-->rh_urb_enqueue-->usb_hcd_link_urb_to_ep@hcd.c
+
+drivers/usb/core/urb.c
+
+

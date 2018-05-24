@@ -35,3 +35,7 @@ hardware/rk29/audio/AudioHardware.cpp
 open_input_stream -->adev_open_input_stream{
 - 
 }@audio_hw.c
+
+
+in_read-->start_input_stream
+

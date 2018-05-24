@@ -1,0 +1,31 @@
+//
+
+pin_request_callback-->callbackEnv->CallVoidMethod(method_pinRequestCallback,addr,min_16_digits)
+@com_android_bluetooth_btservice_AdapterService.cpp-->pinRequestCallback@JniCallbacks.java-->
+pinRequestCallback@BondStateMachine.java
+
+
+
+ssp_request_callback-->callbackEnv->CallVoidMethod(method_sspRequestCallback,addr,pass_key)
+@com_android_bluetooth_btservice_AdapterService.cpp-->sspRequestCallback@JniCallbacks.java-->
+sspRequestCallback@BondStateMachine.java
+
+
+
+
+sendDisplayPinIntent-->mAdapterService.sendOrderedBroadcast(ACTION_PAIRING_REQUEST)@BondStateMachine.java
+-->onReceive-->startActivity(pairingIntent)@BluetoothPairingRequest.java
+-->onCreate{
+
+}@BluetoothPairingDialog.java
+
+packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/JniCallbacks.java
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/BondStateMachine.java
+================
+//stack
+BTA_DM_COD {0x5A, 0x40, 0x08} //设备类型SERVICE_CLASS MAJOR_CLASS MINOR_CLASS
+
+BTM_LOCAL_IO_CAPS               BTM_IO_CAP_IO//配对方式
+
+system/bt/bta/dm/bta_dm_act.c

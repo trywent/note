@@ -1,0 +1,3 @@
+//休眠最后一部
+
+suspend_set_ops(&rk30_pm_ops)@mach-rk30pm.c-->rk30_pm_ops.enter

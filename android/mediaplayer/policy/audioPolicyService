@@ -13,8 +13,8 @@ AudioPolicyService::AudioPolicyService{
    - 打开设备，audio_policy_dev_open(module, &mpAudioPolicyDev)-->module->methods->open@audio_policy.h
    }
 - 新方法{
-   - AudioPolicyClient //实现AudioPolicyClientImpl
-   - createAudioPolicyManager-->AudioPolicyManager	
+   - AudioPolicyClient //实现AudioPolicyClientImpl,对audioflinger的一个封装
+   - createAudioPolicyManager-->AudioPolicyManager(AudioPolicyClient)	
    }
 
 }

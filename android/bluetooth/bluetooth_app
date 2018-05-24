@@ -1,0 +1,21 @@
+//============应用
+- 扫描设备
+- 查看已配对设备
+- Establish RFCOMM channels
+- 连接(多个连接)，传输数据
+
+
+1 获取adapter，BluetoothAdapter.getDefaultAdapter()
+2 打开蓝牙,enable
+3 查询以配对设备，BluetoothAdapter.getBondedDevices()
+4 查找设备，BluetoothAdapter.startDiscovery
+
+连接：
+作为server-
+1 通过BluetoothDevice.listenUsingRfcommWithServiceRecord获取BluetoothServerSocket
+2 监听等待连接，BluetoothServerSocket.accept
+3 BluetoothServerSocket.close
+
+作为client-
+1 通过BluetoothDevice.createRfcommSocketToServiceRecord(UUID)获取BluetoothSocket
+2 BluetoothSocket.connect()

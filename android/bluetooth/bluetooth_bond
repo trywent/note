@@ -1,17 +1,31 @@
-//设置中连接蓝牙
+/*
+settingslib提供蓝牙访问的接口。蓝牙信息通过LocalBluetoothManager获取
+frameworks/base/packages/SettingsLib/src/com/android/settingslib
+
+*/
 //加入扫描的设备
 DeviceFoundHandler(BluetoothDevice.ACTION_FOUND){
 - cachedDevice = mDeviceManager.addDevice-->addDevice{
 	- new CachedBluetoothDevice
 	- mCachedDevices.add
+	- mBtManager.getEventManager().dispatchDeviceAdded
 	}@CachedBluetoothDeviceManager.java
 - cachedDevice.setNewName //初始化扫描的设备
 }BluetoothEventManager.java
 
+//通知应用端
+DeviceFoundHandler@BluetoothEventManager.java-->addDevice@CachedBluetoothDeviceManager.java
+-->dispatchDeviceAdded-->callback.onDeviceAdded@BluetoothEventManager.java-->
+onDeviceAdded@DeviceListPreferenceFragment.java
 
 frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/BluetoothEventManager.java
 frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/LocalBluetoothManager.java
 frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/CachedBluetoothDeviceManager.java
+================
+//settings注册回调
+
+mLocalManager.getEventManager().registerCallback(this)@DeviceListPreferenceFragment.java
+
 //设置中显示设备
 updateContent(BluetoothAdapter.STATE_ON)-->addDeviceCategory(mAvailableDevicesCategory)@BluetoothSettings.java-->
 addCachedDevices{
@@ -40,8 +54,7 @@ BluetoothPairingRequest.onReceive(ACTION_PAIRING_REQUEST)-->startActivity(pairin
 
 }@BluetoothPairingDialog.java
 
-
-
+packages/apps/Settings/src/com/android/settings/bluetooth/DeviceListPreferenceFragment.java
 packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothPairingRequest.java
 packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothPairingDialog.java
 ======================
@@ -68,6 +81,9 @@ deviceFoundCallback@JniCallbacks.java-->deviceFoundCallback(address/*发送广�
 
 ======================
 /*
+LMP(链路层Link Management Protocol)PIN code 
+
+
 安全简易配对SSP（Secure simple pairing）,蓝牙2.0之后配对方式，简易安全配对一共有四种，其中Out of Band很少使用到，具体如下： 
 Numeric Comparison 
 配对双方都显示一个6位的数字，由用户来核对数字是否一致，并输入Yes/No，两端Yes表示一致即可配对,可以防止中间人攻击。 

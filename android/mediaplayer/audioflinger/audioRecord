@@ -45,6 +45,12 @@ AudioRecord::AudioRecord-->set(audio_source_t inputSource,
 	}
 }@AudioRecord.cpp
 
+AudioPolicyManager::getInputForAttr{
+- device = getDeviceAndMixForInputSource
+- getInputForDevice(device)
+}
+
+
 
 //read数据,读取数据拷贝到 buffer中
 read@AudioRecord.java-->native_read_in_short_array(/*byte,short,float数据格式不同*/)-->

@@ -1,5 +1,5 @@
 //usb设备创建
-hub_thread-->hub_events-->hub_port_connect_change{
+usb_hub_init-->hub_thread-->hub_events-->hub_port_connect_change{
  //处理各种事件
 - usb_alloc_dev
 - usb_new_device

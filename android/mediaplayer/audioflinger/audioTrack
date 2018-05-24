@@ -33,8 +33,10 @@ AudioTrack::set{
 - AudioTrackThread
 - createTrack_l{
 	- AudioSystem::getOutputForAttr(&output)-->aps->getOutputForAttr{//获取output
-		- 
-		}
+		- strategy = getStrategyForAttr(&attributes)//获取策略
+		- device = getDeviceForStrategy(strategy)
+		- getOutputForDevice(device)
+		}@AudioPolicyManager.cpp
 	- audioFlinger->createTrack
 	}
 }

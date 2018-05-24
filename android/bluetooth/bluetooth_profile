@@ -28,7 +28,7 @@ AVRCP_CONTROLLER  ---- BluetoothAvrcpController ---- AvrcpControllerService
 A2DP_SINK  ---- BluetoothA2dpSink ---- A2dpSinkService
 
 //============接口
-定义各种profile：
+定义profile：
 
 BluetoothAdapter.getProfileProxy(AVRCP_CONTROLLER)@BluetoothAdapter.java-->
 new BluetoothAvrcpController-->doBind(连接到activiton为IBluetoothAvrcpController的服务)

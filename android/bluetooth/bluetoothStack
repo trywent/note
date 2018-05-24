@@ -11,13 +11,22 @@ classInitNative{
 }
 
 //2.
+static classInitNative@AdapterService.java-->
+classInitNative{
+- sJniCallbacksField //设置java层JniCallbacks回调函数
+- hw_get_module(BT_STACK_MODULE_ID,&module)//hal层
+- module->methods->open(module，abstraction) //获取协议栈
+- btStack = (bluetooth_module_t *)abstraction //协议栈
+- sBluetoothInterface = btStack->get_bluetooth_interface //协议栈调用接口bluetooth_interface@bluetooth.c
+}
+
+
 onCreate@AdapterService.java-->
 initNative{
 - sBluetoothInterface->init(sBluetoothCallbacks)  //设置协议栈回调
 - sBluetoothInterface->set_os_callouts            //系统相关回调
-- sBluetoothInterface->get_profile_interface(BT_PROFILE_SOCKETS_ID)//获取socket接口
-- btStack = (bluetooth_module_t *)abstraction //协议栈
-- sBluetoothInterface = btStack->get_bluetooth_interface //协议栈接口
+- sBluetoothSocketInterface = sBluetoothInterface->get_profile_interface(BT_PROFILE_SOCKETS_ID)//获取socket接口
+
 }
 
 packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
@@ -32,7 +41,7 @@ hw_module_t HAL_MODULE_INFO_SYM = {
 get_bluetooth_interface@com_android_bluetooth_btservice_AdapterService.cpp-->
 bluetooth__get_bluetooth_interface-->bluetoothInterface@bluetooth.c //接口
 
-//接口
+//java--jni--stack接口
 static const bt_interface_t bluetoothInterface = {
     sizeof(bluetoothInterface),
     init,
@@ -51,46 +60,57 @@ static const bt_interface_t bluetoothInterface = {
     create_bond,
     remove_bond,
     cancel_bond,
-}
+    get_connection_state,
+    pin_reply,
+    ssp_reply,
+}@bluetooth.c
+
+//stack--jni--java的回调接口
+static bt_callbacks_t sBluetoothCallbacks = {
+    sizeof(sBluetoothCallbacks),
+    adapter_state_change_callback,
+    adapter_properties_callback,
+    remote_device_properties_callback,
+    device_found_callback,
+    discovery_state_changed_callback,
+    pin_request_callback,
+    ssp_request_callback,
+    bond_state_changed_callback,
+    acl_state_changed_callback,
+    callback_thread_event,
+    dut_mode_recv_callback,
+    le_test_mode_recv_callback,
+    energy_info_recv_callback
+}@com_android_bluetooth_btservice_AdapterService.cpp
 
 //enable bluetooth
 interface.start_up_stack_async-->thread_post(management_thread, event_start_up_stack)-->
 event_start_up_stack@stack_manager.c-->bte_main_enable@bte_main.c-->BTU_StartUp@btu_init.c
 
-//JNI
-bluetoothInterface.init(callbacks){
+//设置stack回调java接口
+initNative-->bluetoothInterface->init(sBluetoothCallbacks){
 - bt_hal_cbacks = callbacks //设置回调
-- stack_manager_get_interface()->init_stack()
-}
-
-===========
-//扫描 device manager
-startDiscovery@Bluetooth.c-->btif_dm_start_discovery(mode=BTA_DM_GENERAL_INQUIRY)@btif_dm.c-->
-BTA_DmSearch@bta_dm_api.c-->bta_sys_sendmsg@bta_sys_main.c-->fixed_queue_enqueue-->
-list_append(queue->list, data)/*加入队列*/@fixed_queue.c
-
-
-//返回设备信息
-remote_device_properties_cb
-
-//扫描到设备
-device_found_cb
+- stack_manager_get_interface{
+	- ensure_manager_initialized-->thread_new
+	- return interface //stack接口
+	}
+- init_stack-->thread_post(management_thread, event_init_stack)-->event_init_stack{
+	- module_init(get_module(BT_UTILS_MODULE))-->bt_utils_module.init@bt_utils.c
+    	- module_init(get_module(BTIF_CONFIG_MODULE))-->btif_config_module.init@btif_configs.c
+	- btif_init_bluetooth@btif_core.c
+	}@stack_manager.c
+}@bluetooth.c
 
 
 
-btif_dm_search_devices_evt{
-- BTA_DM_DISC_RES_EVT-->remote_device_properties_cb
-- BTA_DM_INQ_RES_EVT-->device_found_cb
-}
-===========
-//连接
-setPin
+//btif进程，对应jni的接口
+btif_init_bluetooth{
+- btif_fetch_local_bdaddr(&btif_local_bd_addr)
+- bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME) //bt中处理jni调用的线程
+- btif_transfer_context(btif_jni_associate)-->callback_thread_event//jni接口的环境关联到当前线程。(当前现成可以回调jni)
+}@btif_core.c
 
-===========
-//sprd  a2dp sink src转换
--#define BTA_AV_SINK_INCLUDED TRUE
-+#define BTA_AV_SINK_INCLUDED FALSE 
-@include/bt_target.h
+
 
 
 
@@ -101,4 +121,18 @@ system/bt/stack/btu/btu_init.c
 btif/src/btif_dm.c
 bta/dm/bta_dm_api.c
 bta/sys/bta_sys_main.c
+
+
+system/bt/btif/src/btif_core.c
+
+//operation system interface?
 osi/src/fixed_queue.c
+===========
+//sprd  a2dp sink src转换
+-#define BTA_AV_SINK_INCLUDED TRUE
++#define BTA_AV_SINK_INCLUDED FALSE 
+@include/bt_target.h
+
+
+
+

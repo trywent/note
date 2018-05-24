@@ -1,16 +1,25 @@
 //电量信息  通过广播发出ACTION_BATTERY_CHANGED
 startCoreServices-->mSystemServiceManager.startService(BatteryService.class)@SystemServer.java
 -->onStart{
+- binder = ServiceManager.getService("batteryproperties")//电池
+- batteryPropertiesRegistrar= IBatteryPropertiesRegistrar.Stub.asInterface(binder)
 - batteryPropertiesRegistrar.registerListener(new BatteryListener()) //注册监听
-- publishBinderService("battery", new BinderService())
+- publishBinderService("battery", new BinderService())//注册电池服务
 - publishLocalService(BatteryManagerInternal.class, new LocalService())
-}
+}@BatteryService.java
+
+
+
+
 
 //
 public static abstract class Uid   //用户进程类
 public static abstract class Proc  //进程信息类 cpu使用时间
 public final static class HistoryItem //
 
+
+
+frameworks/base/services/core/java/com/android/server/BatteryService.java
 frameworks/base/core/java/android/os/BatteryStats.java
 ____________________
 //应用电池使用信息
@@ -27,32 +36,49 @@ frameworks/base/core/java/com/android/internal/os/BatteryStatsHelper.java
 ====================
 //daemon
 service healthd /sbin/healthd
-main{
-- 初始化，healthd_mode_ops
+main@healthd.cpp-->healthd_main{
+- 初始化，healthd_mode_ops = &android_ops{
+		   	.init = healthd_mode_android_init,
+   	 		.preparetowait = healthd_mode_android_preparetowait,
+    			.heartbeat = healthd_mode_android_heartbeat,
+    			.battery_update = healthd_mode_android_battery_update,
+		}
 - healthd_init{
 	- healthd_mode_ops->init-->healthd_mode_android_init{
 			- 创建服务BatteryPropertiesRegistrar
+			- publish(gBatteryPropertiesRegistrar) //服务"batteryproperties"
 			}
-	- wakealarm_init  
-	- uevent_init //监听kernel中的POWER事件
-	- BatteryMonitor->init(&healthd_config) //电池状态获取电量，温度..
+	- wakealarm_init-->healthd_register_event(wakealarm_fd, wakealarm_event)
+	- uevent_init-->healthd_register_event(uevent_fd, uevent_event) //监听kernel消息，电池
+	- BatteryMonitor->init(&healthd_config){ //
+		- 加入要监听的状态路径到mChargerNames，ac(充电)，usb(usb充电)，battery
+		}
 	}
-- healthd_mainloop //等待并处理事件
-}
+- healthd_mainloop{ //等待并处理事件
+	- epoll_wait
+	- events[n].data.ptr(events)
+	}
+}@healthd_common.cpp
 
+//注册监听器到"batteryproperties"
+BatteryPropertiesRegistrar::registerListener-->mListeners.add(listener)
+
+
+//读取电池状态更新 /sys/class/power_supply
 periodic_chores-->healthd_battery_update-->
 BatteryMonitor::update{
 - 读取电池信息，batteryStatus，batteryHealth
 - healthd_mode_ops->battery_update-->healthd_mode_android_battery_update//通知listerner
-}
+}@healthd_common.cpp
 
 
 healthd_mode_android_battery_update-->gBatteryPropertiesRegistrar->notifyListeners-->
-BatteryPropertiesRegistrar::notifyListeners-->
+notifyListeners-->batteryPropertiesChanged@BatteryPropertiesRegistrar.cpp
 
 
 
 system/core/healthd/healthd.cpp
+system/core/healthd/healthd_common.cpp
 system/core/healthd/healthd_mode_android.cpp
 system/core/healthd/BatteryPropertiesRegistrar.cpp
 

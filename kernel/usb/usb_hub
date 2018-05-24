@@ -1,10 +1,10 @@
 //usb hub
-usb_hub_init{
+usb_init@usb.c-->usb_hub_init{
   //注册hub驱动
 - usb_register(&hub_driver) 
   //处理event
 - kthread_run(hub_thread)-->hub_thread(开始线程处理事件)-->hub_events{
-- list_empty(&hub_event_list) //遍历事件
+- 判断list_empty(&hub_event_list) //等待事件
 - hub_port_connect_change{//连接状态改变
 	 - usb_alloc_dev
 	 - usb_new_device
@@ -14,8 +14,8 @@ usb_hub_init{
 }@hub.c
 
 
-//加入事件
-hub_irq
+//加入hub事件
+usb_fill_int_urb(hub_irq)
 kick_khubd-->list_add_tail(&hub->event_list, &hub_event_list)@hub.c
 
 

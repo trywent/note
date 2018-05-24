@@ -1,3 +1,4 @@
+//
 suspend/resume:
 
 用户空间接口：
@@ -60,12 +61,16 @@ enter_state{
 		- suspend_ops->prepare
 		- suspend_ops->prepare_late
 		- 休眠，syscore_suspend(syscore_ops_list遍历执行suspend)@syscore.c
-		- 进入休眠，suspend_ops->enter
+		- 进入休眠，suspend_ops->enter //平台相关，休眠最后步骤
 		- 唤醒，syscore_resume
 		}
 	}
 }@suspend.c
 
+syscore_suspend{
+- 
+
+}syscore.c
 __________________
 resume：
 late_resume_work-->late_resume{
