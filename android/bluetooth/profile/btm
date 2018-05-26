@@ -1,0 +1,14 @@
+//
+
+btm_init{
+- btm_inq_db_init                   /* Inquiry Database and Structures */
+- btm_acl_init                      /* ACL Database and Structures */
+- btm_sec_init(BTM_SEC_MODE_SP)       /* Security Manager Database and Structures */
+- btm_sco_init                      /* SCO Database and Structures (If included) */
+- btm_dev_init                      /* Device Manager Structures & HCI_Reset */
+}
+
+
+
+
+system/bt/stack/btm/btm_main.c

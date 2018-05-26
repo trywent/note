@@ -1,5 +1,31 @@
 //bluetooth stack
+/******************************************
 
+bta - Bluetooth Application
+btcore - Bluetooth Core
+btif - Bluetooth Interface
+btu - Bluetooth Upper Layer  对L2CAP RFCOMM, SDP and the BTIf封装？
+btm - Bluetooth Manager 
+BTE: Bluetooth embedded system
+
+CO: call out\CI: call in
+HF : Handsfree Profile
+HH: HID Host Profile
+HL: Health Device Profile
+AV:audio\vidio
+ag: audio gateway
+ar: audio/video registration
+gattc: GATT client
+BLE: Bluetooth Low Energy
+
+
+OPP：文件传输规范
+hfp：和电话相关，接听、挂断电话，以及连接sco通路
+a2dp：蓝牙立体声规范，其中包含avrcp规范，avrcp规范实现了听歌时暂停、上下歌曲选择等控制模式。目前蓝牙耳机一般都支持这两种规范。
+hid：人机交互规范，蓝牙鼠标键盘等
+phap：电话号码簿访问协议
+hdp：蓝牙医疗相关规范
+*******************************************/
 //1.
 static{classInitNative}@AdapterService.java-->
 classInitNative{
@@ -83,16 +109,22 @@ static bt_callbacks_t sBluetoothCallbacks = {
     energy_info_recv_callback
 }@com_android_bluetooth_btservice_AdapterService.cpp
 
-//enable bluetooth
-interface.start_up_stack_async-->thread_post(management_thread, event_start_up_stack)-->
-event_start_up_stack@stack_manager.c-->bte_main_enable@bte_main.c-->BTU_StartUp@btu_init.c
 
-//设置stack回调java接口
+
+/*******************************************
+初始化
+btif(BT_JNI_WORKQUEUE_NAME)---- threadpost ----stack manager(stack_manager) //线程切换
+
+设置stack回调java接口，
+创建stack_manager初始化stack
+
+
+*******************************************/
 initNative-->bluetoothInterface->init(sBluetoothCallbacks){
 - bt_hal_cbacks = callbacks //设置回调
 - stack_manager_get_interface{
-	- ensure_manager_initialized-->thread_new
-	- return interface //stack接口
+	- ensure_manager_initialized-->thread_new("stack_manager") //创建 management_thread线程
+	- return interface //stack接口，栈初始化
 	}
 - init_stack-->thread_post(management_thread, event_init_stack)-->event_init_stack{
 	- module_init(get_module(BT_UTILS_MODULE))-->bt_utils_module.init@bt_utils.c
@@ -103,12 +135,59 @@ initNative-->bluetoothInterface->init(sBluetoothCallbacks){
 
 
 
-//btif进程，对应jni的接口
+//btif BT_JNI_WORKQUEUE_NAME线程，对应jni的接口
 btif_init_bluetooth{
 - btif_fetch_local_bdaddr(&btif_local_bd_addr)
 - bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME) //bt中处理jni调用的线程
 - btif_transfer_context(btif_jni_associate)-->callback_thread_event//jni接口的环境关联到当前线程。(当前现成可以回调jni)
 }@btif_core.c
+
+
+
+/*******************************************
+ 打开蓝牙
+
+
+*******************************************/
+enable-->stack_manager_get_interface()->start_up_stack_async@bluetooth.c-->
+thread_post(management_thread, event_start_up_stack)-->event_start_up_stack{
+- ensure_stack_is_initialized-->event_init_stack
+- module_start_up(get_module(BTIF_CONFIG_MODULE)
+- bte_main_enable{
+	- module_start_up(get_module(BTSNOOP_MODULE))-->btsnoop_module.start_up@btsnoop.c
+	- module_start_up(get_module(HCI_MODULE))-->hci_module.start_up@hci_layer.c
+	- BTU_StartUp@btu_init.c
+	}@bte_main.c
+- btif_thread_post(event_signal_stack_up)//回调上层
+}@stack_manager.c
+
+BTU_StartUp{
+ //创建队列
+- btu_bta_msg_queue
+- btu_general_alarm_queue
+- btu_oneshot_alarm_queue
+- btu_l2cap_alarm_queue
+- bt_workqueue_thread = thread_new(BT_WORKQUEUE_NAME)//新线程
+- thread_post(bt_workqueue_thread, btu_task_start_up)-->btu_task_start_up@btu_task.c
+}@btu_init.c
+
+
+btu_task_start_up{
+  /* Initialize the mandatory core stack control blocks
+     (BTU, BTM, L2CAP, and SDP)
+   */
+- btu_init_core{
+	- btm_init //btm初始
+	- l2c_init
+	- sdp_init
+	- gatt_init
+	- btm_ble_init
+	}@btu_init.c
+- BTE_InitStack
+- bta_sys_init
+}@btu_task.c
+
+
 
 
 
@@ -122,10 +201,15 @@ btif/src/btif_dm.c
 bta/dm/bta_dm_api.c
 bta/sys/bta_sys_main.c
 
-
 system/bt/btif/src/btif_core.c
 
-//operation system interface?
+system/bt/hci/src/hci_layer.c
+system/bt/hci/src/btsnoop.c
+
+system/bt/stack/btu/btu_init.c
+system/bt/stack/btu/btu_task.c
+
+//operation system interface
 osi/src/fixed_queue.c
 ===========
 //sprd  a2dp sink src转换

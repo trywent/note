@@ -9,44 +9,7 @@ mode:需要创建文件时，设置文件的权限
 ssize_t read(int fd, void *buf, size_t count);//返回实际读取的数据个数
 ssize_t write(int fd, const void *buf, size_t count);//返回写入的数据个数
 
-_____________________
-
-select,pselect:等待文件描述符准备好执行IO操作
-
-
-poll，ppoll:等待文件描述符上的事件，直到文件描述符能够执行IO操作。会阻塞直到事件发生
-ppoll与poll的区别是，ppoll除了超时结束等待，还会在收到某个信号后结束等待。
-
-epoll:(仅比poll快)
-poll的变种可用做边界触发，水平触发，能够监听多个文件描述符
-
--epoll_create返回指向epoll实例的指针。结束使用close()关闭
--epoll_ctl注册感兴趣的文件描述符。注册在当前epoll上的文件描述符被称为epoll set
--epoll_wait开始工作
-
-epoll事件分发接口能够作用为 edge-triggered (ET)和level-triggered (LT)。
-1，在pipe读取端的文件描述符(rfd),注册到epoll实例。
-2，pipe写入端，写入2kB数据
-3，对epoll_wait的调用会返回rfd    //边界触发,产生事件
-4，pipe读取端，从rfd读取1KB数据
-5，调用epoll_wait                //边界触发，不会获取事件
-
-
-epoll_wait返回epoll_event:
-
-	typedef union epoll_data {
-               void    *ptr;
-               int      fd;
-               uint32_t u32;
-               uint64_t u64;
-           } epoll_data_t;
-
-           struct epoll_event {
-               uint32_t     events;    /* Epoll events */
-               epoll_data_t data;      /* User data variable */
-           };
-
-______________________
+——————————————————————
 socket:
 int socket(int domain, int type, int protocol)
 //创建一个socket用于通信，返回一个fd

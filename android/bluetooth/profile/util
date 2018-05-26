@@ -1,6 +1,80 @@
-//工具函数
+//pthread
+/*
+
+结束条件：
+- 调用pthread_exit，向调用pthread_join的线程传递退出信息
+- start_routine返回
+- pthread_cancel
+- thread所在进程调用exit
+*/
+
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                          void *(*start_routine) (void *), void *arg);
 
 
+
+//封装thread
+thread_new-->thread_new_sized{
+- reactor_new{//创建reactor
+	- epoll_create
+	- eventfd
+	- epoll_ctl(ret->epoll_fd, EPOLL_CTL_ADD, ret->event_fd, &event)//等待读取数据EPOLLIN,用于监听是否结束
+	} 
+- fixed_queue_new()//创建workqueue
+- pthread_create(&ret->pthread, NULL, run_thread)
+}
+
+
+/*
+fd = fixed_queue_get_dequeue_fd(thread->work_queue)
+work_queue_read_cb 为获取事件后执行的函数
+*/
+run_thread(thread->reactor, fd, context, work_queue_read_cb){
+- reactor_register(work_queue_read_cb)
+- reactor_start(0)-->run_reactor//循环
+}
+
+//执行queue中的函数
+work_queue_read_cb-->fixed_queue_dequeue(queue)->func();
+
+/* 
+监听fd,若有事件则执行read_ready，或write_ready
+*/
+reactor_register(reactor,fd,read_ready,write_ready){
+- 创建reactor_object_t，将参数保存到reactor_object_t
+- 将reactor_object_t保存到event中
+- epoll_ctl(reactor->epoll_fd, EPOLL_CTL_ADD, fd, &event)
+}
+
+run_reactor(reactor,/*0 循环运行 1 执行一次*/){
+- epoll_wait(reactor->epoll_fd) //监听事件
+ 
+//遍历返回的所有事件
+- eventfd_read(reactor->event_fd),监听是否结束运行
+- object = (reactor_object_t *)events[j].data.ptr
+- object->read_ready
+- object->write_ready
+}
 
 system/bt/osi/src/thread.c
 system/bt/osi/src/reactor.c
+
+//queue fixed_queue_enqueue将data加入到队列queue
+void fixed_queue_enqueue(fixed_queue_t *queue, void *data);
+
+/* Dequeues the next element from |queue|. If the queue is currently empty,
+ this function will block the caller until an item is enqueued. This
+ function will never return NULL. |queue| may not be NULL.*/
+void *fixed_queue_dequeue(fixed_queue_t *queue);
+
+
+//alarm 定时回调
+/* Sets an alarm to fire |cb| after the given |deadline|. Note that |deadline| is the
+ number of milliseconds relative to the current time. |data| is a context variable
+ for the callback and may be NULL. |cb| will be called back in the context of an
+ unspecified thread (i.e. it will not be called back in the same thread as the caller).
+ |alarm| and |cb| may not be NULL.*/
+void alarm_set(alarm_t *alarm, period_ms_t deadline, alarm_callback_t cb, void *data);
+
+
+system/bt/osi/include/alarm.h
