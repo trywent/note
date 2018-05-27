@@ -37,3 +37,8 @@ apt-mark hold package
 列出所有包：
 dpkg -l
 
+
+
+//系统升级
+sudo do-release-upgrade -d
+

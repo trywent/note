@@ -1,0 +1,63 @@
+//蓝牙技术有两种
+Basic Rate (BR){//721.2kb/s
+- Enhanced Data Rate (EDR) //2.1Mb/s
+- Media Access Control (MAC)//54Mb/s
+- Physical (PHY)
+} 
+
+Alternate MAC/PHYs (AMPs)
+
+Low Energy (LE)
+
+
+
+//从下到上层次结构
+physical channel---physical link---logical transport---logical link---L2CAP channel
+
+
+link manager protocol (LMP)用于建立连接,使用asynchronous connection-oriented
+logical transport(ACL)传输方式
+
+LMP@logic liink{
+- baseband and physical layers
+}
+
+L2CAP@logic liink{//有个协议控制频道基于ACL
+- baseband
+}
+
+
+Service Discovery Protocol (SDP)
+Generic Access Profile (GAP)
+Protocol Adaptation Layers (PALs)
+
+
+//定义了一套蓝牙实现的最基础协议
+Generic Access Profile (GAP){
+- BR/EDR{
+	Radio, Baseband, Link Manager, L2CAP, SDP
+	}
+- LE{
+	Physical Layer, Link Layer, L2CAP, Security Manager, Attribute Protocol and Generic
+	Attribute Profile
+	}
+}
+
+
+
+host{
+Security Manager Protocol (SMP) //只存在LE系统中。BR/EDR中在LMP
+Attribute Protocol (ATT)
+Generic Attribute Profile (GATT)
+Generic Access Profile (GAP)
+Alternate MAC/PHYs (AMPs)
+}
+
+Controller(BR/EDR/LE){
+Device Manager
+Link Manager Protocol (LMP)//BR/EDR
+Link Layer Protocol (LL)//LE
+Baseband Resource Manager
+Link Controller//
+PHY //接收数据包
+}

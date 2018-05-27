@@ -4,7 +4,7 @@ dwc_otg_driver.probe-->dwc_otg_driver_probe{
 }
 
 
-dwc_otg_hc_driver.start-->dwc_otg_hcd_start-->hcd_reinit@dwc_otg_hcd.c-->dwc_otg_core_host_init@dwc_otg_cil.c
+dwc_otg_hc_driver.start-->dwc_otg_hcd_start-->hcd_reinit@dwc_otg_hcd.c-->9@dwc_otg_cil.c
 
 
 drivers/usb/dwc_otg/dwc_otg_hcd.c

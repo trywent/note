@@ -1,3 +1,40 @@
 //
+BTU_StartUp{
+ //创建队列
+- btu_bta_msg_queue
+- btu_general_alarm_queue
+- btu_oneshot_alarm_queue
+- btu_l2cap_alarm_queue
+- bt_workqueue_thread = thread_new(BT_WORKQUEUE_NAME)//新线程
+- thread_post(bt_workqueue_thread, btu_task_start_up)-->btu_task_start_up@btu_task.c
+}@btu_init.c
 
-BTU_StartUp
+
+
+
+l2cu_no_dynamic_ccbs
+
+
+
+//btu中队列处理btu_general_alarm_queue，处理函数btu_general_alarm_ready
+fixed_queue_register_dequeue(btu_general_alarm_queue,btu_general_alarm_ready)-->btu_general_alarm_ready
+btu_general_alarm_process(IMER_LIST_ENT *p_tle){
+- BTU_TTYPE_L2CAP_LINK:
+- BTU_TTYPE_L2CAP_CHNL:
+- BTU_TTYPE_L2CAP_HOLD:
+- BTU_TTYPE_L2CAP_INFO:
+- BTU_TTYPE_L2CAP_FCR_ACK:
+	l2c_process_timeout
+- BTU_TTYPE_SDP
+}
+
+//将任务加入队列btu_general_alarm_queue
+btu_start_timer(&p_lcb->timer_entry, BTU_TTYPE_L2CAP_LINK)@l2c_utils.c-->alarm_set(alarm,btu_general_alarm_cb)
+-->btu_general_alarm_cb-->fixed_queue_enqueue(btu_general_alarm_queue, p_tle)@btu_task.c
+
+
+l2c_process_timeout(BTU_TTYPE_L2CAP_LINK)-->l2c_process_timeout
+
+stack/btu/btu_task.c
+stack/l2cap/l2c_utils.c
+

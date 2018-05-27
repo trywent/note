@@ -1,0 +1,8 @@
+//
+HCI Command Packet：host发给controller，主要是HCI 命令， 注意是命令，不是数据。
+
+HCI Event Packet：controller发给host。对应于command packet。
+
+HCI ACL Data Packet： host发给controller或者相反。主要是L2CAP发送和接收的数据，我们上层的所有数据，注意是数据，而不是命令，都是通过这个type来传递的。
+
+HCI Synchronous Data Packet：用来传输语音（SCO）数据的。注意一般都会通过PCM接口来传输SCO数据

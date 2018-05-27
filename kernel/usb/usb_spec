@@ -147,3 +147,10 @@ host:
 中断数据传输：中断传输(usb触摸)
 同步传输：同步传输(视频，音频)
 
+
+===============
+//hub 设备连接移除检测，传输错误恢复
+大概三個模塊Hub Repeater, the Hub Controller, and the Transaction Translator
+
+
+hub的本地始终维持一个帧计数器，并且通过SOF(start of frame)和host同步
