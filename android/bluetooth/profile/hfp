@@ -1,26 +1,4 @@
 //client
-static{ classInitNative}//设置jni回调函数
-{
-onConnectionStateChanged
-onAudioStateChanged
-onCall-->sendMessage(EVENT_TYPE_CALL)
-onCallSetup-->sendMessage(EVENT_TYPE_CALLSETUP)
-}
-
-HeadsetClientStateMachine{
-- initializeNative //获取接口设置回调
-- addState(mDisconnected)
-- addState(mConnecting)
-- addState(mConnected)
-- addState(mAudioOn, mConnected)
-- setInitialState(mDisconnected)
-}@HeadsetClientStateMachine.java 
-
-initializeNative{
-- getBluetoothInterface
-- sBluetoothHfpClientInterface =btInf->get_profile_interface(BT_PROFILE_HANDSFREE_CLIENT_ID)//hfpclient接口
-- sBluetoothHfpClientInterface->init(&sBluetoothHfpClientCallbacks) //设置回调
-}@com_android_bluetooth_hfpclient.cpp
 ===============
 //电话
 waitForIndicators
@@ -58,12 +36,58 @@ Connected.processMessage{
 	}
 }
 
+
+
+
+static{ classInitNative}//设置jni回调函数
+{
+onConnectionStateChanged
+onAudioStateChanged
+onCall-->sendMessage(EVENT_TYPE_CALL)
+onCallSetup-->sendMessage(EVENT_TYPE_CALLSETUP)
+}
+
+HeadsetClientStateMachine{
+- initializeNative //获取接口设置回调
+- addState(mDisconnected)
+- addState(mConnecting)
+- addState(mConnected)
+- addState(mAudioOn, mConnected)
+- setInitialState(mDisconnected)
+}@HeadsetClientStateMachine.java 
+
+initializeNative{
+- getBluetoothInterface
+- sBluetoothHfpClientInterface =btInf->get_profile_interface(BT_PROFILE_HANDSFREE_CLIENT_ID)//hfpclient接口
+- sBluetoothHfpClientInterface->init(&sBluetoothHfpClientCallbacks) //设置回调
+}@com_android_bluetooth_hfpclient.cpp
+
+
 packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientService.java
 packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientStateMachine.java 
 packages/apps/Bluetooth/jni/com_android_bluetooth_hfpclient.cpp
 
+
 //=================
 //stack
+
+init-->bt_hf_client_callbacks = callbacks@btif_hf_client.c
+
+
+//注册回调bte_hf_client_evt，到队列btu_bta_msg_queue
+btif_hf_client_execute_service@btif_hf_client.c-->
+BTA_HfClientEnable(bte_hf_client_evt){
+- bta_sys_register(BTA_ID_HS, &bta_hf_client_reg) //注册到BTA
+- bta_sys_sendmsg(BTA_HF_CLIENT_API_ENABLE_EVT)-->fixed_queue_enqueue(btu_bta_msg_queue)@bta_sys_main.c
+}@bta_hf_client_api.c
+
+//注册
+btu_bta_msg_ready@btu_task.c-->bta_sys_event-->bta_sys_cb.reg[id]->evt_hdlr
+@bta_sys_main.c-->bta_hf_client_reg.bta_hf_client_hdl_event@bta_hf_client_api.c-->
+bta_hf_client_api_enable@bta_hf_client_main.c
+
+//设置回调到bta_hf_client_cb.p_cback
+bte_hf_client_evt-->
 btif_hf_client_upstreams_evt{
 - BTA_HF_CLIENT_OPEN_EVT{//连接
 	- btif_hf_client_cb.state = BTHF_CLIENT_CONNECTION_STATE_CONNECTED
@@ -79,6 +103,16 @@ btif_hf_client_upstreams_evt{
 - BTA_HF_CLIENT_AUDIO_CLOSE_EVT://声音断开
 	- HAL_CBACK(bt_hf_client_callbacks, audio_state_cb, BTHF_CLIENT_AUDIO_STATE_DISCONNECTED)
 
-}
+}@btif_hf_client.c
 
 
+//连接事件上报
+
+bta_hf_client_svc_conn_open-->bta_hf_client_cb.p_cback)(BTA_HF_CLIENT_CONN_EVT)@bta_hf_client_act.c
+-->bte_hf_client_evt@btif_hf_client.c
+
+btif/src/btif_hf_client.c
+bta/hf_client/bta_hf_client_api.c
+bta/hf_client/bta_hf_client_main.c
+bta/sys/bta_sys_main.c
+bta/hf_client/bta_hf_client_act.c

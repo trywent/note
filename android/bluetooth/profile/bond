@@ -1,31 +1,41 @@
 //
-
-pin_request_callback-->callbackEnv->CallVoidMethod(method_pinRequestCallback,addr,min_16_digits)
-@com_android_bluetooth_btservice_AdapterService.cpp-->pinRequestCallback@JniCallbacks.java-->
-pinRequestCallback@BondStateMachine.java
-
-
-
-ssp_request_callback-->callbackEnv->CallVoidMethod(method_sspRequestCallback,addr,pass_key)
-@com_android_bluetooth_btservice_AdapterService.cpp-->sspRequestCallback@JniCallbacks.java-->
-sspRequestCallback@BondStateMachine.java
+//扫描 device manager
+startDiscovery@Bluetooth.c-->btif_dm_start_discovery{
+- BTA_DmBleScanFilterSetup(BTA_DM_BLE_SCAN_COND_DELETE)
+- BTA_DmBleScanFilterSetup(BTA_DM_BLE_SCAN_COND_ADD)
+- BTA_DmSearch(&inq_params,bte_search_devices_evt)
+}
 
 
 
 
-sendDisplayPinIntent-->mAdapterService.sendOrderedBroadcast(ACTION_PAIRING_REQUEST)@BondStateMachine.java
--->onReceive-->startActivity(pairingIntent)@BluetoothPairingRequest.java
--->onCreate{
+(mode=BTA_DM_GENERAL_INQUIRY)@btif_dm.c-->
+BTA_DmSearch@bta_dm_api.c-->bta_sys_sendmsg@bta_sys_main.c-->fixed_queue_enqueue-->
+list_append(queue->list, data)/*加入队列*/@fixed_queue.c
 
-}@BluetoothPairingDialog.java
 
-packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
-packages/apps/Bluetooth/src/com/android/bluetooth/btservice/JniCallbacks.java
-packages/apps/Bluetooth/src/com/android/bluetooth/btservice/BondStateMachine.java
-================
-//stack
-BTA_DM_COD {0x5A, 0x40, 0x08} //设备类型SERVICE_CLASS MAJOR_CLASS MINOR_CLASS
+//返回设备信息
+remote_device_properties_cb
 
-BTM_LOCAL_IO_CAPS               BTM_IO_CAP_IO//配对方式
+//扫描到设备
+device_found_cb
 
-system/bt/bta/dm/bta_dm_act.c
+
+
+btif_dm_search_devices_evt{
+- BTA_DM_DISC_RES_EVT-->remote_device_properties_cb
+- BTA_DM_INQ_RES_EVT-->device_found_cb
+}
+
+======================
+//bond
+btu_hcif_process_event(HCI_CONNECTION_REQUEST_EVT)-->btu_hcif_connection_request_evt@btu_hcif.c
+-->btm_sec_conn_req@btm_sec.c-->l2c_link_hci_conn_req@l2c_link.c
+
+
+
+
+bta/dm/bta_dm_act.c
+stack/btm/btm_sec.c
+stack/l2cap/l2c_link.c
+bt/stack/btu/btu_hcif.c

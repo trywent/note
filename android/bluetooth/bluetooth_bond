@@ -125,14 +125,26 @@ ACTION_PAIRING_REQUES
 sendDisplayPinIntent@BondStateMachine.java
 
 
-02-28 10:04:20.814  2416  2458 I BluetoothBondStateMachine: Bond address is:80:13:82:A6:3E:1F
-02-28 10:04:20.814  2416  2458 I BluetoothBondStateMachine: Entering PendingCommandState State
-02-28 10:04:20.815  2416  2442 I BluetoothBondStateMachine: bondStateChangeCallback: Status: 0 Address: 80:13:82:A6:3E:1F newState: 1
-02-28 10:04:20.816  2416  2458 I BluetoothBondStateMachine: Bond State Change Intent:80:13:82:A6:3E:1F OldState: 10 NewState: 11
-02-28 10:04:21.422  2416  2442 I BluetoothBondStateMachine: pinRequestCallback: [B@78d1394 name:[B@b809e3d cod:5898764
+//
 
-02-28 10:04:29.417  2416  2458 I BluetoothBondStateMachine: Bond State Change Intent:80:13:82:A6:3E:1F OldState: 11 NewState: 12
-02-28 10:04:29.418  2416  2458 I BluetoothBondStateMachine: StableState(): Entering Off State
+pin_request_callback-->callbackEnv->CallVoidMethod(method_pinRequestCallback,addr,min_16_digits)
+@com_android_bluetooth_btservice_AdapterService.cpp-->pinRequestCallback@JniCallbacks.java-->
+pinRequestCallback@BondStateMachine.java
+
+
+
+ssp_request_callback-->callbackEnv->CallVoidMethod(method_sspRequestCallback,addr,pass_key)
+@com_android_bluetooth_btservice_AdapterService.cpp-->sspRequestCallback@JniCallbacks.java-->
+sspRequestCallback@BondStateMachine.java
+
+
+
+
+sendDisplayPinIntent-->mAdapterService.sendOrderedBroadcast(ACTION_PAIRING_REQUEST)@BondStateMachine.java
+-->onReceive-->startActivity(pairingIntent)@BluetoothPairingRequest.java
+-->onCreate{
+
+}@BluetoothPairingDialog.java
 
 
 //连接profile

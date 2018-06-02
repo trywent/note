@@ -35,7 +35,7 @@ run_thread(thread->reactor, fd, context, work_queue_read_cb){
 }
 
 //执行queue中的函数
-work_queue_read_cb-->fixed_queue_dequeue(queue)->func();
+work_queue_read_cb-->(work_item_t)fixed_queue_dequeue(queue)->func()@thread.c
 
 /* 
 监听fd,若有事件则执行read_ready，或write_ready

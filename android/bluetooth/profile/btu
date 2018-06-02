@@ -1,4 +1,4 @@
-//
+//btu - Bluetooth Upper Layer  对L2CAP RFCOMM, SDP and the BTIf封装？
 BTU_StartUp{
  //创建队列
 - btu_bta_msg_queue
@@ -10,10 +10,13 @@ BTU_StartUp{
 }@btu_init.c
 
 
+//
+l2cu_release_ccb-->l2cu_no_dynamic_ccbs-->btu_start_timer@l2c_utils.c
 
 
-l2cu_no_dynamic_ccbs
-
+//将任务加入队列btu_general_alarm_queue
+btu_start_timer(&p_lcb->timer_entry, BTU_TTYPE_L2CAP_LINK)@l2c_utils.c-->alarm_set(alarm,btu_general_alarm_cb)
+-->btu_general_alarm_cb-->fixed_queue_enqueue(btu_general_alarm_queue, p_tle)@btu_task.c
 
 
 //btu中队列处理btu_general_alarm_queue，处理函数btu_general_alarm_ready
@@ -28,13 +31,47 @@ btu_general_alarm_process(IMER_LIST_ENT *p_tle){
 - BTU_TTYPE_SDP
 }
 
-//将任务加入队列btu_general_alarm_queue
-btu_start_timer(&p_lcb->timer_entry, BTU_TTYPE_L2CAP_LINK)@l2c_utils.c-->alarm_set(alarm,btu_general_alarm_cb)
--->btu_general_alarm_cb-->fixed_queue_enqueue(btu_general_alarm_queue, p_tle)@btu_task.c
 
 
 l2c_process_timeout(BTU_TTYPE_L2CAP_LINK)-->l2c_process_timeout
 
+
+
+===============================
+//l2cap
+l2cu_send_peer_disc_req@l2c_utils.c-->
+
+
+l2c_rcv_acl_data-->process_l2cap_cmd(L2CAP_CMD_DISC_REQ)@l2c_main.c-->
+l2c_csm_execute(L2CEVT_L2CAP_DISCONNECT_REQ)-->l2c_csm_open(L2CEVT_L2CAP_DISCONNECT_REQ)
+-->Disconnect_Ind_Cb@l2c_csm.c
+
+
+l2c_link_hci_conn_comp-->l2c_process_held_packets(FALSE)-->l2c_rcv_acl_data@l2c_link.c
+
+
+l2c_process_timeout(BTU_TTYPE_L2CAP_HOLD)-->l2c_process_held_packets(TRUE)@l2c_main.c
+-->l2c_rcv_acl_data
+
+
+l2c_link_check_send_pkts@l2c_link.c-->
+l2cu_get_next_buffer_to_send-->l2cu_get_next_channel_in_rr@l2c_utils.c
+
+//断开连接
+l2c_link_timeout
+
+BTM_SecBondCancel-->btm_sec_send_hci_disconnect
+
+
+btm_sec_auth_complete
+//资料
+l2c_data_write-->l2c_csm_execute-->l2c_scm_open-->l2c_link_check_send_pkts-->
+l2c_link_send_to_lower-->bte_main_hci_send-->transmit_buf
+
+
 stack/btu/btu_task.c
+stack/btu/btu_hcif.c
 stack/l2cap/l2c_utils.c
+stack/l2cap/l2c_main.c
+stack/l2cap/l2c_csm.c
 

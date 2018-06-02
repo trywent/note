@@ -1,4 +1,4 @@
-//蓝牙技术有两种
+//蓝牙技术有两种  频率范围2.400~2.4835GHz。79个通道，从2.402GHz开始，每隔1MHz有一个RF通道
 Basic Rate (BR){//721.2kb/s
 - Enhanced Data Rate (EDR) //2.1Mb/s
 - Media Access Control (MAC)//54Mb/s
@@ -61,3 +61,12 @@ Baseband Resource Manager
 Link Controller//
 PHY //接收数据包
 }
+
+
+
+
+=====================
+//l2cap
+
+L2CAP Service Data Units(SDU)
+protocol data unit (PDU) 

@@ -1,1 +1,61 @@
-//
+//blutooth application
+
+application---bta---hw
+
+
+================
+//BTA_ID_SYS
+bta_sys_cb{
+- reg    //注册的应用接口
+- sys_hw_cback //hw层接口
+}
+//上层接口
+btu_task_start_up{
+- fixed_queue_register_dequeue(btu_bta_msg_queue,thread_get_reactor(bt_workqueue_thread),
+      btu_bta_msg_ready)
+- bta_sys_init
+}
+
+bta_sys_init{
+- fixed_queue_register_dequeue(btu_bta_alarm_queue,thread_get_reactor(bt_workqueue_thread,
+	btu_bta_alarm_ready)//注册queue bt_workqueue_thread
+- bta_sys_register(BTA_ID_SYS,bta_sys_hw_reg)//注册profile到BTA,
+- BTM_RegisterForDeviceStatusNotif
+}@bta_sys_main.c
+
+
+//任务
+bta_sys_sendmsg@bta_dm_api.c-->bta_sys_sendmsg-->fixed_queue_enqueue(btu_bta_msg_queue)-->
+/*收到任务*/btu_bta_msg_ready-->bta_sys_event{
+- p_msg->event >> 8//获取event对应的id
+- bta_sys_cb.reg[id]->evt_hdlr-->bta_sys_hw_reg.evt_hdlr-->bta_sys_sm_execute-->bta_sys_action
+}@bta_sys_main.c
+
+bta_sys_action{
+
+	
+}
+
+______________
+//hw层接口
+bta_dm_enable-->bta_sys_hw_register(bta_dm_sys_hw_cback)@bta_dm_act.c
+
+
+bta/sys/bta_sys_main.c
+bta/dm/bta_dm_act.c
+bta/sys/bta_sys.h
+
+================
+//device manager. BTA_ID_DM BTA_ID_DM_SEARCH 
+BTA_EnableBluetooth{
+- bta_sys_register(BTA_ID_DM,&bta_dm_reg)
+- bta_sys_register(BTA_ID_DM_SEARCH)
+- bta_sys_sendmsg(BTA_DM_API_ENABLE_EVT)
+}
+
+bta_dm_reg.bta_dm_sm_execute-->bta_dm_action{
+- 
+}
+
+
+bta/dm/bta_dm_api.c

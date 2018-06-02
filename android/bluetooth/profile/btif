@@ -1,3 +1,5 @@
+//bt interface
+
 /***************************************
 向上回调接口，有上下文转换
 ****************************************/
@@ -37,25 +39,8 @@ btif/src/btif_dm.c
 system/bt/btif/src/btif_core.c
 system/bt/bta/dm/bta_dm_api.c
 system/bt/bta/sys/bta_sys_main.c
-======================
-//扫描 device manager
-startDiscovery@Bluetooth.c-->btif_dm_start_discovery(mode=BTA_DM_GENERAL_INQUIRY)@btif_dm.c-->
-BTA_DmSearch@bta_dm_api.c-->bta_sys_sendmsg@bta_sys_main.c-->fixed_queue_enqueue-->
-list_append(queue->list, data)/*加入队列*/@fixed_queue.c
 
-
-//返回设备信息
-remote_device_properties_cb
-
-//扫描到设备
-device_found_cb
-
-
-
-btif_dm_search_devices_evt{
-- BTA_DM_DISC_RES_EVT-->remote_device_properties_cb
-- BTA_DM_INQ_RES_EVT-->device_found_cb
-}
+=========================
 
 
 

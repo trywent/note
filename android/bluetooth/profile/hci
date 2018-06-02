@@ -1,8 +1,60 @@
 //
 HCI Command Packet：host发给controller，主要是HCI 命令， 注意是命令，不是数据。
-
 HCI Event Packet：controller发给host。对应于command packet。
-
 HCI ACL Data Packet： host发给controller或者相反。主要是L2CAP发送和接收的数据，我们上层的所有数据，注意是数据，而不是命令，都是通过这个type来传递的。
-
 HCI Synchronous Data Packet：用来传输语音（SCO）数据的。注意一般都会通过PCM接口来传输SCO数据
+
+
+//HCI初始化
+
+
+
+bte_main_enable-->module_start_up(get_module(HCI_MODULE))@bte_main.c-->
+hci_module.start_up-->start_up{
+- vendor_open-->dlopen("libbt-vendor.so")@vendor.c//加载本地库
+}@hci_layer.c
+
+
+hci_layer_get_interface-->vendor_get_interface@hci_layer.c
+
+
+===============================
+//收到hci上传事件.队列btu_hci_msg_queue
+
+//发送命令，并设置回复后的回调函数
+btu_hcif_send_cmd-->hci_layer_get_interface()->transmit_command(btu_hcif_command_status_evt
+/btu_hcif_command_complete_evt)@btu_hcif.c-->transmit_command{
+- 设置wait_entry回调函数
+- fixed_queue_enqueue(command_queue, wait_entry)
+}@hci_layer.c
+
+
+//处理command_queue上的命令。将已执行的命令项目移到pending_response
+event_command_ready-->list_append(commands_pending_response, wait_entry)@hci_layer.c
+
+//收到回复
+hal_says_data_ready-->
+filter_incoming_event{
+HCI_COMMAND_COMPLETE_EVT:
+- wait_entry = get_waiting_command
+- wait_entry->complete_callback-->btu_hcif_command_complete_evt-->
+	fixed_queue_enqueue(btu_hci_msg_queue,event) //将任务加入到queue
+
+HCI_COMMAND_STATUS_EVT
+- wait_entry = get_waiting_command
+- wait_entry->status_callback-->btu_hcif_command_status_evt-->
+	fixed_queue_enqueue(btu_hci_msg_queue,event) //将任务加入到queue
+
+}hci_layer.c
+
+//执行btu_hci_msg_queue中任务
+btu_hci_msg_queue-->btu_hci_msg_ready-->btu_hci_msg_process{
+- BT_EVT_TO_BTU_HCI_ACL:l2c_rcv_acl_data@l2c_csm.c
+- BT_EVT_TO_BTU_HCI_EVT:btu_hcif_process_event@btu_hcif.c
+
+}@btu_task.c
+
+
+system/bt/main/bte_main.c
+system/bt/hci/src/hci_layer.c
+system/bt/hci/src/vendor.c
