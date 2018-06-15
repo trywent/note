@@ -1,0 +1,20 @@
+//设置timezone
+onListItemClick-->alarm.setTimeZone@ZonePicker.java-->setTimeZone@AlarmManager.java-->
+setTimeZone{
+- SystemProperties.set(TIMEZONE_PROPERTY, zone.getID())
+- TimeZone.setDefault(null)
+}@AlarmManagerService.java
+
+//进程设置默认时区
+commonInit@RuntimeInit.java-->TimezoneGetter.setInstance(设置默认时区为"persist.sys.timezone")@TimezoneGetter.java
+
+
+//获取默认时区
+getDefault--> TimeZone.getTimeZone(从TimezoneGetter获取时区名)-->getCustomTimeZone-->
+new SimpleTimeZone@TimeZone.java
+
+
+frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
+libcore/luni/src/main/java/java/util/TimeZone.java
+libcore/luni/src/main/java/org/apache/harmony/luni/internal/util/TimezoneGetter.java
+libcore/luni/src/main/java/java/util/SimpleTimeZone.java

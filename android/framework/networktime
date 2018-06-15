@@ -1,3 +1,11 @@
+//
+
+Reference Timestamp：系统时钟最后一次被设定或更新的时间。
+Originate Timestamp：NTP请求报文离开客户端时客户端的本地时间。客户端
+Receive Timestamp：NTP请求报文到达服务端时服务端的本地时间。服务器
+Transmit Timestamp：应答报文离开服务端时服务端的本地时间。服务器
+
+========
 通过网络更新时间(NTP服务)：
 
 注册重复设置时间(没有成功)：

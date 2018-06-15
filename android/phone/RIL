@@ -1,6 +1,9 @@
-准备工作
+//
 
-________________
+
+
+
+================
 AT命令：
 at_open{
 - 设置处理函数，s_unsolHandler
@@ -43,5 +46,3 @@ hardware/ril/rild/rild.c
 
 接口：
 hardware/ril/libril/ril.cpp
-================
-工作流程：

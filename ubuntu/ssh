@@ -20,7 +20,8 @@ scp -r /root/.ssh/id_rsa.pub 192.168.31.147:/root/.ssh/authorized_keys
 
 cat  id_rsa.pub >> ~/.ssh/authorized_keys
 
-或者ssh-copyid user@host即可
+或者
+ssh-copyid user@host
 
 
 拷贝A中.ssh到C中.ssh。C可免密登录
@@ -43,3 +44,7 @@ sudo apt-get install openssh-server
 scp root@192.168.1.12:/usr/local/src/ *.log /root/
 scp root@192.168.1.11:/usr/local/src/ *.log /root/
 
+
+
+=======
+tmate远程登录

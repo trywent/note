@@ -1,117 +1,128 @@
 //
-config_systemBarComponent：TabletStatusBar(平板的systemUI)
-config_statusBarComponent：PhoneStatusBar(手机systemUI)
+status_bar.xml{
+- notification_lights_out
+- system_icons.xml{
+	- statusIcons
+	- signal_cluster_view.xml
+	- battery
+	}
+}
 
-mHasSystemNavBar：系统导航条在平板上，导航条一直在设备底部
-mHasNavigationBar：手机上导航条，当设备横放是导航条放置在右边
-
-(设置是否有导航栏)setInitialDisplaySize@PhoneWindowManager.java：
-根据屏幕大小密度判断是否要mHasSystemNavBar，
-
-
-SystemUI的流程:
+SystemUI启动:
 ServerThread.run-->ActivityManagerService.self().systemReady-->startSystemUi-->
-context.startService@SystemServer.java-->(设备是tablet时,mstar为phone)onCreate--> mServices[i].start()
-@SystemUIService.java-->start-->super.start@TabletStatusBar.java-->start@BaseStatusBar.java
--->mBarService.registerStatusBar(CommandQueue)-->(注册statusBar)registerStatusBar
-@StatusBarManagerService.java
+context.startService@SystemServer.java-->onCreate@SystemUIService.java--> 
+startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
+- 遍历SERVICES{
+            Dependency.class,
+            NotificationChannels.class,
+            CommandQueue.CommandQueueStart.class,
+            KeyguardViewMediator.class,
+            Recents.class,
+            VolumeUI.class,
+            Divider.class,
+            SystemBars.class,
+	    .....
+	}
+- SystemUIFactory.getInstance().createInstance(cl) //创建服务对象
+- mServices[i].start() //
+}@SystemUIApplication.java
 
 
-窗口：
-super.start-->createAndAddWindows-->addStatusBarWindow-->makeStatusBarView-->
-WindowManagerImpl.getDefault().addView@TabletStatusBar.java-->sWindowManager.addView-->
-addView@WindowMangerImpl.java
+_______________________
+//窗口：
+SystemBars.start-->createStatusBarFromConfig{
+- mContext.getString(R.string.config_statusBarComponent)//获取bar名statusbar.phone.StatusBar
+- mStatusBar.start-->start{
+	- mNetworkController=Dependency.get(NetworkController)//NetworkControllerImpl
+	- mCommandQueue.addCallbacks(this)
+	- createAndAddWindows
+	- mIconPolicy = new PhoneStatusBarPolicy
+	}@StatusBar.java
+}@SystemBars.java
 
+
+createAndAddWindows-->addStatusBarWindow{
+- makeStatusBarView{
+	- inflateStatusBarWindow-->mStatusBarWindow = View.inflate(R.layout.super_status_bar)
+	  //设置statusBarFragment为CollapsedStatusBarFragment 折叠的statusBar(正常状态)
+	- FragmentHostManager.get(mStatusBarWindow).addTagListener().getFragmentManager().replace(new CollapsedStatusBarFragment)
+	- StatusBarIconControllerImpl.addIconGroup(new IconManager((ViewGroup))
+	- mStatusBarWindow.findViewById(R.id.qs_frame) //快速设置view
+	}
+- mStatusBarWindowManager.add(mStatusBarWindow, getStatusBarHeight())
+}@StatusBar.java
+
+
+//替换view中status_bar_container为CollapsedStatusBarFragment
+FragmentHostManager.get(mStatusBarWindow)-->Dependency.get(FragmentService.class).getFragmentHostManager
+@FragmentHostManager.java-->getFragmentHostManager(view){
+- new FragmentHostState()-->new FragmentHostManager-->createFragmentHost{
+	- mFragments = FragmentController.createController(HostCallbacks)
+	}
+- mHosts.put(root, state)
+- getFragmentHostManager //返回FragmentHostManager
+}@FragmentService.java
+
+mFragments.getFragmentManager()@FragmentController.java-->HostCallbacks.getFragmentManagerImpl
+@FragmentHostCallback.java-->FragmentManagerImpl@FragmentManager.java
+
+//折叠statusBar
+onViewCreated{
+- mStatusBar
+- mSystemIconArea
+- mSignalClusterView = mStatusBar.findViewById(R.id.signal_cluster)//信号图标SignalClusterView
+}@CollapsedStatusBarFragment.java
+
+
+//信号图标
+onFinishInflate{
+//初始化并设置所有图标的view
+- mWifiSignalSpacer
+- mMobileSignalGroup
+}@SignalClusterView.java
+
+//将view关联到controler
+setSubs-->inflatePhoneState{
+- new PhoneState{
+	- inflate(R.layout.mobile_signal_group)
+	- setViews //设置mMobileGroup中所有图标
+	}
+- mMobileSignalGroup.addView(state.mMobileGroup) //将mMobileGroup加入到mMobileSignalGroup
+- mPhoneStates.add(state)
+- apply{
+	- mVpn.setVisibility
+	- mWifiGroup.setVisibility
+	- 遍历mPhoneStates，PhoneState.apply //设置电话图标
+	- mNoSimsCombo.setVisibility
+	}
+}
 
 可以通StatusBarManagerService过设置statusBar：
 setIcon@StatusBarManager.java-->setIcon@StatusBarManagerService.java-->
 (通过IStatusBar设置)mBar.setIcon-->setIcon@CommandQueue.java-->updateIcon@TabletStatusBar.java
 
-phone状态条：
-makeStatusBarView{
-- 窗口，mStatusBarWindow = R.layout.super_status_bar
-- 对应的View，R.id.status_bar
-}@PhoneStatusBar.java
 
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
-_______________________________________
-设置状态栏：
-performLayoutAndPlaceSurfacesLocked-->performLayoutAndPlaceSurfacesLockedInner-->mPolicy.finishAnimationLw@WindowManagerService.java-->updateSystemUiVisibilityLw:
-
-updateFocusedWindowLocked--> mPolicy.focusChangedLw@WindowManagerService.java-->
-updateSystemUiVisibilityLw:
-
-::updateSystemUiVisibilityLw-->statusbar.setSystemUiVisibility@PhoneWindowManager.java-->
-setSystemUiVisibility-->mBar.setSystemUiVisibility@StatusBarMangerService.java-->
-setSystemUiVisibility-->sendToTarget-->mCallbacks.setSystemUiVisibility@CommandQueue.java
--->setSystemUiVisibility(判断是否View.SYSTEM_UI_FLAG_LOW_PROFILE)-->sendEmptyMessage-->
-mBarContents.setVisibility@TabletStatusBar.java
-
-::updateSystemUiVisibilityLw-->topAppWindowChanged@StatusBarManagerService.java-->
-topAppWindowChanged-->sendToTarget-->mCallbacks.topAppWindowChanged@CommandQueue.java
--->topAppWindowChanged-->setLightsOn-->setSystemUiVisibility-->mHandler.sendEmptyMessage
--->mBarContents.setVisibility(View.GONE)@TabletStatusBar.java
-
----------------------------
-设置导航栏：
-HideNavInputEventReceiver.onInputEvent--> mWindowManagerFuncs.reevaluateStatusBarVisibility
-@PhoneWindowManager.java-->reevaluateStatusBarVisibility-->performLayoutAndPlaceSurfacesLocked(void)
--->performLayoutAndPlaceSurfacesLockedInner==
-
-updateFocusedWindowLocked == performLayoutLockedInner@WindowManagerService.java-->
-beginLayoutLw(判断是否要隐藏)-->mNavigationBar.hideLw@PhoneWindowManager.java
-
-当导航栏隐藏时，触摸操作会被HideNavInputEventReceiver捕获，然后显示导航栏。
-
-makeStatusBarView-->loadDimens
-
-隐藏导航按钮：
-disable-->disableLocked-->mBar.disable@StatusBarManagerService.java-->disable--> handler.handleMessage-->
-mCallbacks.disable@CommandQueue.java-->disable-->setNavigationVisibility@TabletStatusBar.java
-
----------------------------
-设置完成后通知：
-notifyUiVisibilityChanged-->mWindowManager.statusBarVisibilityChanged@TabletStatusBar.java-->
-statusBarVisibilityChanged@WindowManagerService.java-->mPolicy.adjustSystemUiVisibilityLw-->
-adjustSystemUiVisibilityLw(设置完成后，更新当前SystemUI的状态)-->mResettingSystemUiFlags
-@PhoneWindowManger.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/SystemBars.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/SystemUIService.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/SystemUIApplication.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/SignalClusterView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/fragments/FragmentHostManager.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/fragments/FragmentService.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/CollapsedStatusBarFragment.java
 
 
-mResettingSystemUiFlags(SystemUI正在清除的位，要在清除之后才能够设置)
 
 
-_______________________________________
-statusBar:
-registerStatusBar@statsuBarManagerService.java初始化IStatusBar mBar
-
-setIconVisibility@statsuBarManagerService.java-->setIcon@CommandQueue.java--> handler-->
-mCallbacks.updateIcon-->updateIcon@TabletStatusBar.java
-
-PhoneStatusBar extends BaseStatusBar 继承实现
-_______________________________________
-updateFocusedWindowLocked--> mPolicy.focusChangedLw(设置当前获得焦点的窗口)@WindowManagerService.java-->
-
-为窗口设置WindowManager：
-attach-->mWindow.setWindowManager-->new PhoneWindow().setWindowManagger@Activity.java-->setWindowManager
--->WindowManagerImpl.getDefault@Window.java-->getDefalut-->sWindowManager@WindowManagerImpl.java
-
-生成ViewRootImpl：
-setVisible-->makeVisible-->wm.addView-->getWindowManager.addView@Activity.java-->addView-->
-new ViewRootImpl@WindowManagerImpl.java
-
-ViewRootImpl获取session：
-getWindowSession-->windowManager.openSession@ViewRootImpl.java-->openSession@WindowManagerService.java
-
-通过Session将window加入WindowManager：
-addView-->root.setView@WindowManagerImpl.java-->setView-->sWindowSession.add@ViewRootImpl.java-->
-add-->mService.addWindow@Session.java-->
-addWindow-->win.attach@WindowManagerService.java-->attach-->mSession.windowAddedLocked@WindowState.java
--->windowAddedLocked-->mService.mSessions.add(this)@Session.java
 
 _____________________________________________
 按钮事件：所有的按钮都是实现KeyButtonView.java
 (重写View中方法)onTouchEvent-->sendEvent(发送事件)-->sendEvent(事件和时间)-->
 InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
+
+
+
+
 
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
@@ -119,88 +130,76 @@ frameworks/base/services/java/com/android/server/StatusBarManagerService.java
 frameworks/base/core/java/android/app/StatusBarManager.java
 frameworks/base/core/java/com/android/internal/statusbar/StatusBarIcon.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/KeyButtonView.java
-==============================================
-statusBar的结构：
-statusBar要提供接口供其他服务或应用使用(：通知，电池，信号)。所以要有相应的服务StatusBarManagerService
-提供。
-
-服务的操作都是通过statusBar的mCommandQueue回调来实现(服务有statusBar的实例，跨进程)。
 
 
-start@PhoneStatusBar.java
-_____________________________
-获取窗口管理器：
-sWindowManager = new WindowManagerImpl()
-getDefault-->sWindowManager@WindowManagerImpl.java
-
-
-窗口加入view：
-WindowManagerImpl.getDefault().addView@TabletStatusBar.java-->addView-->
-addView(View, ViewGroup.LayoutParams,CompatibilityInfoHolder, boolean)-->@WindowManagerImpl.java
-
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/tablet/TabletStatusBar.java
-frameworks/base/core/java/android/view/WindowManagerImpl.java
-
-
-============================
-API接口隐藏状态条，导航条：
-updateSystemUiVisibilityLw{
-- 
-
-}
-mLastSystemUiFlags
-
-获取View的属性：
-performTraversals/setView-->collectViewAttributes@ViewRootImpl.java-->dispatchCollectViewAttributes
--->performCollectViewAttributes@View.java
-____________________________
-应用端调用：
-状态条：
-View decorView = getWindow().getDecorView();
-// Hide the status bar.
-int uiOptions = View.SYSTEM_UI_FLAG_FULLSCREEN;
-decorView.setSystemUiVisibility(uiOptions);
-// Remember that you should never show the action bar if the
-// status bar is hidden, so hide that too if necessary.
-ActionBar actionBar = getActionBar();
-actionBar.hide();
-
-导航条：
-View decorView = getWindow().getDecorView();
-// Hide both the navigation bar and the status bar.
-// SYSTEM_UI_FLAG_FULLSCREEN is only available on Android 4.1 and higher, but as
-// a general rule, you should design your app to hide the status bar whenever you
-// hide the navigation bar.
-int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN;
-decorView.setSystemUiVisibility(uiOptions);
-
-
-窗口设置透明：
-windowTranslucentStatus
-windowTranslucentNavigation
-
-systemUI：
-mSystemUiVisibility
 
 ==============================
-通知栏：
+//移动信号控制器
+
+NetworkControllerImpl{
+- mCallbackHandler = new CallbackHandler()
+- mSubscriptionManager = SubscriptionManager.from-->getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) //创建SubscriptionManager
+- mWifiSignalController = new WifiSignalController
+- mEthernetSignalController = new EthernetSignalController
+- mReceiverHandler.post-->mRegisterListeners.run-->registerListeners{
+	- mobileSignalController.registerListener
+	- mContext.registerReceiver(mReceiverHandler)//监听所有的网络状态
+	- updateMobileControllers
+	}
+}@NetworkControllerImpl.java
+
+//sim卡状态变化或者DEMO消息
+updateMobileControllers-->doUpdateMobileControllers-->setCurrentSubscriptions{
+- new MobileSignalController
+- controller.registerListener-->mPhone.listen(mPhoneStateListener)//注册phone监听器
+- mCallbackHandler.setSubs(subscriptions) //将view关联到controler
+}@NetworkControllerImpl.java
+
+
+//view加入到控制器
+onAttachedToWindow-->mNetworkController.addCallback(this)@SignalClusterView.java-->
+addCallback-->mCallbackHandler.setListening@NetworkControllerImpl-->handleMessage(MSG_ADD_REMOVE_SIGNAL)
+-->mSignalCallbacks.add@CallbackHandler.java
+
+
+//更新信号
+MobilePhoneStateListener.onSignalStrengthsChanged/updateTelephony-->updateTelephony{
+- 更新mCurrentState{
+	- connected
+	- level
+	- iconGroup
+	- dataConnected
+	}
+- notifyListenersIfNecessary(r/*判断状态是否发生变化*/)-->notifyListeners(mCallbackHandle)@SignalController.java-->
+	notifyListeners{
+	- new IconState()//创建icon状态
+	- callback.setMobileDataIndicators-->setMobileDataIndicators-->signalCluster.setMobileDataIndicators@CallbackHandler.java
+		-->setMobileDataIndicators-->apply@SignalClusterView.java
+	}
+
+}@MobileSignalController.java
 
 
 
 
-数据信号图表更新：
-NetworkController-->context.registerReceiver(注册接收器)-->onReceive(CONNECTIVITY_ACTION)
--->updateConnectivity-->updateTelephonySignalStrength@NetworkController.java
 
-更新信号强度：
-NetworkController-->mPhone.listen(mPhoneStateListener...)-->PhoneStateListener.
-onServiceStateChanged(信号服务状态更新)-->updateTelephonySignalStrength@NetworkController.java
 
-判断服务状态：
-hasService-->(onServiceStateChanged中赋值mServiceState)mServiceState.getState()
 
-SystemUI/src/com/android/systemui/statusbar/policy/NetworkController.java
+//DEMO加入mobile
+BroadcastReceiver.onReceive(ACTION_DEMO)-->dispatchDemoCommand@StatusBar.java-->
+dispatchDemoCommand(COMMAND_NETWORK)-->addSignalController@NetworkControllerImpl.java-->
+new MobileSignalController{
+- new MobilePhoneStateListener
+- mapIconSets-->mNetworkToIconLookup(FOUR_G)
+- mObserver = new ContentObserver{onChange-->updateTelephony}
+}@MobileSignalController.java
 
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkControllerImpl.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/SignalController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/MobileSignalController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/CallbackHandler.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/qs/tiles/CellularTile.java
 =======================
 wallpaper:(默认的静态壁纸com.android.systemui.ImageWallpaper)
 

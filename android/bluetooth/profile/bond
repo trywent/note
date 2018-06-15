@@ -4,15 +4,24 @@ startDiscovery@Bluetooth.c-->btif_dm_start_discovery{
 - BTA_DmBleScanFilterSetup(BTA_DM_BLE_SCAN_COND_DELETE)
 - BTA_DmBleScanFilterSetup(BTA_DM_BLE_SCAN_COND_ADD)
 - BTA_DmSearch(&inq_params,bte_search_devices_evt)
+}btif_dm.c
+
+
+/*
+search函数表
+const tBTA_DM_ST_TBL bta_dm_search_st_tbl[] = {
+    bta_dm_search_idle_st_table,
+    bta_dm_search_search_active_st_table,
+    bta_dm_search_search_cancelling_st_table,
+    bta_dm_search_disc_active_st_table
 }
+*/
 
-
-
-
-(mode=BTA_DM_GENERAL_INQUIRY)@btif_dm.c-->
-BTA_DmSearch@bta_dm_api.c-->bta_sys_sendmsg@bta_sys_main.c-->fixed_queue_enqueue-->
-list_append(queue->list, data)/*加入队列*/@fixed_queue.c
-
+btif_dm_start_discovery(mode=BTA_DM_GENERAL_INQUIRY)@btif_dm.c-->
+BTA_DmSearch(BTA_DM_API_SEARCH_EVT)@bta_dm_api.c-->bta_sys_sendmsg@bta_sys_main.c-->fixed_queue_enqueue-->
+list_append(queue->list, data)/*加入队列*/@fixed_queue.c-->/*执行队列命令*/-->btu_bta_msg_ready@btu_task.c-->
+bta_dm_search_reg.evt_hdlr@bta_dm_api.c-->bta_dm_search_sm_execute-->bta_dm_search_action[API_SEARCH]
+@bta_dm_main.c-->bta_dm_search_start@bta_dm_act.c
 
 //返回设备信息
 remote_device_properties_cb
@@ -27,6 +36,11 @@ btif_dm_search_devices_evt{
 - BTA_DM_INQ_RES_EVT-->device_found_cb
 }
 
+
+
+bta/dm/bta_dm_api.c
+bta/dm/bta_dm_main.c
+bta/dm/bta_dm_act.c
 ======================
 //bond
 btu_hcif_process_event(HCI_CONNECTION_REQUEST_EVT)-->btu_hcif_connection_request_evt@btu_hcif.c

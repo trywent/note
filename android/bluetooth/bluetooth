@@ -6,27 +6,114 @@ Basic Rate (BR){//721.2kb/s
 } 
 
 Alternate MAC/PHYs (AMPs)
-
 Low Energy (LE)
 
 
 
 //从下到上层次结构
 physical channel---physical link---logical transport---logical link---L2CAP channel
+=====================
+/*base band
+  一个piconet中的设备共享物理channel。一个piconet中只有一个master，最多7个active slave（可以有多个parked slave）
+
+保留的地址0x9E8B00-0x9E8B3F。0x9E8B33用于查询
+
+硬件channel的访问码：device access code (DAC)。 channel access code (CAC)。 inquiry access code (IAC)
+
+当设备同步了physical channel的时间，频率，访问码就认为该设备该channel的连接
 
 
-link manager protocol (LMP)用于建立连接,使用asynchronous connection-oriented
-logical transport(ACL)传输方式
+*/
 
-LMP@logic liink{
-- baseband and physical layers
+312.5 us, 625 us, 1.25 ms, 1.28 s
+CLK 0 , CLK 1 , CLK 2 , CLK 12 //3.2kHZ
+
+
+//4种物理通道：
+通讯
+- basic piconet channel
+- adapted piconet channel 
+查询
+- inquiry scan channel 
+连接
+- page scan channel 
+
+//logical transports picnet中的设备都有一个3bit地址logical transport address (LT_ADDR)。广播地址为0
+• Synchronous Connection-Oriented (SCO) logical transport
+• Extended Synchronous Connection-Oriented (eSCO) logical transport
+• Asynchronous Connection-Oriented (ACL) logical transport
+• Active Slave Broadcast (ASB) logical transport
+• Parked Slave Broadcast (PSB) logical transport
+
+//数据包格式。3种类型，只有access code。access code和header，access code 和header和payload
+68 or 72 bit 54 bit  0-2745 bit
+ACCESS CODE |HEADER |PAYLOAD
+
+//HEADER结构
+3         4     1     1     1    8
+LT_ADDR |TYPE |FLOW |ARQN |SEQN |HEC
+
+
+_____________________
+//状态
+STANDBY CONNECTION PARK
+
+查询设备子状态{
+- Inquiry scan
+- Inquiry
 }
 
-L2CAP@logic liink{//有个协议控制频道基于ACL
-- baseband
+建立连接的子状态{
+page 连接设备
+page scan 等待被连接
+Page Response Substates 
 }
 
 
+inquiry, inquiry scan, master response, slave response, inquiry response
+=====================
+/*LMP 基于ACL连接
+ 管理连接状态（像决定logical transport address (LT_ADDR)是否可以使用），role witch
+
+*/
+LMP message{
+- ACL-C  //默认传输方式
+- ASB-C
+}
+
+//数据格式 master发起的传输TID为0. slave发起的传输TID为1
+TID |Escape OpCode |Extended OpCode |Payload  //LMP PDU with 15 bit OpCode  3bytes
+TID |OpCode |Payload  //LMP PDU with 7 bit OpCode   2bytes
+
+
+//设备功能
+LMP中PDU的类型(M/O)，Mandatory,Optional
+
+
+//一个事务(transaction)包含一组数据交换。。pair，encryption
+connection(设备连接){
+- Baseband page procedure
+- LMP procedures for clock offset request, LMP version, supported features, name request and/or detach
+- (paging deivce)LMP_host_connection_req //
+- (paged deivce)LMP_accepted or LMP_not_accepted //接收到连接请求后，设备可以请求role switch
+- LMP procedures for pairing,authentication and encryption
+- (paging deivce)LMP_setup_complete
+- (paged deivce)LMP_setup_complete
+}
+
+//原始配对
+发起者(LMP_au_rand PDU)
+
+
+=====================
+//l2cap
+
+L2CAP Service Data Units(SDU)
+protocol data unit (PDU) 
+
+
+
+=====================
 Service Discovery Protocol (SDP)
 Generic Access Profile (GAP)
 Protocol Adaptation Layers (PALs)
@@ -62,11 +149,3 @@ Link Controller//
 PHY //接收数据包
 }
 
-
-
-
-=====================
-//l2cap
-
-L2CAP Service Data Units(SDU)
-protocol data unit (PDU) 

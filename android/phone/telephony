@@ -1,37 +1,101 @@
-emergency call：从系统属性ril.ecclist中读取
-isEmergencyNumberInternal@PhoneNumberUtils.java
-
-去电：
-onCreate-->processIntent-->sendOrderedBroadcast-->OutgoingCallReceiver@OutgoingCallBroadcaster.java
--->SipCallOptionHandler.onCreate-->setResultAndFinish@SipCallOptionHandler.java-->placeCall
-@CallController.java-->displayCallScreen(通过intent打开)@PhoneApp.java-->InCallScreen
-
-MHandler.handleMessage-->onPhoneStateChanged
-
-packages/apps/Phone/src/com/android/phone/OutgoingCallBroadcaster.java
-packages/apps/Phone/src/com/android/phone/SipCallOptionHandler.java
-packages/apps/Phone/src/com/android/phone/InCallScreen.java
-
-telephony:
-frameworks/base/telephony/java/android/telephony/PhoneNumberUtils.java
-external/libphonenumber/java/src/com/android/i18n/phonenumbers/ShortNumberUtil.java
-
-
-setting中设置mobileNetworkSetting会使用phone中mobileNetworkSetting.java
-
-
-
 //
-//加入服务
-makeDefaultPhone@PhoneFactory.java-->PhoneProxy-->new PhoneSubInfoProxy@PhoneProxy.java
-PhoneSubInfoProxy-->ServiceManager.addService("iphonesubinfo", this)@PhoneSubInfoProxy.java
-
-//获取id
-getDeviceId-->getSubscriberInfo().getDeviceId-->(通过服务iphonesubinfo获取)@TelephonyManager.java
+startOtherServices{
+- telephonyRegistry = new TelephonyRegistry(context);
+- ServiceManager.addService("telephony.registry", telephonyRegistry);
+}@SystemServer.java
 
 
+//创建phone -----"phone"应用进程
+PhoneFactory.makeDefaultPhones(this)@PhoneGlobals.java-->makeDefaultPhones-->
+makeDefaultPhone{
+- new DefaultPhoneNotifier
+- numPhones= TelephonyManager.getDefault().getPhoneCount//获取phone数量
+- sCommandsInterfaces[i] = new RIL//为每个phone创建ril接口
+- GsmCdmaPhone(sCommandsInterfaces[i] , PhoneNotifier,id)@GsmCdmaPhone.java
+	makeServiceStateTracker(GsmCdmaPhone phone, CommandsInterface ci)@TelephonyComponentFactory.java
+	-->new ServiceStateTracker
+}@phoneFactory.java
 
-frameworks/opt/telephony/src/java/com/android/internal/telephony/PhoneFactory.java
-frameworks/opt/telephony/src/java/com/android/internal/telephony/PhoneProxy.java
-frameworks/opt/telephony/src/java/com/android/internal/telephony/PhoneSubInfoProxy.java
+ServiceStateTracker{
+- mCi.setOnSignalStrengthUpdate(this, EVENT_SIGNAL_STRENGTH_UPDATE)-->//注册回调到RIL接口
+	mSignalStrengthRegistran=new Registrant@BaseCommands.java
+- mCi.registerForRadioStateChanged-->mRadioStateChangedRegistrants.add
+}@ServiceStateTracker.java
+
+//注册phone状态监听 ------"telephony.registry"系统服务进程
+listen(PhoneStateListener)-->sRegistry.listenForSubscriber(PhoneStateListener.callback)@TelephonyManager.java
+listenForSubscriber-->listen{
+- 创建Record并加入到mRecords.add(r)//callback 保存在record中
+}@TelephonyRegistry.java
+
+
+//RIL上报事件 -----ril进程
+currentSignalStrengthInd-->radioService[slotId]->mRadioIndication->currentSignalStrength@ril_service.cpp-->
+currentSignalStrength-->mRil.mSignalStrengthRegistrant.notifyRegistrant@RadioIndication.java-->
+notifyRegistrant-->internalNotifyRegistrant-->handler.sendMessage(what)@Registrant.java-->
+handleMessage(EVENT_GET_SIGNAL_STRENGTH/EVENT_SIGNAL_STRENGTH_UPDATE)-->
+onSignalStrengthResult-->notifySignalStrength-->@ServiceStateTracker.java
+notifySignalStrength-->mNotifier.notifySignalStrength(this)@Phone.java-->
+mRegistry.notifySignalStrengthForPhoneId@DefaultPhoneNotifier.java
+
+
+//通知到监听器 -----"telephony.registry" 系统服务进程
+notifySignalStrengthForPhoneId-->mRecords[].callback.onSignalStrengthsChanged@TelephonyRegistry.java
+
+
+________________
+//更新serviceState
+pollState-->handleMessage(EVENT_POLL_STATE_REGISTRATION/EVENT_POLL_STATE_GPRS/EVENT_POLL_STATE_NETWORK_SELECTION_MODE)-->handlePollStateResult
+pollState
+
+pollStateDone{
+- 
+- mPhone.notifyServiceStateChanged
+}@ServiceStateTracker.java
+
+
+mPhone.notifyServiceStateChanged@ServiceStateTracker.java-->notifyServiceStateChanged@GsmCdmaPhone.java
+-->notifyServiceStateChangedP@Phone.java-->mNotifier.notifyServiceState(this)-->
+notifyServiceState@DefaultPhoneNotifier.java-->notifyServiceStateForPhoneId@TelephonyRegistry.java
+
+
+
+________________
+
+notifySubscriptionInfoChanged@SubscriptionController.java-->tr.notifySubscriptionInfoChanged
+notifySubscriptionInfoChanged-->r.onSubscriptionsChangedListenerCallback.onSubscriptionsChanged
+@TelephonyRegistry.java
+
+
+frameworks/base/services/core/java/com/android/server/TelephonyRegistry.java
 frameworks/base/telephony/java/android/telephony/TelephonyManager.java
+packages/services/Telephony/src/com/android/phone/PhoneGlobals.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/GsmCdmaPhone.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/TelephonyComponentFactory.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/ServiceStateTracker.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/Phone.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/DefaultPhoneNotifier.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/BaseCommands.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/CommandsInterface.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/RadioIndication.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/RIL.java
+frameworks/base/core/java/android/os/Registrant.java
+
+frameworks/opt/telephony/src/java/com/android/internal/telephony/SubscriptionController.java
+
+
+
+==================
+//subscrption
+handleMessage(EVENT_SIM_RESTRICTED)-->
+sReceiver.onRecive(INTENT_VALUE_ICC_CARD_RESTRICTED)-->handleMessage(EVENT_SIM_LOADED)-->handleSimLoaded
+updateSubscriptionInfoByIccId-->mSubscriptionManager.addSubscriptionInfoRecord@SubscriptionInfoUpdater.java-->
+addSubscriptionInfoRecord@SubscriptionManager.java-->addSubInfoRecord@SubscriptionController.java
+
+
+
+frameworks/opt/telephony/src/java/com/android/internal/telephony/SubscriptionInfoUpdater.java
+frameworks/base/telephony/java/android/telephony/SubscriptionManager.java
+frameworks/opt/telephony/src/java/com/android/internal/telephony/SubscriptionController.java
+
+

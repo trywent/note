@@ -149,8 +149,9 @@ btif_init_bluetooth{
 
 
 /*******************************************
- 打开蓝牙
+ enable stack
 
+初始化btu，设置btu新线程BT_WORKQUEUE_NAME
 
 *******************************************/
 enable-->stack_manager_get_interface()->start_up_stack_async@bluetooth.c-->
@@ -165,31 +166,7 @@ thread_post(management_thread, event_start_up_stack)-->event_start_up_stack{
 - btif_thread_post(event_signal_stack_up)//回调上层
 }@stack_manager.c
 
-BTU_StartUp{
- //创建队列
-- btu_bta_msg_queue
-- btu_general_alarm_queue
-- btu_oneshot_alarm_queue
-- btu_l2cap_alarm_queue
-- bt_workqueue_thread = thread_new(BT_WORKQUEUE_NAME)//新线程
-- thread_post(bt_workqueue_thread, btu_task_start_up)-->btu_task_start_up@btu_task.c
-}@btu_init.c
 
-
-btu_task_start_up{
-  /* Initialize the mandatory core stack control blocks
-     (BTU, BTM, L2CAP, and SDP)
-   */
-- btu_init_core{
-	- btm_init //btm初始
-	- l2c_init
-	- sdp_init
-	- gatt_init
-	- btm_ble_init
-	}@btu_init.c
-- BTE_InitStack
-- bta_sys_init
-}@btu_task.c
 
 
 
@@ -215,11 +192,20 @@ system/bt/stack/btu/btu_task.c
 
 //operation system interface
 osi/src/fixed_queue.c
+
+
+
+
+
+
+
+
+
+
 ===========
 //sprd  a2dp sink src转换
 -#define BTA_AV_SINK_INCLUDED TRUE
 +#define BTA_AV_SINK_INCLUDED FALSE 
-
 BTA_DM_COD {0x5A, 0x40, 0x08} //设备类型SERVICE_CLASS MAJOR_CLASS MINOR_CLASS
 BTM_LOCAL_IO_CAPS               BTM_IO_CAP_IO//配对方式
 

@@ -1,4 +1,4 @@
-//
+//bluetooth manager
 
 btm_init{
 - btm_inq_db_init                   /* Inquiry Database and Structures */
@@ -9,6 +9,27 @@ btm_init{
 }
 
 
+//search
+BTM_StartInquiry
+
+
+
+
+
+
 
 
 system/bt/stack/btm/btm_main.c
+stack/btm/btm_inq.c
+stack/btm/btm_ble_gap.c
+
+===================
+//btm security
+
+l2c_link_timeout@l2c_link.c
+
+
+btm_sec_disconnect-->btm_sec_send_hci_disconnect@btm_sec.c
+
+
+stack/btm/btm_sec.c
