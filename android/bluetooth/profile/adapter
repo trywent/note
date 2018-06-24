@@ -1,0 +1,25 @@
+//adapter
+{
+- getDefaultAdapter()
+
+- isEnabled()
+- enable()
+- disable()
+
+- isDiscovering()
+- startDiscovery()
+- cancelDiscovery()
+
+- getProfileProxy(Context context, BluetoothProfile.ServiceListener listener, int profile)
+}@BluetoothAdapter.java
+
+
+//设备连接
+{
+- getName()
+- createBond()
+}@BluetoothDevice.java
+
+
+frameworks/base/core/java/android/bluetooth/BluetoothAdapter.java
+frameworks/base/core/java/android/bluetooth/BluetoothDevice.java

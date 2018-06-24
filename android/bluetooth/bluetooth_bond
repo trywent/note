@@ -21,7 +21,7 @@ onDeviceAdded@DeviceListPreferenceFragment.java
 frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/BluetoothEventManager.java
 frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/LocalBluetoothManager.java
 frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/CachedBluetoothDeviceManager.java
-================
+
 //settings注册回调
 
 mLocalManager.getEventManager().registerCallback(this)@DeviceListPreferenceFragment.java
@@ -36,7 +36,7 @@ addCachedDevices{
 	}
 }@DeviceListPreferenceFragment.java
 
-
+================
 //配对
 BluetoothPairingRequest.onReceive(ACTION_PAIRING_REQUEST)-->startActivity(pairingIntent)@BluetoothPairingRequest.java
 -->onCreate{
