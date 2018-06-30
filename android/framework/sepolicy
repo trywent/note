@@ -39,7 +39,10 @@ rule_name source_type target_type:object_class perm_set;
 
 rule_name:allow,dontaudit,auditallow,neverallow
 其实neverallow的存在是在生成（编译）安全策略文件时检查allow语句是否违反了neverallow，防止由于开发人员的失误导致某些域权限过高
-
+allow  表示主体对客体执行允许的操作。
+dontaudit  表示不记录违反规则的决策信息，且违反规则不影响运行。
+auditallow  表示允许操作并记录访问决策信息。
+neverallow  表示不允许主体对客体执行指定的操作。
 =============
 //操作文件。Scontext的定义(文件，进程)
 /file/path u:object_r:type_id:s0 //定义文件/dev/

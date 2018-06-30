@@ -101,9 +101,14 @@ connection(设备连接){
 - (paged deivce)LMP_setup_complete
 }
 
-//原始配对
-发起者(LMP_au_rand PDU)
+=====================
+//设备认证过程，maste和slave都可以作为verifier。只有双方有link key才能成功
+verfier--->LMP_au_rand(包含一个随机数challenge)--->claimant
+verfier<---LMP_sres(包含challenge,BD_ADDR,secret key/*reponse的计算需要一个共享secret key*/)<---claimant
+verfier--->(验证response，)
 
+//当设备双方没有共享key时。需要pair或ssp过程。pair通过一个pin值计算共享key
+initiator--->LMP_in_rand--->responsder
 
 =====================
 //l2cap

@@ -1,5 +1,5 @@
 requestPermissionDialog
 
-
+/sys/bus/platform/drivers/usb20_otg/force_usb_mode
 
 frameworks/base/services/java/com/android/server/usb/UsbSettingsManager.java

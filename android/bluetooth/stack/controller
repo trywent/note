@@ -1,0 +1,15 @@
+//
+bta_sys_hw_api_enable-->bta_sys_sendmsg(BTA_SYS_EVT_ENABLED_EVT)
+bta_sys_hw_evt_enabled@bta_sys_main.cc-->BTM_DeviceReset@btm_devctl.cc-->
+module_start_up_callbacked_wrapper-->run_wrapped_start_up-->module_start_up@module.cc
+-->controller_module.start_up{
+- 
+}
+
+
+
+system/bt/stack/btm/btm_devctl.cc
+system/bt/btcore/src/module.cc
+system/bt/bta/sys/bta_sys_main.cc
+system/bt/device/src/controller.cc
+

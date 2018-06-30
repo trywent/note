@@ -1,0 +1,19 @@
+//获取并解析vcard数据
+
+pullPhoneBook-->mSession.makeRequest@BluetoothPbapClient.java-->makeRequest
+@BluetoothPbapSession.java--->mObexSession.schedule-->schedule(request)-->
+ObexClientThread.run-->mRequest.execute@BluetoothPbapObexSession.java-->
+execute@BluetoothPbapRequest.java-->readResponse-->new BluetoothPbapVcardList(/*解析数据*/)
+@BluetoothPbapRequestPullPhoneBook.java
+
+
+stop@BluetoothPbapSession.java
+
+
+
+bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapClient.java
+bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapSession.java
+bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapObexSession.java
+bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapRequest.java
+bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapRequestPullPhoneBook.java
+bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapSession.java

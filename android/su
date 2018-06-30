@@ -1,0 +1,28 @@
+//修改权限
+chmod 4755 //分配 setuid权限
+chmod 6755 //分配setgid setuid权限
+
+
+//https://docs.oracle.com/cd/E19683-01/816-4883/secfile-69/index.html
+//setuid Permission:
+
+When set-user identification (setuid) permission is set on an executable file, a process that runs this file is granted access based on the owner of the file (usually root), rather than the user who is running the executable file. This special permission allows a user to access files and directories that are normally only available to the owner. For example, the setuid permission on the passwd command makes it possible for a user to change passwords, assuming the permissions of the root ID:
+
+-r-sr-sr-x   3 root     sys       104580 Sep 16 12:02 /usr/bin/passwd
+
+This special permission presents a security risk, because some determined users can find a way to maintain the permissions that are granted to them by the setuid process even after the process has finished executing.
+Note –
+
+The use of setuid permissions with the reserved UIDs (0–100) from a program might not set the effective UID correctly. Use a shell script instead or avoid using the reserved UIDs with setuid permissions.
+
+//setgid Permission:
+
+The set-group identification (setgid) permission is similar to setuid, except that the process's effective group ID (GID) is changed to the group owner of the file, and a user is granted access based on permissions granted to that group. The /usr/bin/mail command has setgid permissions:
+
+-r-x--s--x   1 root     mail       63628 Sep 16 12:01 /usr/bin/mail
+
+
+
+setgid(gid)
+setuid(gid)
+

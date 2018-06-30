@@ -1,21 +1,76 @@
-//============应用
-- 扫描设备
-- 查看已配对设备
-- Establish RFCOMM channels
-- 连接(多个连接)，传输数据
+//============app
+BluetoothAdapter.getDefaultAdapter(){//接口
+- enable/disabel
+- startDiscovery
+- getAddress
+- 
+}
+
+//获取profile
+- 获取adapter，
+- 获取porfile，getProfileProxy(Context context, BluetoothProfile.ServiceListener listener, int profile)
+- 设置BluetoothProfile.ServiceListener{
+	- onServiceConnected(int profile, BluetoothProfile proxy)
+	- onServiceDisconnected(int profile)
+	}
+- BluetoothProfile执行操作
+
+//============profile
+getProfileProxy{
+- BluetoothA2dpSink(context, listener)
+- BluetoothAvrcpController(context, listener)
+- BluetoothHeadsetClient(context, listener)
+- BluetoothPbapClient(context, listener)
+}@BluetoothAdapter.java
+
+//a2dpsink 
+BluetoothA2dpSink{
+- IBluetoothManager.registerStateChangeCallback
+- doBind-->bindServiceAsUser(IBluetoothA2dpSink.class)
+}@BluetoothA2dpSink.java
+
+interface{
+- connect
+- disconnect
+- isA2dpPlaying
+}
+
+//avrcp controller 
+BluetoothAvrcpController-->doBind-->bindServiceAsUser(IBluetoothAvrcpController.class)@BluetoothAvrcpController.java
+
+interface{
+- sendGroupNavigationCmd
+- sendPassThroughCmd
+}
+
+//pbapclient
+BluetoothPbapClient-->doBind-->bindServiceAsUser(IBluetoothPbapClient.class)@BluetoothPbapClient.java
+
+interface{
+- connect //连接后自动下载
+- disconnect
+}
+
+frameworks/base/core/java/android/bluetooth/BluetoothAdapter.java
+frameworks/base/core/java/android/bluetooth/BluetoothA2dpSink.java
+frameworks/base/core/java/android/bluetooth/BluetoothAvrcpController.java
+frameworks/base/core/java/android/bluetooth/BluetoothPbapClient.java
+//============service
+
+classInitNative@AdapterService.java
+
+onCreate{
+- mBinder = new AdapterServiceBinder
+- initNative
+- ProfileObserver.start
+- setAdapterService-->sAdapterService
+}
 
 
-1 获取adapter，BluetoothAdapter.getDefaultAdapter()
-2 打开蓝牙,enable
-3 查询以配对设备，BluetoothAdapter.getBondedDevices()
-4 查找设备，BluetoothAdapter.startDiscovery
 
-连接：
-作为server-
-1 通过BluetoothDevice.listenUsingRfcommWithServiceRecord获取BluetoothServerSocket
-2 监听等待连接，BluetoothServerSocket.accept
-3 BluetoothServerSocket.close
 
-作为client-
-1 通过BluetoothDevice.createRfcommSocketToServiceRecord(UUID)获取BluetoothSocket
-2 BluetoothSocket.connect()
+
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/ProfileService.java
+
+

@@ -64,6 +64,7 @@ git clone git:地址  mProject
 文件管理：
 git status            //文件状态
 git add <file>          //跟踪新文件
+git add -f            //强制加入ignore文件
 git add <modifiedfile>  //暂存文件
 git diff              //查看未暂存的被修改文件
 git diff --cached     //查看已暂存的被修改文件
@@ -80,6 +81,7 @@ git log               //查看提交历史
 git log -p  -num      //-p查看提交的差异，-num查看最近几次的差异
 git log --pretty=oneline  file  //列出文件的修改
 git log --stat         //列出修改的文件名
+git log --stat=num         //列出修改的文件名，指定文件名长度
 git log -p filename   //内容
 git log --all --grep="xxx" //查看修改的标记
 git config log.date iso   //显示时间格式
@@ -119,7 +121,20 @@ git add files
 //合并冲突
 git checkout --ours   //保留本地的
 git checkout --theirs //保留远程的
-______________________________
+
+_______________________
+//储藏当前分支的修改
+git stash //将当前的储存，修改文件储存
+git stash --all //将所有文件储存，包括untracked file
+git stash list //查看储存
+git stash apply //应用上一个储存
+git stash apply stash@{num} //应用某一个储存
+git stash drop //移除储存 
+git stash pop //应用并移除 
+
+
+
+_______________________
 远程仓库：
 git remote     //查看远程仓库名
 git remote -v  //查看远程仓库名子，地址
@@ -192,6 +207,8 @@ git pull --all  //更新所有分支
 
 ______________________________
 git补丁：
+git format-patch -n <sha> //生成从<sha>开始的n个提交的补丁
+
 git diff > xx.patch
 
 git apply xx.patch

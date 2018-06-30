@@ -1,0 +1,6 @@
+//
+SYSCALL_DEFINE1(setgid)@sys.c-->nsown_capable-->ns_capable@capablility.c-->
+security_capable@security.c-->security_ops->capable-->selinux_ops.capable-->
+selinux_capable{
+- cap_capable
+}@hooks.c

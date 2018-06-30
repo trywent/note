@@ -1,8 +1,35 @@
-//
+//avrcp controller
+AvrcpControllerService-->initNative@AvrcpControllerService.java
 
+start{
+- HandlerThread().start
+- new AvrcpControllerStateMachine(this).start
+}
 
+//jni回调设置id3
+btavrcp_track_changed_callback@com_android_bluetooth_avrcp_controller.cpp-->
+onTrackChanged@AvrcpControllerService.java-->Connected.processMessage(MESSAGE_PROCESS_TRACK_CHANGED)
+-->mAddressedPlayer.updateCurrentTrack@AvrcpControllerStateMachine.java-->
+updateCurrentTrack= track@AvrcpPlayer.java
+
+//开始广播metadata
+startAvrcpUpdates@AvrcpControllerService.java
+
+//停止广播metadata
+stopAvrcpUpdates@AvrcpControllerService.java
 
 
 
 frameworks/base/core/java/android/bluetooth/BluetoothAvrcpController.java
 packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/AvrcpControllerService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/AvrcpControllerStateMachine.java
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/AvrcpPlayer.java
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/TrackInfo.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp_controller.cpp
+
+//=========================
+//avrcp
+MediaControllerListener-->onMetadataChanged
+
+
+/home/bsp/sp9853/packages/apps/Bluetooth/src/com/android/bluetooth/avrcp/Avrcp.java

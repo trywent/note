@@ -2,7 +2,7 @@
 
 UiHandler.handleMessage(SHOW_FINGERPRINT_ERROR_UI_MSG)-->setMessage(R.string.system_error_manufacturer)
 
-
+qemu.hw.mainkeys=0
 
 //audio
 mic ---main mic(mic0)

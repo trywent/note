@@ -46,9 +46,12 @@ processMessage-->adapterService.processStart@AdapterState.java-->setProfileServi
 
 @AdapterState.java
 
+
+//8.1
+BleOnState.processMessage(USER_TURN_ON)@AdapterState.java-->startCoreServices-->
+setProfileServiceState(supportedProfileServices,BluetoothAdapter.STATE_ON)@AdapterService.java
+
 apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
 apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterState.java
-apps/Bluetooth/src/com/android/bluetooth/avrcp/AvrcpControllerService.java
-
 
 
