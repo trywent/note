@@ -1,0 +1,25 @@
+//
+
+
+rpm_idle@runtime.c-->usb_device_pm_ops.runtime_idle@usb.c-->usb_runtime_idle@driver.c
+-->pm_runtime_autosuspend@pm_runtime.h-->__pm_runtime_suspend@runtime.c-->usb_runtime_suspend
+-->usb_suspend_both{
+- usb_suspend_device
+- suspend失败，usb_resume_interface
+}@driver.c
+
+
+
+kick_hub_wq-->queue_work(hub_wq, &hub->events)-->hub_event@hub.c
+
+
+
+
+
+
+kernel/drivers/base/power/runtime.c
+kernel/drivers/usb/core/usb.c
+kernel/drivers/usb/core/driver.c
+kernel/drivers/usb/core/hub.c
+
+kernel/drivers/power/sprd_2731_charge.c

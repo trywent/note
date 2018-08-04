@@ -8,6 +8,7 @@ qemu.hw.mainkeys=0
 mic ---main mic(mic0)
 3702 ---aux mic(mic1)
 
+am start com.sprd.engineermode/.EngineerModeActivity
 
 //otg
 echo device  > /sys/devices/platform/soc/soc:ap-ahb/e2500000.usb2/host_dev
@@ -19,4 +20,18 @@ dd if=/mnt/usbdisk/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/
 
 dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/boot bs=1024 count=16000
 
-dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/uboot bs=1024 count=590
+dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/uboot bs=1024 count=600
+
+dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/recovery bs=1024 count=18234
+
+setprop sys.fyt.debug.set debugon
+
+/home/bsp/sp9853/prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9/bin/x86_64-linux-android-addr2line
+
+//blue
+
+echo 1 > /proc/sys/kernel/printk
+echo 6 > /proc/sys/kernel/printk
+echo l > /proc/sysrq-trigger
+
+echo 'c' >/proc/sysrq-trigger

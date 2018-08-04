@@ -1,14 +1,17 @@
 //adapter
 {
-- getDefaultAdapter()
+- getDefaultAdapter
 
-- isEnabled()
-- enable()
-- disable()
+- isEnabled
+- enable
+- disable
+- setName
 
-- isDiscovering()
-- startDiscovery()
-- cancelDiscovery()
+- setScanMode(SCAN_MODE_CONNECTABLE_DISCOVERABLE)//设置可被查找到
+
+- isDiscovering
+- startDiscovery
+- cancelDiscovery
 
 - getProfileProxy(Context context, BluetoothProfile.ServiceListener listener, int profile)
 }@BluetoothAdapter.java
@@ -18,6 +21,7 @@
 {
 - getName()
 - createBond()
+- removeBond
 }@BluetoothDevice.java
 
 

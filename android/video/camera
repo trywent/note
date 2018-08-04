@@ -1,238 +1,52 @@
-//====================================
-camera:
+//
+1- Obtain an instance of Camera from open(int).
+2- Get existing (default) settings with getParameters().
+3- If necessary, modify the returned Camera.Parameters object and call setParameters(Camera.Parameters).
+4- If desired, call setDisplayOrientation(int).
+5- Important: Pass a fully initialized SurfaceHolder to setPreviewDisplay(SurfaceHolder). 
+   Without a surface, the camera will be unable to start the preview.
+6- Important: Call startPreview() to start updating the preview surface.
+   Preview must be started before you can take a picture.
+7- When you want, call takePicture(Camera.ShutterCallback, Camera.PictureCallback, 
+   Camera.PictureCallback, Camera.PictureCallback) to capture a photo. Wait for the callbacks to provide the actual image data.
+8- After taking a picture, preview display will have stopped. To take more photos, 
+   call startPreview() again first.
+9- Call stopPreview() to stop updating the preview surface.
+10- Important: Call release() to release the camera for use by other applications. 
+    Applications should release the camera immediately in onPause()
 
-JNI
-所在位置frameworks/base/core/jni/android_hardware_Camera.cpp。调用更底层函数操作摄像头，返回数据。
-
-Native framework
-本地框架定义在frameworks/av/camera/Camera.cpp，提供与android.hardware.Camera类相同的功能的本地操作。
-这个类通过IPC代理访问摄像头服务
-
-Binder IPC proxies
-IPC代理执行跨进程通信。在frameworks/av/camera文件夹中有三个binder类使用摄像头服务。
-ICameraService是摄像头服务的接口。ICamera是打开的摄像头设备的接口。ICameraClient是提供给应用程序的设备接口。
-
-Camera service
-在frameworks/av/services/camera/libcameraservice/CameraService.cpp,与HAL层交互
-
-HAL
-硬件抽象层，摄像头服务调用的接口，根据硬件实现。
-
-=====================================
-camera服务开始：
-mediaserver@init.rc-->main-->CameraService::instantiate(加入服务管理器，等待远程调用)-->
-new CameraService@main_mediaserver.cpp-->onFirstRef(获取HAL模块)@CameraService.cpp
-
-
-CameraService::onFirstRef-->hw_get_module(CAMERA_HARDWARE_MODULE_ID)--mModule->get_number_of_cameras
-@CameraService.cpp-->
+使用camera流程{
+- public static Camera open (int cameraId)
+- public final void setPreviewDisplay (SurfaceHolder holder)
+- public final void startPreview ()
+- public final void release ()
+}
 
 
-相机个数：
-mModule->get_number_of_cameras@CameraService.cpp-->camera_get_number_of_cameras{
-- 查找video设备并打开，获取摄像头信息。open("/dev/videox")
-- 将获取的摄像头信息填充到gCamInfos，ioctl(获取信息)
-- 返回摄像头个数
-}@CameraHal_Module.cpp
-
-
-______________________________________
-使用摄像头：
-*  Detect and Access Camera - 检测摄像头是否存在，并请求使用
-
-*  Create a Preview Class - 继承SurfaceView并实现接口SurfaceHolder，创建一个预览类。用来预览摄像头镜像
-
-*  Build a Preview Layout - 创建预览后，要创建一个视图布局用来在预览的同时使用户可以操作
-
-*  Setup Listeners for Capture - 链接监听器到界面控制，用来响应用户操作开是照相或录像
-
-*  Capture and Save Files - 捕获并保存输出的图像或视频
-
-*  Release the Camera - 使用完后必须正确释放摄像头
-
-检测摄像头：
-context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA) //设备是否有摄像头功能
-
-打开摄像头：
-open{
-- 获取摄像头个数，getNumberOfCameras{
-		- 
-
-	}
-- 获取摄像头信息用来判断摄像头前后，getCameraInfo(i, cameraInfo)
-- 打开后面摄像头，new Camera(back)
-
+{
+- public List<int[]> getSupportedPreviewFpsRange () //获取支持的预览帧率
+- public List<Camera.Size> getSupportedPreviewSizes () //获取支持的大小
+- public void setPreviewFpsRange (int min, int max) //设置预览帧率
+- public void setPreviewSize (int width, int height) //设置预览大小
+- public void setRotation (int rotation) //设置旋转
 }@Camera.java
 
-getNumberOfCameras@Camera.java-->android_hardware_Camera_getNumberOfCameras-->
-Camera::getNumberOfCameras@android_hardware_Camera.cpp-->getNumberOfCameras-->
-(获取camera服务)cs->getNumberOfCameras@CameraBase.cpp
+//打开
+Camera.open-->new Camera-->cameraInitNormal-->cameraInitVersion(cameraId, CAMERA_HAL_API_VERSION_NORMAL_CONNECT)
+-->native_setup(this,cameraId){
+- 
+}
 
-
-获取摄像头属性：
-Camera.getParameters(返回值类型为Camera.Parameters)
-
-
-
-
+Camera::connect(int cameraId, const String16& clientPackageName ...)-->CameraBaseT<Camera>::connect{
+- Camera c = new Camera(cameraId) 
+- ICameraService cs = getCameraService
+- cs.get()->*fnConnectService-->ICameraService.()
+}
 
 
 frameworks/base/core/java/android/hardware/Camera.java
 frameworks/base/core/jni/android_hardware_Camera.cpp
-frameworks/av/services/camera/libcameraservice/CameraService.cpp
-frameworks/av/services/camera/libcameraservice/CameraHardwareInterface.h
-frameworks/av/include/camera/ICameraService.h
-frameworks/av/camera/ICameraService.cpp
-frameworks/av/camera/CameraBase.cpp
+frameworks/av/camera/include/camera/Camera.h
 frameworks/av/camera/Camera.cpp
-frameworks/av/media/mediaserver/main_mediaserver.cpp
-frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
-
-hardware/xxx/camera/CameraHal_Module.cpp
-==========================================
-video:
-配置文件初始化：
-android_media_MediaProfiles_native_init-->MediaProfiles::getInstance@android_media_MediaProfiles.cpp-->
-getInstance(从xml中获取配置或使用默认)-->createDefaultInstance(没有xml,初始每个属性值)-->
-createDefaultCamcorderProfiles(创建默认)--createDefaultAudioEncoders-->profiles->mAudioEncoders.add-->
-返回MediaProfile@MediaProfiles.cpp
-
-从xml获取配置：
-createInstanceFromXmlFile-->startElementHandler@MediaProfiles.cpp
-
-获取配置文件：
-get(quality)-->get(cameraId,quality)@CamcorderProfile.java-->native_get_camcorder_profile-->
-android_media_MediaProfiles_native_get_camcorder_profile@android_media_MediaProfiles.cpp-->
-getCamcorderProfileParamByName(获取profile值)@MediaProfiles.cpp
-
-设置配置：
-setProfile-->setVideoEncoder@MediaRecorder.java-->android_media_MediaRecorder_setVideoEncoder@
-android_media_MediaRecorder.cpp-->setVideoEncoder-->mMediaRecorder->setVideoEncoder-->
-(服务端binder service->createMediaRecorder).setVideoEncoder@mediarecorder.cpp-->
-setVideoEncoder-->mRecorder->setVideoEncoder@MediaRecorderClient.cpp-->setVideoEncoder@
-
-
-
-frameworks/base/media/java/android/media/CamcorderProfile.java
-frameworks/base/media/jni/android_media_MediaProfiles.cpp
-frameworks/av/media/libmedia/MediaProfiles.cpp
-frameworks/base/media/java/android/media/MediaRecorder.java
-frameworks/base/media/jni/android_media_MediaRecorder.cpp
-frameworks/av/media/libmedia/mediarecorder.cpp
-frameworks/av/media/libmediaplayerservice/MediaRecorderClient.cpp
-frameworks/av/media/libmediaplayerservice/StagefrightRecorder.cpp
-__________________________________________
-MediaRecorder@MediaRecorder.java-->(设置recorder)native_setup-->android_media_MediaRecorder_native_setup
-(创建MediaRecorder)-->setMediaRecorder@android_media_MediaRecorder.cpp
-
-创建MediaRecorder:
-new MediaRecorder(getService(String16("media.player")，创建createMediaRecorder)@mediarecorder.cpp
--->(远程调用)createMediaRecorder-->new MediaRecorderClient@MediaPlayerService.cpp-->
-MediaRecorderClient-->mRecorder= new StagefrightRecorder@MediaRecorderClient.cpp-->StagefrightRecorder
-@StagefrightRecorder.cpp
-
-创建MPEG4Writer：
-start@MediaRecorderClient.cpp-->start-->startMPEG4Recording-->setupMPEG4Recording-->new MPEG4Writer
-@StagefrightRecorder.cpp-->
-
-设置Tracks：
-setupMPEG4Recording-->writer->addSource@StagefrightRecorder.cpp-->addSource-->
-new Tracks--mTracks.push_back@MPEG4Writer.cpp
-
-设置声音：
-startMPEG4Recording-->setupMPEG4Recording-->setupAudioEncoder-->createAudioSource
-@StagefrightRecorder.cpp-->initCheck@AudioSource.cpp
-
-start(开始)@MediaRecorder.java-->android_media_MediaRecorder_start-->getMediaRecorder().start()
-@android_media_MediaRecorder.cpp-->start-->mMediaRecorder->start@mediarecorder.cpp-->start
--->(是一个StagefrightRecorder)mRecorder->start@MediaRecorderClient.cpp-->start-->
-startMPEG4Recording--setupMPEG4Recording--mWriter->start@StagefrightRecorder.cpp-->start-->
-startTracks(遍历mTracks，执行Tracks.start)-->Track::start@MPEG4Writer.cpp-->
-
-录制代理：
-RecordingProxy(方法实现都是通过Camera)@Camera.cpp
-
-CameraSource
-
-frameworks/base/media/java/android/media/MediaRecorder.java
-frameworks/base/media/jni/android_media_MediaRecorder.cpp
-frameworks/av/media/libmedia/mediarecorder.cpp
-frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
-frameworks/av/media/libmediaplayerservice/MediaRecorderClient.cpp
-frameworks/av/media/libmediaplayerservice/StagefrightRecorder.cpp
-frameworks/av/media/libstagefright/MPEG4Writer.cpp
-frameworks/av/media/libstagefright/AudioSource.cpp
-==========================================应用
-打开：
-open-->new Camera()-->native_setup@Camera.java-->android_hardware_Camera_native_setup(初始化本地camera)
--->Camera::connect(cameraId)@android_hardware_Camera.cpp-->cs->connect@Camera.cpp-->connect(连接到服务,
-返回ICamera)@ICameraService.cpp-->interface_cast<ICamera>-->ICamera.asInterface-->new BpCamera(
-是一个Client的远程代理)@ICamera.cpp
-
-connect-->cs->connect(CameraId)@Camera.cpp-->CameraService::connect(设置client)-->hardware->initialize
-@CameraService.cpp-->initialize-->module->methods->open@CameraHardwareInterface.h-->
-HAL_MODULE_INFO_SYM.method.open-->camera_module_methods.open-->camera_device_open(根据cameraId打开)-->
-new android::CameraHardware@CameraHal_Module.cpp-->openCamera(打开/dev/vediox)@CameraHardware.cpp
-
-camer@对应service端的一个client:(如典型调用流程)
-releaseRecordingFrame-->c->releaseRecordingFrame@Camera.cpp-->(跨进程，服务端)Client::releaseRecordingFrame
--->mHardware->releaseRecordingFrame@CameraService.cpp-->releaseRecordingFrame-->(mDevice在HAL中初始化)
-mDevice->ops->release_recording_frame@CameraHardwareInterface.h-->release_recording_frame-->
-camera_release_recording_frame@CamerHal_Module.cpp
-
-
-查询数目：
-open-->getNumberOfCameras@Camera.java-->android_hardware_Camera_getNumberOfCameras
-@android_hardware_Camera.cpp-->Camera::getNumberOfCameras()@Camera.cpp-->cs->getNumberOfCameras
-@CameraService.cpp-->get_number_of_cameras-->camera_get_number_of_cameras(一直返回2)@CameraHal_module.cpp
-
-查询信息：
-getCameraInfo-->android_hardware_Camera_getCameraInfo@android_hardware_Camera.cpp-->Camera::getCameraInfo
-@Camera.cpp-->cs->getCameraInfo-->mModule->get_camera_info@CameraService.cpp-->get_camera_info
-@CameraHal_Module.cpp
-
-应用：
-onCreate-->CameraStartUpThread.start-->CameraStartUpThread.run-->Util.openCamera@Camera.java-->
-CameraHolder.instance().open@Util.java-->open-->CameraManager.instance().cameraOpen@CameraHolder.java
--->android.hardware.Camera.open@CameraManager.java
-
-
-获取服务：
-getCameraServicer-->interface_cast<ICameraService>@Camera.cpp-->ICameraService.asInterface@IInterface.h
--->IMPLEMENT_META_INTERFACE@ICameraService.cpp-->new Bp##INTERFACE(obj)@IInterface.h-->
-new BpCameraService(封装了能够远程调用的方法，通过这些接口进行远程调用)@ICameraService.cpp
-
-
-initialize@IndicatorControlBar.java-->initializeCameraPicker@IndicatorControl.java-->CameraPicker
--->onClick@CameraPicker.java
-
-packages/apps/Camera/src/com/android/camera/ui/IndicatorControl.java
-packages/apps/Camera/src/com/android/camera/ui/IndicatorControlBar.java
-----------------------------------------
-CameraService::connect-->new CameraHardware@CameraService.cpp-->openCamera-->
-mCamera->Open@CameraHardware.cpp-->
-
-拍照流程：
-onCreate-->CameraStartUpThread.start-->initializeFocusManager-->new FocusManager(Carmer为listener)
-@Camera.java
-
-onShutterButtonFocus-->mFocusManager.onShutterDown()-->autoFocus-->mListener.autoFocus()@FocusManager.java
--->autoFocus@Camera.java
-
-onShutterButtonClick-->mFocusManager.doSnap()@Camera.java-->capture-->mListener.capture(设置
-SNAPSHOT_IN_PROGRESS)@FocusManager.java-->
-
-onShutterButtonFocus-->mFocusManager.onShutterUp()@Camera.java-->cancelAutoFocus-->mListener.
-cancelAutoFocus@FocusManager.java-->cancelAutoFocus@Camera.java
-
-移除相机：
-DisableCameraReceiver(接收启动广播判断是否存在摄像头设备)@DisableCameraReceiver.java
-
-setCameraState
-onShutterButtonClick
-SNAPSHOT_IN_PROGRESS
-pref_video_time_lapse_frame_interval_default  0->1s
-
-
-packages/apps/Camera/src/com/android/camera/Camera.java
-
+frameworks/av/camera/include/camera/CameraBase.h
+frameworks/av/camera/CameraBase.cpp

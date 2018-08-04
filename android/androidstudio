@@ -1,0 +1,5 @@
+//
+
+dependencies {
+    compileOnly files('libs/framework.jar') //报outofindexException 将implementation修改compileOnly
+}

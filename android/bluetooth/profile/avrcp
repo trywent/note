@@ -1,25 +1,72 @@
-//avrcp controller
-AvrcpControllerService-->initNative@AvrcpControllerService.java
+//avrcp controller 客端
+//回调接口
+typedef struct {
+    /** set to sizeof(BtRcCallbacks) */
+    size_t      size;
+    btrc_passthrough_rsp_callback                               passthrough_rsp_cb;
+    btrc_groupnavigation_rsp_callback                           groupnavigation_rsp_cb;
+    btrc_connection_state_callback                              connection_state_cb;
+    btrc_ctrl_getrcfeatures_callback                            getrcfeatures_cb;
+    btrc_ctrl_setplayerapplicationsetting_rsp_callback          setplayerappsetting_rsp_cb;
+    btrc_ctrl_playerapplicationsetting_callback                 playerapplicationsetting_cb;
+    btrc_ctrl_playerapplicationsetting_changed_callback         playerapplicationsetting_changed_cb;
+    btrc_ctrl_setabsvol_cmd_callback                            setabsvol_cmd_cb;
+    btrc_ctrl_registernotification_abs_vol_callback             registernotification_absvol_cb;
+    btrc_ctrl_track_changed_callback                            track_changed_cb;
+    btrc_ctrl_play_position_changed_callback                    play_position_changed_cb;
+    btrc_ctrl_play_status_changed_callback                      play_status_changed_cb;
+    btrc_ctrl_get_folder_items_callback                         get_folder_items_cb;
+    btrc_ctrl_change_path_callback                              change_folder_path_cb;
+    btrc_ctrl_set_browsed_player_callback                       set_browsed_player_cb;
+    btrc_ctrl_set_addressed_player_callback                     set_addressed_player_cb;
+} btrc_ctrl_callbacks_t;
+
+
+
+
+AvrcpControllerService-->initNative{
+- btInf->get_profile_interface(BT_PROFILE_AV_RC_CTRL_ID) //获取avrcp controller接口.bt_rc_ctrl_interface@btif_rc.cc
+- sBluetoothAvrcpInterface->init@com_android_bluetooth_avrcp_controller.cpp-->
+	init_ctrl@btif_rc.cc
+}@AvrcpControllerService.java
+
+
+
 
 start{
 - HandlerThread().start
 - new AvrcpControllerStateMachine(this).start
 }
 
-//jni回调设置id3
-btavrcp_track_changed_callback@com_android_bluetooth_avrcp_controller.cpp-->
-onTrackChanged@AvrcpControllerService.java-->Connected.processMessage(MESSAGE_PROCESS_TRACK_CHANGED)
--->mAddressedPlayer.updateCurrentTrack@AvrcpControllerStateMachine.java-->
-updateCurrentTrack= track@AvrcpPlayer.java
+//获取播放信息
+playItemNative-->sBluetoothAvrcpInterface->play_item_cmd
 
-//开始广播metadata
+
+//jni回调状态变化
+handle_notification_response@btif_rc.cc-->sBluetoothAvrcpCallbacks.play_status_changed_cb-->
+
+//jni回调设置id3
+handle_get_elem_attr_response@btif_rc.cc-->sBluetoothAvrcpCallbacks.track_changed_cb-->
+btavrcp_track_changed_callback(/*p_attrs包含播放信息*/)@com_android_bluetooth_avrcp_controller.cpp-->
+onTrackChanged@AvrcpControllerService.java-->Connected.processMessage(MESSAGE_PROCESS_TRACK_CHANGED)
+-->handleMessage(){
+- mAddressedPlayer.updateCurrentTrack-->updateCurrentTrack= track@AvrcpPlayer.java//设置TrackInfo播放信息
+- broadcastMetaDataChanged(getMediaMetaData)//广播播放信息
+}@AvrcpControllerStateMachine.java
+
+
+
+//开始广播metadata. a2dpsink开始播放时，开始广播信息数据
+Connected.processMessage(STACK_EVENT)-->processAudioStateEvent@A2dpSinkStateMachine.java
+handleMessage(SRC_STR_START/SNK_PLAY)-->startAvrcpUpdates-->avrcpService.startAvrcpUpdates@A2dpSinkStreamHandler.java
 startAvrcpUpdates@AvrcpControllerService.java
 
 //停止广播metadata
 stopAvrcpUpdates@AvrcpControllerService.java
 
 
-
+packages/apps/Bluetooth/src/com/android/bluetooth/a2dpsink/A2dpSinkStateMachine.java
+packages/apps/Bluetooth/src/com/android/bluetooth/a2dpsink/A2dpSinkStreamHandler.java
 frameworks/base/core/java/android/bluetooth/BluetoothAvrcpController.java
 packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/AvrcpControllerService.java
 packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/AvrcpControllerStateMachine.java
@@ -28,8 +75,50 @@ packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/TrackInfo.java
 packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp_controller.cpp
 
 //=========================
-//avrcp
+//avrcp 主端
+//回调接口
+static btrc_callbacks_t sBluetoothAvrcpCallbacks = {
+    sizeof(sBluetoothAvrcpCallbacks),
+    btavrcp_remote_features_callback,
+    btavrcp_get_play_status_callback,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    btavrcp_get_element_attr_callback,
+    btavrcp_register_notification_callback,
+    btavrcp_volume_change_callback,
+    btavrcp_passthrough_command_callback,
+    btavrcp_set_addressed_player_callback,
+    btavrcp_set_browsed_player_callback,
+    btavrcp_get_folder_items_callback,
+    btavrcp_change_path_callback,
+    btavrcp_get_item_attr_callback,
+    btavrcp_play_item_callback,
+    btavrcp_get_total_num_items_callback,
+    btavrcp_search_callback,
+    btavrcp_add_to_play_list_callback,
+}
+
+//回复获取当前播放信息
+get_element_attr_cb@btif_rc.c-->
+btavrcp_get_element_attr_callback-->method_getElementAttr@com_android_bluetooth_avrcp.cpp
+getElementAttrRequestFromNative-->AvrcpMessageHandler.handleMessage(MSG_NATIVE_REQ_GET_ELEM_ATTRS)@Avrcp.java
+getElementAttrRspNative-->get_element_attr_rsp@com_android_bluetooth_avrcp.cpp
+
+//回复获取item(播放列表中的歌曲?)信息
+btavrcp_get_item_attr_callback@com_android_bluetooth_avrcp.cpp-->CallVoidMethod(method_getItemAttrCallback)-->
+getItemAttrRequestFromNative-->obtainMessage(MSG_NATIVE_REQ_GET_ITEM_ATTR)-->AvrcpMessageHandler.handleMessage
+-->handleGetItemAttr-->getItemAttrRsp-->(填充信息之类的？)-->getItemAttrRspNative@Avrcp.java-->
+sBluetoothAvrcpInterface->get_item_attr_rsp@com_android_bluetooth_avrcp.cpp
+
+
+
 MediaControllerListener-->onMetadataChanged
 
+packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp.cpp
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcp/Avrcp.java
 
-/home/bsp/sp9853/packages/apps/Bluetooth/src/com/android/bluetooth/avrcp/Avrcp.java
+

@@ -1,0 +1,83 @@
+//target
+
+//接口
+static const btrc_interface_t bt_rc_interface = {
+    sizeof(bt_rc_interface),
+    init,
+    get_play_status_rsp,
+    NULL, /* list_player_app_attr_rsp */
+    NULL, /* list_player_app_value_rsp */
+    NULL, /* get_player_app_value_rsp */
+    NULL, /* get_player_app_attr_text_rsp */
+    NULL, /* get_player_app_value_text_rsp */
+    get_element_attr_rsp,
+    NULL, /* set_player_app_value_rsp */
+    register_notification_rsp,
+    set_volume,
+    set_addressed_player_rsp,
+    set_browsed_player_rsp,
+    get_folder_items_list_rsp,
+    change_path_rsp,
+    get_item_attr_rsp,
+    play_item_rsp,
+    get_total_num_of_items_rsp,
+    search_rsp,
+    add_to_now_playing_rsp,
+    cleanup,
+}
+
+//回调接口，
+typedef struct {
+    /** set to sizeof(BtRcCallbacks) */
+    size_t      size;
+    btrc_remote_features_callback               remote_features_cb;
+    btrc_get_play_status_callback               get_play_status_cb;
+    btrc_list_player_app_attr_callback          list_player_app_attr_cb;
+    btrc_list_player_app_values_callback        list_player_app_values_cb;
+    btrc_get_player_app_value_callback          get_player_app_value_cb;
+    btrc_get_player_app_attrs_text_callback     get_player_app_attrs_text_cb;
+    btrc_get_player_app_values_text_callback    get_player_app_values_text_cb;
+    btrc_set_player_app_value_callback          set_player_app_value_cb;
+    btrc_get_element_attr_callback              get_element_attr_cb;
+    btrc_register_notification_callback         register_notification_cb;
+    btrc_volume_change_callback                 volume_change_cb;
+    btrc_passthrough_cmd_callback               passthrough_cmd_cb;
+    btrc_set_addressed_player_callback          set_addressed_player_cb;
+    btrc_set_browsed_player_callback            set_browsed_player_cb;
+    btrc_get_folder_items_callback              get_folder_items_cb;
+    btrc_change_path_callback                   change_path_cb;
+    btrc_get_item_attr_callback                 get_item_attr_cb;
+    btrc_play_item_callback                     play_item_cb;
+    btrc_get_total_num_of_items_callback        get_total_num_of_items_cb;
+    btrc_search_callback                        search_cb;
+    btrc_add_to_now_playing_callback            add_to_now_playing_cb;
+}
+
+
+initNative-->btInf->get_profile_interface(BT_PROFILE_AV_RC_ID)@com_android_bluetooth_avrcp.cpp
+-->get_profile_interface@bluetooth.cc-->btif_rc_get_interface-->bt_rc_interface@btif_rc.cc
+
+init-->bt_rc_callbacks@btif_rc.cc//设置回调
+
+btif_rc_get_interface
+
+//收到获取信息命令。。回复获取当前信息
+btif_rc_upstreams_evt(AVRC_PDU_GET_ELEMENT_ATTR)-->get_element_attr_cb //收到命令
+
+get_element_attr_rsp //回复信息
+
+
+
+//回复获取item(播放列表中的歌曲？)信息
+btif_rc_upstreams_evt(AVRC_PDU_GET_ITEM_ATTRIBUTES)-->get_item_attr_cb
+
+get_item_attr_rsp@btif_rc
+
+bta_av_hdl_event@bta_av_main.cc-->
+bta_av_sm_execute-->bta_av_rc_msg-->bta_av_proc_meta_cmd@bta_av_act.cc
+
+packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp.cpp
+system/bt/btif/src/bluetooth.cc
+system/bt/btif/src/btif_rc.cc
+system/bt/bta/av/bta_av_main.cc
+system/bt/bta/av/bta_av_act.cc

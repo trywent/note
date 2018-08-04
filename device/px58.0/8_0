@@ -15,3 +15,9 @@ busybox setserial -a /dev/ttyS0
 dumpsys window windows
 
 com.android.settings/com.android.settings.FallbackHome
+
+
+//cpu
+/sys/class/devfreq/dmc/
+
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq

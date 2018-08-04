@@ -1,0 +1,72 @@
+//controller
+btInf->get_profile_interface(BT_PROFILE_AV_RC_CTRL_ID)@com_android_bluetooth_avrcp_controller.cpp
+-->get_profile_interface@bluetooth.cc-->btif_rc_ctrl_get_interface-->bt_rc_ctrl_interface@btif_rc.cc
+
+static const btrc_ctrl_interface_t bt_rc_ctrl_interface = {
+    sizeof(bt_rc_ctrl_interface),
+    init_ctrl,
+    send_passthrough_cmd,
+    send_groupnavigation_cmd,
+    change_player_app_setting,
+    play_item_cmd,
+    get_playback_state_cmd,
+    get_now_playing_list_cmd,
+    get_folder_list_cmd,
+    get_player_list_cmd,
+    change_folder_path_cmd,
+    set_browsed_player_cmd,
+    set_addressed_player_cmd,
+    set_volume_rsp,
+    volume_change_notification_rsp,
+    cleanup_ctrl,
+};
+
+
+//=============
+init_ctrl{
+- bt_rc_ctrl_callbacks //设置jni回调
+- btif_rc_cb
+- lbl_init
+}@btif_rc.cc
+
+
+//播放状态
+handle_notification_response{
+- AVRC_RSP_INTERIM{
+	- AVRC_EVT_PLAY_STATUS_CHANGE
+	}
+
+- AVRC_RSP_CHANGED{
+	- AVRC_RSP_CHANGED
+	}
+}
+
+
+HAL_CBACK(bt_rc_ctrl_callbacks, play_status_changed_cb)@btif_rc.cc-->btavrcp_track_changed_callback
+@com_android_bluetooth_avrcp_controller.cpp
+
+//播放状态信息
+btif_rc_handler(BTA_AV_META_MSG_EVT)-->
+handle_avk_rc_metamsg_rsp(AVRC_PDU_GET_ELEMENT_ATTR)-->handle_get_elem_attr_response-->
+HAL_CBACK(bt_rc_ctrl_callbacks, track_changed_cb)@btif_rc.cc
+
+
+//获取id3
+get_element_attribute_cmd
+
+
+//发送获取CAP命令
+handle_rc_connect-->handle_rc_ctrl_features-->getcapabilities_cmd(AVRC_CAP_COMPANY_ID)
+
+handle_get_capability_response(接收到回复AVRC_CAP_COMPANY_ID)-->getcapabilities_cmd(AVRC_CAP_EVENTS_SUPPORTED)-->
+handle_avk_rc_metamsg_rsp-->handle_get_capability_response(AVRC_CAP_EVENTS_SUPPORTED)-->register_for_event_notification
+-->register_notification_cmd
+
+
+
+btif_rc_handler-->andle_avk_rc_metamsg_rsp{
+- handle_notification_response
+}
+
+system/bt/btif/src/btif_av.cc
+system/bt/btif/src/btif_rc.cc

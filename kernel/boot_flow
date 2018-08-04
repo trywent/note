@@ -1,11 +1,12 @@
 //
 start_kernel{
-
-
+- setup_arch(&command_line)
+- setup_command_line(command_line)
 - mm_init
 
 
 - rcu_init
+- console_init
 }@main.c
 
 

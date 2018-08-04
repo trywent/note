@@ -1,0 +1,49 @@
+//videox操作接口  https://linuxtv.org/downloads/v4l-dvb-apis-new/uapi/v4l/v4l2.html
+
+#include <fcntl.h>
+
+int open(const char *device_name, int flags)
+int ioctl(int fd, int request, void *argp)
+int close(int fd)
+
+//查询设备功能。open后必须的操作
+int ioctl(int fd, VIDIOC_QUERYCAP, struct v4l2_capability *argp)
+
+
+/*输入设备有很多，cvbs，s-video，sensor*/
+/*查询当前设备输入，输出设备的信息 ioctl(fd, VIDIOC_ENUMINPUT, struct v4l2_input)
+  查询支持的视频格式
+*/
+VIDIOC_ENUMINPUT ，VIDIOC_ENUMOUTPUT 
+//查询当前输入输出设备号 ioctl(fd, VIDIOC_G_INPUT, &index)
+VIDIOC_G_INPUT and VIDIOC_G_OUTPUT 
+//设置当前输入输出 ioctl(fd, VIDIOC_S_INPUT, &index)
+ VIDIOC_S_INPUT and VIDIOC_S_OUTPUT 
+
+//tuner 调谐器(选台)
+
+
+//modulator 调制器(output)
+
+
+
+//支持的视屏格式标准
+
+//当前视频使用的格式
+VIDIOC_G_STD and VIDIOC_S_STD
+
+//支持的视频格式
+VIDIOC_ENUMSTD 
+
+
+//Digital Video (DV) Timings
+VIDIOC_ENUM_DV_TIMINGS, VIDIOC_SUBDEV_ENUM_DV_TIMINGS 
+
+
+//用户控制接口，亮度，饱和度，对比度
+V4L2_CID_BASE
+VIDIOC_SUBSCRIBE_EVENT, VIDIOC_UNSUBSCRIBE_EVENT //控制发生变化时事件通知
+
+
+===============
+//图像格式

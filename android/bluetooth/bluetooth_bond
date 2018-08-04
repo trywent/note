@@ -76,7 +76,7 @@ remote_device_properties_callback-->method_devicePropertyChangedCallback@luetoot
 }@RemoteDevices.java
 
 //加入设备
-device_found_callback-->method_deviceFoundCallbac@@com_android_bluetooth_btservice_AdapterService.cppk-->
+device_found_callback-->method_deviceFoundCallbac@@com_android_bluetooth_btservice_AdapterService.cpp-->
 deviceFoundCallback@JniCallbacks.java-->deviceFoundCallback(address/*发送广播ACTION_FOUND*/)@RemoteDevices.java
 
 ======================

@@ -1,11 +1,29 @@
+//
 ActivityStack //activity栈
-
 TaskRecord  //任务，在mTaskHistory中
-
 ActivityRecord //activity记录
-
-
 ActivityRecord-->TaskRecord-->ActivityStack
 
-————————————————————————
-mWindowManager.moveTaskToTop(task.taskId) //窗口与task关联？？？？？
+
+/*
+所有activity栈都保存在mStacks中。按照先后顺序加入到mstacks中。当有应用启动时会有移动操作
+
+*/
+mStacks@ActivitySackSupervisor.java @ActivityStack.java
+
+
+
+/* 设置焦点栈mFocusStack
+*  
+*
+*/
+startActivityUncheckedLocked-->ActivityStack.moveToFront()//启动过程中设置
+@ActivityStackSuperVisor.java
+
+//windowManager设置，触摸stack对应所在区域时设置该栈为焦点。没有考虑这个栈是否可见
+H.handleMessage(TAP_OUTSIDE_STACK)@WindowManagerService.java-->setFocusedStack-->
+setFocusedActivityLocked@ActivityManagerService.java-->setFocusedStack-->
+task.stack.moveToFront@ActivityStackSuperVisor.java
+
+
+========================

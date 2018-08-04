@@ -1,0 +1,24 @@
+//
+
+
+
+
+
+
+
+
+
+
+//sirq
+
+
+
+
+
+
+
+
+
+
+//查看CPU状态 System Request Key Hacks
+echo l > /proc/sysrq-trigger

@@ -17,3 +17,8 @@
 
 //可选操作
 安装目录：--prefix=
+
+
+
+//查看bin的elf信息.版本运行架构
+readelf -h file

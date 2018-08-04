@@ -23,8 +23,10 @@ cat /proc/asound/sprdphone/pcm2c/sub0/status
 cat /proc/asound/sprdphone/pcm2c/sub0/info
 cat /proc/asound/sprdphone/pcm2c/info
 
-dd if=/storage/USB0/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16000
-dd if=/sdcard/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16000
+dd if=/storage/USB0/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16384
+dd if=/sdcard/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot bs=1024 count=16384
+
+dd if=/sdcard/recovery.img of=/dev/block/platform/sdio_emmc/by-name/recovery bs=1024 count=16426
 
 61      BOOL    1       ADC1-DAC Digital Loop switch             Off
 62      BOOL    1       ADC-DAC Digital Loop switch              Off

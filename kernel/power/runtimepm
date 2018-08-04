@@ -1,0 +1,23 @@
+//
+pm_runtime_init{
+- 初始化dev->power
+- INIT_WORK(&dev->power.work, pm_runtime_work)
+- setup_timer(&dev->power.suspend_timer, pm_suspend_timer_fn)
+}
+
+pm_runtime_work{
+- 获取req，dev->power.request
+- 执行相应的函数
+- rpm_idle
+- rpm_suspend
+- rpm_suspend
+- rpm_resume
+}
+
+pm_request_idle(RPM_ASYNC)@pm_runtime.h-->__pm_runtime_idle-->rpm_idle-->(RPM_ASYNC)queue_work(pm_wq, &dev->power.work)
+@runtime.c
+
+
+
+kernel/include/linux/pm_runtime.h
+kernel/drivers/base/power/runtime.c

@@ -1,0 +1,8 @@
+//
+__setup("console=", console_setup)@printk.c
+
+start_kernel-->parse_early_param-->parse_early_options-->do_early_param@main.c-->console_setup@printk.c
+
+
+kernel/init/main.c
+kernel/kernel/printk/printk.c

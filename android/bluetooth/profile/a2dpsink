@@ -1,0 +1,6 @@
+//
+
+initNative-->sBluetoothA2dpInterface->init(&sBluetoothA2dpCallbacks)
+
+
+packages/apps/Bluetooth/jni/com_android_bluetooth_a2dp_sink.cpp

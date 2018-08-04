@@ -10,3 +10,51 @@ onCreaet@Settings.java-->onCreate{
 packages/apps/Settings/src/com/android/settings/Settings.java
 packages/apps/Settings/src/com/android/settings/SettingsActivity.java
 packages/apps/Settings/src/com/android/settings/dashboard/DashboardSummary.java
+
+
+
+
+
+
+===============
+//bluetooth
+
+//connected device 蓝牙,nfc,printer,usb
+getPreferenceControllers{
+- NfcPreferenceController
+- UsbModePreferenceController
+- BluetoothMasterSwitchPreferenceController
+}@ConnectedDeviceDashboardFragment.java
+
+getPreferenceScreenResId-->R.xml.connected_devices@ConnectedDeviceDashboardFragment.java
+
+//蓝牙
+displayPreference{
+- BluetoothEnabler //开关
+- handlePreferenceTreeClick-->startPreferencePanelAsUser(BluetoothSettings.class)
+}@BluetoothMasterSwitchPreferenceController.java
+
+//已配对设备
+initPreferencesFromPreferenceScreen-->mPairedDevicesCategory@BluetoothSettings.java
+
+
+createDevicePreference(cachedDevice){
+- BluetoothDevicePreference
+- initDevicePreference-->initDevicePreference-->setOnGearClickListener(mDeviceProfilesListener)
+	@BluetoothSettings.java-->startPreferencePanel(BluetoothDeviceDetailsFragment.class)//点击
+}@DeviceListPreferenceFragment.java
+
+
+onPreferenceTreeClick-->unpairDevice-->mCachedDevice.unpair@DeviceProfilesSettingsEx.java
+
+
+packages/apps/Settings/src/com/android/settings/connecteddevice/ConnectedDeviceDashboardFragment.java
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothMasterSwitchPreferenceController.java
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothEnabler.java
+frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/LocalBluetoothAdapter.java
+
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothSettings.java
+packages/apps/Settings/src/com/android/settings/bluetooth/DeviceListPreferenceFragment.java
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothDeviceDetailsFragment.java
+vendor/sprd/platform/packages/apps/Settings/src/com/android/settings/bluetooth/DeviceProfilesSettingsEx.java
+

@@ -4,9 +4,13 @@ start:
 app.thread.scheduleLaunchActivity
 
 
+//启动当前应用前会将前一个应用pause
+resumeTopActivityLocked-->resumeTopActivityInnerLocked-->mStackSupervisor.pauseBackStacks@ActivityStack.java
 
 ______________
 resumed
+
+
 
 ______________
 pause:
@@ -146,3 +150,5 @@ resumeTopActivityLocked{
 - 显示next，mWindowManager.setAppVisibility(next.appToken, true)
 }
 
+
+ensureActivitiesVisibleLocked-->isStackVisibleLocked(当前栈是否可见)
