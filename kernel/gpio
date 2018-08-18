@@ -1,3 +1,12 @@
+//gpio
+push-pull
+
+
+open-drain
+
+
+
+
 //初始化 @Document/driver.txt linux/gpio/driver.h
 
 

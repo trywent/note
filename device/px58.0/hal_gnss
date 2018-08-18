@@ -15,6 +15,11 @@ ServiceManager::add{
 - ifaceMap.insertService //加入到map
 }
 
+
+/*
+ hal层封装成一个服务
+
+*/
 //=============hal servcice  android/hardware/gnss/1.0/IGnss.h//接口定义
 service gnss_service /vendor/bin/hw/android.hardware.gnss@1.0-service//服务启动
 -->main-->defaultPassthroughServiceImplementation<IGnss>@service.cpp-->
@@ -79,9 +84,10 @@ interface/gnss/1.0/android.hardware.gnss@1.0_genc++/gen/android/hardware/gnss/1.
 interface/gnss/1.0/android.hardware.gnss@1.0_genc++/gen/android/hardware/gnss/1.0/GnssAll.cpp
 
 
+/*
+ android层通过服务访问hal层
 
-
-
+*/
 //=============client 使用服务（android framework）
 class_init_native@GnssLocationProvider.java-->
 android_location_GnssLocationProvider_class_init_native{

@@ -35,3 +35,11 @@ echo 6 > /proc/sys/kernel/printk
 echo l > /proc/sysrq-trigger
 
 echo 'c' >/proc/sysrq-trigger
+
+
+//temp
+cat sys/class/thermal/thermal_zone1/temp
+
+
+cat /sys/devices/virtual/thermal/thermal_zone*/type
+cat /sys/devices/virtual/thermal/thermal_zone*/temp

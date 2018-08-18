@@ -1,0 +1,29 @@
+
+
+The OP has probably long since solved this, but for the sake of anyone who gets here by google:
+
+#include <sys/poll.h>
+
+struct pollfd fds[1];
+fds[0].fd = serial_fd;
+fds[0].events = POLLIN ;
+int pollrc = poll( fds, 1, 1000);
+if (pollrc < 0)
+{
+    perror("poll");
+}
+else if( pollrc > 0)
+{
+    if( fds[0].revents & POLLIN )
+    {
+        char buff[1024];
+        ssize_t rc = read(serial_fd, buff, sizeof(buff) );
+        if (rc > 0)
+        {
+            /* You've got rc characters. do something with buff */
+        }
+    }
+}    
+
+Make sure the serial port is opened in nonblocking mode as poll() can sometimes return when there are no characters waiting.
+

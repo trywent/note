@@ -1,0 +1,17 @@
+//
+
+//注册uart驱动。注册一次
+uart_register_driver(&sprd_uart_driver)
+
+
+
+//注册uart设备
+uart_add_one_port(&sprd_uart_driver, up)
+
+
+
+sprd_startup-->devm_request_irq(port->irq, sprd_handle_irq)-->
+sprd_handle_irq-->sprd_rx
+
+
+kernel/drivers/tty/serial/sprd_serial.c

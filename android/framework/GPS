@@ -1,4 +1,4 @@
-卫星：
+//卫星：
 azimuth 方位角，航向
 elevation 高度，海拔
 PRN       伪随机码
@@ -99,22 +99,25 @@ requestLocationUpdates-->_requestLocationUpdates-->mService.requestLocationUpdat
 UpdateRecord)
 
 ---------------------
-调用监听：
+status回调：
 nmea_reader_parse-->gps_state->callbacks.location_cb@MstarGps.c-->
 location_callback-->method_reportLocation@com_android_server_location_GpsLocationProvider.cpp
 -->reportLocation(onFirstFix固定地址)，reportNmea(onNmeaReceived卫星消息)，
 reportStatus(onGpsStarted，onGpsStopped启动，停止)，reportSvStatus(onSvStatusChanged)
 --> listener.mListener.onxxxx()@GpsLocationProvider.java
 
-处理Nmea消息
+处理Nmea回调：
 onNmeaReceived-->sendMessage-->
 mGpsHandler.handleMessage@GpsStatusListenerTransport@LocationManager.java-->
 mNmeaListener.onNmeaReceived@LocationManager.java
 
-LocationListener:
-LocationWorkerHandler(收到location改变消息)-->handleLocationChangedLocked(从记录UpdateRecord获取监听器)
+LocationListener回调:
+GnssCallback::gnssLocationCb@com_android_server_location_GpsLocationProvider.cpp-->
+reportLocation@GnssLocationProvider.java-->
+LocationWorkerHandler(MSG_LOCATION_CHANGED)-->handleLocationChangedLocked(从记录UpdateRecord获取监听器)
 -->receiver.callLocationChangedLocked(callLocationChangedLocked,callStatusChangedLocked)
--->mListener.onLocationChanged
+-->mListener.onLocationChanged@LocationManagerService.java
+
 
 SettingsObserver-->updateProvidersLocked(更新状态)-->updateProviderListenersLocked-->
 record.mReceiver.callProviderEnabledLocked-->mListener.onProviderEnabled
@@ -162,8 +165,14 @@ jb/frameworks/base/location/java/android/location/LocationManager.java
 jb/frameworks/base/services/java/com/android/server/LocationManagerService.java
 jb/frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
 frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
-=====================================
-使用位置服务：
+
+//=====================================
+gnss service:
+
+
+
+//=====================================
+应用使用位置服务：
 通过LocationManager可以获得以下功能：
 -查询LocationProviders，提供最后可知位置
 -注册/注销一个listener，定期从location provider更新的位置
@@ -178,12 +187,12 @@ Location Strategies(位置战略，策略)：
 
 __________________________________
 三种监听器：
-addGpsStatusListener(GpsStatus.Listener)
-addNmeaListener(GpsStatus.NmeaListener)
-requestLocationUpdates(ProviderName, LocationListener)
+LocationManager.addGpsStatusListener(GpsStatus.Listener)
+LocationManager.addNmeaListener(GpsStatus.NmeaListener)
+LocationManager.requestLocationUpdates(ProviderName, LocationListener)
 
 获取LocationProvider：
-getBestProvider-->getProviders-->_getProvidersLocked-->mProviders.get(从mProvider获取)
+LocationManager.getBestProvider-->getProviders-->_getProvidersLocked-->mProviders.get(从mProvider获取)
 @LoacationManagerService.java
 
 mProvider添加：
