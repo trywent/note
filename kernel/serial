@@ -73,12 +73,40 @@ tty_fops.read-->tty_read{
 }@tty_io.c
 
 
-
-//wirte
+======================
+//写入数据并传送
 tty_fops.write-->tty_write{
 - 获取tty_ldisc设备，tty_ldisc_ref_wait(tty)
 - 通过tty_ldisc操作，do_tty_write-->ld->ops->write
 }@tty_io.c
+
+
+
+======================
+//收到数据并读取
+tty_struct.buf
+
+tty_insert_flip_char(struct tty_struct *tty){//将读取的数据保存到buffer
+- struct tty_buffer *tb = tty->buf.tail //获取bufer
+- tb->char_buf_ptr[tb->used++] = ch //若buffer有空间保存数据到buffer中
+- tty_insert_flip_string_flags{//现有空间不够
+	- tty_buffer_request_room-->tty_buffer_find //调整buffer大小
+	- memcpy //将数据拷贝到buffer中
+	}
+}@tty_buffer.c
+
+tty_flip_buffer_push{
+- tty->buf.tail->commit = tty->buf.tail->used
+- flush_to_ldisc{ //低延时
+	- count = head->commit - head->read //当前buffer中的数据数量
+	- disc->ops->receive_buf-->n_tty_receive_buf{
+		- 
+		}@n_tty.c
+	}
+- schedule_work-->flush_to_ldisc //高延时
+}@tty_buffer.c
+
+
 
 kernel/drivers/tty/tty_io.c
 kernel/drivers/tty/serial/serial_core.c
