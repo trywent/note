@@ -19,7 +19,7 @@ AudioSystem::getDevicesForStream@android_media_AudioSystem.cpp-->getDevicesForSt
 AudioManager.setStreamVolume-->AudioService.setStreamVolume{
 - 检查状态是否正确，ensureValidStreamType
 - 获取streamstate，streamState = mStreamStates[streamTypeAlias = mStreamVolumeAlias]
-- 获取流对应的设备，getDeviceForStream
+- 获取流对应的设备device，getDeviceForStream
 - syncronised{
 	- streamState.getIndex
 	- 将要设置的音量根据mIndex转换，rescaleIndex

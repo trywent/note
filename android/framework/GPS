@@ -98,6 +98,13 @@ requestLocationUpdates-->_requestLocationUpdates-->mService.requestLocationUpdat
 -->requestLocationUpdate(将listener加入mReceivers)-->requestLocationUpdatesLocked(添加监听器的记录
 UpdateRecord)
 
+
+jb/frameworks/base/location/java/android/location/LocationManager.java
+jb/frameworks/base/services/java/com/android/server/LocationManagerService.java
+jb/frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
+frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
+
+//===================================== HAL
 ---------------------
 status回调：
 nmea_reader_parse-->gps_state->callbacks.location_cb@MstarGps.c-->
@@ -161,14 +168,10 @@ gps串口/dev/ttyMbx4
 
 
 jb/hardware/mstar/libgps/MstarGps.c
-jb/frameworks/base/location/java/android/location/LocationManager.java
-jb/frameworks/base/services/java/com/android/server/LocationManagerService.java
-jb/frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
-frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 
-//=====================================
-gnss service:
 
+
+//gnss service:
 
 
 //=====================================

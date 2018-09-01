@@ -1,12 +1,26 @@
 //====================================
+struct uart_state{
+struct uart_port //硬件端口
+struct tty_port  //上层应用
+}
+
+
+
+
+
+
+
+//====================================
 //一般ttys的设备都是动态分配
 
 
 //注册驱动
-uart_register_driver{ 
+uart_register_driver(struct uart_driver){ 
 - 初始化驱动中的tty_driver normal，设置驱动名，波特率...
-- 初始化uart_driver->state,tty_port_init{//驱动中支持的最大端口数
-	- 
+- tty_set_operations(normal, &uart_ops) //设置tty_driver的操作函数
+- 初始化uart_driver->state,{
+	- tty_port_init//驱动中支持的最大端口数
+	- uart_port->ops = uart_port_ops
 	}
 - 注册串口驱动，tty_register_driver{
 		- 请求字符设备号alloc_chrdev_region() //一般driver名为"ttyS"
@@ -23,15 +37,19 @@ uart_register_driver{
 }@serial_core.c
 
 //加入端口
-uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)@serial_core.c-->
-tty_port_register_device_attr{
-- tty_port_link_device
-- tty_register_device_attr{
-	- 若是非动态创建，tty_cdev_add //一般动态创建
+uart_add_one_port(struct uart_driver *drv, struct uart_port *uport){
+- uart_state->uart_port= uart_port
+- tty_port_register_device_attr(struct tty_port,struct tty_driver){
+	- tty_port_link_device
+	- tty_register_device_attr{
+	- tty_cdev_add{ //创建字符设备
+		- driver->cdevs[index]->ops = tty_fops
+		- cdev_add
+		}	
 	- 创建并初始化struct device
 	- device_register
 	}@tty_io.c
-}@tty_port.c
+}@serial_core.c-->
 
 
 
@@ -50,26 +68,36 @@ console_init@tty_io.c-->tty_ldisc_begin-->tty_register_ldisc(N_TTY, &tty_ldisc_N
 tty_fops.open-->tty_open{
 - struct tty_struct *tty //主要初始化这个
 - 若设备是TTYAUX_MAJOR。则获取对应的驱动 //一般不走这个流程
-- 获取设备对应的tty_driver，tty_lookup_driver-->get_tty_driver{//普通ttyS流程
+- 获取设备对应的tty_driver，tty_lookup_driver-->get_tty_driver{//普通ttyS流程。查找tty_register_driver注册的tty驱动
 	- 遍历tty_drivers中的驱动，返回设备号相同的struct tty_driver
 	}@tty_io.c
 - 根据tty_driver查找tty设备，tty_driver_lookup_tty
 - 没有找到，初始化一个tty设备，tty_init_dev{
-		- 分配设置tty，alloc_tty_struct-->tty_ldisc_init-->tty_ldisc_get(N_TTY){
-			- ldops = get_ldops-->tty_ldiscs[disc] //获取操作函数 tty_ldisc_N_TTY
-			- ld = kmalloc(sizeof(struct tty_ldisc)
-			- ld->ops = ldops
-			}@tty_ldisc.c
+		- 分配设置tty，alloc_tty_struct{
+			- 
+			- tty_ldisc_init-->tty_ldisc_get(N_TTY){
+			 - ldops = get_ldops-->tty_ldiscs[disc] //获取操作函数 tty_ldisc_N_TTY
+			 - ld = kmalloc(sizeof(struct tty_ldisc)
+			 - ld->ops = ldops
+			 }@tty_ldisc.c
+			- tty->ops = driver->ops //设置tty_struct的操作函数为，tty_driver的操作函数
+			}
 		- 将tty设置到对应驱动中，tty_driver_install_tty-->(设置串口配置)tty_init_termios
 		- tty_ldisc_setup
 		}
 - 关联tty结构和被打开文件，tty_add_file
 }@tty_io.c
 
-//read
-tty_fops.read-->tty_read{
-- ld = tty_ldisc_ref_wait(tty)-->tty->ldisc
-- ld->ops->read-->n_tty_read@n_tty.c
+//ioctl
+tty_ioctl{
+- tty->ops->ioctl-->uart_ops.ioctl-->uart_ioctl-->@serial_core.c
+- ld->ops->ioctl-->tty_ldisc_N_TTY.ioctl-->n_tty_ioctl@n_tty.c-->n_tty_ioctl_helper-->tty_mode_ioctl-->
+	set_termios-->tty_set_termios{
+		- tty->ops->set_termios-->uart_set_termios-->uart_change_speed-->uport->ops->set_termios@serial_core.c
+			-->
+		- ld->ops->set_termios-->n_tty_set_termios@n_tty.c
+		}@tty_ioctl.c
+- 
 }@tty_io.c
 
 
@@ -84,10 +112,17 @@ tty_fops.write-->tty_write{
 
 ======================
 //收到数据并读取
-tty_struct.buf
+tty_struct.buf //driver保存数据的buffer
 
-tty_insert_flip_char(struct tty_struct *tty){//将读取的数据保存到buffer
-- struct tty_buffer *tb = tty->buf.tail //获取bufer
+
+//驱动保存数据
+uart_insert_char{
+- 没有忽略的状态位，插入字符tty_insert_flip_char //ignore_status_mask这些标记由用户空间设置
+- overrun置位，tty_insert_flip_char(TTY_OVERRUN)
+}
+
+tty_insert_flip_char(struct tty_port *port){//将读取的数据保存到buffer
+- struct tty_buffer *tb = port->buf.tail //获取bufer
 - tb->char_buf_ptr[tb->used++] = ch //若buffer有空间保存数据到buffer中
 - tty_insert_flip_string_flags{//现有空间不够
 	- tty_buffer_request_room-->tty_buffer_find //调整buffer大小
@@ -106,6 +141,16 @@ tty_flip_buffer_push{
 - schedule_work-->flush_to_ldisc //高延时
 }@tty_buffer.c
 
+//用户读取数据
+tty_fops.read-->tty_read{
+- ld = tty_ldisc_ref_wait(tty)-->tty->ldisc
+- ld->ops->read-->n_tty_read@n_tty.c
+}@tty_io.c
+
+n_tty_read{
+
+
+}@n_tty.c
 
 
 kernel/drivers/tty/tty_io.c

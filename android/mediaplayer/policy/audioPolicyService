@@ -3,6 +3,9 @@
 
 选择打开的output，input设备
 
+
+9853：vendor/sprd/modules/audio/normal/newapm/O.x/AudioPolicyManagerSPRD.cpp
+
 */
 
 
@@ -14,7 +17,7 @@ AudioPolicyService::AudioPolicyService{
    }
 - 新方法{
    - AudioPolicyClient //实现AudioPolicyClientImpl,对audioflinger的一个封装
-   - createAudioPolicyManager-->AudioPolicyManager(AudioPolicyClient)	
+   - createAudioPolicyManager-->new AudioPolicyManager(AudioPolicyClient)	
    }
 
 }

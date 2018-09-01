@@ -25,14 +25,14 @@ service gnss_service /vendor/bin/hw/android.hardware.gnss@1.0-service//服务启
 -->main-->defaultPassthroughServiceImplementation<IGnss>@service.cpp-->
 defaultPassthroughServiceImplementation{
 - registerPassthroughServiceImplementation{
-	- Interface::getService("default")-->IGnss::getService(stub=true){//获取stub，本地服务
+	- Interface::getService("default")-->IGnss::getService("default",true){//获取stub，本地服务
 		- sm->getTransport-->ServiceManager::getTransport-->vintf::Transport getTransport //获取服务类型hwbinder
 		- 
-		}
+		}@IGnss.h
 	- service->registerAsService-->IGnss::registerAsService-->sm->add@IGnssAll.cpp
 	}
 - joinRpcThreadpool //开始服务binder线程
-}
+}@LegacySupport.h
 
 //获取hal类型,当前是hwbinder
 vintf::Transport getTransport{
@@ -46,8 +46,10 @@ vintf::Transport getTransport{
 
 //获取服务
 IGnss::getService{//stub==true则是获取本地服务
-- stub==false{
-
+- IServiceManager sm = defaultServiceManager()
+- stub==false{//client端获取服务
+	- 
+	- sm->get(IGnss::descriptor, serviceName)
 	}
 - stub==true{//从当前进程的本地服务获取BsGnss,用于注册到serviceManager
 	- baseInterface= getPassthroughServiceManager().get-->
@@ -58,7 +60,7 @@ IGnss::getService{//stub==true则是获取本地服务
 		- interface = generator("default")-->HIDL_FETCH_IGnss{
 			- hw_get_module(GPS_HARDWARE_MODULE_ID)//加载本地库
 			- module->methods->open(module, GPS_HARDWARE_MODULE_ID,&device)
-			- new Gnss(device)
+			- new Gnss(device)-->Gnss::Gnss(gnssDevice)-->gnssDevice->get_gps_interface(GPS库接口mGnssIface)@Gnss.cpp
 			}@Gnss.cpp
 		- registerReference{//加入到
 			- defaultServiceManager().registerPassthroughClient
@@ -67,7 +69,17 @@ IGnss::getService{//stub==true则是获取本地服务
 		}@ServiceManagement.cpp
 	- 返回new BsGnss(IGnss::castFrom(baseInterface))
 	}
-}
+}@GnssAll.cpp
+
+
+//HAL lib(原来的封装)
+new Gnss(device)-->Gnss::Gnss(gnssDevice)-->gnssDevice->get_gps_interface(GPS库接口mGnssIface)@Gnss.cpp//关联到库接口
+
+
+//回调
+location_cb@xxxgps.c-->
+Gnss::sGnssCb.location_cb-->Gnss::locationCb-->sGnssCbIface->gnssLocationCb@Gnss.cpp
+-->GnssCallback::gnssLocationCb@com_android_server_location_GnssLocationProvider.cpp
 
 system/hwservicemanager/service.cpp
 system/libhidl/transport/ServiceManager.cpp
@@ -83,7 +95,6 @@ hardware/interfaces/gnss/1.0/default/Gnss.cpp
 interface/gnss/1.0/android.hardware.gnss@1.0_genc++/gen/android/hardware/gnss/1.0/IGnss.h
 interface/gnss/1.0/android.hardware.gnss@1.0_genc++/gen/android/hardware/gnss/1.0/GnssAll.cpp
 
-
 /*
  android层通过服务访问hal层
 
@@ -92,7 +103,7 @@ interface/gnss/1.0/android.hardware.gnss@1.0_genc++/gen/android/hardware/gnss/1.
 class_init_native@GnssLocationProvider.java-->
 android_location_GnssLocationProvider_class_init_native{
 - 初始化java层回调函数
-- gnssHal = IGnss::getService()
+- gnssHal = IGnss::getService()-->getService("default",false)@@IGnss.h
 - gnssXtraIface = gnssHal->getExtensionXtra()
 - agnssIface = gnssHal->getExtensionAGnss()
 }@com_android_server_location_GnssLocationProvider.cpp

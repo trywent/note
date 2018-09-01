@@ -107,13 +107,21 @@ install_package-->really_install_package{
 bootable/recovery/install.cpp
 
 
-#######################
+=====================
 ota：
 make otapackage-->ota_from_target_files BUILT_TARGET_FILES_PACKAGE(源文件) zip(目标)
 
 
+ota_from_target_files
+--downgrade@Makefile
 
 build-recoveryimage-target@Makefile
+
+
+
+WriteFullOTAPackage@ota_from_target_files-->AssertOlderBuild-->
+script.AssertOlderBuild(ts, ts_text)@edify_generator.py
+
 
 build/core/Makefile
 build/tools/releasetools/ota_from_target_files

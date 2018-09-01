@@ -1,0 +1,57 @@
+//
+struct GnssCallback : public IGnssCallback {
+    Return<void> gnssLocationCb(const android::hardware::gnss::V1_0::GnssLocation& location) override;
+    Return<void> gnssStatusCb(const IGnssCallback::GnssStatusValue status) override;
+    Return<void> gnssSvStatusCb(const IGnssCallback::GnssSvStatus& svStatus) override;
+}@com_android_server_location_GnssLocationProvider.cpp
+
+GpsCallbacks Gnss::sGnssCb = {
+    .size = sizeof(GpsCallbacks),
+    .location_cb = locationCb,
+    .status_cb = statusCb,
+    .sv_status_cb = gpsSvStatusCb,
+    .nmea_cb = nmeaCb,
+    .set_capabilities_cb = setCapabilitiesCb,
+    .acquire_wakelock_cb = acquireWakelockCb,
+    .release_wakelock_cb = releaseWakelockCb,
+    .create_thread_cb = createThreadCb,
+    .request_utc_time_cb = requestUtcTimeCb,
+    .set_system_info_cb = setSystemInfoCb,
+    .gnss_sv_status_cb = gnssSvStatusCb,
+}@Gnss.cpp
+
+static const GpsInterface  _GpsInterface = {
+    size:                       sizeof(GpsInterface), 
+    init: 			gps_init,
+    start:			gps_start,
+    stop:			gps_stop,
+}@gps.c
+
+//hal服务
+new Gnss(device)-->Gnss::Gnss(gnssDevice)-->gnssDevice->get_gps_interface(GPS库接口mGnssIface)@Gnss.cpp//关联到库接口
+
+
+//获取HAL接口
+HAL_MODULE_INFO_SYM.method-->hw_module_methods.open-->open_gps(&device){
+- gps_device//创建device
+- gps_device->get_gps_interface = gps_get_hardware_interface //初始化
+}
+
+
+//client设置回调
+Gnss::setCallback(/*设置回调*/callback){
+- sGnssCbIface = callback //client的回调  JNI
+- mGnssIface->init(&sGnssCb)@Gnss.cpp-->_GpsInterface.init-->gps_init(GpsCallbacks)@gps.c //设置hal库回调
+}Gnss.cpp
+
+parse_gds_token-->location_callback@gps.c-->
+Gnss::sGnssCb.location_cb-->Gnss::locationCb-->sGnssCbIface->gnssLocationCb@Gnss.cpp
+-->GnssCallback::gnssLocationCb@com_android_server_location_GnssLocationProvider.cpp
+
+
+
+
+
+sp9853/hardware/interfaces/gnss/1.0/default/Gnss.cpp
+vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps.c
+frameworks/base/services/core/jni/com_android_server_location_GnssLocationProvider.cpp

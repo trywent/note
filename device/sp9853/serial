@@ -14,4 +14,47 @@ sprd_startup-->devm_request_irq(port->irq, sprd_handle_irq)-->
 sprd_handle_irq-->sprd_rx
 
 
+//中断context
+uart_insert_char
+
+
+
+tty_flip_buffer_push@sprd_serial.c-->
+tty_schedule_flip-->queue_work(system_unbound_wq, &buf->work)-->flush_to_ldisc-->receive_buf@tty_buffer.c-->
+n_tty_receive_buf/n_tty_receive_buf2-->n_tty_receive_buf_common
+__receive_buf{
+- n_tty_receive_buf_real_raw
+- n_tty_receive_buf_raw
+- n_tty_receive_buf_closing
+- n_tty_receive_char_lnext
+- n_tty_receive_buf_fast
+}@n_tty.c
+
+n_tty_receive_char_flagged(TTY_OVERRUN)-->n_tty_receive_overrun@n_tty.c
+
+ldata->num_overrun
+
+
 kernel/drivers/tty/serial/sprd_serial.c
+
+
+
+
+=========================
+sp9853i_1h10:/ # cat /proc/tty/driver/sprd_serial                              
+serinfo:1.0 driver revision:
+0: uart:SPX mmio:0xE7000000 irq:40 tx:51780 rx:1000482 RTS|CTS|DTR|DSR
+1: uart:SPX mmio:0xE7100000 irq:41 tx:1104347 rx:247 RTS|CTS|DTR|DSR
+2: uart:SPX mmio:0xE7200000 irq:42 tx:336817 rx:389384 RTS|CTS|DTR|DSR
+3: uart:SPX mmio:0xE7300000 irq:43 tx:469098 rx:113348911 RTS|CTS|DTR|DSR
+
+
+root@sql_fyt6025:/ # cat /proc/tty/driver/serial_sprd                          
+serinfo:1.0 driver revision:
+0: uart:SPX port:00000000 irq:34 tx:8435 rx:111 CTS|DSR
+1: uart:SPX port:00000000 irq:35 tx:290932 rx:18114985 pe:49 oe:131 RTS|CTS|DTR|DSR
+2: uart:SPX port:00000000 irq:36 tx:22161 rx:26249 RTS|CTS|DTR|DSR
+3: uart:SPX port:00000000 irq:37 tx:367570 rx:534466 RTS|CTS|DTR|DSR
+4: uart:SPX port:00000000 irq:38 tx:32 rx:0 RTS|CTS|DTR|DSR
+
+

@@ -14,3 +14,9 @@ The SIGFPE signal is sent to a process when it executes an erroneous arithmetic 
 
 SIGSEGV 段错误
 The SIGSEGV signal is sent to a process when it makes an invalid virtual memory reference
+
+
+
+
+android：
+kill -3 pid

@@ -1,4 +1,4 @@
-服务初始化：
+//服务初始化：
 
 main--> MediaPlayerService::instantiate@main_mediaserver.cpp
 MediaPlayerService::instantiate-->addService(String16("media.player"), new MediaPlayerService())@

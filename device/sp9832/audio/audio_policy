@@ -11,11 +11,15 @@ main{
 	}
 }
 
-//sprd使用USE_CUSTOM_AUDIO_POLICY
+//sprd使用USE_CUSTOM_AUDIO_POLICY = 1
 AudioPolicyService::onFirstRef{
 - AudioPolicyClient@AudioPolicyClientImpl.cpp
 - createAudioPolicyManager-->new AudioPolicyManagerSPRD@AudioPolicyManagerSPRD.cpp
 }
+
+//USE_CUSTOM_AUDIO_POLICY
+AudioPolicyManagerSPRD编译库 libaudiopolicymanager.so 
+
 
 frameworks/av/media/mediaserver/main_mediaserver.cpp
 frameworks/native/include/binder/BinderService.h
