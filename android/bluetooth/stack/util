@@ -56,6 +56,11 @@ run_reactor(reactor,/*0 循环运行 1 执行一次*/){
 - object->write_ready
 }
 
+
+//想thread中加入任务
+thread_post(thread,func,data)-->fixed_queue_enqueue
+
+
 system/bt/osi/src/thread.c
 system/bt/osi/src/reactor.c
 

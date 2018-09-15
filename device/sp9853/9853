@@ -29,6 +29,8 @@ setprop sys.fyt.debug.set debugon
 /home/bsp/sp9853/prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9/bin/x86_64-linux-android-addr2line
 
 //blue
+echo "AT-VB\r\n" >> /dev/BT_serial
+
 
 echo 1 > /proc/sys/kernel/printk
 echo 6 > /proc/sys/kernel/printk
@@ -38,6 +40,10 @@ echo 'c' >/proc/sysrq-trigger
 
 echo 'l' >/proc/sysrq-trigger
 
+echo 1 > /sys/devices/platform/soc/soc:ap-apb/e7000000.serial/uart_conf
+
+9832 uart1:
+echo 1 > /sys/devices/70100000.uart/uart_conf
 //temp
 cat sys/class/thermal/thermal_zone1/temp
 
@@ -58,22 +64,32 @@ echo set_dump_data_path=/data/local/media/ > /data/local/media/mmi.audio.ctrl
 
 
 
-//kernel  
--include device/sprd/isharkl2/common/AndroidKernel.mk
-@device/sprd/isharkl2/sp9853i_1h10/AndroidBoard.mk
+
+===============================频率
+echo 0 > /sys/devices/system/cpu/cpuhotplug/qos_core_ctl //关闭IPA
+echo 0 > /sys/class/thermal/thermal_zone0/thm_enable
+echo 0 > /sys/class/thermal/thermal_zone1/thm_enable  //关闭dvfs
+echo userspace > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+echo userspace > /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
+echo 1 > /sys/module/cpuidle/parameters/off  //关闭idle
 
 
-KERNEL_DEFCONFIG := sprd_isharkl2_defconfig@BoardConfig.mk
-
-//动态修改
-$(USER_CONFIG) : $(KERNEL_CONFIG)
-	$(shell ./kernel/scripts/sprd_custom_config_kernel.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_CUSTOM_CONFIG))
-	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_USER_CONFIG))
-	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_BOARD_SPEC_CONFIG))
-	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_MICROARRAY_CONFIG))
-	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_GOODIX_CONFIG))
-else
-@AndroidKernel.mk
+//查看可用频率
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+cat /sys/devices/system/cpu/cpu4/cpufreq/scaling_available_frequencies 
 
 
-scrpts/sprd/defconfig_update.sh //defconfig
+//设置频率
+echo 1872000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
+echo 1872000 > /sys/devices/system/cpu/cpu4/cpufreq/scaling_setspeed  
+
+
+//获取当前频率
+cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+cat /sys/devices/system/cpu/cpu4/cpufreq/cpuinfo_cur_freq  
+
+
+
+624000
+
+echo 624000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed

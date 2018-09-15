@@ -117,8 +117,9 @@ tty_struct.buf //driver保存数据的buffer
 
 //驱动保存数据
 uart_insert_char{
-- 没有忽略的状态位，插入字符tty_insert_flip_char //ignore_status_mask这些标记由用户空间设置
-- overrun置位，tty_insert_flip_char(TTY_OVERRUN)
+- 若有ignore_status_mask(除了overrun)错误不保存数据，否则插入字符tty_insert_flip_char //ignore_status_mask这些标记由用户空间设置
+- 若插入失败设置buf_overrun
+- overrun置位且没有被ignore，tty_insert_flip_char(TTY_OVERRUN)
 }
 
 tty_insert_flip_char(struct tty_port *port){//将读取的数据保存到buffer

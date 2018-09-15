@@ -19,54 +19,61 @@ static const btrc_ctrl_interface_t bt_rc_ctrl_interface = {
     set_volume_rsp,
     volume_change_notification_rsp,
     cleanup_ctrl,
-};
+}@btif_rc.cc
 
 
 //=============
-init_ctrl{
+(jni)-->bt_rc_ctrl_interface.init_ctrl{
 - bt_rc_ctrl_callbacks //设置jni回调
 - btif_rc_cb
 - lbl_init
 }@btif_rc.cc
 
+//sprd add
+get_element_attr_cmd 
 
-//播放状态
+//获取信息
 handle_notification_response{
-- AVRC_RSP_INTERIM{
+- AVRC_RSP_INTERIM{//临时状态
 	- AVRC_EVT_PLAY_STATUS_CHANGE
 	}
 
 - AVRC_RSP_CHANGED{
-	- AVRC_RSP_CHANGED
+	- AVRC_EVT_PLAY_STATUS_CHANGE{ //判断event
+		- 若正在播放开始定时获取信息,rc_start_play_status_timer,获取信息get_element_attribute_cmd //获取id3
+		- 若停止播放了,停止信息定时器
+		}		
+	- AVRC_EVT_TRACK_CHANGE,获取播放信息get_element_attribute_cmd
 	}
 }
 
+//收到回复
+btif_rc_handler-->andle_avk_rc_metamsg_rsp{
+- AVRC_PDU_REGISTER_NOTIFICATION:handle_notification_response
+- AVRC_PDU_GET_ELEMENT_ATTR:handle_get_elem_attr_response{
+	- HAL_CBACK(bt_rc_ctrl_callbacks, track_changed_cb)@btif_rc.cc
+	}
+- 
+}
 
-HAL_CBACK(bt_rc_ctrl_callbacks, play_status_changed_cb)@btif_rc.cc-->btavrcp_track_changed_callback
-@com_android_bluetooth_avrcp_controller.cpp
-
-//播放状态信息
-btif_rc_handler(BTA_AV_META_MSG_EVT)-->
-handle_avk_rc_metamsg_rsp(AVRC_PDU_GET_ELEMENT_ATTR)-->handle_get_elem_attr_response-->
-HAL_CBACK(bt_rc_ctrl_callbacks, track_changed_cb)@btif_rc.cc
-
-
-//获取id3
-get_element_attribute_cmd
-
-
-//发送获取CAP命令
-handle_rc_connect-->handle_rc_ctrl_features-->getcapabilities_cmd(AVRC_CAP_COMPANY_ID)
 
 handle_get_capability_response(接收到回复AVRC_CAP_COMPANY_ID)-->getcapabilities_cmd(AVRC_CAP_EVENTS_SUPPORTED)-->
 handle_avk_rc_metamsg_rsp-->handle_get_capability_response(AVRC_CAP_EVENTS_SUPPORTED)-->register_for_event_notification
--->register_notification_cmd
+-->register_notification_cmd@btif_rc.c
 
 
 
-btif_rc_handler-->andle_avk_rc_metamsg_rsp{
-- handle_notification_response
-}
+handle_rc_metamsg_rsp-->btif_rc_upstreams_rsp_evt{
+- AVRC_PDU_REGISTER_NOTIFICATION
+- AVRC_PDU_SET_ABSOLUTE_VOLUME
+- AVRC_PDU_GET_ELEMENT_ATTR-->HAL_CBACK(bt_rc_ctrl_callbacks,get_element_attr_rsp_cb)//回调更新函数
+}@btif_rc.cc
+
+
+
+btif_av_state_idle_handler@btif_av.cc
+
+
 
 system/bt/btif/src/btif_av.cc
 system/bt/btif/src/btif_rc.cc

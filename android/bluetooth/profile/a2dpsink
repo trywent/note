@@ -4,3 +4,14 @@ initNative-->sBluetoothA2dpInterface->init(&sBluetoothA2dpCallbacks)
 
 
 packages/apps/Bluetooth/jni/com_android_bluetooth_a2dp_sink.cpp
+
+
+
+
+BtifAvrcpAudioTrackCreate@btif_avrcp_audio_track.cc
+
+
+
+
+bt/btif/src/btif_avrcp_audio_track.cc
+bt/btif/src/btif_a2dp_sink.cc

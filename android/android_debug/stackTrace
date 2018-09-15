@@ -24,3 +24,6 @@ try {
 } catch (Exception e) {
     Log.i("TAGNAME", "xxx", e);
 }
+
+
+Log.getStackTraceString(new Exception())

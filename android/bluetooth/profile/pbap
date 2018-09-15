@@ -17,3 +17,38 @@ bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapObexSession.java
 bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapRequest.java
 bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapRequestPullPhoneBook.java
 bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapSession.java
+
+======================
+//8.1
+connect-->service.connect@BluetoothPbapClient.java-->connect@PbapClientService.java-->
+pbapClientStateMachine.start-->Connecting.enter{
+- mSdpReceiver = new SDPBroadcastReceiver
+- mCurrentDevice.sdpSearch(BluetoothUuid.PBAP_PSE)//搜索sdp
+- new HandlerThread().start
+- PbapClientConnectionHandler.Builder
+}@PbapClientStateMachine.java
+
+SDPBroadcastReceiver.onReceive-->sendMessage(MSG_SDP_COMPLETE)-->Connecting.processMessage(MSG_SDP_COMPLETE)
+-->mConnectionHandler.obtainMessage(MSG_CONNECT).sendToTarget()@PbapClientStateMachine.java-->
+handleMessage{
+- connectSocket
+- connectObexSession-->new ClientSession().connect
+- mPbapClientStateMachine.obtainMessage(MSG_CONNECTION_COMPLETE).sendToTarget()-->transitionTo(mConnected)
+
+}@PbapClientConnectionHandler.java
+
+
+//下载电话本
+Connected.enter-->obtainMessage(MSG_DOWNLOAD).sendToTarget@PbapClientStateMachine.java-->
+handleMessage(MSG_DOWNLOAD){
+- request = new BluetoothPbapRequestPullPhoneBook().execute()//获取电话本
+- processor = new PhonebookPullRequest //处理接收数据
+- 
+}@PbapClientConnectionHandler.java
+
+
+
+frameworks/base/core/java/android/bluetooth/BluetoothPbapClient.java
+packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/PbapClientService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/PbapClientStateMachine.java
+packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/PbapClientConnectionHandler.java

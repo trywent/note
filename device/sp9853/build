@@ -1,0 +1,19 @@
+//kernel  
+-include device/sprd/isharkl2/common/AndroidKernel.mk
+@device/sprd/isharkl2/sp9853i_1h10/AndroidBoard.mk
+
+
+KERNEL_DEFCONFIG := sprd_isharkl2_defconfig@BoardConfig.mk
+
+//动态修改
+$(USER_CONFIG) : $(KERNEL_CONFIG)
+	$(shell ./kernel/scripts/sprd_custom_config_kernel.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_CUSTOM_CONFIG))
+	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_USER_CONFIG))
+	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_BOARD_SPEC_CONFIG))
+	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_MICROARRAY_CONFIG))
+	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_GOODIX_CONFIG))
+else
+@AndroidKernel.mk
+
+
+scrpts/sprd/defconfig_update.sh //defconfig

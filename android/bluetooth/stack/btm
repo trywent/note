@@ -1,5 +1,7 @@
 //bluetooth manager
 
+
+//btu_init_core-->btm_init 从btu启动
 btm_init{
 - btm_inq_db_init                   /* Inquiry Database and Structures */
 - btm_acl_init                      /* ACL Database and Structures */

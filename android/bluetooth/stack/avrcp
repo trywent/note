@@ -57,14 +57,30 @@ typedef struct {
 initNative-->btInf->get_profile_interface(BT_PROFILE_AV_RC_ID)@com_android_bluetooth_avrcp.cpp
 -->get_profile_interface@bluetooth.cc-->btif_rc_get_interface-->bt_rc_interface@btif_rc.cc
 
-init-->bt_rc_callbacks@btif_rc.cc//设置回调
+(jni)init{
+- bt_rc_callbacks@btif_rc.cc//设置回调
+}@btif_rc.cc
+
 
 btif_rc_get_interface
 
-//收到获取信息命令。。回复获取当前信息
-btif_rc_upstreams_evt(AVRC_PDU_GET_ELEMENT_ATTR)-->get_element_attr_cb //收到命令
 
-get_element_attr_rsp //回复信息
+
+//接收到命令
+btif_rc_handler{
+- BTA_AV_RC_OPEN_EVT:handle_rc_connect-->handle_rc_ctrl_features-->getcapabilities_cmd(AVRC_CAP_COMPANY_ID)//发送获取CAP命令
+- BTA_AV_META_MSG_EVT{
+	- handle_rc_metamsg_cmd-->btif_rc_upstreams_evt(AVRC_PDU_GET_ELEMENT_ATTR)-->get_element_attr_cb //收到获取信息命令
+	- AVRC_OP_VENDOR:handle_avk_rc_metamsg_rsp
+	}
+}
+
+
+
+
+
+//回复信息
+get_element_attr_rsp 
 
 
 

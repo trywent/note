@@ -1,0 +1,8 @@
+//
+//sprd  a2dp sink src转换
+-#define BTA_AV_SINK_INCLUDED TRUE
++#define BTA_AV_SINK_INCLUDED FALSE 
+BTA_DM_COD {0x5A, 0x40, 0x08} //设备类型SERVICE_CLASS MAJOR_CLASS MINOR_CLASS
+BTM_LOCAL_IO_CAPS               BTM_IO_CAP_IO//配对方式
+
+@include/bt_target.h

@@ -1,0 +1,27 @@
+//
+static const btav_source_interface_t bt_av_src_interface = {
+    sizeof(btav_source_interface_t),
+    init_src,
+    src_connect_sink,
+    disconnect,
+    codec_config_src,
+    cleanup_src,
+};
+
+static const btav_sink_interface_t bt_av_sink_interface = {
+    sizeof(btav_sink_interface_t),
+    init_sink,
+    sink_connect_src,
+    disconnect,
+    cleanup_sink,
+    update_audio_focus_state,
+    update_audio_track_gain,
+};
+
+init_sink-->btif_av_init
+
+
+
+
+
+system/bt/btif/src/btif_av.cc

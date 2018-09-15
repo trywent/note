@@ -98,3 +98,17 @@ dump_stack()
 
 
 
+
+//ftrace
+trace_printk()
+tracing_on/tracing_off 控制跟踪信息的记录
+
+
+@/sys/kernel/debug/tracing
+echo 1 > /sys/kernel/debug/tracing/tracing_on
+echo function > current_tracer
+echo 0 > /sys/kernel/debug/tracing/tracing_on
+
+
+adb shell cat /sys/kernel/debug/tracing/trace > trace.txt
+

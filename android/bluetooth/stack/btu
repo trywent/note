@@ -1,4 +1,7 @@
 //btu - Bluetooth Upper Layer  对L2CAP RFCOMM, SDP and the BTIf封装
+
+
+//enable-->bte_main_enable 打开蓝牙后启动....management_thread线程中
 BTU_StartUp{
  //创建队列
 - btu_bta_msg_queue
@@ -24,16 +27,17 @@ btu_task_start_up{
 	}@btu_init.c
 - BTE_InitStack
 - bta_sys_init
+- message_loop_thread_ = thread_new("btu message loop") //创建新线程
+- thread_post(message_loop_thread_, btu_message_loop_run)
+}@btu_task.c
+
   /*将队列关联到新线程BT_WORKQUEUE_NAME，btu_bta_msg_queue，btu_hci_msg_queue，
    btu_general_alarm_queue，btu_oneshot_alarm_queue,btu_l2cap_alarm_queue*/
 - fixed_queue_register_dequeue(btu_bta_msg_queue,
       thread_get_reactor(bt_workqueue_thread),btu_bta_msg_ready)
-}@btu_task.c
 
 
-
-
-
-
+system/bt/stack/btu/btu_init.cc
+system/bt/stack/btu/btu_task.cc
 
 
