@@ -18,10 +18,25 @@ static const btav_sink_interface_t bt_av_sink_interface = {
     update_audio_track_gain,
 };
 
+
+=============================
+//a2dpsink
 init_sink-->btif_av_init
 
+bte_av_sink_media_callback@btif_av.cc
+btif_a2dp_sink_enqueue_buf-->fixed_queue_enqueue(btif_a2dp_sink_cb.rx_audio_queue, p_msg)@btif_a2dp_sink.cc
+
+btif_a2dp_sink_avk_handle_timer-->btif_a2dp_sink_handle_inc_media
 
 
 
+
+btif_dm_upstreams_evt-->btif_dm_execute_service_request@
 
 system/bt/btif/src/btif_av.cc
+btif/src/btif_a2dp_sink.cc
+btif/src/btif_avrcp_audio_track.cc
+btif/src/btif_dm.cc
+
+
+

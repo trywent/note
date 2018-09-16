@@ -161,3 +161,9 @@ repo forall -c 'git branch fytamster'
 
 需改同步：
 1）修改manifest.xml中<>
+
+
+===================
+aosp
+repo init -u https://aosp.tuna.tsinghua.edu.cn/platform/manifest
+
