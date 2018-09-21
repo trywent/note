@@ -27,9 +27,12 @@ phap：电话号码簿访问协议
 hdp：蓝牙医疗相关规范
 
 
-
 snoop log 开关BLUETOOTH_BTSNOOP_ENABLE_PROPERTY "persist.bluetooth.btsnoopenable"
 *******************************************/
+BTA_A2DP_SOURCE_SERVICE_ID 3 /* A2DP Source profile. */
+BTA_HID_SERVICE_ID 20        /* HID */
+BTA_HFP_HS_SERVICE_ID 24     /* HSP HS role */
+BTA_SDP_SERVICE_ID 29        /* SDP Search */
 //1.
 static{classInitNative}@AdapterService.java-->
 classInitNative{

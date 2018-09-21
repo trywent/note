@@ -1,4 +1,29 @@
+//
+====================================
 //bt interface
+
+
+btif_init_bluetooth{
+- btif_fetch_local_bdaddr(&btif_local_bd_addr)
+- bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME) //bt中处理jni调用的线程
+- thread_post(bt_jni_workqueue_thread, run_message_loop) //在jni线程中开始message处理
+- btif_transfer_context(btif_jni_associate)-->callback_thread_event//jni接口的环境关联到当前线程。(当前现成可以回调jni)
+}@btif_core.c
+
+
+//使能某个bluetooth服务
+btif_enable_service(tBTA_SERVICE_ID)-->btif_transfer_context 
+-->btif_sendmsg-->do_in_jni_thread@btif_core.cc
+
+
+/***************************************
+向下接口，无上下文转换
+****************************************/
+btif_dm_start_discovery
+btif_dm_cancel_discovery
+btif_dm_create_bond
+
+
 
 /***************************************
 向上回调接口，有上下文转换
@@ -21,12 +46,6 @@ bte_dm_evt-->btif_transfer_context(btif_dm_upstreams_evt)
 
 btif_dm_read_energy_info-->bta_energy_info_cb
 
-/***************************************
-向下接口，无上下文转换
-****************************************/
-btif_dm_start_discovery
-btif_dm_cancel_discovery
-btif_dm_create_bond
 
 
 
@@ -39,8 +58,8 @@ btif/src/btif_dm.c
 system/bt/btif/src/btif_core.c
 system/bt/bta/dm/bta_dm_api.c
 system/bt/bta/sys/bta_sys_main.c
-
-=========================
+====================================
+//bt interface
 
 
 

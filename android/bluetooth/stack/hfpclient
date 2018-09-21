@@ -1,23 +1,72 @@
 //=================
-//stack
-
+//jni接口
+bthfClientInterface = {
+    sizeof(bthf_client_interface_t),
+    .init = init,
+    .connect = connect,
+    .disconnect = disconnect,
+    .connect_audio = connect_audio,
+    .disconnect_audio = disconnect_audio,
+}
+//初始化jni接口
 init-->bt_hf_client_callbacks = callbacks@btif_hf_client.c
 
+//开始服务,设置bta api回调函数
+btif_in_execute_service_request@btif_dm.cc
+btif_hf_client_execute_service@btif_hf_client.c-->BTA_HfClientEnable(bta_hf_client_evt)@bta_hf_client_api.c-->
+bta_hf_client_api_enable{
+- bta_sys_register(BTA_ID_HS, &bta_hf_client_reg)
+- bta_hf_client_cb_arr_init   //初始化control block...回调接口,函数接口
+- bta_hf_client_cb_arr.p_cback = bta_hf_client_evt  //设置回调接口bta--->btif
+- bta_sys_collision_register(BTA_ID_HS, bta_hf_client_collision_cback)
+}@bta_hf_client_main.c
 
-//注册回调bte_hf_client_evt，到队列btu_bta_msg_queue
-btif_hf_client_execute_service@btif_hf_client.c-->
-BTA_HfClientEnable(bte_hf_client_evt){
-- bta_sys_register(BTA_ID_HS, &bta_hf_client_reg) //注册到BTA
-- bta_sys_sendmsg(BTA_HF_CLIENT_API_ENABLE_EVT)-->fixed_queue_enqueue(btu_bta_msg_queue)@bta_sys_main.c
-}@bta_hf_client_api.c
 
-//注册
-btu_bta_msg_ready@btu_task.c-->bta_sys_event-->bta_sys_cb.reg[id]->evt_hdlr
-@bta_sys_main.c-->bta_hf_client_reg.bta_hf_client_hdl_event@bta_hf_client_api.c-->
-bta_hf_client_api_enable@bta_hf_client_main.c
 
-//设置回调到bta_hf_client_cb.p_cback
-bte_hf_client_evt-->
+===================
+//发送操作命令,接受回复
+/*状态机处理回调btif-->bta. bta-->btif
+* 状态表有4中状态,st_init,st_opening,st_open,st_closing
+* 每种状态中包含15种event.每种event有2个action,一个next state
+*
+*/
+bta_sys_sendmsg(BTA_HF_CLIENT_API_AUDIO_OPEN_EVT)-->bta_message_loop->task_runner()->PostTask(bta_sys_event)
+-->bta_sys_event@bta_sys_main.cc-->bta_hf_client_reg.evt_hdlr-->bta_hf_client_hdl_event-->
+bta_hf_client_sm_execute{
+- client_cb = bta_hf_client_find_cb_by_handle(layer_specific) //根据handle,连接设备control block
+- state_table = bta_hf_client_st_tbl[client_cb->state] //获取状态表
+- client_cb->state = state_table[event][BTA_HF_CLIENT_NEXT_STATE] //设置下一个状态
+- action = state_table[event][i] 
+- bta_hf_client_action[action](p_data){//获取该事件下状态的action,并执行
+- client_cb->state = state_table[event][BTA_HF_CLIENT_NEXT_STATE] //设备下一个状态
+}@bta_hf_client_main.cc
+
+
+
+//connect_audio
+connect_audio{
+- cb = btif_hf_client_get_cb_by_bda(*bd_addr)//获取连接的设备
+- 若设备支持BTA_HF_CLIENT_PEER_CODEC,BTA_HfClientSendAT
+- 否则执行,BTA_HfClientAudioOpen-->bta_sys_sendmsg(BTA_HF_CLIENT_API_AUDIO_OPEN_EVT)
+-  btif_transfer_context(btif_in_hf_client_generic_evt)-->btif_sendmsg//在线程bt_jni_workqueue_thread,通知上层正在连接
+	-do_in_jni_thread(&bt_jni_msg_ready)-->bt_jni_msg_ready-->btif_context_switched
+	-->@btif_core.cc-->btif_in_hf_client_generic_evt
+}@btif_hf_client.c
+
+
+BTA_HfClientAudioOpen-->bta_sys_sendmsg@btif_hf_client.c-->bta_hf_client_sco_open
+-->bta_hf_client_sco_event(BTA_HF_CLIENT_SCO_OPEN_E)@bta_hf_client_sco.cc-->
+
+//disconnect_audio
+
+
+
+
+
+____________________
+//回调到bta_hf_client_cb.p_cback
+bta_hf_client_app_callback-->bta_hf_client_cb.p_cback@bta_hf_client_main.c
+bta_hf_client_evt(event)-->btif_transfer_context(btif_hf_client_upstreams_evt,event)
 btif_hf_client_upstreams_evt{
 - BTA_HF_CLIENT_OPEN_EVT{//连接
 	- btif_hf_client_cb.state = BTHF_CLIENT_CONNECTION_STATE_CONNECTED
@@ -35,14 +84,49 @@ btif_hf_client_upstreams_evt{
 
 }@btif_hf_client.c
 
+===================
+//sco
+bta_hf_client_sco_event{
+- BTA_HF_CLIENT_SCO_SHUTDOWN_ST{
+	- BTA_HF_CLIENT_SCO_LISTEN_E
+	- BTA_HF_CLIENT_SCO_OPEN_E
+	}
 
-//连接事件上报
+- BTA_HF_CLIENT_SCO_LISTEN_ST
 
-bta_hf_client_svc_conn_open-->bta_hf_client_cb.p_cback)(BTA_HF_CLIENT_CONN_EVT)@bta_hf_client_act.c
--->bte_hf_client_evt@btif_hf_client.c
+}
 
-btif/src/btif_hf_client.c
-bta/hf_client/bta_hf_client_api.c
-bta/hf_client/bta_hf_client_main.c
-bta/sys/bta_sys_main.c
-bta/hf_client/bta_hf_client_act.c
+bta_hf_client_sco_create{
+- BTM_SetEScoMode(&params)
+- BTM_CreateSco( bta_hf_client_sco_conn_cback,bta_hf_client_sco_disc_cback)
+}@bta_hf_client_sco.cc
+
+BTM_CreateSco{
+- 遍历 p= btm_cb.sco_cb.sco_db[0]{ //BTM_MAX_SCO_LINKS最多3个sco连接
+   	- p->p_conn_cb = p_conn_cb
+	- p->p_disc_cb = p_disc_cb
+
+	} 
+}
+
+===================
+//rfc回调
+bta_hf_client_port_cback-->bta_sys_sendmsg(BTA_HF_CLIENT_RFC_DATA_EVT)
+
+(状态机执行)bta_hf_client_action(bta_hf_client_st_open[RFC_DATA_EVT])-->bta_hf_client_rfc_data
+@bta_hf_client_act.cc-->bta_hf_client_at_parse-->bta_hf_client_at_parse_start-->
+bta_hf_client_parser_cb@bta_hf_client_at.cc
+
+
+
+
+===================
+
+btif/src/btif_hf_client.cc
+bta/hf_client/bta_hf_client_api.cc
+bta/hf_client/bta_hf_client_main.cc
+bta/sys/bta_sys_main.cc
+bta/hf_client/bta_hf_client_sco.cc
+bta/hf_client/bta_hf_client_act.cc
+bta/hf_client/bta_hf_client_at.cc
+stack/btm/btm_sco.cc

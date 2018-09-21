@@ -1,51 +1,102 @@
 //
 HCI Command Packet：host发给controller，主要是HCI 命令， 注意是命令，不是数据。
 HCI Event Packet：controller发给host。对应于command packet。
-HCI ACL Data Packet： host发给controller或者相反。主要是L2CAP发送和接收的数据，我们上层的所有数据，注意是数据，而不是命令，都是通过这个type来传递的。
+HCI ACL Data Packet： host发给controller或者相反。主要是L2CAP发送和接收的数据，我们上层的所有数据，
+			注意是数据，而不是命令，都是通过这个type来传递的。
 HCI Synchronous Data Packet：用来传输语音（SCO）数据的。注意一般都会通过PCM接口来传输SCO数据
 
 
 //HCI初始化
-
-
-
 bte_main_enable-->module_start_up(get_module(HCI_MODULE))@bte_main.c-->
-hci_module.start_up-->start_up{
+hci_module.start_up-->hci_module_start_up{
+- startup_timer = alarm_new("hci.startup_timer")
+- command_response_timer = alarm_new("hci.command_response_timer")
+- thread = thread_new("hci_thread")
+- packet_fragmenter->init(&packet_fragmenter_callbacks)-->callbacks=packet_fragmenter_callbacks@packet_fragmenter.cc
+- thread_post(thread, message_loop_run)-->message_loop_run{//开始消息队列
+	- 创建message_loop_
+	- hci_initialize //加载本地库文件,本地接口
+	}
 - vendor_open-->dlopen("libbt-vendor.so")@vendor.c//加载本地库
 }@hci_layer.c
 
+hci_initialize{
+- bt_vendor_fd = fd = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI) //打开socket
+- addr.hci_family = AF_BLUETOOTH
+- addr.hci_dev = hci_interface
+- bind(fd, (struct sockaddr*)&addr)
+- reader_thread = new Thread("hci_sock_reader") //创建读线程
+- monitor_socket //开始监听消息
+}@hci_layer_linux.cc
 
-hci_layer_get_interface-->vendor_get_interface@hci_layer.c
 
-
-===============================
-//收到hci上传事件.队列btu_hci_msg_queue
 
 //发送命令，并设置回复后的回调函数
-btu_hcif_send_cmd-->hci_layer_get_interface()->transmit_command(btu_hcif_command_status_evt
-/btu_hcif_command_complete_evt)@btu_hcif.c-->transmit_command{
-- 设置wait_entry回调函数
-- fixed_queue_enqueue(command_queue, wait_entry)
+btu_hcif_send_cmd-->hci_layer_get_interface()->
+transmit_command(p_buf/*命令*/,btu_hcif_command_status_evt/*回调*/,btu_hcif_command_complete_evt/*回调*/)@btu_hcif.c
+-->transmit_command{
+- 创建并初始化wait_entry,包含命令信息
+- enqueue_command(wait_entry){
+	- callback = base::Bind(&event_command_ready, wait_entry)
+	- message_loop_->task_runner()->PostTask(FROM_HERE, std::move(callback))		
+	}
+}@hci_layer.c
+
+-->event_command_ready{
+- list_append(commands_pending_response, wait_entry)
+- packet_fragmenter->fragment_and_dispatch-->fragment_and_dispatch{
+	- 设置event,stream //格式化要发送的数?
+	- callbacks->fragmented(packet)-->transmit_fragment@hci_layer.c//发送数据
+		-->hci_transmit(packet)-->write(bt_vendor_fd)@hci_layer_linux.cc
+	}@packet_fragmenter.cc
+- update_command_response_timer //设置回复计时?
 }@hci_layer.c
 
 
-//处理command_queue上的命令。将已执行的命令项目移到pending_response
-event_command_ready-->list_append(commands_pending_response, wait_entry)@hci_layer.c
-
 //收到回复
-hal_says_data_ready-->
-filter_incoming_event{
-HCI_COMMAND_COMPLETE_EVT:
-- wait_entry = get_waiting_command
-- wait_entry->complete_callback-->btu_hcif_command_complete_evt-->
-	fixed_queue_enqueue(btu_hci_msg_queue,event) //将任务加入到queue
+monitor_socket{
+- read(fd, buf, buf_size)//读取数据
+- HCI_PACKET_TYPE_COMMAND:
+        packet->event = MSG_HC_TO_STACK_HCI_EVT
+        hci_event_received(FROM_HERE, packet)
+- HCI_PACKET_TYPE_ACL_DATA:
+        packet->event = MSG_HC_TO_STACK_HCI_ACL
+        acl_event_received(packet)
+- HCI_PACKET_TYPE_SCO_DATA:
+        packet->event = MSG_HC_TO_STACK_HCI_SCO
+        sco_data_received(packet)
+- HCI_PACKET_TYPE_EVENT:
+        packet->event = MSG_HC_TO_STACK_HCI_EVT
+        hci_event_received(FROM_HERE, packet)
+}
 
-HCI_COMMAND_STATUS_EVT
-- wait_entry = get_waiting_command
-- wait_entry->status_callback-->btu_hcif_command_status_evt-->
-	fixed_queue_enqueue(btu_hci_msg_queue,event) //将任务加入到queue
-
+//收到命令和事件数据,回调hci_layer_get_interface中传入的函数
+hci_event_received-->filter_incoming_event(packet){
+- stream = packet->data
+- STREAM_TO_UINT8(event_code, stream) //获取event
+- HCI_COMMAND_COMPLETE_EVT{
+	- STREAM_TO_UINT16(opcode, stream)//获取操作码
+	- wait_entry = get_waiting_command(opecode) //从commands_pending_response获取等待结果的命令
+	- wait_entry->complete_callback-->btu_hcif_command_complete_evt-->do_in_hci_thread@btu_hcif.cc
+	}
+- HCI_COMMAND_STATUS_EVT{
+	- wait_entry = get_waiting_command(opecode)
+	- wait_entry->status_callback-->btu_hcif_command_status_evt-->do_in_hci_thread@btu_hcif.cc
+	}
 }hci_layer.c
+
+//收到sco数据
+sco_data_received-->packet_fragmenter->reassemble_and_dispatch@hci_layer.cc-->
+reassemble_and_dispatch{
+- MSG_HC_TO_STACK_HCI_ACL,{
+	- callbacks->reassembled-->callbacks->reassembled@hci_layer.cc
+	}
+- 其它事件,callbacks->reassembled
+}@packet_fragmenter.cc
+
+dispatch_reassembled{
+- 
+}@hci_layer.cc
 
 //执行btu_hci_msg_queue中任务
 btu_hci_msg_queue-->btu_hci_msg_ready-->btu_hci_msg_process{
@@ -55,6 +106,12 @@ btu_hci_msg_queue-->btu_hci_msg_ready-->btu_hci_msg_process{
 }@btu_task.c
 
 
+
+
+
+
 system/bt/main/bte_main.c
 system/bt/hci/src/hci_layer.c
-system/bt/hci/src/vendor.c
+system/bt/hci/src/packet_fragmenter.cc
+system/bt/hci/src/hci_layer_linux.cc
+system/bt/stack/btu/btu_hcif.cc

@@ -1,0 +1,83 @@
+//client
+===============
+static{ classInitNative}//设置jni回调函数
+{
+onConnectionStateChanged
+onAudioStateChanged
+onCall-->sendMessage(EVENT_TYPE_CALL)
+onCallSetup-->sendMessage(EVENT_TYPE_CALLSETUP)
+}
+
+HeadsetClientStateMachine{
+- initializeNative //获取接口设置回调
+- addState(mDisconnected)
+- addState(mConnecting)
+- addState(mConnected)
+- addState(mAudioOn, mConnected)
+- setInitialState(mDisconnected)
+}@HeadsetClientStateMachine.java 
+
+initializeNative{
+- getBluetoothInterface
+- sBluetoothHfpClientInterface =btInf->get_profile_interface(BT_PROFILE_HANDSFREE_CLIENT_ID)//hfpclient接口
+- sBluetoothHfpClientInterface->init(&sBluetoothHfpClientCallbacks) //设置回调
+}@com_android_bluetooth_hfpclient.cpp
+
+
+//连接状态回调
+
+sBluetoothHfpClientCallbacks.connection_state_cb-->connection_state_cb@com_android_bluetooth_hfpclient.cpp
+-->onConnectionStateChanged-->service.messageFromNative(event)@NativeInterface.java-->
+messageFromNative-->sm.sendMessage(StackEvent.STACK_EVENT,event)@HeadsetClientService.java
+
+//connectAudio/disconnectAudio
+connectAudio-->sm.sendMessage(HeadsetClientStateMachine.CONNECT_AUDIO)@HeadsetClientService.java
+-->NativeInterface.connectAudioNative@HeadsetClientStateMachine.java-->connectAudioNative
+@NativeInterface.java-->connectAudioNative-->sBluetoothHfpClientInterface->connect_audio
+@com_android_bluetooth_hfpclient.cpp-->bthfClientInterface.connect_audio-->connect_audio
+@btif_hf_client.c
+
+
+//声音状态回调
+audio_state_cb-->method_onAudioStateChanged@com_android_bluetooth_hfpclient.cpp-->
+onAudioStateChanged(state)@NativeInterface.java-->service.messageFromNative{
+- StackEvent event = new StackEvent(EVENT_TYPE_AUDIO_STATE_CHANGED)//AUDIO_STATE_DISCONNECTED 0 AUDIO_STATE_CONNECTED 2
+- sendMessage(STACK_EVENT)-->processAudioEvent
+}@HeadsetClientStateMachine.java 
+
+
+//Connected state
+Connected.processMessage{
+- ACCEPT_CALL-->acceptCall{ //acceptCall/rejectCall@HeadsetClientService.java
+	- getCall(CALL_STATE_INCOMING|CALL_STATE_WAITING)//获取要处理的call
+	- action =CALL_ACTION_ATA //设置对应的action
+	- handleCallActionNative//发送命令，接听
+	- 接听成功，addQueuedAction-->mQueuedActions.add(ACCEPT_CALL,action)//用于命令返回时处理
+	}
+- REJECT_CALL-->rejectCall
+- STACK_EVENT{
+	- EVENT_TYPE_CALL-->updateCallIndicator
+	- EVENT_TYPE_CALLSETUP-->updateCallSetupIndicator
+	- EVENT_TYPE_CALLHELD-->updateCallHeldIndicator
+	- EVENT_TYPE_CMD_RESULT{//发送蓝牙命令后，返回结果
+		- 获取发送过的命令数据，mQueuedActions.poll()
+		- ACCEPT_CALL{
+			- 接听成功，mPendingAction = queuedAction
+			}
+		}
+	}
+}
+
+
+
+
+
+
+
+packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientStateMachine.java 
+packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/NativeInterface.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_hfpclient.cpp
+
+
+

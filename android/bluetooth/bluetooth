@@ -154,3 +154,9 @@ Link Controller//
 PHY //接收数据包
 }
 
+
+
+======================
+//hfp
+hfp peer(AG audio gateway 音频流)  //一般是手机
+hfp hf(handsfree 控制接听拨号)    //耳机,车机

@@ -1,5 +1,6 @@
+//
 设置permission，feature：
-readPermissionsFromXml(/etc/permissions/*.xml)@ApplicationPackageManager.java
+readPermissionsFromXml(/etc/permissions/ *.xml)@ApplicationPackageManager.java
 
 
 获取feature：
@@ -8,5 +9,7 @@ packageManager.getSystemAvailableFeatures-->mPM.getSystemAvailableFeatures
 @ApplicationPackageManager.java
 
 
+//notLowRam="true" 非低内存启动功能
+<feature name="android.software.voice_recognizers" notLowRam="true" />
 
 frameworks/base/core/java/android/app/ApplicationPackageManager.java

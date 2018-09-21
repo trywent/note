@@ -3,21 +3,12 @@
 
 //enable-->bte_main_enable 打开蓝牙后启动....management_thread线程中
 BTU_StartUp{
- //创建队列
-- btu_bta_msg_queue
-- btu_general_alarm_queue
-- btu_oneshot_alarm_queue
-- btu_l2cap_alarm_queue
 - bt_workqueue_thread = thread_new(BT_WORKQUEUE_NAME)//新线程
 - thread_post(bt_workqueue_thread, btu_task_start_up)-->btu_task_start_up@btu_task.c
 }@btu_init.c
 
 
-btu_task_start_up{
-- 
-  /* Initialize the mandatory core stack control blocks
-     (BTU, BTM, L2CAP, and SDP)                     */
-   
+btu_task_start_up{ 
 - btu_init_core{
 	- btm_init //btm初始
 	- l2c_init
@@ -25,19 +16,35 @@ btu_task_start_up{
 	- gatt_init
 	- btm_ble_init
 	}@btu_init.c
-- BTE_InitStack
+- BTE_InitStack{
+	- RFCOMM_Init
+	- A2DP_Init
+	- AVRC_Init
+	}
 - bta_sys_init
 - message_loop_thread_ = thread_new("btu message loop") //创建新线程
-- thread_post(message_loop_thread_, btu_message_loop_run)
+- thread_post(message_loop_thread_, btu_message_loop_run) //开始循环处理message
 }@btu_task.c
 
-  /*将队列关联到新线程BT_WORKQUEUE_NAME，btu_bta_msg_queue，btu_hci_msg_queue，
-   btu_general_alarm_queue，btu_oneshot_alarm_queue,btu_l2cap_alarm_queue*/
-- fixed_queue_register_dequeue(btu_bta_msg_queue,
-      thread_get_reactor(bt_workqueue_thread),btu_bta_msg_ready)
+=======================
+//发送hci命令
+btu_hcif_send_cmd-->hci_layer_get_interface()->transmit_command(
+p_buf, btu_hcif_command_complete_evt, btu_hcif_command_status_evt,vsc_callback)@btu_hcif.cc
+
+//收到hci命令回复,在message_loop_thread_线程中处理
+btu_hcif_command_complete_evt-->do_in_hci_thread(btu_hcif_command_complete_evt_on_task)-->
+btu_hcif_command_complete_evt_on_task-->btu_hcif_hdl_command_complete{
+
+}@btu_hcif.cc
+
+//收到hci状态回复,在message_loop_thread_线程中处理
+btu_hcif_command_status_evt-->do_in_hci_thread(btu_hcif_command_status_evt_on_task)-->
+btu_hcif_hdl_command_status{
+
+}@@btu_hcif.cc
 
 
 system/bt/stack/btu/btu_init.cc
 system/bt/stack/btu/btu_task.cc
-
+system/bt/stack/btu/btu_hcif.cc
 
