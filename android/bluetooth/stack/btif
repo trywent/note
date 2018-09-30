@@ -10,10 +10,23 @@ btif_init_bluetooth{
 - btif_transfer_context(btif_jni_associate)-->callback_thread_event//jni接口的环境关联到当前线程。(当前现成可以回调jni)
 }@btif_core.c
 
+//切换到jni线程中bt_jni_workqueue_thread
+btif_transfer_context(p_cback,event,p_params){
+- p_msg->hdr.event = BT_EVT_CONTEXT_SWITCH_EVT
+- p_msg->p_cb = p_cback
+- btif_sendmsg-->do_in_jni_thread-->bt_jni_msg_ready(BT_EVT_CONTEXT_SWITCH_EVT)-->
+	btif_context_switched(p_msg)--p_msg->pcb(event)
+}
 
 //使能某个bluetooth服务
-btif_enable_service(tBTA_SERVICE_ID)-->btif_transfer_context 
--->btif_sendmsg-->do_in_jni_thread@btif_core.cc
+btif_enable_service(tBTA_SERVICE_ID)-->btif_transfer_context(btif_dm_execute_service_request)
+-->btif_sendmsg-->do_in_jni_thread@-->btif_core.ccbtif_dm_execute_service_request
+-->btif_in_execute_service_request{
+- btif_av_sink_execute_service    //a2dpsink 服务
+- btif_hf_client_execute_service  //hfpclient
+}@btif_dm.cc
+
+
 
 
 /***************************************

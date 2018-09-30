@@ -24,6 +24,8 @@ dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdi
 
 dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/recovery bs=1024 count=18234
 
+dd if=/sdcard/wcn.bin of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/wcnmodem bs=1024 count=1160
+
 setprop sys.fyt.debug.set debugon
 
 /home/bsp/sp9853/prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9/bin/x86_64-linux-android-addr2line

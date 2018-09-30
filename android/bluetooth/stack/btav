@@ -17,11 +17,112 @@ static const btav_sink_interface_t bt_av_sink_interface = {
     update_audio_focus_state,
     update_audio_track_gain,
 };
+//---------------bta接口
+bta_sys_sendmsg-->bta_av_reg->evt_hdlr--> //在线程message_loop_thread_
+bta_av_hdl_event{
+- bta_av_nsm_act[event] //非状态机处理消息
+- bta_av_sm_execute //状态机,av控制处理
+- bta_av_ssm_execute  //状态机,av流控制处理
+}@bta_av_main.cc
 
+
+btif_queue_connect-->(切换线程)queue_int_handle_evt{//bt_jni_workqueue_thread线程
+- queue_int_add   //加入
+- queue_int_advance  //清空
+- queue_int_cleanup  //移除
+- btif_queue_connect_next-->p_head->connect_cb //执行
+}
+//回调接口切到jni上下文...上层通知一类
+btif_transfer_context-->btif_sendmsg//线程中bt_jni_workqueue_thread
 
 =============================
 //a2dpsink
-init_sink-->btif_av_init
+init_sink-->btif_av_init{
+- btif_a2dp_sink_startup{
+	- 初始化,btif_a2dp_sink_cb
+	- worker_thread = thread_new("btif_a2dp_sink_worker_thread") //创建线程
+	- rx_audio_queue,cmd_msg_queue //注册工作队列到worker_thread
+	- fixed_queue_register_dequeue(cmd_msg_queuebtif_a2dp_sink_command_ready)
+	}
+- btif_enable_service(service_id)-->btif_av_sink_execute_service
+	- BTA_AvEnable(bte_av_callback){
+		- bta_sys_register(BTA_ID_AV, &bta_av_reg)@bta_av_api.cc //注册bta接口
+		- bta_sys_sendmsg(BTA_AV_API_ENABLE_EVT)//打开api?
+		}
+	- BTA_AvRegister(BTA_AV_CHNL_AUDIO){
+		- tBTA_AV_API_REG* p_buf //创建
+		- p_buf->hdr.layer_specific = BTA_AV_CHNL_AUDIO
+		- bta_sys_sendmsg(BTA_AV_API_REGISTER_EVT)-->bta_av_api_register@bta_av_main.cc
+		}
+	}
+- btif_av_cb.sm_handle = btif_sm_init(btif_av_state_handlers) //初始化状态机
+}@btif_av.cc
+
+
+BTA_AvEnable(bte_av_callback)-->bta_av_api_enable{//enable 设置bta_av_cb回调.非状态机处理
+- bta_av_cb.p_cback = bte_av_callback
+-(*bta_av_cb.p_cback)(BTA_AV_ENABLE_EVT, &bta_av_data)-->bte_av_callback
+}@
+
+BTA_AvRegister(BTA_AV_CHNL_AUDIO)-->bta_av_api_register{//register.非状态机处理
+- 创建registr,p_scb
+- p_scb= bta_av_alloc_scb(BTA_AV_CHNL_AUDIO)
+- 是BTA_AV_CHNL_AUDIO{//初始化scb(stream control block) 
+	- scb
+	}
+- (*bta_av_cb.p_cback)(BTA_AV_REGISTER_EVT, &bta_av_data)-->bte_av_callback
+}@bta_av_main.cc
+
+//回调
+bte_av_callback-->btif_transfer_context(btif_av_handle_event)
+-->btif_av_handle_event{
+- BTIF_AV_CLEANUP_REQ_EVT
+- BTA_AV_REGISTER_EVT
+- btif_sm_dispatch-->p_cb->p_handlers-->btif_av_state_handlers[state]{//状态机处理
+	- BTA_AV_REGISTER_EVT: btif_av_cb.bta_handle= registr.hndl
+	- BTIF_AV_CONNECT_REQ_EVT:
+	}
+}@btif_av.cc
+
+/*
+btif中状态机 btif_av_state_handlers(初始状态BTIF_AV_STATE_IDLE)
+bta中状态表(stream state machine) bta_av_a2dp_action
+bta_av_a2dp_action 定义了所有操作函数
+
+*/
+bta_av_a2dp_action
+
+
+
+//---------------connect
+sink_connect_src-->btif_queue_connect(UUID_SERVCLASS_AUDIO_SINK, bd_addr, connect_int)
+-->queue_int_handle_evt-->connect_int-->btif_sm_dispatch(BTIF_AV_CONNECT_REQ_EVT)-->
+btif_av_state_idle_handler{
+- BTIF_AV_CONNECT_REQ_EVT{
+	- BTA_AvOpen
+	- btif_sm_change_state
+	}
+}@btif_av.cc
+
+
+BTA_AvOpen{BTA_AV_API_OPEN_EVT}@btif_av_api.cc-->bta_sys_sendmsg-->bta_av_reg->evt_hdlr-->
+bta_av_hdl_event@bta_av_main.cc
+-->bta_av_ssm_execute(BTA_AV_API_OPEN_EVT){ //状态机,av流控制处理
+- state_table = bta_av_sst_tbl[p_scb->state] //当前状态表
+- p_scb->p_act_tbl[action]()-->bta_av_a2dp_action[action] //执行处理
+ -->bta_av_connect_req@bta_av_aact.cc
+}@bta_av_ssm.cc
+
+//-----------------收到命令
+btif_a2dp_sink_command_ready{
+- btif_a2dp_sink_decoder_update_event{
+	- 更新采样率,声道
+	- btif_a2dp_sink_cb.audio_track = BtifAvrcpAudioTrackCreate@btif_avrcp_audio_track.cc
+	}
+- btif_a2dp_sink_clear_track_event
+- btif_a2dp_sink_set_focus_state_event
+- btif_a2dp_sink_audio_rx_flush_event
+}@btif_a2dp_sink.cc
 
 //stream数据
 bte_av_sink_media_callback@btif_av.cc
@@ -36,13 +137,25 @@ btif_a2dp_sink_enqueue_buf{
 
 
 
+
+
 btif_dm_upstreams_evt-->btif_dm_execute_service_request@
 
-system/bt/btif/src/btif_av.cc
+
+
+//播放状态
+btif_a2dp_on_stopped-->btif_a2dp_sink_on_stopped
+
+
+
+btif/src/btif_av.cc
+btif/src/btif_a2dp.cc
 btif/src/btif_a2dp_sink.cc
 btif/src/btif_avrcp_audio_track.cc
 btif/src/btif_dm.cc
-
+bta/av/bta_av_main.cc
+bta/av/bta_av_ssm.cc
+bta/av/bta_av_aact.cc
 =============================
 //a2dpsource
 

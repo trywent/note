@@ -1,0 +1,105 @@
+//AdapterService
+
+onCreate{//启动
+- AdapterServiceBinder
+- AdapterState.make
+}@AdapterService.java
+
+//加载库
+static{classInitNative}@AdapterService.java-->
+classInitNative{
+- jniCallbackClass = env->FindClass("com/android/bluetooth/btservice/JniCallbacks")//获取回调类
+- sJniCallbacksField ,method_stateChangeCallback，method_adapterPropertyChangedCallback//初始化一些回调方法JniCallbacks
+- hw_get_module(BT_STACK_MODULE_ID,&module)//hal层
+- module->methods->open(module，abstraction) //获取协议栈
+- btStack = (bluetooth_module_t *)abstraction //协议栈
+- sBluetoothInterface = btStack->get_bluetooth_interface //协议栈调用接口bluetooth_interface@bluetooth.c
+}@com_android_bluetooth_btservice_AdapterService.cpp
+
+
+//获取profile interface
+sBluetoothInterface->get_profile_interface@com_android_bluetooth_btservice_AdapterService.cpp
+-->bluetoothInterface.get_profile_interface-->
+get_profile_interface{
+- btif_hf_client_get_interface-->bthfClientInterface@btif_hf_client.cc
+- btif_av_get_sink_interface-->bt_av_sink_interface@btif_av.cc
+}@blutooth.cc
+
+processMessage-->adapterService.processStart@AdapterState.java-->setProfileServiceState
+-->(启动Config.PROFILE_SERVICES中所有服务)startService@AdapterService.java
+
+
+//打开蓝牙
+enable(false)-->sendMessage(BLE_TURN_ON)@AdapterService.java
+
+//关闭
+disable-->sendMessage(BLE_TURN_OFF)@AdapterService.java
+
+
+BleOnProcessStart{
+- mAdapterProperties.init(mRemoteDevices)
+- mJniCallbacks.init(mBondStateMachine,mRemoteDevices)
+- setGattProfileServiceState
+}
+
+
+onStartCommand-->doStart-->
+notifyProfileServiceStateChanged@ProfileService.java-->onProfileServiceStateChanged-->
+handleMessage(MESSAGE_PROFILE_SERVICE_STATE_CHANGED)-->processProfileServiceStateChanged{
+- isBleTurningOn-->sendMessage(BLE_STARTED) //GattService
+- isBleTurningOff-->sendMessage(BLE_STOPPED) //GattService
+}@AdapterService.java
+
+
+//AdapterState=====================
+mOffState.processMessage{
+- BLE_TURN_ON{
+	- notifyAdapterStateChange(STATE_BLE_TURNING_ON)
+	- adapterService.BleOnProcessStart
+	- sendMessageDelayed(BLE_START_TIMEOUT)//发送on超时消息
+	}
+
+}@AdapterState.java
+
+
+PendingCommandState.processMessage{
+- BLE_START_TIMEOUT{//启动超时,切到关闭状态
+	- transitionTo(mOffState)
+	- notifyAdapterStateChange(STATE_OFF)
+	}
+- BLE_STARTED{
+
+	}
+
+}@AdapterState.java
+
+OnState.processMessage{
+- BLE_TURN_OFF{
+	- transitionTo(mPendingCommandState)
+	- sendMessageDelayed(STATE_TURNING_OFF)
+	- adapterProperties.onBluetoothDisable
+	}
+- STATE_TURNING_OFF{//关闭超时
+	- 继续关闭流程
+	}
+}@AdapterState.java
+
+
+BleOnState.processMessage{//ble
+- USER_TURN_ON{
+	- startCoreServices-->setProfileServiceState(STATE_ON)@AdapterService.java
+	}
+}@AdapterState.java
+
+
+
+
+
+
+apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
+apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterState.java
+apps/Bluetooth/src/com/android/bluetooth/btservice/ProfileService.java
+apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
+system/bt/btif/src/bluetooth.cc
+
+

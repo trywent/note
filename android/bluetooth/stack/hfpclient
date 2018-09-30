@@ -46,16 +46,19 @@ bta_hf_client_sm_execute{
 //connect_audio
 connect_audio{
 - cb = btif_hf_client_get_cb_by_bda(*bd_addr)//获取连接的设备
-- 若设备支持BTA_HF_CLIENT_PEER_CODEC,BTA_HfClientSendAT
-- 否则执行,BTA_HfClientAudioOpen-->bta_sys_sendmsg(BTA_HF_CLIENT_API_AUDIO_OPEN_EVT)
+- 若设备支持codec协商,BTA_HfClientSendAT
+- 不支持codec协商则执行,BTA_HfClientAudioOpen
 -  btif_transfer_context(btif_in_hf_client_generic_evt)-->btif_sendmsg//在线程bt_jni_workqueue_thread,通知上层正在连接
 	-do_in_jni_thread(&bt_jni_msg_ready)-->bt_jni_msg_ready-->btif_context_switched
 	-->@btif_core.cc-->btif_in_hf_client_generic_evt
 }@btif_hf_client.c
 
+BTA_HfClientSendAT-->bta_sys_sendmsg(BTA_HF_CLIENT_SEND_AT_CMD_EVT)@btif_hf_client.c-->
 
-BTA_HfClientAudioOpen-->bta_sys_sendmsg@btif_hf_client.c-->bta_hf_client_sco_open
--->bta_hf_client_sco_event(BTA_HF_CLIENT_SCO_OPEN_E)@bta_hf_client_sco.cc-->
+
+
+BTA_HfClientAudioOpen-->bta_sys_sendmsg(BTA_HF_CLIENT_API_AUDIO_OPEN_EVT)@btif_hf_client.c-->
+bta_hf_client_sco_open-->bta_hf_client_sco_event(BTA_HF_CLIENT_SCO_OPEN_E)@bta_hf_client_sco.cc-->
 
 //disconnect_audio
 

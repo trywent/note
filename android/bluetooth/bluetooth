@@ -14,7 +14,7 @@ Low Energy (LE)
 physical channel---physical link---logical transport---logical link---L2CAP channel
 =====================
 /*base band
-  一个piconet中的设备共享物理channel。一个piconet中只有一个master，最多7个active slave（可以有多个parked slave）
+一个piconet中的设备共享物理channel。一个piconet中只有一个master，最多7个active slave（可以有多个parked slave）
 
 保留的地址0x9E8B00-0x9E8B3F。0x9E8B33用于查询
 

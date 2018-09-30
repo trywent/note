@@ -36,19 +36,38 @@ btif_dm_search_devices_evt{
 - BTA_DM_INQ_RES_EVT-->device_found_cb
 }
 
+//setScanMode
+setScanMode-->mAdapterProperties.setScanMode-->setAdapterPropertyNative-->
+sBluetoothInterface->set_adapter_property@com_android_bluetooth_btservice_AdapterService.cpp
+-->set_adapter_property@bluetooth.cc-->btif_set_adapter_property{
+//BT_PROPERTY_BDNAME
+- BTA_DmSetDeviceName-->bta_sys_sendmsg-->bta_dm_reg[0]-->bta_dm_sm_execute@bta_dm_api.cc
+  -->bta_dm_action-->bta_dm_set_dev_name@bta_dm_main.cc
+//BT_PROPERTY_ADAPTER_SCAN_MODE
+- BTA_DmSetVisibility
+}@btif_core.cc
+
+tif_set_adapter_property-->execute_storage_request(BTIF_CORE_STORAGE_ADAPTER_WRITE)
+btif_storage_set_adapter_property(property)-->prop2cfg-->btif_config_set_str@btif_storage.cc
 
 
-bta/dm/bta_dm_api.c
-bta/dm/bta_dm_main.c
-bta/dm/bta_dm_act.c
-======================
+//set NAME
+btif_set_adapter_property-->execute_storage_request(BTIF_CORE_STORAGE_ADAPTER_WRITE)
+btif_storage_set_adapter_property(property/*BT_PROPERTY_BDNAME*/)-->prop2cfg-->btif_config_set_str@btif_storage.cc
+
+btif_get_default_local_name//获取默认蓝牙名
+
 //bond
 btu_hcif_process_event(HCI_CONNECTION_REQUEST_EVT)-->btu_hcif_connection_request_evt@btu_hcif.c
 -->btm_sec_conn_req@btm_sec.c-->l2c_link_hci_conn_req@l2c_link.c
 
 
+//获取信息
+btif_storage_get_adapter_property-->cfg2prop
 
 
+bta/dm/bta_dm_api.c
+bta/dm/bta_dm_main.c
 bta/dm/bta_dm_act.c
 stack/btm/btm_sec.c
 stack/l2cap/l2c_link.c

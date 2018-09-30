@@ -42,7 +42,7 @@ bta_sys_init{
 //bta任务处理
 bta_sys_sendmsg(pmsg){
 - get_message_loop //获取message_loop_@btu_task  在线程message_loop_thread_
-- bta_message_loop->task_runner()->PostTask(bta_sys_event,pmsg)-->bta_sys_event
+- bta_message_loop->task_runner()->PostTask(bta_sys_event,pmsg)-->bta_sys_event(p_msg)
 	-->(*bta_sys_cb.reg[id]->evt_hdlr)(p_msg) //执行到BTA_ID_SYS,BTA_ID_DM_SEARCH
 }@bta_sys_main.c
 

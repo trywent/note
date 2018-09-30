@@ -24,8 +24,13 @@ initializeNative{
 }@com_android_bluetooth_hfpclient.cpp
 
 
-//连接状态回调
+//connect
+connect(BluetoothDevice)-->service.connect@BluetoothHeadsetClient.java-->
+connect-->sm.sendMessage(CONNECT)@HeadsetClientService.java-->Disconnected.processMessage(CONNECT)
+@HeadsetClientStateMachine.java-->NativeInterface.connectNative@NativeInterface.java-->
+sBluetoothHfpClientInterface->connect@com_android_bluetooth_hfpclient.cpp
 
+//连接状态回调
 sBluetoothHfpClientCallbacks.connection_state_cb-->connection_state_cb@com_android_bluetooth_hfpclient.cpp
 -->onConnectionStateChanged-->service.messageFromNative(event)@NativeInterface.java-->
 messageFromNative-->sm.sendMessage(StackEvent.STACK_EVENT,event)@HeadsetClientService.java

@@ -1,4 +1,5 @@
 //adapter
+
 {
 - getDefaultAdapter
 
@@ -17,7 +18,7 @@
 }@BluetoothAdapter.java
 
 
-//设备连接
+//设备信息,连接
 {
 - getName()
 - createBond()
@@ -25,5 +26,7 @@
 }@BluetoothDevice.java
 
 
+
 frameworks/base/core/java/android/bluetooth/BluetoothAdapter.java
 frameworks/base/core/java/android/bluetooth/BluetoothDevice.java
+

@@ -1,0 +1,91 @@
+//启动
+startOtherServices-->mSystemServiceManager.startService(BluetoothService.class)@SystemServer.java
+-->BluetoothService@BluetoothService.java-->BluetoothManagerService@BluetoothManagerService
+
+mSystemServiceManager.startBootPhase@SystemServer.java-->startBootPhase-->
+service.onBootPhase@SystemServiceManager.java-->onBootPhase(PHASE_SYSTEM_SERVICES_READY)
+-->mBluetoothManagerService.handleOnBootPhase@BluetoothService.java-->
+handleOnBootPhase{
+- sendEnableMsg(mQuietEnableExternal)-->handleEnable-->doBind(IBluetooth)//打开蓝牙
+- getNameAndAddress-->handleMessage(MESSAGE_GET_NAME_AND_ADDRESS)-->doBind(IBluetooth)
+}@BluetoothManagerService.java
+
+//连接服务
+doBind(IBluetooth)@BluetoothManagerService.java-->onCreate@AdapterService.java
+
+//adapter初始化
+BluetoothManager-->getDefaultAdapter{
+- ServiceManager.getService(BLUETOOTH_MANAGER_SERVICE)
+- new BluetoothAdapter(managerService)
+}@BluetoothAdapter.java
+
+//打开蓝牙
+enable@BluetoothAdapter.java-->mManagerService.enable-->enable{
+- 保存设置值，persistBluetoothSetting(Settings.Global.BLUETOOTH_ON)
+- sendEnableMsg-->sendMessage(MESSAGE_ENABLE)-->handleEnable
+}@BluetoothManagerService.java
+
+handleEnable{
+- mBluetooth==null{
+	- sendMessageDelayed(MESSAGE_TIMEOUT_BIND) //发送连接超时广播
+	- doBind(IBluetooth.class) //连接服务 "android.bluetooth.IBluetooth"
+	}
+- mBluetooth!=null{
+	- 
+	}
+}@BluetoothManagerService.java
+
+//关闭.persist=false 不保存关闭设置
+disable(boolean persist){
+- persistBluetoothSetting
+- sendDisableMsg-->sendMessage(MESSAGE_DISABLE)-->handleDisable-->mBluetooth.disable()
+}@BluetoothManagerService.java
+
+
+
+=======================
+//注册监听蓝牙状态更新
+BluetoothAdapter-->managerService.registerAdapter(mManagerCallback)@BluetoothAdapter.java-->
+sendMessage(MESSAGE_REGISTER_ADAPTER)-->mCallbacks.register(callback)@BluetoothManagerService.java
+
+getService-->adapter.getBluetoothService(mStateChangeCallback)@BluetoothDevice.java
+-->getBluetoothService-->mProxyServiceStateCallbacks.add@BluetoothAdapter.java
+
+//蓝牙连接服务通知
+mConnection.onServiceConnected-->sendMessage(MESSAGE_BLUETOOTH_SERVICE_CONNECTED)-->
+sendBluetoothServiceUpCallback-->mCallbacks.getBroadcastItem(i).onBluetoothServiceUp
+@BluetoothManagerService.java-->onBluetoothServiceUp-->cb.onBluetoothServiceUp@BluetoothAdapter.java
+-->mStateChangeCallback.onBluetoothServiceUp@BluetoothDevice.java
+
+//蓝牙断开服务通知
+recoverBluetoothServiceFromError/handleMessage(MESSAGE_USER_SWITCHED)/bluetoothStateChangeHandler
+/mConnection.onServiceDisconnected-->sendMessage(MESSAGE_BLUETOOTH_SERVICE_DISCONNECTED)-->
+
+sendBluetoothServiceDownCallback-->mCallbacks.getBroadcastItem(i).onBluetoothServiceDown
+@BluetoothManagerService.java-->onBluetoothServiceDown-->cb.onBluetoothServiceDown@BluetoothAdapter.java
+-->mStateChangeCallback.onBluetoothServiceDown@BluetoothDevice.java
+
+
+//蓝牙状态
+mBluetooth.registerCallback(mBluetoothCallback)@BluetoothManagerService.java
+
+updateAdapterState-->onBluetoothStateChange@AdapterService.java-->
+mBluetoothCallback.onBluetoothStateChange-->sendMessage(MESSAGE_BLUETOOTH_STATE_CHANGE)
+handleMessage(MESSAGE_BLUETOOTH_STATE_CHANGE){ //状态变化
+- bluetoothStateChangeHandler{
+	- STATE_OFF{
+		- sendBluetoothServiceDownCallback
+		- unbindAndFinish
+		}
+	- 	
+	}
+
+- recoverBluetoothServiceFromError //错误状态回复
+}@BluetoothManagerService.java
+
+
+frameworks/base/services/core/java/com/android/server/BluetoothService.java
+frameworks/base/services/core/java/com/android/server/BluetoothManagerService.java
+frameworks/base/core/java/android/bluetooth/BluetoothAdapter.java
+frameworks/base/core/java/android/bluetooth/BluetoothDevice.java
+packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java

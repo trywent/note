@@ -1,10 +1,18 @@
-//
+//a2dpsink
 
-initNative-->sBluetoothA2dpInterface->init(&sBluetoothA2dpCallbacks)
+initNative{
+- getBluetoothInterface  //adapter service中初始化
+- sBluetoothA2dpInterface = btInf->get_profile_interface(BT_PROFILE_ADVANCED_AUDIO_SINK_ID)
+	-->bt_av_sink_interface@btif_av.cc
+- sBluetoothA2dpInterface->init(&sBluetoothA2dpCallbacks)
+}@com_android_bluetooth_a2dp_sink.cpp
 
-
-packages/apps/Bluetooth/jni/com_android_bluetooth_a2dp_sink.cpp
-
+//connect
+connect(BluetoothDevice)-->service.connect@BluetoothA2dpSink.java-->
+BluetoothA2dpSinkBinder.connect-->connect-->mStateMachine.sendMessage(CONNECT)
+@A2dpSinkService.java-->Disconnected.processMessage(CONNECT)-->connectA2dpNative
+@A2dpSinkStateMachine.java-->sBluetoothA2dpInterface->connect@com_android_bluetooth_a2dp_sink.cpp
+bt_av_sink_interface-->connect@btif_av.cc
 
 
 
@@ -12,6 +20,10 @@ BtifAvrcpAudioTrackCreate@btif_avrcp_audio_track.cc
 
 
 
-
+frameworks/base/core/java/android/bluetooth/BluetoothA2dpSink.java
+packages/apps/Bluetooth/src/com/android/bluetooth/a2dpsink/A2dpSinkService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/a2dpsink/A2dpSinkStateMachine.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_a2dp_sink.cpp
+bt/btif/src/btif_av.cc
 bt/btif/src/btif_avrcp_audio_track.cc
 bt/btif/src/btif_a2dp_sink.cc
