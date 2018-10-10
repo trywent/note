@@ -1,4 +1,4 @@
-多媒体服务启动：
+//多媒体服务启动：
 service media /system/bin/mediaserver@init.rc-->
 main{
 - fork子进程，开始log服务MediaLogService::instantiate()

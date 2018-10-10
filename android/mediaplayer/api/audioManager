@@ -4,3 +4,4 @@ aps->isStreamActive-->isStreamActive@AudioPolicyService.cpp-->mpAudioPolicy->is_
 -->ap_is_stream_active-->lap->apm->isStreamActive@audio_policy_hal.cpp-->
 isStreamActive
 
+

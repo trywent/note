@@ -57,10 +57,29 @@ AudioStreamOutALSA::close_l-->closePcmOut_l@AudioHardware.cpp-->
 route_pcm_close(route/PLAYBACK_OFF_ROUTE/){
 - pcm_open
 - mixer_open
-- 设置route，route_set_controls
+- 设置route，route_set_controls-->set_controls@alsa_route.c-->mixer_ctl_select@alsa_mixer.c
 }@alsa_route.c
+
+
+
 
 
 hardware/rk29/audio/AudioHardware.cpp
 hardware/rk29/audio/alsa_route.c
 hardware/rk29/audio/alsa_mixer.c
+
+
+//kernel===========
+snd_ctl_elem_write_user-->snd_ctl_elem_write
+rk616_snd_path_controls.rk616_playback_path_put{
+- rk616_codec_power_up
+- rk616_set_gpio
+}
+
+
+rk616_codec_set_spk
+
+
+
+
+sound/soc/codecs/rk616_codec.c

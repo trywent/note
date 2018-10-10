@@ -1,0 +1,53 @@
+//NULPlayer=================
+enum player_type {
+    STAGEFRIGHT_PLAYER = 3,
+    NU_PLAYER = 4, //默认播放器
+    TEST_PLAYER = 5,
+};
+
+createPlayer(NU_PLAYER)-->factory->createPlayer@MediaPlayerService.cpp-->
+createPlayer-->new NuPlayerDriver@MediaPlayerFactory.cpp-->
+NuPlayerDriver{
+- mLooper(new ALooper)
+- mPlayer(new NuPlayer(pid))
+- mLooper->registerHandler(mPlayer)
+}@NuPlayerDriver.cpp
+
+onMessageReceived{
+- kWhatSetDataSource{
+	- 已经开始onResume 
+	- onStart
+	}
+- kWhatSourceNotify-->onSourceNotify
+}
+
+
+onSourceNotify{
+- kWhatInstantiateSecureDecoders-->onInstantiateSecureDecoders
+}
+//设置源
+setDataSource(fd)@NuPlayerDriver.cpp-->setDataSourceAsync(fd){
+- msg = new AMessage(kWhatSetDataSource)
+- notify = new AMessage(kWhatSourceNotify)
+- source = new GenericSource
+- source->setDataSource(fd)
+- msg->post(source)
+}@NuPlayer.cpp
+
+
+
+//start:
+start-->new AMessage(kWhatStart)->post-->onMessageReceived(kWhatStart)-->
+onStart{
+- 
+}@NuPlayer.cpp
+
+
+onInstantiateSecureDecoders
+
+postScanSources-->onMessageReceived(kWhatScanSources)
+
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDriver.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayer.cpp

@@ -6,8 +6,8 @@ mSystemServiceManager.startBootPhase@SystemServer.java-->startBootPhase-->
 service.onBootPhase@SystemServiceManager.java-->onBootPhase(PHASE_SYSTEM_SERVICES_READY)
 -->mBluetoothManagerService.handleOnBootPhase@BluetoothService.java-->
 handleOnBootPhase{
-- sendEnableMsg(mQuietEnableExternal)-->handleEnable-->doBind(IBluetooth)//打开蓝牙
-- getNameAndAddress-->handleMessage(MESSAGE_GET_NAME_AND_ADDRESS)-->doBind(IBluetooth)
+- sendEnableMsg(mQuietEnableExternal)-->handleEnable-->doBind(IBluetooth)//启动时打开蓝牙
+- getNameAndAddress-->handleMessage(MESSAGE_GET_NAME_AND_ADDRESS)-->doBind(IBluetooth) //获取完成会自动关闭蓝牙
 }@BluetoothManagerService.java
 
 //连接服务

@@ -1,0 +1,19 @@
+//文件
+文件属性{
+- user
+- group
+- 每个用户组拥有的权限 //三种用户owner | group | all 每种用户可有三种权限read | write | execute
+}
+
+
+ls -l //查看权限
+//进程
+进程属性{
+- user
+- group
+}
+
+
+ps -e -o UID,USER,GID,GROUP,RGROUP,PID,PPID,ARGS=CMD //查看进程属性
+groups username      //查看username属于的用户组
+cat /proc/pid/status //获取进程状态

@@ -46,7 +46,7 @@ bta_hf_client_sm_execute{
 //connect_audio
 connect_audio{
 - cb = btif_hf_client_get_cb_by_bda(*bd_addr)//获取连接的设备
-- 若设备支持codec协商,BTA_HfClientSendAT
+- 若设备支持codec协商,BTA_HfClientSendAT(BTA_HF_CLIENT_AT_CMD_BCC)
 - 不支持codec协商则执行,BTA_HfClientAudioOpen
 -  btif_transfer_context(btif_in_hf_client_generic_evt)-->btif_sendmsg//在线程bt_jni_workqueue_thread,通知上层正在连接
 	-do_in_jni_thread(&bt_jni_msg_ready)-->bt_jni_msg_ready-->btif_context_switched
@@ -54,7 +54,11 @@ connect_audio{
 }@btif_hf_client.c
 
 BTA_HfClientSendAT-->bta_sys_sendmsg(BTA_HF_CLIENT_SEND_AT_CMD_EVT)@btif_hf_client.c-->
-
+bta_hf_client_action[BTA_HF_CLIENT_SEND_AT_CMD]@bta_hf_client_main.cc-->
+bta_hf_client_send_at_cmd{
+- bta_hf_client_send_at_bcc
+- BTA_HF_CLIENT_AT_CMD_CLCC
+}@btif_hf_client.c
 
 
 BTA_HfClientAudioOpen-->bta_sys_sendmsg(BTA_HF_CLIENT_API_AUDIO_OPEN_EVT)@btif_hf_client.c-->
@@ -89,7 +93,11 @@ btif_hf_client_upstreams_evt{
 
 ===================
 //sco
-bta_hf_client_sco_event{
+bta_hf_client_sm_execute-->bta_hf_client_action{
+- bta_hf_client_sco_open
+- bta_hf_client_sco_close
+}@bta_hf_client_main.cc-->
+bta_hf_client_sco_event{//sco状态处理
 - BTA_HF_CLIENT_SCO_SHUTDOWN_ST{
 	- BTA_HF_CLIENT_SCO_LISTEN_E
 	- BTA_HF_CLIENT_SCO_OPEN_E
@@ -97,11 +105,20 @@ bta_hf_client_sco_event{
 
 - BTA_HF_CLIENT_SCO_LISTEN_ST
 
-}
+- BTA_HF_CLIENT_SCO_OPEN_ST{
+	- 
+	}
+}@bta_hf_client_sco.cc
 
-bta_hf_client_sco_create{
-- BTM_SetEScoMode(&params)
+bta_hf_client_sco_create(origin/*是否发起连接*/){
+- origin{
+	- BTM_SetEScoMode(&params)
+	- bta_sys_sco_use	
+	}
 - BTM_CreateSco( bta_hf_client_sco_conn_cback,bta_hf_client_sco_disc_cback)
+- 非origin{
+	- BTM_RegForEScoEvts(bta_hf_client_esco_connreq_cback) //注册连接监听
+	}
 }@bta_hf_client_sco.cc
 
 BTM_CreateSco{
@@ -113,7 +130,7 @@ BTM_CreateSco{
 }
 
 ===================
-//rfc回调
+//rfc
 bta_hf_client_port_cback-->bta_sys_sendmsg(BTA_HF_CLIENT_RFC_DATA_EVT)
 
 (状态机执行)bta_hf_client_action(bta_hf_client_st_open[RFC_DATA_EVT])-->bta_hf_client_rfc_data
@@ -123,7 +140,15 @@ bta_hf_client_parser_cb@bta_hf_client_at.cc
 
 
 
-===================
+//收到AT command
+bta_hf_client_port_cback@bta_hf_client_rfc.cc-->bta_hf_client_action[BTA_HF_CLIENT_RFC_DATA]
+@bta_hf_client_main.cc-->bta_hf_client_rfc_data@bta_hf_client_act.cc-->
+bta_hf_client_at_parse{//解析命令
+- 
+- bta_hf_client_at_parse_start
+}@btif_hf_client.cc
+
+
 
 btif/src/btif_hf_client.cc
 bta/hf_client/bta_hf_client_api.cc
@@ -133,3 +158,4 @@ bta/hf_client/bta_hf_client_sco.cc
 bta/hf_client/bta_hf_client_act.cc
 bta/hf_client/bta_hf_client_at.cc
 stack/btm/btm_sco.cc
+bta/hf_client/bta_hf_client_rfc.cc

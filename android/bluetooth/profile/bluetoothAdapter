@@ -35,17 +35,19 @@ enable(false)-->sendMessage(BLE_TURN_ON)@AdapterService.java
 //关闭
 disable-->sendMessage(BLE_TURN_OFF)@AdapterService.java
 
-
+//打开蓝牙
 BleOnProcessStart{
+- supportedProfileServices = Config.getSupportedProfiles //获取支持的profile
+- mProfileServicesState.put(STATE_OFF)//初始化profile状态为STATE_OFF
 - mAdapterProperties.init(mRemoteDevices)
 - mJniCallbacks.init(mBondStateMachine,mRemoteDevices)
-- setGattProfileServiceState
+- setGattProfileServiceState(STATE_ON)//遍历profile找到gatt启动,并设置状态STATE_ON
 }
 
-
-onStartCommand-->doStart-->
-notifyProfileServiceStateChanged@ProfileService.java-->onProfileServiceStateChanged-->
-handleMessage(MESSAGE_PROFILE_SERVICE_STATE_CHANGED)-->processProfileServiceStateChanged{
+//profileService通知profile状态,
+onStartCommand-->doStart-->notifyProfileServiceStateChanged@ProfileService.java
+-->onProfileServiceStateChanged-->handleMessage(MESSAGE_PROFILE_SERVICE_STATE_CHANGED)
+-->processProfileServiceStateChanged{
 - isBleTurningOn-->sendMessage(BLE_STARTED) //GattService
 - isBleTurningOff-->sendMessage(BLE_STOPPED) //GattService
 }@AdapterService.java
@@ -54,9 +56,9 @@ handleMessage(MESSAGE_PROFILE_SERVICE_STATE_CHANGED)-->processProfileServiceStat
 //AdapterState=====================
 mOffState.processMessage{
 - BLE_TURN_ON{
-	- notifyAdapterStateChange(STATE_BLE_TURNING_ON)
-	- adapterService.BleOnProcessStart
+	- notifyAdapterStateChange(STATE_BLE_TURNING_ON)	
 	- sendMessageDelayed(BLE_START_TIMEOUT)//发送on超时消息
+	- adapterService.BleOnProcessStart
 	}
 
 }@AdapterState.java
@@ -87,13 +89,16 @@ OnState.processMessage{
 
 BleOnState.processMessage{//ble
 - USER_TURN_ON{
-	- startCoreServices-->setProfileServiceState(STATE_ON)@AdapterService.java
+	- startCoreServices-->setProfileServiceState(STATE_ON)@AdapterService.java //已经打开
 	}
 }@AdapterState.java
 
-
-
-
+//通知
+notifyAdapterStateChange-->adapterService.updateAdapterState(oldState, newState)@AdapterState.java
+-->updateAdapterState{
+- 遍历mCallbacks
+- mCallbacks.getBroadcastItem(i).onBluetoothStateChange
+}@AdapterService.java
 
 
 apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
