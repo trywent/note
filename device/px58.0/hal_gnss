@@ -17,8 +17,10 @@ ServiceManager::add{
 
 
 /*
- hal层封装成一个服务
-
+ hal层封装成一个服务.
+ 默认服务和实现@hardware/interfaces/gnss/1.0/default/Android.mk
+ LOCAL_MODULE := android.hardware.gnss@1.0-impl
+ LOCAL_MODULE := android.hardware.gnss@1.0-service
 */
 //=============hal servcice  android/hardware/gnss/1.0/IGnss.h//接口定义
 service gnss_service /vendor/bin/hw/android.hardware.gnss@1.0-service//服务启动
@@ -54,8 +56,12 @@ IGnss::getService{//stub==true则是获取本地服务
 - stub==true{//从当前进程的本地服务获取BsGnss,用于注册到serviceManager
 	- baseInterface= getPassthroughServiceManager().get-->
 	  IServiceManager.get("android.hardware.gnss@1.0::IGnss","default"){
-		//"/system/lib64/hw/" "/vendor/lib64/hw/""/odm/lib64/hw/"
-		- 遍历打开库dlopen("android.hardware.gnss@1.0-impl.so") 
+		- prefix = "android.hardware.gnss@1.0" + "-impl" //前缀
+		- 遍历paths = {"/system/lib64/hw/" "/vendor/lib64/hw/""/odm/lib64/hw/"}
+		- search(path, prefix, ".so"){
+			- 
+			}
+		- 遍历打开查找到的库,dlopen("android.hardware.gnss@1.0-impl.so") 
 		- generator = dlsym(handle, "HIDL_FETCH_IGNSS")//查找符号HIDL_FETCH_IGNSS
 		- interface = generator("default")-->HIDL_FETCH_IGnss{
 			- hw_get_module(GPS_HARDWARE_MODULE_ID)//加载本地库

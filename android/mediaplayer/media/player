@@ -5,6 +5,17 @@ enum player_type {
     TEST_PLAYER = 5,
 };
 
+NuPlayer{
+- Source mSource
+- Surface mSurface
+- AudioSink mAudioSink
+- DecoderBase mVideoDecoder
+- DecoderBase mAudioDecoder
+- CCDecoder mCCDecoder
+- Renderer mRenderer
+}
+
+
 createPlayer(NU_PLAYER)-->factory->createPlayer@MediaPlayerService.cpp-->
 createPlayer-->new NuPlayerDriver@MediaPlayerFactory.cpp-->
 NuPlayerDriver{
@@ -19,35 +30,157 @@ onMessageReceived{
 	- onStart
 	}
 - kWhatSourceNotify-->onSourceNotify
+- kWhatScanSources{
+	- instantiateDecoder(&mVideoDecoder)
+	- instantiateDecoder(&mAudioDecoder)
+	}
 }
-
 
 onSourceNotify{
-- kWhatInstantiateSecureDecoders-->onInstantiateSecureDecoders
+- kWhatInstantiateSecureDecoders-->onInstantiateSecureDecoders{//设置解码器
+	- instantiateDecoder(&mVideoDecoder)
+	- instantiateDecoder(&mAudioDecoder)
+	} 
 }
-//设置源
+
+//设置mSource
 setDataSource(fd)@NuPlayerDriver.cpp-->setDataSourceAsync(fd){
 - msg = new AMessage(kWhatSetDataSource)
 - notify = new AMessage(kWhatSourceNotify)
 - source = new GenericSource
 - source->setDataSource(fd)
-- msg->post(source)
+- msg->post(source)-->onMessageReceived(kWhatSetDataSource)-->mSource
 }@NuPlayer.cpp
 
+//设置mAudioSink
+MediaPlayerService::Client::setDataSource_pre-->setAudioSink-->
+onMessageReceived(kWhatSetAudioSink)-->mAudioSink@@NuPlayer.cpp
+
+//设置mSurface
+MediaPlayerService::Client::setVideoSurfaceTexture-->NuPlayerDriver::setVideoSurfaceTexture
+mPlayer->setVideoSurfaceTextureAsync-->NuPlayer::setVideoSurfaceTextureAsync-->
+onMessageReceived(kWhatSetVideoSurface){
+- !mStarted,performSetSurface(surface){
+	- mSurface
+	- setVideoScalingMode
+	}
+- 否则延迟操作{
+	- mDeferredActions.push_back(FlushDecoderAction)
+	- mDeferredActions.push_back(SetSurfaceAction(surface))
+	- mDeferredActions.push_back(SimpleAction(&performScanSources))
+	- mDeferredActions.push_back(ResumeDecoderAction)
+	- processDeferredActions
+	}
+}
+
+//初始化mVideoDecoder,mAudioDecoder
+instantiateDecoder(audio,&decoder){
+- format = mSource->getFormat(audio) //获取格式
+- !audio{
+	- ccNotify = new AMessage(kWhatClosedCaptionNotify)
+	- 获取mime
+	- mCCDecoder = new CCDecoder(ccNotify)
+	- format->setInt32 //设置secure,protected,operatiion-rate
+	}
+- audio{
+	- notify = new AMessage(kWhatAudioNotify)
+	}
+- !audio{
+	- notify = new AMessage(kWhatVideoNotify)
+	- *decoder = new Decoder(mRenderer,mSurface,mCCDecoder)
+	}
+- (*decoder)->init()
+- (*decoder)->configure(format)  //初始化
+}
 
 
 //start:
 start-->new AMessage(kWhatStart)->post-->onMessageReceived(kWhatStart)-->
 onStart{
-- 
+- mSource->start()
+- mRenderer = new Renderer(mAudioSink)
+- mVideoDecoder->setRenderer(mRenderer)
+- mAudioDecoder->setRenderer(mRenderer)
+- postScanSources-->new AMessage(kWhatScanSources).post()-->instantiateDecoder//初始化decoder
 }@NuPlayer.cpp
 
+performDecoderFlush-->flushDecoder
 
-onInstantiateSecureDecoders
+//source 提供数据===================
+setDataSourceAsync@NuPlayer.cpp-->setDataSource{
+- 设置mFd,(网络源)mHTTPService
+- 网络源设置mUri
+}@GenericSource.cpp
 
-postScanSources-->onMessageReceived(kWhatScanSources)
+//prepare初始化源
+prepareAsync@NuPlayerDriver.cpp-->prepareAsync-->mSource->prepareAsync@NuPlayer.cpp-->
+prepareAsync(创建新looper)-->onPrepareAsync{
+- 网络源mUri{
+	- 检查uri是否"http"
+	- DataSource::CreateFromURI
+	}
+- 文件源mFd{
+	- mediaExService(getService(String16("media.extractor")) //获取extractor
+	- source = mediaExService->makeIDataSource
+	- mDataSource = DataSource::CreateFromIDataSource(source)
+	}
+- initFromDataSource{
+	- extractor = MediaExtractor::Create(mDataSource)
+	- numtracks = extractor->countTracks
+	- 初始化mAudioTrack{ //获取track audio
+		- mAudioTrack.mIndex 
+		- mAudioTrack.source=extractor->getTrack
+		}
+	- 初始化mVideoTrack{ //获取track video
+		- mVideoTrack.mIndex 
+		- mVideoTrack.source=extractor->getTrack
+		}
+	}
+- finishPrepareAsync{
+	- startSources{
+		- mAudioTrack.mSource->start()
+		- mVideoTrack.mSource->start()
+		}
+	- mBufferingMonitorLooper->registerHandler(mBufferingMonitor) //监听buffer?
+	}
+}@GenericSource.cpp
+
+
+//start
+start-->postReadBuffer-->onMessageReceived(kWhatReadBuffer)onReadBuffer-->readBuffer
+
+
+dequeueAccessUnit-->postReadBuffer
+
+
+//decoder 处理数据===================
+
+//config
+instantiateDecoder-->(*decoder)->configure(format)@NuPlayer-->configure@NuPlayerDecoderBase.cpp
+-->onConfigure{
+- mCodec = MediaCodec::CreateByType()
+- mCodec->configure()
+- mCodec->setCallback(reply)
+- mCodec->start()
+}@NuPlayerDecoder.cpp
+
+
+
+onInputBufferFetched-->queueInputBuffer
+
+
+onInputBufferAvailable@MediaCodec.cpp-->
+onMessageReceived(kWhatCodecNotify)-->cbID==CB_INPUT_AVAILABLE-->handleAnInputBuffer-->
+NuPlayer::DecoderBase::onRequestInputBuffers-->
+doRequestBuffers-->fetchInputData@NuPlayerDecoder.cpp-->mSource->dequeueAccessUnit@GenericSource.cpp
+
+
 
 frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
 frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp
 frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDriver.cpp
 frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayer.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDecoder.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDecoderBase.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/GenericSource.cpp
+frameworks/av/media/libstagefright/MediaCodec.cpp

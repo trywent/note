@@ -1,7 +1,6 @@
-AIDL文件
+//AIDL文件
 /jb/out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/src
-======================================
-service:
+//======================================service:
 
 service像其他应用的对象一样，也运行在主进程中。也就是在进行耗时操作时，service应该运行在自己的线程中（另生成一个线程）。
 IntentService 已经实现了在另一个线程中工作。
@@ -13,16 +12,9 @@ IntentService 已经实现了在另一个线程中工作。
 
 实现一个Service，其中要实现的几个重要方法：
 onStartCommand() 当组件调用startService时系统调用的函数
-The system calls this method when another component, such as an activity, requests that the service be started, by calling startService(). Once this method executes, the service is started and can run in the background indefinitely. If you implement this, it is your responsibility to stop the service when its work is done, by calling stopSelf() or stopService(). (If you only want to provide binding, you don't need to implement this method.)
-
 onBind()  组件绑定到service时，系统调用的函数
-The system calls this method when another component wants to bind with the service (such as to perform RPC), by calling bindService(). In your implementation of this method, you must provide an interface that clients use to communicate with the service, by returning an IBinder. You must always implement this method, but if you don't want to allow binding, then you should return null.
-
 onCreate() 服务被创建时系统调用的函数
-The system calls this method when the service is first created, to perform one-time setup procedures (before it calls either onStartCommand() or onBind()). If the service is already running, this method is not called.
-
 onDestroy() 服务被销毁时系统调用的函数
-The system calls this method when the service is no longer used and is being destroyed. Your service should implement this to clean up any resources such as threads, registered listeners, receivers, etc. This is the last call the service receives.
 
 service有什么作用（好像没什么作用）：
 1.告诉系统一些任务要在后台进行（不让系统杀死进程，回收资源）。 
@@ -43,8 +35,7 @@ The Android SDK tools generate an interface in the Java programming language, ba
 3. Expose the interface to clients 实现服务的onbind函数，返回对应的binder
 Implement a Service and override onBind() to return your implementation of the Stub class.
 
-_______________________
-client获得binder
+//client获得binder
 服务实现onBind(返回binder)，用户实现onServiceConnected(接收服务返回的binder，将binder转换为服务)。
 
 when a client (such as an activity) calls bindService() to connect to this service, the client's onServiceConnected() callback receives the mBinder instance returned by the service's onBind() method.
@@ -166,10 +157,8 @@ new ServiceDispatcher(c, context, handler, flags)--sd.getIServiceConnection-->Se
 getIServiceConnection(返回new InnerConnection)@LoadedApk.java-->
 
 frameworks/base/core/java/android/app/LoadedApk.java
-============================
-系统服务生成：
-首先实现aidl文件会自动生成stub类。要实现的服务继承stub类。
-服务的实例一般在SystemServer中加入。
+//============================
+//系统服务生成
 ----------------------------
 aidl生成的文件：
 Ixxx.stub在接口Ixxx中实现。Ixxx接口包括要实现的函数，Ixxx.stub继承Binder类和该接口。
@@ -246,8 +235,7 @@ jb/frameworks/base/services/jni/com_android_server_SystemServer.cpp
 jb/frameworks/base/cmds/system_server/library/system_init.cpp
 frameworks/native/libs/binder/IPCThreadState.cpp
 
-==============================
-ServiceManager的操作：添加服务，获取服务
+//==============================ServiceManager的操作：添加服务，获取服务
 
 系统服务使用：参考IAlarmManager.java流程
 asInterface返回new android.app.IAlarmManager.Stub.Proxy(obj)，会将mRemote=obj。
@@ -256,16 +244,7 @@ android.app.IAlarmManager.Stub.proxy实现IAlarmManager中的接口,如：调用
 setTime@IAlarmManager.java-->setTime@IAlarmManager.Stub.Proxy-->
 mRemote.transact(Stub.TRANSACTION_setTime, _data, _reply, 0)。
 
------------------------
-添加系统服务到serviceManager：
-ServiceManager.addService(String name, IBinder service)@SystemService.java-->addService-->
-getIServiceManager().addService-->ServiceManagerNative.asInterface(BinderInternal.getContextObject())
-.addService@ServiceManager.java-->ServiceManagerProxy.addService(通过data.writeStrongBinder写入service。
-传输parcel)@ServiceManagerNative.java-->（mRomote是BpBinder）mRemote.transact-->(通过BpBinder远程调用)BpBinder::transact-->IPCThreadState::self()-->transact@BpBinder.cpp--> 
-
-一般在systemServer中添加服务(IBinder的实现)，驱动记录这些服务(对象的引用转换)。
------------------------
-首先获取ServiceManager：
+//首先获取ServiceManager：
 ServiceManagerNative.asInterface（IBinder），返回ServiceManagerProxy。该代理通过IBinder传输数据。
 IBinder的获取通过：
 getIServiceManager-->ServiceManagerNative.asInterface(BinderInternal.getContextObject())
@@ -281,8 +260,16 @@ ProcessState::self()->getContextObject-->getStrongProxyForHandle-->lookupHandleL
 设置handle entry(lookupHandleLocked中要获取的)
 mHandleToObject.editItemAt@Vector.h-->editItemLocation@VectorImpl.cpp将对应的handle缓存在vector中。
 取出handle，查看binder是否为null，若为null则new BpBinder(handle)。
------------------------
-再从serviceManager获取服务：
+
+//添加系统服务到serviceManager：
+ServiceManager.addService(String name, IBinder service)@SystemService.java-->addService-->
+getIServiceManager().addService-->ServiceManagerNative.asInterface(BinderInternal.getContextObject())
+.addService@ServiceManager.java-->ServiceManagerProxy.addService(通过data.writeStrongBinder写入service。
+传输parcel)@ServiceManagerNative.java-->（mRomote是BpBinder）mRemote.transact-->(通过BpBinder远程调用)BpBinder::transact-->IPCThreadState::self()-->transact@BpBinder.cpp--> 
+
+一般在systemServer中添加服务(IBinder的实现)，驱动记录这些服务(对象的引用转换)。
+
+//再从serviceManager获取服务：
 getSystemService-->SYSTEM_SERVICE_MAP.get(name).getService(this)(获取Manager,通过manager调用服务)-->
 ServiceManager.getService@ContextImpl.java-->getService-->getIServiceManager().getService
 @ServcieManager.java-->ServiceManagerProxy.getService@ServiceManagerNative.java-->transact(CHECK_SERVICE_TRANSACTION,)-->（java层在这里获取，IBinder binder =reply.readStrongBinder()）-->
@@ -315,10 +302,8 @@ frameworks/base/core/java/android/os/ServiceManager.java
 frameworks/base/core/java/android/os/ServiceManagerNative.java
 frameworks/base/core/jni/android_util_Binder.cpp
 frameworks/base/cmds/servicemanager/service_manager.c
-______________________
-______________________|
-______________________|
-添加surfaceFlinger：
+
+//===================添加surfaceFlinger
 inti1@SystemServcer.java-->android_server_SystemServer_init1@com_android_server_SystemServer.cpp-->
 system_init-->SurfaceFlinger::instantiate@system_init.c-->instantiate-->publish@BinderServcie.h-->
 sm->addService-->addService@BpServiceManager-->BpServiceManager.addService-->remote()->transact
@@ -352,8 +337,7 @@ Client::onTransact@SurfaceFlinger.cpp-->
 BnSurfaceComposerClient::onTransact-->createSurface@ISurfaceComposerClient.cpp-->Client::createSurface
 -->
 
-==============================
-相关类：
+//==============================相关类：
 class IBinder : public virtual RefBase
 class BpBinder : public IBinder
 
@@ -390,8 +374,9 @@ IPCThreadState::waitForResponse-->executeCommand(处理从驱动获取数据,应
 b->transact(调用binder的相应的函数)
 
 jb/framework/native/libs/binder/IPCThreadState.cpp
-===============================
-kernel:
+
+
+//===============================kernel:
 写入驱动的数据结构为binder_write_read，其中read指向mIn的数据，write指向mOut的数据。驱动处理mOut.data中命令和数据。
 函数writeTransactionData@IPCThreadState.cpp向mOut中写入要传输的数据。
 
@@ -426,8 +411,7 @@ jb/frameworks/base/cmds/servicemanager/service_manager.c
 src/jb/frameworks/base/cmds/servicemanager/binder.c
 
 
-=====================================
-RefBase：
+//=====================================RefBase：
 
 IBinder : public virtual RefBase   //@IBinder.h
 -有方法transact

@@ -96,7 +96,7 @@ player->setDataSource@mediaplayer.cpp-->(跨进程)Client::setDataSource(source)
 		@StagefrightPlayer.cpp-->AwesomePlayer::setDataSource-->setDataSource_l
 		- 
 		}
-	- setDataSource_post{
+	- setDataSource_post(player){
 		- p->setRetransmitEndpoint
 		- 设置mPlayer
 		}
@@ -169,7 +169,8 @@ mediaPlayerService::client{
 - setDataSource{
 	- MediaPlayerFactory::getPlayerType //获取播放器类型
 	- setDataSource_pre
-	- setDataSource_post	
+	- setDataSource_post
+	- p->setDataSource(fd)
 	}
 - start
 }
@@ -185,7 +186,7 @@ getPlayerType(a)-->GET_PLAYER_TYPE_IMPL{
 setDataSource_pre(player_type){
 - createPlayer(playerType)-->MediaPlayerFactory::createPlayer{
 	- factory = sFactoryMap.valueFor(playerType)
-	- factory->createPlayer(pid)
+	- p = factory->createPlayer(pid)-->NuPlayerFactory::createPlayer-->new NuPlayerDriver
 	- p->initCheck
 	- p->setNotifyCallback
 	}@MediaPlayerFactory.cpp
@@ -195,11 +196,15 @@ setDataSource_pre(player_type){
 - binder = IOmx::getService()//默认执行
 - mCodecDeathListener = new ServiceDeathNotifier(omx)
 - binder->linkToDeath(mCodecDeathListener)
-- new AudioOutput
+- mAudioOutput =new AudioOutput
+- p->setAudioSink(mAudioOutput) //设置audio
 }@MediaPlayerService.cpp
 
 //设置源
 setDataSource-->p->setDataSource(fd)@MediaPlayerService.cpp
+
+
+
 
 frameworks/base/media/java/android/media/MediaPlayer.java
 frameworks/base/media/jni/android_media_MediaPlayer.cpp

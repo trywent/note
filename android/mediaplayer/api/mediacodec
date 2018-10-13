@@ -1,0 +1,100 @@
+//
+input ---->codec----> output
+
+
+Data Types{
+- Compressed Buffers //需要解码的数据
+- Raw Audio Buffers //pcm数据
+- Raw Video Buffers{
+	- COLOR_FormatSurface
+	- YUV,例如COLOR_FormatYUV420Flexible
+	- other, specific formats
+	}
+}
+
+MediaCodec{
+//Creation
+- MediaExtractor.getTrackFormat //获取文件格式
+- MediaCodecList.findDecoderForFormat(MediaFormat) //获取codec名字
+- createByCodecName(String) //创建codec
+//Initialization
+- setCallback()
+- configure (MediaFormat, Surface, MediaCrypto,flags) //设置视频输出的surface.解码还是编码
+//Codec-specific data  一些特殊编码数据.必须在start之前提交
+//Data Processing
+- queueInputBuffer(index)/onInputBufferAvailable //同步/异步
+- dequeuOutputBuffer(index)/onOutputBufferAvailable //同步/异步
+}
+
+example{
+- MediaCodec codec = MediaCodec.createDecoderByType(type);
+- codec.configure(format, ...);
+- codec.start();
+- ByteBuffer[] inputBuffers = codec.getInputBuffers();
+- ByteBuffer[] outputBuffers = codec.getOutputBuffers();
+ for (;;) {
+   int inputBufferIndex = codec.dequeueInputBuffer(timeoutUs);
+   if (inputBufferIndex >= 0) {
+     // fill inputBuffers[inputBufferIndex] with valid data
+     ...
+     codec.queueInputBuffer(inputBufferIndex, ...);
+   }
+
+   int outputBufferIndex = codec.dequeueOutputBuffer(timeoutUs);
+   if (outputBufferIndex >= 0) {
+     // outputBuffer is ready to be processed or rendered.
+     ...
+     codec.releaseOutputBuffer(outputBufferIndex, ...);
+   } else if (outputBufferIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
+     outputBuffers = codec.getOutputBuffers();
+   } else if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+     // Subsequent data will conform to new format.
+     MediaFormat format = codec.getOutputFormat();
+     ...
+   }
+ }
+- codec.stop();
+- codec.release();
+}
+
+//MediaCodec================
+init{
+- mCodec = GetCodecBase{
+	- new ACodec //omx
+	- new MediaFilter //filter
+	}
+- mBufferChannel = mCodec->getBufferChannel()
+}@@MediaCodec.cpp
+
+
+getInputBuffers(&buf)-->onMessageReceived(kWhatGetBuffers){
+- mBufferChannel->getInputBufferArray(dstBuffers) //input
+- mBufferChannel->getOutputBufferArray(dstBuffers)//output
+}@MediaCodec.cpp
+
+queueInputBuffer(index)
+
+
+onInputBufferAvailable
+
+createPersistentInputSurface@MediaCodec.java-->native_createPersistentInputSurface
+-->android_media_MediaCodec_createPersistentInputSurface@android_media_MediaCodec.cpp
+CreatePersistentInputSurface{
+- OMXClient.connect()
+- omx = OMXClient.interface()
+}@MediaCodec.cpp
+
+
+
+//ACodec====================
+
+ACodec::UninitializedState::onAllocateComponent(AMessage){
+- 
+}
+
+
+
+frameworks/base/media/java/android/media/MediaCodec.java
+frameworks/base/media/jni/android_media_MediaCodec.cpp
+frameworks/av/media/libstagefright/MediaCodec.cpp
+frameworks/av/media/libstagefright/ACodec.cpp
