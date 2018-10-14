@@ -1,1 +1,122 @@
-//
+//android.hardware.camera2
+{
+- CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE)
+- CameraManager.getCameraIdList //获取摄像头id
+- CameraManager.getCameraCharacteristics (String cameraId) //获取摄像头属性，支持的图像格式大小
+- surfaceHolder.setFixedSize //设置surface
+- CameraManager.openCamera(cameraId,CameraDevice.StateCallback){   //打开摄像头,设置回调
+	- onOpened(cameraDevice) //回调打开成功,传入cameraDevice
+	- onDisconnected
+	}
+- CameraDevice.createCaptureSession(CameraCaptureSession.StateCallback){ //创建session。设置回调
+	- onConfigured //回调配置成功，传入CameraCaptureSession
+	}
+- CameraDevice.createCaptureRequest //创建请求
+- CameraCaptureSession.setRepeatingRequest/capture  //请求数据
+}
+
+CameraManagerGlobal.getCameraService-->connectCameraServiceLocked{
+- ServiceManager.getService(CAMERA_SERVICE_BINDER_NAME) //"media.camera"
+- cameraService.addListener(this)
+}@CameraManager.java
+
+
+openCamera-->openCameraForUid-->openCameraDeviceUserAsync(callback){
+- new CameraDeviceImpl
+- 支持HAL3.2+{
+	- cameraService = CameraManagerGlobal.get().getCameraService //获取服务
+	- cameraService.connectDevice(callbacks, cameraId) //连接到服务
+	}
+- 老方式{
+	- CameraDeviceUserShim.connectBinderShim(callbacks, id)
+	}
+- deviceImpl.setRemoteDevice(cameraUser) //本地设备关联到服务端
+}@CameraManager.java
+
+
+frameworks/base/core/java/android/hardware/camera2/CameraManager.java
+frameworks/base/core/java/android/hardware/camera2/CameraDevice.java
+frameworks/base/core/java/android/hardware/camera2/CameraCaptureSession.java
+frameworks/base/core/java/android/hardware/camera2/impl/CameraDeviceImpl.java
+frameworks/base/core/java/android/hardware/camera2/legacy/CameraDeviceUserShim.java
+//=========================service
+/*
+  service通过hardware::camera::provider::V2_4::ICameraProvider获取
+  HIDL接口CameraProvider
+
+*/
+service cameraserver@cameraserver.rc-->main{
+- sm = defaultServiceManager()
+- CameraService::instantiate()-->publish-->sm->addService(getServiceName,new CameraService)@BinderService.h
+}@main_cameraserver.cpp
+
+
+CameraService::onFirstRef{
+- BatteryNotifier::getInstance //电池
+- enumerateProviders{//摄像头个数？
+	- new CameraProviderManager()->initialize(this,sHardwareServiceInteractionProxy)
+	- mCameraProviderManager->getCameraDeviceIds
+	- onDeviceStatusChanged(PRESENT)//更新
+	}	
+- pingCameraServiceProxy
+}@CameraService.cpp
+
+//初始化provider
+CameraProviderManagerinitialize(CameraService listener,ServiceInteractionProxy sHardwareServiceInteractionProxy ){
+- mListener=listener
+- mServiceProxy
+- mServiceProxy->registerForNotifications(this)--> //注册监听器
+	hardware::camera::provider::V2_4::ICameraProvider::registerForNotifications@CameraProviderManager.h
+- addProviderLocked(newProvider){ //"legacy/0"  "external/0"加入摄像头
+	- mServiceProxy->getService(newProvider)--> //获取provider
+	  hardware::camera::provider::V2_4::ICameraProvider::getService
+	}
+}@CameraProviderManager.cpp
+
+
+
+frameworks/av/camera/cameraserver/main_cameraserver.cpp
+frameworks/native/include/binder/BinderService.h
+frameworks/av/services/camera/libcameraservice/CameraService.cpp
+frameworks/av/services/camera/libcameraservice/common/CameraProviderManager.cpp
+frameworks/av/services/camera/libcameraservice/common/CameraProviderManager.h
+//================================HAL provider device
+interface ICameraProvider {//provider
+- setCallback(ICameraProviderCallback callback)
+- getVendorTags()
+- getCameraIdList()
+- isSetTorchModeSupported() //闪光灯
+- getCameraDeviceInterface_V1_x
+- getCameraDeviceInterface_V3_x
+}
+
+service vendor.camera-provider-2-4 /vendor/bin/hw/android.hardware.camera.provider@2.4-service_64
+@android.hardware.camera.provider@2.4-service_64.rc-->main-->defaultPassthroughServiceImplementation<ICameraProvider>("legacy/0")
+@service.cpp
+
+
+HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
+- hw_get_module(CAMERA_HARDWARE_MODULE_ID, &rawModule) //加载HAL库
+- mModule = new CameraModule(rawModule)
+- mModule->init()
+- mModule->setCallbacks(this)
+- addDeviceNames
+}@CameraProvider.cpp
+
+
+hardware/interfaces/camera/provider/2.4/default/service.cpp
+hardware/interfaces/camera/provider/2.4/default/CameraProvider.cpp
+
+//device interface
+ICameraDeviceSession{
+- configureStreams_3_4
+- processCaptureRequest_3_4
+}
+
+ICameraDeviceCallback{
+- processCaptureResult_3_4
+}
+
+
+hardware/interfaces/camera/device/3.4/default/CameraDevice.cpp
+hardware/interfaces/camera/device/3.4/default/CameraDeviceSession.cpp

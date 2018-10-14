@@ -28,15 +28,19 @@ main{
 }@main_codecservice.cpp
 
 
-//加载用户自定义硬件解码
-new Omx()-->new OMXMaster()-->addVendorPlugin-->
-addPlugin("libstagefrighthw.so"){
-- dlopen(libname)
-- createOMXPlugin = dlsym("createOMXPlugin")
-- addPlugin(createOMXPlugin()){
-	- mPlugins.push_back(plugin)
-	- mPluginByComponentName.add //遍历plugin中component
+//加载用户自定义硬件解码，加载软解
+new Omx()-->new OMXMaster(){
+- 初始化mProcessName
+- addVendorPlugin-->addPlugin("libstagefrighthw.so"){
+	- dlopen(libname)
+	- createOMXPlugin = dlsym("createOMXPlugin")
+	- addPlugin(createOMXPlugin()){
+		- mPlugins.push_back(plugin)
+		- plugin->enumerateComponents //遍历plugin中component
+		- mPluginByComponentName.add //保存component
+		}
 	}
+- addPlugin(new SoftOMXPlugin) //加入软解
 }
 
 //client
