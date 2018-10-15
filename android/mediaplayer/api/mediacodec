@@ -58,13 +58,27 @@ example{
 }
 
 //MediaCodec================
+MediaCodec::CreateByType(mime){
+- MediaCodecList::findMatchingCodecs(mime,&componentName){
+	- getInstance{
+		- IMediaPlayerService> service = interface_cast(getService("media.player"))
+		- sRemoteList = service->getCodecList //获取解码list
+		}
+	- list->findCodecByType(mime) //查找对应的几码器
+	- matchs->push(componentName) //保存
+	- 判断是否优先软解并返回
+	}@MediaCodecList.cpp
+- 从查找到的codec中初始化，codec->init(componentName)
+}@MediaCodec.cpp
+
+
 init{
 - mCodec = GetCodecBase{
 	- new ACodec //omx
 	- new MediaFilter //filter
 	}
 - mBufferChannel = mCodec->getBufferChannel()
-}@@MediaCodec.cpp
+}@MediaCodec.cpp
 
 
 getInputBuffers(&buf)-->onMessageReceived(kWhatGetBuffers){
@@ -98,3 +112,4 @@ frameworks/base/media/java/android/media/MediaCodec.java
 frameworks/base/media/jni/android_media_MediaCodec.cpp
 frameworks/av/media/libstagefright/MediaCodec.cpp
 frameworks/av/media/libstagefright/ACodec.cpp
+frameworks/av/media/libstagefright/MediaCodecList.cpp

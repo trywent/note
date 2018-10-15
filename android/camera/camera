@@ -17,6 +17,7 @@
 
 使用camera流程{
 - public static Camera open (int cameraId)
+- void setParameters (Camera.Parameters params)
 - public final void setPreviewDisplay (SurfaceHolder holder)
 - public final void startPreview ()
 - public final void release ()
