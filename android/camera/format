@@ -1,0 +1,2 @@
+//
+lcd:Support YUV420/YUV422/ARGB8888/RGB565/AFBC-RGBA data format in each layer

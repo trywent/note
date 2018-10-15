@@ -145,6 +145,8 @@ setSurface/setDisplay@MediaPlayer.java-->android_media_MediaPlayer_setVideoSurfa
 setVideoSurface-->getMediaPlayer().setVideoSurfaceTexture@android_media_MediaPlayer.cpp
 -->setVideoSurfaceTexture(bufferProducer)-->mPlayer->setVideoSurfaceTexture@mediaplayer.cpp
 
+
+//mediaPlayerService:====================
 //服务初始化：
 
 main--> MediaPlayerService::instantiate@main_mediaserver.cpp
@@ -162,7 +164,6 @@ registerBuiltinFactories{
 }@MediaPlayerFactory.cpp
 
 
-//mediaPlayerService:====================
 
 mediaPlayerService::client{
 - create(IMediaPlayerClient)-->new Client(pid,IMediaPlayerClient)

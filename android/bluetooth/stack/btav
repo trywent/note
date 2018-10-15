@@ -17,7 +17,7 @@ static const btav_sink_interface_t bt_av_sink_interface = {
     update_audio_focus_state,
     update_audio_track_gain,
 };
-//---------------bta接口
+//bta接口
 bta_sys_sendmsg-->bta_av_reg->evt_hdlr--> //在线程message_loop_thread_
 bta_av_hdl_event{
 - bta_av_nsm_act[event] //非状态机处理消息
@@ -42,16 +42,17 @@ init_sink-->btif_av_init{
 	- 初始化,btif_a2dp_sink_cb
 	- worker_thread = thread_new("btif_a2dp_sink_worker_thread") //创建线程
 	- rx_audio_queue,cmd_msg_queue //注册工作队列到worker_thread
-	- fixed_queue_register_dequeue(cmd_msg_queuebtif_a2dp_sink_command_ready)
+	- fixed_queue_register_dequeue(cmd_msg_queue,btif_a2dp_sink_command_ready)
 	}
 - btif_enable_service(service_id)-->btif_av_sink_execute_service
 	- BTA_AvEnable(bte_av_callback){
 		- bta_sys_register(BTA_ID_AV, &bta_av_reg)@bta_av_api.cc //注册bta接口
 		- bta_sys_sendmsg(BTA_AV_API_ENABLE_EVT)//打开api?
 		}
-	- BTA_AvRegister(BTA_AV_CHNL_AUDIO){
+	- BTA_AvRegister(BTA_AV_CHNL_AUDIO,bte_av_sink_media_callback){
 		- tBTA_AV_API_REG* p_buf //创建
 		- p_buf->hdr.layer_specific = BTA_AV_CHNL_AUDIO
+		- p_buf->p_app_sink_data_cback = bte_av_sink_media_callback
 		- bta_sys_sendmsg(BTA_AV_API_REGISTER_EVT)-->bta_av_api_register@bta_av_main.cc
 		}
 	}
@@ -61,15 +62,21 @@ init_sink-->btif_av_init{
 
 BTA_AvEnable(bte_av_callback)-->bta_av_api_enable{//enable 设置bta_av_cb回调.非状态机处理
 - bta_av_cb.p_cback = bte_av_callback
+- bta_av_cb.features = p_data->api_enable.features //设置功能
 -(*bta_av_cb.p_cback)(BTA_AV_ENABLE_EVT, &bta_av_data)-->bte_av_callback
-}@
+}@bta_av_api.cc
 
-BTA_AvRegister(BTA_AV_CHNL_AUDIO)-->bta_av_api_register{//register.非状态机处理
+BTA_AvRegister(BTA_AV_CHNL_AUDIO,bte_av_sink_media_callback)-->bta_av_api_register{//register.非状态机处理
 - 创建registr,p_scb
 - p_scb= bta_av_alloc_scb(BTA_AV_CHNL_AUDIO)
+- BTA_AV_FEAT_RCTG{//control TG功能
+	- bta_ar_reg_avrc(UUID_SERVCLASS_AV_REM_CTRL_TARGET) //注册一个sdp record
+	}
 - 是BTA_AV_CHNL_AUDIO{//初始化scb(stream control block) 
 	- scb
 	}
+- p_scb->seps[codec_index].p_app_sink_data_cback //设置sink数据处理回调函数
+- cs.p_sink_data_cback = bta_av_sink_data_cback
 - (*bta_av_cb.p_cback)(BTA_AV_REGISTER_EVT, &bta_av_data)-->bte_av_callback
 }@bta_av_main.cc
 
@@ -113,11 +120,16 @@ bta_av_hdl_event@bta_av_main.cc
  -->bta_av_connect_req@bta_av_aact.cc
 }@bta_av_ssm.cc
 
-//-----------------收到命令
+//处理命令
+avdt_scb_hdl_pkt@avdt_scb.cc-->avdt_scb_hdl_pkt_no_frag-->(*p_scb->cs.p_sink_data_cback)@avdt_scb_act.cc
+bta_av_sink_data_cback-->p_app_sink_data_cback@bta_av_aact.cc-->bte_av_sink_media_callback@btif_av.cc
+btif_a2dp_sink_update_decoder-->fixed_queue_enqueue(cmd_msg_queue,BTIF_MEDIA_SINK_DECODER_UPDATE)
+@btif_a2dp_sink.cc
+
 btif_a2dp_sink_command_ready{
 - btif_a2dp_sink_decoder_update_event{
 	- 更新采样率,声道
-	- btif_a2dp_sink_cb.audio_track = BtifAvrcpAudioTrackCreate@btif_avrcp_audio_track.cc
+	- btif_a2dp_sink_cb.audio_track = BtifAvrcpAudioTrackCreate@btif_avrcp_audio_track.cc //创建audioTrack
 	}
 - btif_a2dp_sink_clear_track_event
 - btif_a2dp_sink_set_focus_state_event
@@ -156,6 +168,8 @@ btif/src/btif_dm.cc
 bta/av/bta_av_main.cc
 bta/av/bta_av_ssm.cc
 bta/av/bta_av_aact.cc
+stack/avdt/avdt_scb_act.cc
+stack/avdt/avdt_scb.cc
 =============================
 //a2dpsource
 

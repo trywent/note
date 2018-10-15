@@ -1,3 +1,23 @@
+/*
+角色:The controller (CT)发送命令,The target (TG)接收命令
+
+4个层次功能:
+Category 1: Player/Recorder 基本的播放录制功能
+
+Category 2: Monitor/Amplifier 音视频的状态监听
+
+Category 3: Tuner 微调?
+
+Category 4: Menu 菜单信息,播放列表?
+
+
+
+
+*/
+
+
+
+
 //avrcp controller 客端
 /*
  PASSTHROUGH_ID_PLAY        = 0x44  68
