@@ -20,5 +20,5 @@
 
 
 
-//查看bin的elf信息.版本运行架构
+//查看可执行bin的elf信息.版本运行架构
 readelf -h file

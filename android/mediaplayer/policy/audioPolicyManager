@@ -56,7 +56,13 @@ AudioPolicyManagerBase::getOutput{
 AudioPolicyManager::getOutputForAttr(&output,selectedDeviceId){
 - strategy = getStrategyForAttr //获取策略
 - device = getDeviceForStrategy(strategy)//获取设备
-- getOutputForDevice(device)
+- getOutputForDevice(device,stream){
+	- 遍历mOutputs查找合适的output返回
+	- outputDesc = new SwAudioOutputDescriptor(profile)
+	- outputDesc->mDevice = device
+	- mpClientInterface->openOutput(output)
+	- addOutput(output, outputDesc)
+	}
 }
 
 _____________________
@@ -68,7 +74,7 @@ ap_set_stream_volume_index_for_device@audio_policy_hal.cpp-->setStreamVolumeInde
 - 设置音量到连接的设备，checkAndSetVolume{
 	- 连接蓝牙不设置
 	- 计算音量，computeVolume
-	- mpClientInterface->setStreamVolume-->set_stream_volume
+	- outputDesc->setVolume-->mpClientInterface->setStreamVolume-->set_stream_volume
 	}
 }
 

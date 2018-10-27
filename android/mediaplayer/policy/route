@@ -1,3 +1,13 @@
+//audiopolicy
+
+
+AudioPolicyManager::getOutputForAttr{
+- 
+- mOutputRoutes.addRoute(session,audio_source_t,DeviceDescriptor)
+}
+
+
+//audioService===============
 //监听耳机，hdmi的连接状态更新
 WiredAccessoryObserver-->makeObservedUEventList{
 - new UEventInfo(NAME_H2W)
@@ -59,8 +69,6 @@ route_pcm_close(route/PLAYBACK_OFF_ROUTE/){
 - mixer_open
 - 设置route，route_set_controls-->set_controls@alsa_route.c-->mixer_ctl_select@alsa_mixer.c
 }@alsa_route.c
-
-
 
 
 

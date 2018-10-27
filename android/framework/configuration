@@ -1,4 +1,4 @@
-========================
+//========================
 字体：
 systemReady-->retrieveSettings-->Settings.System.getConfiguration
 
@@ -96,6 +96,9 @@ onItemSelected{
 onLocaleSelected-->LocalePicker.updateLocale@LocalPicker.java-->updateLocale-->
 am.updateConfiguration@(内部)LocalePicker.java-->updateConfiguration-->
 updateConfigurationLocked(更新当前配置，是已经运行的activity运行在当前配置下)@ActivityManagerService.java
+
+onLocaleSelected-->LocalePicker.updateLocale@LocalPicker.java-->am.updatePersistentConfiguration
+updatePersistentConfiguration
 
 改变数据库：
 updateLocale-->BackupManager.dataChanged@LocalPicker.java

@@ -1,0 +1,17 @@
+//lsusb
+
+遍历"/sys/bus/usb/devices/"目录下所有文件夹,读取文件夹下的uevent若有以下三项则是usb设备
+{
+- "BUSNUM=%u\n", &busnum
+- "DEVNUM=%u\n", &devnum
+- "PRODUCT=%x/%x/", &pid, &vid
+}
+
+
+
+
+external/toybox/toys/other/lsusb
+
+
+
+//adb

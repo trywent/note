@@ -79,8 +79,12 @@ adb root:
 
 system/core/adb/
 
-_____________________________________
-识别设备：
+//设备：
+//添加设备
+transport_registration_func-->transport_list.push_front(t)
+
+//列出设备adb devices
+handle_host_request("devices")-->list_transports(遍历transport_list中设备)-->append_transport(填充信息)
  
 
 弹出调试允许对话框：

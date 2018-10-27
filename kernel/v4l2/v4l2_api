@@ -1,5 +1,4 @@
-
-======================================
+//======================================
 video_device:包含设备信息，设备操作函数（v4l2_file_operations，release,）
 注册相关：video_register_device，video_unregister_device
 

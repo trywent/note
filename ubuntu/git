@@ -138,19 +138,13 @@ _______________________
 远程仓库：
 git remote     //查看远程仓库名
 git remote -v  //查看远程仓库名子，地址
-
 git remote add [shortname] [url] //添加远程仓库
-
+git remote set-url xxxx name
 git fetch [remote-name]  //从远程仓库获取本地没有的数据(更新)
-
 git push [remote-name] [branch-name] //推送数据到远程仓库
-
 git remote show [remote-name] //查看远程仓库信息
-
 git remote rename <name> <toname>  //重命名
-
 git remote rm <file> //删除仓库
-
 git ls-remote --heads <remote-name>  //列出远程分支
 
 git branch -r  //列出远程分支

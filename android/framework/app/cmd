@@ -1,4 +1,4 @@
-启动activity：
+//启动activity：
 am start com.android.email/.activity.Welcome 
 
 -e|--es <EXTRA_KEY> <EXTRA_STRING_VALUE>
@@ -11,6 +11,9 @@ am start -->runStart-->makeIntent(构建intent)
 
 am startservice -n com.syu.ms/.ServiceMain
 am startservice -n com.syu.ms/app.ModuleService
+
+//广播
+am broadcast -a com.android.test --es test_string "this is test string" --ei test_int 100 --ez test_boolean true
 
 px3:
 am start -e "com.syu.fyt" "fytSecond" com.syu.music/.MAct

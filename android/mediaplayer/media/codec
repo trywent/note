@@ -1,4 +1,4 @@
-//
+//open MAX兼容解码器
 
 
 
@@ -41,7 +41,33 @@ new Omx()-->new OMXMaster(){
 		}
 	}
 - addPlugin(new SoftOMXPlugin) //加入软解
-}
+}OMXMaster.cpp
+
+
+Omx::allocateNode(name,observer,_hidl_cb/*omxNode*/){
+- instance = new OMXNodeInstance
+- OMXMaster::makeComponentInstance(name,handle) //获取codec的handle
+- instance->setHandle(handle)
+- _hidl_cb(toStatus(OK), new TWOmxNode(instance))
+}@Omx.cpp
+
+
+OMXMaster::makeComponentInstance(name){
+- index = mPluginByComponentName.indexOfKey(name) 
+- plugin = mPluginByComponentName.valueAt(index)//根据name获取pluging(硬解,软解)
+- plugin->makeComponentInstance(name,callback,compoment){//创建component(decoder)
+	- makeComponentInstance{//硬解
+	- 
+	}
+	- makeComponentInstance{//软解
+	- dlopen(libName),创建库名并打开//"libstagefright_soft_"
+	- createSoftOMXComponent = dlsym(createSoftOMXComponent) //查找函数
+	- codec = createSoftOMXComponent(name,callback,compoment) //创建codec
+	- codec->initCheck
+	}	
+	}
+- mPluginByInstance.add(*component, plugin)
+}@OMXMaster.cpp
 
 //client
 OMXClient::connect{
@@ -59,6 +85,9 @@ OMXClient::connect{
 
 frameworks/av/services/mediacodec/main_codecservice.cpp
 frameworks/av/media/libstagefright/OMXClient.cpp
+frameworks/av/media/libstagefright/omx/1.0/Omx.cpp
+frameworks/av/media/libstagefright/omx/OMXMaster.cpp
+
 
 //hardware中的omx没有使用
 hardware/interfaces/media/omx/1.0/IOmx.hal

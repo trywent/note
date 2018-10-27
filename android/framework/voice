@@ -1,6 +1,44 @@
-//
-dumpssy "voiceinteraction"
+//dumpsys "voiceinteraction"
+initForUser{
+- 
+}
+
+
+setCurRecognizer-->Settings.Secure.putStringForUser(VOICE_RECOGNITION_SERVICE)@VoiceInteractionManagerService.java
+setCurInteractor-->Settings.Secure.putStringForUser(Settings.Secure.VOICE_INTERACTION_SERVICE)@VoiceInteractionManagerService.java
+
+//使用语音
+createSpeechRecognizer(Context)-->createSpeechRecognizer(context, null)-->
+new SpeechRecognizer(context){
+- mContext
+}@SpeechRecognizer.java
+
+setRecognitionListener(RecognitionListener)-->putMessage(MSG_CHANGE_LISTENER)-->
+handleChangeListener-->mListener.mInternalListener= listener@SpeechRecognizer.java
+
+startListening{
+- mConnection==null{
+	- serviceComponent = Settings.Secure.getString(VOICE_RECOGNITION_SERVICE)
+	- bindService(serviceIntent)//bind语音服务
+	}
+- putMessage(MSG_START)-->handleStartListening-->mService.startListening(recognizerIntent, mListener)
+}@SpeechRecognizer.java
 
 
 
+frameworks/base/core/java/android/speech/SpeechRecognizer.java
+frameworks/base/core/java/android/speech/RecognitionListener.java
 frameworks/base/services/voiceinteraction/java/com/android/server/voiceinteraction/VoiceInteractionManagerService.java
+
+
+
+
+
+//设置中设置语音
+VoiceInputHelper{
+- mAvailableVoiceInteractions =getPackageManager().queryIntentServices(VoiceInteractionService.SERVICE_INTERFACE) //语音交互
+- mAvailableRecognition = getPackageManager().queryIntentServices(RecognitionService.SERVICE_INTERFACE) //语音识别
+}
+
+
+packages/apps/Settings/src/com/android/settings/voice/VoiceInputHelper.java

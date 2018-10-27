@@ -8,6 +8,7 @@ AudioService{
 - 创建并初始化流状态，createStreamStates
 }
 
+//获取流对应的设备
 getDeviceForStream-->AudioSystem.getDevicesForStream@AudioService.java-->
 getDevicesForStream@AudioSystem.java-->android_media_AudioSystem_getDevicesForStream
 AudioSystem::getDevicesForStream@android_media_AudioSystem.cpp-->getDevicesForStream
@@ -19,7 +20,7 @@ AudioSystem::getDevicesForStream@android_media_AudioSystem.cpp-->getDevicesForSt
 AudioManager.setStreamVolume-->AudioService.setStreamVolume{
 - 检查状态是否正确，ensureValidStreamType
 - 获取streamstate，streamState = mStreamStates[streamTypeAlias = mStreamVolumeAlias]
-- 获取流对应的设备device，getDeviceForStream
+- device，getDeviceForStream //获取流对应的设备
 - syncronised{
 	- streamState.getIndex
 	- 将要设置的音量根据mIndex转换，rescaleIndex
@@ -37,10 +38,13 @@ AudioManager.setStreamVolume-->AudioService.setStreamVolume{
 - 音量变化UI和广播，sendVolumeUpdate
 }
 
+
+
 //设置音量到audioSystem
 VolumeStreamState.applyDeviceVolume-->AudioSystem.setStreamVolumeIndex@AudioSystem.java-->
-
-
+setStreamVolumeIndex-->aps->setStreamVolumeIndex@AudioSystem.cpp-->setStreamVolumeIndex
+@AudioPolicyManager.cpp-->setStreamVolumeIndex@AudioPolicyService.cpp-->setStreamVolume
+@AudioSystem.cpp-->setStreamVolume@AudioFlinger.cpp
 
 //设置流静音
 setStreamMute-->mStreamStates[streamType].mute(IBinder cb)-->VolumeStreamState.mute{

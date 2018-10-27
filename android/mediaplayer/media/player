@@ -60,7 +60,7 @@ onMessageReceived(kWhatSetAudioSink)-->mAudioSink@@NuPlayer.cpp
 MediaPlayerService::Client::setVideoSurfaceTexture-->NuPlayerDriver::setVideoSurfaceTexture
 mPlayer->setVideoSurfaceTextureAsync-->NuPlayer::setVideoSurfaceTextureAsync-->
 onMessageReceived(kWhatSetVideoSurface){
-- !mStarted,performSetSurface(surface){
+- !mStarted状态,performSetSurface(surface){
 	- mSurface
 	- setVideoScalingMode
 	}
@@ -154,12 +154,17 @@ dequeueAccessUnit-->postReadBuffer
 
 
 //decoder 处理数据===================
-
+NuPlayer::Decoder::Decoder{
+- mSurface(surface)
+- mSource(source)
+- mRenderer(renderer)
+- mCCDecoder(ccDecoder)
+}
 //config
 instantiateDecoder-->(*decoder)->configure(format)@NuPlayer-->configure@NuPlayerDecoderBase.cpp
 -->onConfigure{
 - mCodec = MediaCodec::CreateByType()
-- mCodec->configure()
+- mCodec->configure(format,mSurface) //surface
 - mCodec->setCallback(reply)
 - mCodec->start()
 }@NuPlayerDecoder.cpp

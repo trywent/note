@@ -46,15 +46,10 @@ surfaceDestroyed(SurfaceHolder)来判断窗口销毁创建时，Surface所处的
 (通常是程序主线程)中调用.
 操作底层Surface必须在它的有效期间，在SurfaceHolder.Callback.surfaceCreated()和
 SurfaceHolder.Callback.surfaceDestroyed()之间
-===============================
-openTransaction@Surface.java-->Surface_openTransaction-->SurfaceComposerClient::openGlobalTransaction
-@android_view_Surface.cpp
 
 
 
 
-frameworks/base/core/java/android/view/Surface.java
-frameworks/base/core/jni/android_view_Surface.cpp
 
 ================================
 //通过SurfaceHolder来操作Surface
@@ -82,3 +77,40 @@ updateWindow{
 - mSession.relayout(mNewSurface)-->relayoutWindow-->winAnimator.createSurfaceLocked
 	@WindowManagerService.java
 }@SurfaceView.java
+
+
+
+//visible
+setVisibility(设置mRequestedVisible)-->
+updateSurface{
+- if(creating|visibleChanged...){ //创建surface,显示变化
+	- if(creating){
+		- mSurfaceSession = new SurfaceSession
+		- mSurfaceControl = new SurfaceControlWithBackground
+		}
+	- SurfaceControl.openTransaction()
+	- mSurfaceControl.setLayer
+	- mSurfaceControl.show/mSurfaceControl.hide //显示或隐藏
+	- mSurfaceControl.setPosition
+	- mSurfaceControl.setMatrix
+	- mSurfaceControl.setSize
+	- SurfaceControl.closeTransaction
+	}
+- 
+}
+
+
+
+//显示/隐藏
+show/hide@SurfaceControl.java-->nativeSetFlags@android_view_SurfaceControl.cpp
+
+
+//lsec
+"sys.fyt_hidevideo";
+
+        //
+
+frameworks/base/core/java/android/view/SurfaceView.java
+frameworks/base/core/java/android/view/SurfaceControl.java
+frameworks/base/core/jni/android_view_SurfaceControl.cpp
+

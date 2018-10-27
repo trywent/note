@@ -1,0 +1,98 @@
+//
+v4l2_ctrl_handler{ //handler结构
+- struct list_head ctrls
+- struct list_head ctrl_refs->v4l2_ctrl_ref{
+	- 
+	- struct v4l2_ctrl *ctrl;
+	}
+}
+
+1. 创建设备并设置,v4l2_ctrl_handler //创建ctrl时传入的参数
+struct foo {//v4l2_device设备使用流程
+struct v4l2_device v4l2_dev;
+struct v4l2_ctrl_handler ctrl_handler;
+};
+v4l2_ctrl_handler_init(&foo->ctrl_handler, nr_of_controls/*control数目*/)
+foo->v4l2_dev.ctrl_handler = &foo->ctrl_handler;
+
+struct foo{//v4l2_subdev设备使用流程
+struct v4l2_subdev sd;
+struct v4l2_ctrl_handler ctrl_handler;
+}
+foo->sd.ctrl_handler = &foo->ctrl_handler
+v4l2_ctrl_handler_free(&foo->ctrl_handler) //最后释放
+
+2. 加入controls
+static const s64 exp_bias_qmenu[] = {
+     -2, -1, 0, 1, 2
+};
+static const char * const test_pattern[] = {
+	"Disabled",
+	"Vertical Bars",
+	"Solid Black",
+	"Solid White",
+};
+
+v4l2_ctrl_handler_init(&foo->ctrl_handler, nr_of_controls);
+v4l2_ctrl_new_std(&foo->ctrl_handler, &foo_ctrl_ops,
+			V4L2_CID_BRIGHTNESS, 0, 255, 1, 128);
+v4l2_ctrl_new_std(&foo->ctrl_handler, &foo_ctrl_ops,
+			V4L2_CID_CONTRAST, 0, 255, 1, 128);
+v4l2_ctrl_new_std_menu(&foo->ctrl_handler, &foo_ctrl_ops,
+			V4L2_CID_POWER_LINE_FREQUENCY,
+			V4L2_CID_POWER_LINE_FREQUENCY_60HZ, 0,
+			V4L2_CID_POWER_LINE_FREQUENCY_DISABLED);
+v4l2_ctrl_new_int_menu(&foo->ctrl_handler, &foo_ctrl_ops,
+			V4L2_CID_EXPOSURE_BIAS,
+			ARRAY_SIZE(exp_bias_qmenu) - 1,
+			ARRAY_SIZE(exp_bias_qmenu) / 2 - 1,
+			exp_bias_qmenu);
+v4l2_ctrl_new_std_menu_items(&foo->ctrl_handler, &foo_ctrl_ops,
+			V4L2_CID_TEST_PATTERN, ARRAY_SIZE(test_pattern) - 1, 0,
+			0, test_pattern);
+
+3. 初始化,将control默认值设置到hw
+v4l2_ctrl_handler_setup(&foo->ctrl_handler)
+4. 实现v4l2_ctrl_ops //创建ctrl时传入的参数
+static const struct v4l2_ctrl_ops foo_ctrl_ops = {
+	.s_ctrl = foo_s_ctrl,
+};
+static int foo_s_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct foo *state = container_of(ctrl->handler, struct foo, ctrl_handler);
+
+	switch (ctrl->id) {
+	case V4L2_CID_BRIGHTNESS:
+		write_reg(0x123, ctrl->val);
+		break;
+	case V4L2_CID_CONTRAST:
+		write_reg(0x456, ctrl->val);
+		break;
+	}
+	return 0;
+}
+
+//更高级处理
+
+//获取ctrl值
+struct v4l2_ctrl { //这里面有ctrl设置值,可以直接使用...violate寄存器中值需重新读取
+	s32 val;
+	struct {
+		s32 val;
+	} cur;
+	union v4l2_ctrl_ptr p_new;
+	union v4l2_ctrl_ptr p_cur;
+}
+
+static int g_volatile_ctrl(struct v4l2_ctrl *ctrl) //当寄存器值是易变的,需实现这个函数
+{
+	switch (ctrl->id) {
+	case V4L2_CID_BRIGHTNESS:
+		ctrl->val = read_reg(0x123);
+		break;
+	}
+}
+
+//不能在g_volatile/s/try_ctrl操作函数中调用
+s32 v4l2_ctrl_g_ctrl(struct v4l2_ctrl *ctrl)
+int v4l2_ctrl_s_ctrl(struct v4l2_ctrl *ctrl, s32 val);

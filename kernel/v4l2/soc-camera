@@ -1,0 +1,44 @@
+//提供camera host和camera sensor的统一接口
+- camera/camera device/camera sensor //视频IC
+- camera host //Soc
+- camera host bus //视屏信号传输总线,mipi
+
+//host流程
+static struct soc_camera_host_ops camera_host_ops = {
+        .owner          = THIS_MODULE,
+        .add            = camera_add_device,
+        .remove         = camera_remove_device,
+        .set_fmt        = camera_set_fmt_cap,
+        .try_fmt        = camera_try_fmt_cap,
+        .init_videobuf2 = camera_init_videobuf2,  //video device打开时调用
+        .poll           = camera_poll,
+        .querycap       = camera_querycap,
+        .set_bus_param  = camera_set_bus_param,  //配置host和sensor连接参数
+        /* The rest of host operations are optional */
+};
+
+struct soc_camera_host  *ici;
+ici->drv_name           = DRV_NAME;
+ici->ops                = &camera_host_ops;
+ici->priv               = pcdev;
+ici->v4l2_dev.dev       = &pdev->dev;
+ici->nr                 = pdev->id;
+
+soc_camera_host_register(struct soc_camera_host *);
+
+//摄像头接口.通过v4l2-subdev API和host连接
+soc_camera_link
+
+//设置位置和大小(像素单位).一般host和sensor都可以设置位置大小.最好设置sensor,减少数据传输和计算
+VIDIOC_S_CROP
+
+//设置格式
+VIDIOC_S_FMT
+
+struct soc_camera_device{
+.user_width
+.user_height
+}
+
+
+ioctl(VIDIOC_S_FMT) //设置图像格式

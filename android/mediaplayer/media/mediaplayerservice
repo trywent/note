@@ -140,13 +140,18 @@ start-->_start@MediaPlayer.java-->android_media_MediaPlayer_start-->getMediaPlay
 MediaPlayerService::Client::start-->getPlayer()->start@MediaPlayerService.cpp
 
 
-00.//视频设置surface
+6.//视频设置surface
 setSurface/setDisplay@MediaPlayer.java-->android_media_MediaPlayer_setVideoSurface-->
 setVideoSurface-->getMediaPlayer().setVideoSurfaceTexture@android_media_MediaPlayer.cpp
 -->setVideoSurfaceTexture(bufferProducer)-->mPlayer->setVideoSurfaceTexture@mediaplayer.cpp
 
 
 //mediaPlayerService:====================
+/*
+ player :public MediaPlayerInterface : public MediaPlayerBase
+
+*/
+
 //服务初始化：
 
 main--> MediaPlayerService::instantiate@main_mediaserver.cpp

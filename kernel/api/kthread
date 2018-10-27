@@ -1,4 +1,11 @@
+//process
 
+
+
+
+
+
+//kthread
 创建：
 kthread_create@kthread.h-->(返回一个task_struct)kthread_create_on_node{
 - 
