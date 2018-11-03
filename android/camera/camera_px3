@@ -1,18 +1,12 @@
 //====================================
 
-使用摄像头：
-*  Detect and Access Camera - 检测摄像头是否存在，并请求使用
-
-*  Create a Preview Class - 继承SurfaceView并实现接口SurfaceHolder，创建一个预览类。用来预览摄像头镜像
-
-*  Build a Preview Layout - 创建预览后，要创建一个视图布局用来在预览的同时使用户可以操作
-
-*  Setup Listeners for Capture - 链接监听器到界面控制，用来响应用户操作开是照相或录像
-
-*  Capture and Save Files - 捕获并保存输出的图像或视频
-
-*  Release the Camera - 使用完后必须正确释放摄像头
-
+使用camera流程{
+- public static Camera open (int cameraId)
+- void setParameters (Camera.Parameters params)
+- public final void setPreviewDisplay (SurfaceHolder holder)
+- public final void startPreview ()
+- public final void release ()
+}
 检测摄像头：
 context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA) //设备是否有摄像头功能
 

@@ -1,0 +1,15 @@
+//
+sdiom_packer_init-->sdiom_launch_thread{
+- kthread_create(tx_core_thread)
+- kthread_create(tx_trans_thread)
+- kthread_create(rx_core_thread)
+- kthread_create(rx_trans_thread)-->rx_trans_thread-->sdiom_rx_trans_task@sdiom_rx_trans.c
+}@sdiom_packer_main.c
+
+sdiom_rx_trans_task{
+- sdiom_rx_trans_down-->down(struct semaphore *sem) //等待信号
+- sdiom_rx_recvbuf_fill //填充数据
+}@sdiom_rx_trans.c
+
+kernel/drivers/misc/sprdwcn_bsp/sc2342/sdiom/sdiom_packer_main.c
+kernel/drivers/misc/sprdwcn_bsp/sc2342/sdiom/sdiom_rx_trans.c

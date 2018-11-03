@@ -39,15 +39,13 @@ frameworks/base/core/java/android/hardware/camera2/CameraDevice.java
 frameworks/base/core/java/android/hardware/camera2/CameraCaptureSession.java
 frameworks/base/core/java/android/hardware/camera2/impl/CameraDeviceImpl.java
 frameworks/base/core/java/android/hardware/camera2/legacy/CameraDeviceUserShim.java
-//=========================service
+//=========================cameraService
 /*
-  service通过hardware::camera::provider::V2_4::ICameraProvider获取
-  HIDL接口CameraProvider
-
+  service通过hardware::camera::provider::V2_4::ICameraProvider获取HIDL接口CameraProvider 
 */
 service cameraserver@cameraserver.rc-->main{
 - sm = defaultServiceManager()
-- CameraService::instantiate()-->publish-->sm->addService(getServiceName,new CameraService)@BinderService.h
+- CameraService::instantiate()-->publish-->sm->addService(getServiceName("media.camera"),new CameraService)@BinderService.h
 }@main_cameraserver.cpp
 
 
@@ -62,7 +60,7 @@ CameraService::onFirstRef{
 }@CameraService.cpp
 
 //初始化provider
-CameraProviderManagerinitialize(CameraService listener,ServiceInteractionProxy sHardwareServiceInteractionProxy ){
+initialize(CameraService listener,ServiceInteractionProxy sHardwareServiceInteractionProxy ){
 - mListener=listener
 - mServiceProxy
 - mServiceProxy->registerForNotifications(this)--> //注册监听器
@@ -80,8 +78,8 @@ frameworks/native/include/binder/BinderService.h
 frameworks/av/services/camera/libcameraservice/CameraService.cpp
 frameworks/av/services/camera/libcameraservice/common/CameraProviderManager.cpp
 frameworks/av/services/camera/libcameraservice/common/CameraProviderManager.h
-//================================HAL provider device
-interface ICameraProvider {//provider
+//================================HAL Service
+interface ICameraProvider {//provider接口
 - setCallback(ICameraProviderCallback callback)
 - getVendorTags()
 - getCameraIdList()
@@ -91,7 +89,7 @@ interface ICameraProvider {//provider
 }
 
 service vendor.camera-provider-2-4 /vendor/bin/hw/android.hardware.camera.provider@2.4-service_64
-@android.hardware.camera.provider@2.4-service_64.rc-->main-->defaultPassthroughServiceImplementation<ICameraProvider>("legacy/0")
+@android.hardware.camera.provider@2.4-service_64.rc-->main-->defaultPassthroughServiceImplementati on<ICameraProvider>("legacy/0")
 @service.cpp
 
 
@@ -100,14 +98,14 @@ HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
 - mModule = new CameraModule(rawModule)
 - mModule->init()
 - mModule->setCallbacks(this)
-- addDeviceNames
+- mModule->getNumberOfCameras //获取camera个数
+- 遍历,mModule->getCameraInfo(i)
 }@CameraProvider.cpp
 
 
-hardware/interfaces/camera/provider/2.4/default/service.cpp
-hardware/interfaces/camera/provider/2.4/default/CameraProvider.cpp
 
-//device interface
+
+//device
 ICameraDeviceSession{
 - configureStreams_3_4
 - processCaptureRequest_3_4
@@ -118,5 +116,8 @@ ICameraDeviceCallback{
 }
 
 
+
+hardware/interfaces/camera/provider/2.4/default/service.cpp
+hardware/interfaces/camera/provider/2.4/default/CameraProvider.cpp
 hardware/interfaces/camera/device/3.4/default/CameraDevice.cpp
 hardware/interfaces/camera/device/3.4/default/CameraDeviceSession.cpp

@@ -1,17 +1,25 @@
-hardware中各个模块都编译成动态库，在使用某个模块时再加载。
+//hardware中各个模块都编译成动态库，在使用某个模块时再加载。
 
-1，hw_get_module-->hw_get_module_by_class(根据ID名(audio_policy,..)，查找相应的库，并加载)
--->load(打开库)-->dlsym(获取hw_module_t)
-(所有的模块都有一个名为HAL_MODULE_INFO_SYM的结构体)@hardware.c
+1，hw_get_module(ID)-->hw_get_module_by_class{
+- 构建库名name = ID.[prop] //ro.product.board,ro.hardware
+- 加载库,load(name){
+	- dlopen(path)//打开库
+	- hmi = dlsym(HAL_MODULE_INFO_SYM_AS_STR)//所有的模块都有一个名为HAL_MODULE_INFO_SYM的结构体
+	- 
+	}
+}@hardware.c
 
 2，(获取hw_module_t后可调用其中的函数methods)methods.open(打开模块，设置设备函数)-->设置hw_device_t
+
+	hmi.open
 
 3，通过hw_device_t操作
 
 int access(const char *pathname, int mode)是否有权限访问一个文件，可以访问返回0
 hardware/libhardware/hardware.c
-____________________________
-模块的实现：
+
+
+//模块的实现：
 1，实现一个名为HAL_MODULE_INFO_SYM结构体.(加载对应的模块库后，获取这个名的结构体)
 
 ____________________________

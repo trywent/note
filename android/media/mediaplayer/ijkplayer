@@ -1,0 +1,24 @@
+//
+
+IjkMediaPlayer-->this(sLocalLibLoader)-->
+initPlayer(libLoader){
+- loadLibrariesOnce(libLoader){
+	- libLoader.loadLibrary("ijkffmpeg");
+        - libLoader.loadLibrary("ijksdl");
+        - libLoader.loadLibrary("ijkplayer");
+	}
+- initNativeOnce-->native_init
+- native_setup
+}@IjkMediaPlayer.java
+
+{
+void start() throws IllegalStateException;
+void stop() throws IllegalStateException;
+void pause() throws IllegalStateException;
+}@IjkMediaPlayer.java
+
+
+ijkplayer/ijkplayer-java/src/main/java/tv/danmaku/ijk/media/player/IjkMediaPlayer.java //java player
+ijkplayer/ijkmedia/ijkplayer/android/ijkplayer_jni.c     //jni
+ijkplayer/ijkmedia/ijkplayer/android/ijkplayer_android.c //android c player
+ijkplayer/ijkmedia/ijkplayer/ijkplayer.c //player

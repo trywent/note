@@ -1,0 +1,30 @@
+//isp(Image Signal Processing，即图像信号处理。主要用来对前端图像传感器输出信号处理的单元，以匹配不同厂商的图象传感器)
+lens 将光信号投射到sensor 的感光区域后，sensor 经过光电转换，将Bayer 格式的原始图像送给ISP，
+ISP 经过算法处理，输出RGB 空间域的图像给后端的视频采集单元
+
+
+
+
+//cif(camera insterface)
+
+
+//csi (CMOS Sensor Interface)
+
+
+CSI: mipi csi host controller;
+DSI: mipi dsi host controller;
+DCAM: support camera interface process, image resizing and rotation;
+ISP: support image signal processing for data from sensor;
+JPG: support compression and decompression for YUV image data;
+CPP: camera post processor;
+DPU: display processor unit, support osd and 6 layer blending and support write back;
+SFBCD:data streame decompression unit
+PDAF相位对焦：它的全称是PhaseDetectionAutoFocus
+
+
+
+
+
+
+
+

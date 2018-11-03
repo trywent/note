@@ -72,6 +72,7 @@ kernel/arch/arm/mach-rk30/devices.c
 
 出错：
 debug> fiq debugger mode 
+debug> console
 
 serial_rk_interrupt-->serial_rk_handle_port-->(寄存器信息)rk29_uart_dump_register
 

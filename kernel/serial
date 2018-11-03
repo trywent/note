@@ -101,6 +101,8 @@ tty_ioctl{
 }@tty_io.c
 
 
+uart_ops.startup
+
 ======================
 //写入数据并传送
 tty_fops.write-->tty_write{
@@ -112,7 +114,8 @@ tty_fops.write-->tty_write{
 
 ======================
 //收到数据并读取
-tty_struct.buf //driver保存数据的buffer
+#define N_TTY_BUF_SIZE 4096*2 @tty.h
+tty_port.buf //driver保存数据的buffer 
 
 
 //驱动保存数据
@@ -141,6 +144,12 @@ tty_flip_buffer_push{
 	}
 - schedule_work-->flush_to_ldisc //高延时
 }@tty_buffer.c
+
+//驱动读取数据错误
+handle_lsr_errors{
+- 帧错误,port->icount.frame++
+- overrun错误,port->icount.overrun++
+}
 
 //用户读取数据
 tty_fops.read-->tty_read{

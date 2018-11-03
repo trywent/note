@@ -22,11 +22,22 @@ driver{
 //=================struct v4l2_device
 注册：
 v4l2_device_register(struct device *dev, struct v4l2_device *v4l2_dev){
-- 初始化v4l2_device
+- INIT_LIST_HEAD(&v4l2_dev->subdevs)
+- v4l2_prio_init //初始化v4l2_prio_state
+- kref_init //引用计数
+- v4l2_dev->dev = dev
 - 设置设备名，若设备名为空则将从dev中获取设备名(驱动名+总线号)
 - dev_get_drvdata(dev)为空,设置dev-driver_data为v4l2_dev，dev_set_drvdata
 }
-注销：v4l2_device_unregister(struct v4l2_device *v4l2_dev); //会自动注销子设备
+注销：
+v4l2_device_unregister(struct v4l2_device *v4l2_dev){ 
+- v4l2_device_disconnect
+- list_for_each_entry_safe{ //遍历注销子设备
+	- v4l2_device_unregister_subdev(sd)//注销subdev
+	- client = v4l2_get_subdevdata(sd),i2c_unregister_device(client) //是i2c,注销该设备
+	- spi = v4l2_get_subdevdata(sd),spi_unregister_device(spi)
+	}
+}
 
 关联多媒体：
 - dev_set_drvdata()设置dev->driver_data指向包含v4l2_device实例的结构
@@ -145,8 +156,10 @@ v4l2_i2c_new_subdev_cfg
 v4l2_i2c_new_subdev_board
 
 //=================video_device
-真正的设备节点通过video_device创建
+/*真正的设备节点通过video_device创建
 
+video_device会关联
+*/
 动态创建：
 struct video_device *vdev = video_device_alloc();
 vdev->release = video_device_release; //必须设置,最后一个使用者退出时调用
@@ -181,17 +194,40 @@ media_entity_init(&vdev->entity, 1, pad, 0)
 热插拔设备执行v4l2_device_disconnect前也需获取锁
 
 //video_device 注册
-/*
-VFL_TYPE_GRABBER: videoX for video input/output devices
-VFL_TYPE_VBI: vbiX for vertical blank data (i.e. closed captions, teletext)
-VFL_TYPE_RADIO: radioX for radio tuners
-最后一个参数是设备变化，-1为自动选择。*/
-video_register_device(vdev, VFL_TYPE_GRABBER, -1)//注册
+video_register_device(vdev, VFL_TYPE_GRABBER, -1/*自动选择*/)-->__video_register_device{
+- name_base //根据类型设置名字,VFL_TYPE_GRABBER:video VFL_TYPE_VBI:vbi VFL_TYPE_RADIO:radio v4l-subdev swradio
+- minor_offset,minor_cnt //若是固定设备号,设置设备号范围
+- 设备号vdev->minor,编号vdev->num//查找并设置minor,若使用固定设备号每种设备都有固定范围
+//初始化字符设备
+- vdev->cdev = cdev_alloc
+- vdev->cdev->ops = &v4l2_fops
+- cdev_add(vdev->cdev, MKDEV(VIDEO_MAJOR, vdev->minor)
+//注册到sysfs
+- vdev->dev.class = &video_class
+- vdev->dev.devt = MKDEV(VIDEO_MAJOR, vdev->minor)
+- dev_set_name(&vdev->dev, "%s%d", name_base, vdev->num)
+- device_register(&vdev->dev)
+//注册到media
+- media_device_register_entity
+}
+
+//文件操作函数..最终调用到video_device->fops
+struct file_operations v4l2_fops = {
+- read-->vdev->fops->read
+- v4l2_write-->vdev->fops->write
+- v4l2_mmap-->vdev->fops->mmap
+- v4l2_ioctl-->vdev->fops->unlocked_ioctl
+}
+
 video_device_release()//注册失败,释放video_device struct。
 video_unregister_device(vdev)//注销
 media_entity_cleanup(&vdev->entity)//若初始了media entity在release中执行
 
-//打开debug,向下面属性文件写数据
+
+
+kernel/drivers/media/v4l2-core/v4l2-dev.c
+
+//=================打开debug,向下面属性文件写数据
 /sys/class/video4linux/<devX>/dev_debug
 
 video_device helper functions

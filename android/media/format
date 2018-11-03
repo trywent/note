@@ -1,3 +1,8 @@
+//多媒体容器
+mkv、rmvb、avi、MP4、flv、wmv
+
+
+
 //视频数据编码格式？H.264
 国际上制定视频编解码技术的组织有两个:
 一个是“国际电联（ITU-T）”，它制定的标准有H.261、H.263、H.263+等
@@ -6,17 +11,13 @@
 H.264，同时也是MPEG-4第十部分，是由ITU-T视频编码专家组（VCEG）和ISO/IEC动态图像专家组（MPEG）联合组成的联合视频组（JVT，Joint Video Team）提出的高度压缩数字视频编解码器标准。这个标准通常被称之为H.264/AVC（或者AVC/H.264或者H.264/MPEG-4 AVC或MPEG-4/H.264 AVC
 
 
-//文件格式？mkv、rmvb、avi、MP4、flv、wmv
-h.264是mp4的一种编码 它既是ITU-T的H.264，又是ISO/IEC的MPEG-4高级视频编码（Advanced Video Coding，AVC）
-MP4有多种编码：DivX、XviD、H.263、 MS MPEG-4 3688 、 Microsoft Video1 、Microsoft RLE
 
-=======================
-//音频编码
+
+
+//音频编码 压缩比为：aac>ogg>mp3(wma)>ape>flac>wav
 G.711也称为PCM（脉冲编码调制），16bits（采用16bits采样与存储）的PCM信号编码成8bits的样本进行传输
 
 
-
-//音频数据压缩。。压缩比为：aac>ogg>mp3(wma)>ape>flac>wav
 MP3(MPEG Audio Layer3)
 WMA(Windows Media Audio)
 WAV()

@@ -26,8 +26,18 @@ ici->nr                 = pdev->id;
 
 soc_camera_host_register(struct soc_camera_host *);
 
-//摄像头接口.通过v4l2-subdev API和host连接
-soc_camera_link
+
+//camera
+/*摄像头接口.通过v4l2-subdev API和host连接
+ 通过这个结构体说明连接的host.该结构体关联到i2c的平台数据
+ 通过soc_camera_i2c_to_link()可以获取该结构
+*/
+soc_camera_link{ 
+
+}
+
+soc_mbus_get_fmtdesc() //获取格式
+soc_camera_limit_side() //限制camera的大小
 
 //设置位置和大小(像素单位).一般host和sensor都可以设置位置大小.最好设置sensor,减少数据传输和计算
 VIDIOC_S_CROP
@@ -42,3 +52,86 @@ struct soc_camera_device{
 
 
 ioctl(VIDIOC_S_FMT) //设置图像格式
+
+//===================soc-camera
+//host 
+soc_camera_host_register(struct soc_camera_host *ici){
+- v4l2_device_register //注册v4l2_device
+- list_add_tail(&ici->list, &hosts) //加入到hosts
+- scan_of_host-->soc_of_bind{ //处理of nodes
+	- struct soc_camera_async_client *sasc;
+	- soc_camera_add_pdev
+	- sasc->notifier.complete = soc_camera_async_complete //初始化notifier
+	- v4l2_async_notifier_register(&sasc->notifier){
+		- 
+		- list_add(&notifier->list, &notifier_list)
+		- 遍历subdevice,list_for_each_entry_safe-->v4l2_async_test_notify
+		}@v4l2-async.c
+	}
+- scan_async_host-->scan_async_group //设置了asd_sizes
+- scan_add_host{ //其他
+	- list_for_each_entry(&devices)//遍历soc_camera_device
+	- soc_camera_probe
+	}
+
+}@soc_camera.c
+
+
+//创建并注册video_deivce
+v4l2_async_test_notify-->sasc->notifier.complete-->soc_camera_async_complete@v4l2-async.c
+/scan_add_host-->
+soc_camera_probe{
+- v4l2_ctrl_handler_init(&icd->ctrl_handler)//设置controler
+- video_dev_create //创建video_device
+- soc_camera_i2c_init{//配置了i2c boardinfo
+	- adap = i2c_get_adapter
+	- v4l2_i2c_new_subdev_board@v4l2-common.c //注册subdev
+	}
+- soc_camera_probe_finish{
+	- struct soc_camera_host *ici = to_soc_camera_host
+	- v4l2_ctrl_add_handler
+	- soc_camera_add_device
+	- soc_camera_video_start-->video_register_device //注册video_device
+	}
+}@soc_camera.c
+
+
+//subdev
+v4l2_async_register_subdev{ //主动注册
+- list_for_each_entry(notifier, &notifier_list)//遍历notifier_list
+- v4l2_async_test_notify{
+	- v4l2_device_register_subdev(notifier->v4l2_dev)
+	- notifier->complete
+	}
+- list_add(&sd->async_list, &subdev_list) //加入subdev_list
+}
+
+v4l2_i2c_new_subdev-->v4l2_i2c_new_subdev_board{ //设备树注册
+- i2c_new_probed_device/i2c_new_device
+- i2c_get_clientdata
+- v4l2_device_register_subdev
+}
+
+
+//soc_camera driver
+soc_camera_pdrv_probe{//"soc-camera-pdrv"设备探测到
+- struct soc_camera_device *icd = devm_kzalloc //创建soc_camera
+- platform_set_drvdata 
+- soc_camera_device_register(icd)-->list_add_tail(&devices)//加入到device链表
+}@soc_camera.c
+
+
+module_platform_driver(soc_camera_platform_driver)-->
+soc_camera_platform_probe{
+-
+- struct soc_camera_platform_priv *priv = devm_kzalloc
+- struct soc_camera_platform_info *p = pdev->dev.platform_data
+- v4l2_subdev_init(&priv->subdev, &platform_subdev_ops) //初始化subdevice
+- v4l2_device_register_subdev(&ici->v4l2_dev, &priv->subdev) //注册subdevice
+}@soc_camera_platform.c
+
+
+kernel/drivers/media/platform/soc_camera/soc_camera.c
+kernel/drivers/media/platform/soc_camera/soc_camera_platform.c
+kernel/drivers/media/v4l2-core/v4l2-common.c
+kernel/drivers/media/v4l2-core/v4l2-async.c

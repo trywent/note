@@ -1,0 +1,74 @@
+//host
+
+module_platform_driver-->
+sprd_img_probe{
+- misc_register(&image_dev) //"sprd_image"
+- sprd_cam_pw_domain_init
+- sprd_dcam_parse_dt
+- sprd_isp_parse_dt
+- sprd_dcam_drv_init{
+	- dcam_mod_lock //设置各种lock
+	}@dcam_drv.c
+- sprd_isp_drv_init{
+	- isp_mod_lock //各种锁
+	}@isp_drv.c
+}@dcam_core.c
+
+
+//sensor
+sprd_sensor_core_module_init{
+- sprd_sensor_register_driver
+- csi_api_mipi_phy_cfg
+- misc_register(&sensor_dev) //"sprd_sensor"
+- device_create_file //创建sys文件
+}@sprd_sensor_core.c
+
+
+sprd_sensor_file_ioctl
+
+
+sprd_sensor_file_ioctl-->sprd_sensor_io_if_cfg{
+- sprd_sensor_mipi_if_open-->csi_api_open
+- sprd_sensor_mipi_if_close
+}
+
+//cpp
+module_init(sprd_cpp_init)-->platform_driver_register(&sprd_cpp_driver)
+-->sprd_cpp_probe{
+- 初始化sprd_cpp_dev
+- misc_register(&sprd_cpp_dev->md) //"sprd_cpp"
+}@cpp_core.c
+
+
+kernel/drivers/misc/sprd_camera/dcam/dcam_if_r3p0v2/dcam_core.c
+kernel/drivers/misc/sprd_camera/dcam/dcam_if_r3p0v2/dcam_drv.c
+kernel/drivers/misc/sprd_camera/dcam/isp_r6p10v2/isp_drv.c
+kernel/drivers/misc/sprd_camera/sensor/sprd_sensor_core.c
+kernel/drivers/misc/sprd_camera/cpp/lite_r1p0/cpp_core.c
+
+//=======================HAL
+HAL_MODULE_INFO_SYM{
+- common = hw_module_t camera_common {
+	- id = CAMERA_HARDWARE_MODULE_ID
+	- methods = mModuleMethods
+	}
+- get_number_of_cameras =get_number_of_cameras
+- get_camera_info = get_camera_info
+- set_callbacks = set_callbacks
+- get_vendor_tag_ops = get_vendor_tag_ops
+- open_legacy = HAL_open_legacy
+- set_torch_mode = setTorchMode
+}@SprdCamera3Hal.cpp
+
+
+mModuleMethod0s.open-->camera_device_open{
+
+}@SprdCamera3Factory.cpp
+
+
+
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Hal.cpp
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Factory.cpp
+
+
+

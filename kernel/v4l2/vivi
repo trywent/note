@@ -70,3 +70,22 @@ kthread_run(vivi_thread)-->vivi_thread-->vivi_sleep{//循环执行vivi_sleep
 
 
 kernel/drivers/media/platform/vivi.c
+
+
+
+//====================v4l2-pci-skeleton
+module_pci_driver(skeleton_driver)-->
+skeleton_probe{
+- 
+- v4l2_device_register
+//handler
+- v4l2_ctrl_handler_init,v4l2_ctrl_new_std
+- skel->v4l2_dev.ctrl_handler = hdl
+//queue
+- q = &skel->queue, q->ops = &skel_qops
+- vb2_queue_init(q)
+//video_deivce
+- vdev->fops = &skel_fops,vdev->queue = q
+- vdev->v4l2_dev = &skel->v4l2_dev //关联v4l2_dev
+- video_register_device(vdev
+}
