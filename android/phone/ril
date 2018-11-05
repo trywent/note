@@ -1,218 +1,48 @@
 //
-RIL会接收底层传来的消息，再调用已经注册的registrant，通过handler发送消息通知到每个注册者。
-同样也可发送消息到底层。
-
-makeDefaultPhone@PhoneFactory.java-->new RIL(初始化接收，发送者)-->RILReceiver.start()@RIL.java
-
-_1_____
-注册数据链接监听(CDMA，GSM)：
-makeDefaultPhone@PhoneFactory.java-->new CDMAPhone-->init@CDMAPhone.java-->
-CdmaDataConnectionTracker-->(注册各种信息监听)p.mCM.registerForDataNetworkStateChanged
-@CdmaDataConnectionTracker.java-->registerForDataNetworkStateChanged@BaseCommands.java
-
--1.2---
-注册服务状态监听：
-makeDefaultPhone@PhoneFactory.java-->new CDMAPhone-->initSstIcc@CDMAPhone.java-->
-new CdmaServiceStateTracker-->(注册各种信息监听)cm.setOnSignalStrengthUpdate(监听信号强度)
-@CdmaServiceStateTracker.java
-
-_2_____
-上报消息(将消息发送到监听者)：
-RILReceiver.run(循环读取socket中消息)-->processResponse-->(processSolicited)processUnsolicited
-(读取命令类型,执行相应处理)-->(若是数据链接状态变化)mDataNetworkStateRegistrants.notifyRegistrants@RIL.java
--->notifyRegistrants-->internalNotifyRegistrants-->r.internalNotifyRegistrant@RegistrantList.java-->
-internalNotifyRegistrant-->h.sendMessage(发送改注册者的消息)@Registrant.java
 
 
-_3_____
-数据链接处理消息：
-handleMessage(处理底层消息)@CdmaDataConnectionTracker.java-->super.handleMessage-->
-(调用其他各种处理方法)onTrySetupData@DataConnectionTracker.java-->notifyDataConnection-->
-mPhone.notifyDataConnection@DataConnectionTracker.java-->notifyDataConnection-->
-(构造phone时传入的notifier)mNotifier.notifyDataConnection@PhoneBase.java-->notifyDataConnection
--->doNotifyDataConnection-->(通过注册机构服务“telephony.registry”)mRegistry.notifyDataConnection
-@DefaultPhoneNotifier.java-->notifyDataConnection-->broadcastDataConnectionStateChanged
-(发送ACTION_ANY_DATA_CONNECTION_STATE_CHANGED)@TelephonyRegistry.java
-
-监听移动数据链接：
-startMonitoring-->mContext.registerReceiver(ACTION_ANY_DATA_CONNECTION_STATE_CHANGED接收数据链接广播)
--->MobileDataStateReceiver.onReceive(接收数据链接的广播)@MobileDataStateTracker.java-->setDetailedState
--->mTarget.obtainMessage(EVENT_STATE_CHANGED).send@MobileDataStateTracker.java-->MyHandler.handleMessage
-(网络链接)-->handleConnect@ConnectivityService.java
-
--3.2----
-服务状态处理消息：(更新状态)
-handleMessage(处理底层传来的各种消息)-->pollState(查询服务状态)-->cm.getOperator(EVENT_POLL_STATE_OPERATOR_CDMA)
-@CdmaServiceStateTracker.java-->getOperator-->RILRequest.obtain(RIL_REQUEST_OPERATOR).send
-(创建并发送RIL请求)-->RILSender.obtainMessage.send(EVENT_SEND)-->RILSender.handleMessage
-(使用socket发送请求)-->RILReceiver.run(接收socket返回的数据)-->processResponse-->processSolicited
--->rr.mResult.sendToTarget(发送消息)@RIL.java-->handleMessage==>handlePollStateResult-->
-pollStateDone(更新数据链接，服务等状态)-->phone.notifyServiceStateChanged@CdmaServiceStateTracker.java
--->notifyServiceStateChanged@CDMAPhone.java-->notifyServiceStateChangedP-->
-mNotifier.notifyServiceState@PhoneBase.java-->notifyServiceState-->mRegistry.notifyServiceState
-@DefaultPhoneNotifier.java-->notifyServiceState-->r.callback.onServiceStateChanged@TelephonyRegistry.java
 
 
--3.3----
-GSM消息处理：
-
-handleMessage(处理底层消息)-->pollState-->(通过操作cm.getOperator)handlePollStateResult-->pollStateDone
-
-原因:查询没有返回值(EVENT_POLL_STATE_REGISTRATION)
-
-frameworks/base/core/java/android/os/Registrant.java//注册机构，通过传入的handler，发送消息给注册者
-frameworks/base/core/java/android/os/RegistrantList.java//Registrant的容器，(数据链接，信号强度)
-====================================
-获取phone服务：
-mContext.getSystemService(Context.TELEPHONY_SERVICE)-->fetcher.getService-->
-createService-->TelephonyManager@ContextImpl.java
-
-regitry服务：
-ServiceManager.addService("telephony.registry", new TelephonyRegistry(context))@SystemServer.java
-
-监听状态(网络模式，信号强度)：
-(注册监听)listen-->sRegistry.listen@TelephonyManager-->listen@TelephonyRegistry
-
-updateConnectivity-->updateTelephonySignalStrength@NetworkController.java
-
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkController.java
-------------------
-注册监听：
-handleMessage(EVENT_REQUEST_VOICE_RADIO_TECH_DONE)-->updatePhoneObject-->deleteAndCreatePhone-->CallManager.getInstance().registerPhone@PhoneProxy.java-->
-
-registerPhone-->registerForPhoneStates(注册各种监听)-->phone.registerForServiceStateChanged@CallManager.java
-
-registerForServiceStateChanged@CallManager.java
-
-处理返回消息：
-mHandler.handleMessage(EVENT_SERVICE_STATE_CHANGED)-->mServiceStateChangedRegistrants.notifyRegistrants@CallManager.java
+================
+AT命令：
+at_open{
+- 设置处理函数，s_unsolHandler
+- 创建读线程，pthread_create(readerLoop)-->readerLoop{
+	- 读取，readline
+	- 是多行消息isSMSUnsolicited，再次读取readline，并处理s_unsolHandler
+	- 处理，processLine
+	}
+}@atchannel.c
+hardware/ril/reference-ril/atchannel.c
 
 
-handlePollStateResult
-------------------
-=================================
-命令接口：
 
-{
-sPhoneNotifier = new DefaultPhoneNotifier();//构造通知
-sCommandsInterface = new RIL(context, networkMode, cdmaSubscription);//构造命令接口
-new xxPhone(...sCommandsInterface,sPhoneNotifier);//构造phone
-}@PhoneFactory.java
-
-
-ril函数初始化：
-static const RIL_RadioFunctions s_callbacks = {
-    RIL_VERSION,
-    onRequest,
-    currentState,
-    onSupports,
-    onCancel,
-    getVersion
-};
-
-
-ril处理消息：
-processCommandBuffer-->pRI->pCI->dispatchFunction-->(根据命令获取相应的处理函数)s_commands[request])
--->dispatchFunction-->dispatchVoid-->s_callbacks.onRequest@ril.cpp
-onRequest(处理各种请求)-->requestRegistrationState(处理RIL_REQUEST_VOICE_REGISTRATION_STATE)@reference-ril.c
-
-pollState-->
-getVoiceRegistrationState(obtainMessage(EVENT_POLL_STATE_REGISTRATION,...))@GsmServiceStateTracker.java
--->getVoiceRegistrationState-->send(发送RIL_REQUEST_VOICE_REGISTRATION_STATE)-->(返回错误)
-processSolicited-->onError(输出错误消息，REQUEST_NOT_SUPPORTED)@RIL.java
-
-应该是GENERIC_FAILURE
-
+库：由个模块厂家实现
+RIL_Init{
+- 初始s_rilenv
+- 从参数获取串口，s_device_path
+- 创建线程，pthread_create( mainLoop)-->mainloop{
+	- 打开串口ttyUSBx
+	- 开启新线程，监听串口中消息，at_open
+	- 回调RIL_requestTimedCallback(initializeCallback)-->s_rilEnv.RIL_requestTimedCallback
+	}
+}
 hardware/ril/reference-ril/reference-ril.c
-=================================
-//网络状态获取
-
-//networkAttributes@config.xml定义了网络监听类型。
-new ConnectivityService{
-- 遍历mPriorityList{
-	- tracker = netFactory.createTracker //创建track
-	- mNetTrackers[targetNetworkType] =tracker //初始化track 
-	}
-
-}
-
-//开始监听网络状态
-new ConnectivityService(初始化各种数据链接，装入mNetTrackers)@SystemServer.java-->
-mNetTrackers[netType].startMonitoring(开始监听各种网络链接)@ConnectivityService.java
--->MobileDataStateTracker.startMonitoring{
-- INetworkManagementService.registerObserver(InterfaceObserver) //监听
-- mContext.registerReceiver(注册监听数据链接的广播)-->MobileDataStateReceiver.onReceive
-	-->setDetailedState-->msg.sendToTarget(EVENT_STATE_CHANGED)
-}@MobileDataStateTracker.java
-
-//网络返回网络状态，回调注册的监听器
-netd-->main-->NetlinkManager.start-->NetlinkHandler.start
-NetworkManagementService{//接收netd的消息
-- new NativeDaemonConnector(new NetdCallbackReceiver())
-- new Thread(NativeDaemonConnector)-->handleMessage@NativeDaemonConnector.java
-	-->NetdCallbackReceiver.onEvent{
-	- notifyInterfaceAdded
-	- notifyInterfaceRemoved
-	- notifyInterfaceStatusChanged
-	- notifyInterfaceLinkStateChanged
-	}
-}NetworkManagementService.java
-
-//ether 以太网处理监听
-NetworkStateTrackerHandler.handleMessage{
-- EVENT_STATE_CHANGED{
-	- state = info.getState()
-	- (state==DISCONNECTED)handleDisconnect
-	- (state==CONNECTED)handleDisconnect
-	}
-- EVENT_CONFIGURATION_CHANGED-handleConnectivityChange-->mClat.requiresClat
-}
-
-handleDisconnect/handleDisconnect-->handleConnectivityChange
 
 
-几种网络：
-MobileDataStateTracker.java: 
-EthernetDataTracker.java:
-NetworkStateTracker.java:
-DummyDataStateTracker.java:
-BluetoothTetheringDataTracker.java: 
 
-================================
-GSMPhone,CDMAPhone都继承PhoneBase
-
-PhoneFactory(创建GSM，CDMA等phone实例)
-
-makeDefaultPhone-->new PhoneProxy()
-
-PhoneProxy-->mCommandsInterface.registerForOn(EVENT_RADIO_ON,)-->handleMessage(EVENT_REQUEST_VOICE_RADIO_TECH_DONE)-->updatePhoneObject-->deleteAndCreatePhone(创建phone实例)-->PhoneFactory.getXXXXPhone@PhoneProxy.java
-
-frameworks/base/telephony/java/android/telephony/TelephonyManager.java
-frameworks/base/services/java/com/android/server/TelephonyRegistry.java
-frameworks/base/telephony/java/com/android/internal/telephony/DefaultPhoneNotifier.java
-frameworks/base/telephony/java/com/android/internal/telephony/PhoneBase.java
-frameworks/base/telephony/java/com/android/internal/telephony/PhoneFactory.java
-frameworks/base/telephony/java/com/android/internal/telephony/PhoneProxy.java
-frameworks/base/telephony/java/com/android/internal/telephony/cdma/CdmaServiceStateTracker.java
-frameworks/base/telephony/java/com/android/internal/telephony/cdma/CdmaDataConnectionTracker.java
-frameworks/base/telephony/java/com/android/internal/telephony/RIL.java
-frameworks/base/services/java/com/android/server/ConnectivityService.java
-frameworks/base/core/java/android/net/NetworkStateTracker.java
-frameworks/base/core/java/android/net/MobileDataStateTracker.java
-frameworks/base/services/java/com/android/server/TelephonyRegistry.java
-frameworks/base/telephony/java/com/android/internal/telephony/CallManager.java
-frameworks/base/services/java/com/android/server/NetworkManagementService.java
-frameworks/base/services/java/com/android/server/NativeDaemonConnector.java
-_______________________________
-CDMA(电信)，GSM(移动，联通)
-
-Handler(处理底层发送消息)-->ServiceStateTracker.java-->CdmaServiceStateTracker.java
-
-Handler(处理底层发送消息)-->DataConnectionTracker.java-->CdmaDataConnectionTracker.java
+加载库：
+service rild@init.c-->main{
+- 查找对应的库，rilLibPath
+- 解析参数   //-d AT服务的端口， -u 数据端口
+- 打开库，dlopen
+- 开始事件，RIL_startEventLoop
+- 查找库中的函数rilInit，dlsym(dlHandle, "RIL_Init")
+- 执行，rilInit-->RIL_Init
+- 注册函数，RIL_register
+}@rild.c
+hardware/ril/rild/rild.c
 
 
-获取RIL相关log，logcat -b radio
-frameworks/base/telephony/java/com/android/internal/telephony/cdma/CdmaServiceStateTracker.java
-frameworks/base/telephony/java/com/android/internal/telephony/ServiceStateTracker.java
-frameworks/base/telephony/java/com/android/internal/telephony/cdma/CdmaDataConnectionTracker.java
-frameworks/base/telephony/java/com/android/internal/telephony/DataConnectionTracker.java
+接口：
+hardware/ril/libril/ril.cpp

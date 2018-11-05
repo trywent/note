@@ -1,18 +1,22 @@
 //android.hardware.camera2
 {
+//创建cameraDevice
 - CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE)
 - CameraManager.getCameraIdList //获取摄像头id
 - CameraManager.getCameraCharacteristics (String cameraId) //获取摄像头属性，支持的图像格式大小
-- surfaceHolder.setFixedSize //设置surface
-- CameraManager.openCamera(cameraId,CameraDevice.StateCallback){   //打开摄像头,设置回调
-	- onOpened(cameraDevice) //回调打开成功,传入cameraDevice
-	- onDisconnected
+- CameraManager.openCamera(cameraId,CameraDevice.StateCallback)-->//打开摄像头,设置回调
+	CameraDevice.StateCallback{ //监听设备状体
+		- onOpened(cameraDevice) //回调打开成功,传入cameraDevice
+		- onDisconnected
 	}
-- CameraDevice.createCaptureSession(CameraCaptureSession.StateCallback){ //创建session。设置回调
-	- onConfigured //回调配置成功，传入CameraCaptureSession
+- surfaceHolder.setFixedSize //创建并设置surface，用于装填数据
+//创建CameraCaptureSession
+- CameraDevice.createCaptureSession(Surface,CameraCaptureSession.StateCallback)-->//创建session
+	CameraCaptureSession.StateCallback{ //监听session状态
+		- onConfigured //回调配置成功，传入CameraCaptureSession
 	}
-- CameraDevice.createCaptureRequest //创建请求
-- CameraCaptureSession.setRepeatingRequest/capture  //请求数据
+- CaptureRequest = CameraDevice.createCaptureRequest //创建请求
+- CameraCaptureSession.setRepeatingRequest/capture(CaptureRequest)  //请求数据
 }
 
 CameraManagerGlobal.getCameraService-->connectCameraServiceLocked{
