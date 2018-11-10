@@ -1,41 +1,96 @@
 //android.hardware.camera2
-{
-//创建cameraDevice
+使用camera{
 - CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE)
 - CameraManager.getCameraIdList //获取摄像头id
 - CameraManager.getCameraCharacteristics (String cameraId) //获取摄像头属性，支持的图像格式大小
-- CameraManager.openCamera(cameraId,CameraDevice.StateCallback)-->//打开摄像头,设置回调
-	CameraDevice.StateCallback{ //监听设备状体
-		- onOpened(cameraDevice) //回调打开成功,传入cameraDevice
-		- onDisconnected
+- CameraManager.openCamera(cameraId,CameraDevice.StateCallback){   //打开摄像头,设置回调
+	- onOpened(cameraDevice) //回调打开成功,传入cameraDevice
+	- onDisconnected
 	}
-- surfaceHolder.setFixedSize //创建并设置surface，用于装填数据
-//创建CameraCaptureSession
-- CameraDevice.createCaptureSession(Surface,CameraCaptureSession.StateCallback)-->//创建session
-	CameraCaptureSession.StateCallback{ //监听session状态
-		- onConfigured //回调配置成功，传入CameraCaptureSession
+- surfaceHolder.setFixedSize //设置surface
+//session种传入surface.当提交request后,sesion向每个request提供surface
+- CameraDevice.createCaptureSession(Surface,CameraCaptureSession.StateCallback){ //创建session。设置回调
+	- onConfigured //回调配置成功，传入CameraCaptureSession
 	}
-- CaptureRequest = CameraDevice.createCaptureRequest //创建请求
-- CameraCaptureSession.setRepeatingRequest/capture(CaptureRequest)  //请求数据
+- CameraDevice.createCaptureRequest //创建请求
+- CameraCaptureSession.setRepeatingRequest/capture  //请求数据
 }
 
+//cameraService
 CameraManagerGlobal.getCameraService-->connectCameraServiceLocked{
-- ServiceManager.getService(CAMERA_SERVICE_BINDER_NAME) //"media.camera"
+- cameraServiceBinder = ServiceManager.getService(CAMERA_SERVICE_BINDER_NAME) //"media.camera"
+- ICameraService cameraService = ICameraService.Stub.asInterface(cameraServiceBinder)
 - cameraService.addListener(this)
 }@CameraManager.java
 
 
-openCamera-->openCameraForUid-->openCameraDeviceUserAsync(callback){
-- new CameraDeviceImpl
-- 支持HAL3.2+{
-	- cameraService = CameraManagerGlobal.get().getCameraService //获取服务
-	- cameraService.connectDevice(callbacks, cameraId) //连接到服务
+//cameraDevice
+openCamera-->openCameraForUid-->openCameraDeviceUserAsync(cameraId,callback,handler{
+- deviceImpl= new CameraDeviceImpl{
+	- mCameraId = cameraId
+        - mDeviceCallback = callback
+        - mDeviceHandler = handler
+	}@CameraDeviceImpl.java
+- supportsCamera2ApiLocked-->supportsCameraApiLocked-->cameraService.supportsCameraApi(API_VERSION_2)
+- 支持API_VERSION_2{
+	- cameraUser = cameraService.connectDevice(callbacks, cameraId)--> //连接到服务
+		ICameraService.connectDevice
 	}
-- 老方式{
-	- CameraDeviceUserShim.connectBinderShim(callbacks, id)
+- 不支持API_VERSION_2{
+	- cameraUser = CameraDeviceUserShim.connectBinderShim(callbacks, id)
 	}
-- deviceImpl.setRemoteDevice(cameraUser) //本地设备关联到服务端
+- deviceImpl.setRemoteDevice(cameraUser){ //本地设备关联到服务端
+	- mRemoteDevice = new ICameraDeviceUserWrapper(remoteDevice)
+	- mDeviceHandler.post(mCallOnOpened){
+		- sessionCallback.onOpened
+		- mDeviceCallback.onOpened
+		}
+	- mDeviceHandler.post(mCallOnUnconfigured)
+	}@CameraDeviceImpl.java
 }@CameraManager.java
+
+//返回ICameraDeviceUser
+connectDevice{
+- mRemote.transact(Stub.TRANSACTION_connectDevice, _data, _reply, 0)
+- _result = android.hardware.camera2.ICameraDeviceUser.Stub.asInterface(_reply.readStrongBinder())
+- return result
+}@ICameraService.java
+
+
+/*CameraCaptureSession
+camrea输出目标:
+- SurfaceView
+- SurfaceTexture //openGL
+- MediaCodec.createInputSurface //录制
+- MediaRecorder.getSurface //录制
+- renderScript //YUV 数据
+- ImagerReader //RAW,未压缩YUV,压缩JPEG
+
+onConfigured(CameraCaptureSession) //camera配置可能需要几百毫秒,配置完调用该函数
+
+*/
+createCaptureSession(Surface,callback,handler,NORMAL_MODE)-->createCaptureSessionInternal{
+- configureSuccess = configureStreamsChecked(OutputConfiguration outputs){
+	- checkInputConfiguration(inputConfig) //检查当前camera是否支持inputconfig
+	- 遍历已经设置的config,mConfiguredOutputs{
+		- deleteList.add(streamId) //将不需要的配置移到deleteList
+		- outputs.remove(outConfig) //移除已经设置的config
+		}
+	- mDeviceHandler.post(mCallOnBusy)
+	- stopRepeating
+	- waitUntilIdle-->mRemoteDevice.waitUntilIdle //等待空状态
+	- mRemoteDevice.beginConfigure()//开始设置
+	- mRemoteDevice.createInputStream //设置input
+	- mRemoteDevice.deleteStream/mConfiguredOutputs.delete//移除需要删除的配置deleteList
+	- mRemoteDevice.createStream//配置outputs
+	- mDeviceHandler.post(mCallOnIdle/mCallOnUnconfigured)
+	}
+- 高速捕获,mCurrentSession = CameraConstrainedHighSpeedCaptureSessionImpl
+- 否则mCurrentSession = CameraCaptureSessionImpl
+}@CameraDeviceImpl.java
+
+
+//request
 
 
 frameworks/base/core/java/android/hardware/camera2/CameraManager.java
@@ -43,7 +98,10 @@ frameworks/base/core/java/android/hardware/camera2/CameraDevice.java
 frameworks/base/core/java/android/hardware/camera2/CameraCaptureSession.java
 frameworks/base/core/java/android/hardware/camera2/impl/CameraDeviceImpl.java
 frameworks/base/core/java/android/hardware/camera2/legacy/CameraDeviceUserShim.java
-//=========================cameraService
+frameworks/av/camera/aidl/android/hardware/ICameraService.aidl
+frameworks/av/camera/aidl/android/hardware/ICameraServiceListener.aidl
+out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/dotdot/av/camera/aidl/android/hardware/ICameraService.java
+//=========================CameraService
 /*
   service通过hardware::camera::provider::V2_4::ICameraProvider获取HIDL接口CameraProvider 
 */
@@ -76,12 +134,68 @@ initialize(CameraService listener,ServiceInteractionProxy sHardwareServiceIntera
 }@CameraProviderManager.cpp
 
 
+//支持的Api version
+supportsCameraApi(apiVersion){
+- deviceVersion = getDeviceVersion{
+	- getMultiCameraDeviceVersion //sprd
+	- mCameraProviderManager->getHighestSupportedVersion
+	}
+- deviceVersion == {//apiVersion==API_VERSION_1
+	CAMERA_DEVICE_API_VERSION_1_0
+	CAMERA_DEVICE_API_VERSION_3_0
+	CAMERA_DEVICE_API_VERSION_3_1
+	}
+- deviceVersion == {//apiVersion==API_VERSION_2
+	CAMERA_DEVICE_API_VERSION_3_2
+	CAMERA_DEVICE_API_VERSION_3_3
+	CAMERA_DEVICE_API_VERSION_3_4
+	}
+}
+
+//获取camerDevice
+connectDevice{
+- mRemote.transact(Stub.TRANSACTION_connectDevice, _data, _reply, 0)
+- _result = android.hardware.camera2.ICameraDeviceUser.Stub.asInterface(_reply.readStrongBinder())
+- return result
+}@ICameraService.java
+
+connectDevice(id,_aidl_return){
+- BpCameraService::connectDevice{//proxy
+	- remote()->transact(ICameraService::CONNECTDEVIC)//
+	- _aidl_ret_status = _aidl_status.readFromParcel(_aidl_reply)//读取
+	- _aidl_ret_status = _aidl_reply.readStrongBinder(_aidl_return)
+	}	
+- BnCameraService::onTransact(_aidl_data,_aidl_reply){//native
+	- CONNECTDEVICE-->connectDevice(id,&_aidl_return)
+	- _aidl_reply->writeStrongBinder(_aidl_return)
+	}
+}@ICameraService.cpp
+
+connectDevice(cameraCb,cameraId,ICameraDeviceUser* device)-->
+connectHelper(cameraCb,cameraId,API_2,client){
+- validateConnectLocked //检查权限
+- handleEvictionsLocked{ //关闭一些配置冲突的client
+	- getCameraState(cameraId)
+	- CameraClientManager::makeClientDescriptor(cameraId)
+	- mActiveClientManager.wouldEvict(clientDescriptor) //查找要关闭的client
+	- 遍历要断开的client,clientSp->notifyError(ERROR_CAMERA_DISCONNECTED)
+	- 
+	}
+- getDeviceVersion
+- makeClient(this, cameraCb,&client)
+- client->initialize(mCameraProviderManager)
+- device = client
+}@CameraService.cpp
+
+
 
 frameworks/av/camera/cameraserver/main_cameraserver.cpp
 frameworks/native/include/binder/BinderService.h
 frameworks/av/services/camera/libcameraservice/CameraService.cpp
 frameworks/av/services/camera/libcameraservice/common/CameraProviderManager.cpp
 frameworks/av/services/camera/libcameraservice/common/CameraProviderManager.h
+vendor/sprd/platform/frameworks/av/service/camera/libcameraservice/CameraServiceEx.cpp
+out/soong/.intermediates/frameworks/av/camera/libcamera_client/android_x86_64_silvermont_shared_core/gen/aidl/frameworks/av/camera/aidl/android/hardware/ICameraService.cpp
 //================================HAL Service
 interface ICameraProvider {//provider接口
 - setCallback(ICameraProviderCallback callback)

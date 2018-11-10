@@ -1,3 +1,4 @@
+//窗口的surface
 //更新AppWindowToken状态
 updateAllDrawnLocked
 
@@ -17,9 +18,16 @@ commitFinishDrawingLocked{
 
 _______________
 //创建surface
-relayoutWindow-->createSurfaceLocked{
-- 设置状态，DRAW_PENDING
-}
+relayoutWindow@WindowManagerService.java-->createSurfaceLocked{
+- mDrawState = DRAW_PENDING//设置状态
+- 设置width,height//从mWin中获取
+- mSurfaceControl = new SurfaceControl(width,height)
+- SurfaceControl.openTransaction
+- mSurfaceControl.setPosition
+- mSurfaceControl.setLayer
+- mSurfaceControl.setAlpha
+- SurfaceControl.closeTransaction
+}@@WindowStateAnimator.java
 
 窗口变化：
 updateResizingWindows-->(窗口方向变化)DRAW_PENDING
@@ -78,9 +86,6 @@ reclaimSomeSurfaceMemoryLocked{
 - mSurfaceControl = null;
 - mHasSurface = false
 }@WindowManagerService.java
-_______________
-_______________
-
 
 
 frameworks/base/services/java/com/android/server/wm/WindowAnimator.java

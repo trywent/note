@@ -1,4 +1,4 @@
-========================
+//========================
 Context:
 关于应用程序环境的全局信息的接口。它能够访问应用的资源和类，能够进行应用层的操作
 如，启动activity，发送广播，接收intent。
@@ -45,7 +45,19 @@ getTheme{
 
 设备默认主题：
 frameworks/base/core/res/res/values/themes_device_defaults.xml
+//========================systemService
+SystemServiceRegistry{
+- 
+- registerService(Context.WINDOW_SERVICE,WindowManagerImpl)
+- 
+}@SystemServiceRegistry.java
+
+getSystemService(name)@ContextImpl.java-->SystemServiceRegistry.getSystemService
+-->SYSTEM_SERVICE_FETCHERS.get(name)@SystemServiceRegistry.java
 
 
-frameworks/base/core/java/android/content/res/Resources.java
 
+
+frameworks/base/core/java/android/content/Context.java
+frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/core/java/android/app/SystemServiceRegistry.java

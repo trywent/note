@@ -1,2 +1,40 @@
 //
-lcd:Support YUV420/YUV422/ARGB8888/RGB565/AFBC-RGBA data format in each layer
+YUV格式有两大类：planar和packed。
+对于planar的YUV格式，先连续存储所有像素点的Y，紧接着存储所有像素点的U，随后是所有像素点的V。
+对于packed的YUV格式，每个像素点的Y,U,V是连续交*存储的
+YUV 4:4:4采样，每一个Y对应一组UV分量。 
+YUV 4:2:2采样，每两个Y共用一组UV分量。 
+YUV 4:2:0采样，每四个Y共用一组UV分量。 
+
+存储方式:
+1. YUVY 格式 （属于YUV422）
+2. UYVY 格式 （属于YUV422)
+3. YUV422P（属于YUV422）
+4. YV12，YU12格式（属于YUV420）
+5. NV12、NV21（属于YUV420)
+I420: YYYYYYYY UU VV    =>YUV420P
+YV12: YYYYYYYY VV UU    =>YUV420P
+NV12: YYYYYYYY UVUV     =>YUV420SP
+NV21: YYYYYYYY VUVU     =>YUV420SP
+
+{
+DEPTH16 //每个像素16bits(索引表颜色),最高3bits为数据有效性.1--0代表0/7--7/7
+DEPTH_POINT_CLOUD //立体像素4个浮点数,X, Y, Z 和有效性
+FLEX_RGBA_8888  //RGBA每个像素32
+FLEX_RGB_888
+JPEG            //压缩的JPEG.相机的输出格式
+NV16            //YCbCr视屏使用.建议改用YUV_420_888 
+NV21            //YCbCr相机默认预览格式.建议改用YUV_420_888 
+PRIVATE         //
+RAW10           //每个像素10bits,一般是拜耳数据..存储格式特殊
+RAW12           //每个像素12bits.
+RAW_PRIVATE
+RAW_SENSOR
+RGB_565
+UNKNOWN
+YUV_420_888     //YUV
+YUV_422_888
+YUV_444_888
+YUY2
+YV12
+}@android/graphics/ImageFormat

@@ -1,5 +1,10 @@
 //
 
+
+
+
+
+//=============9832
 l2cu_release_ccb-->l2cu_no_dynamic_ccbs-->btu_start_timer@l2c_utils.c
 
 
@@ -50,6 +55,7 @@ BTM_SecBondCancel-->btm_sec_send_hci_disconnect
 
 
 btm_sec_auth_complete
+
 //资料
 l2c_data_write-->l2c_csm_execute-->l2c_scm_open-->l2c_link_check_send_pkts-->
 l2c_link_send_to_lower-->bte_main_hci_send-->transmit_buf

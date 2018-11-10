@@ -73,8 +73,8 @@ setAppStartingWindow(IBinder token, String pkg,
 	- 若是悬浮窗口Window_windowIsFloating，返回
 	- 若显示壁纸Window_windowShowWallpaper，且壁纸窗口存在，返回	
 	}
-- 创建开始窗口数据，new StartingData
-- 发送创建消息ADD_STARTING，-->handleMessage(){
+- wtoken.startingData = new StartingData//创建开始窗口数据
+- ADD_STARTING，-->handleMessage(){ //创建startingWindow
 	- 创建窗口中View，mPolicy.addStartingWindow	
 	}
 }

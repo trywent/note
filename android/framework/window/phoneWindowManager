@@ -157,9 +157,15 @@ layoutWindowLw(WindowState){
 
 
 //starting窗口
-addStartingWindow{
-- win = PolicyManager.makeNewWindow
+addStartingWindow(IBinder appToken, String packageName, int theme,
+            CompatibilityInfo compatInfo, CharSequence nonLocalizedLabel, int labelRes,
+            int icon, int windowFlags) {
+- theme是否和context中主题不一致，则context中theme设置为theme
+- win = new PhoneWindow(context)//创建窗口
+- win.setIsStartingWindow(true)
 - win.setType(TYPE_APPLICATION_STARTING)
+- params.setTitle("Starting " + packageName) //设置名字
+- wm.addView(view, params)
 }@PhoneWindowManager.java
 =================
 设置overscan：

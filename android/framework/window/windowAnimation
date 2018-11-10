@@ -1,3 +1,4 @@
+//窗口动画
 WindowAnimator       //在windowManagerService中进行窗口切换的动画
 WindowStateAnimator  //在windowState中的动画效果
 AppWindowAnimator    //应用窗口动画

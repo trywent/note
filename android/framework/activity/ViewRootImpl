@@ -1,4 +1,12 @@
-加入窗口：
+//activity创建view
+performLaunchActivity@ActivityThread.java-->attach{
+- mWindow = PolicyManager.makeNewWindow(this)
+- mWindow.setCallback(this)
+- mWindow.getLayoutInflater().setPrivateFactory(this)
+}@Activity.java
+
+
+//创建rootView：
 handleResumeActivity-->(将activity的View加入到窗口)wm.addView(decor)@ActivityThread.java-->
 addView-->LocalWindowManager.addView(设置LayoutParams)-->super.addView@window.java-->
 CompatModeWrapper.addView-->mWindowManager.addView-->addView(View, ViewGroup.LayoutParams)
@@ -8,24 +16,38 @@ CompatModeWrapper.addView-->mWindowManager.addView-->addView(View, ViewGroup.Lay
 - 若是panel，找到改panel以来的窗口
 - 创建ViewRootImpl
 - 将ViewRootImpl，和要加入的View。加入对应的数组中
+- mViews.add(view)
+- mRoots.add(root)
+- mParams.add(wparams)
 - 执行root.setView
-}@WindowManagerImpl.java-->setView{
-- 请求布局requestLayout
-- 创建输入通道new InputChannel
-- 将窗口代理和窗口属性，加入到窗口管理器。sWindowSession.add(mWindow,mInputChannel) //窗口服务介入点
+}WindowManagerGlobal.java
 
+//在应用进程中创建
+ViewRootImpl{
+- mWindowSession = WindowManagerGlobal.getWindowSession() //获取一个session的代理(与windowManager通信)
+- loadSystemProperties
+}
+
+setView{
+- 判断surfaceHolder是由应用自己提供，还是使用系统
+- 使用系统的surfaceHolder，打开硬件加速enableHardwareAcceleration{
+	- 判断应用是否开启硬件加速，FLAG_HARDWARE_ACCELERATED
+	- 创建HardwareRenderer.createGlRenderer
+	}
+- requestLayout
+- 创建输入通道new InputChannel
+- mWindowSession.addToDisplay//加入窗口到WindowManager
+- 加入到窗口服务，mWindowSession.addToDisplay(window,inputChannel)//关联窗口服务
+- 输入事件是否有回调(一般没有)，willYouTakeTheInputQueue，有则{
+	- 设置mInputQueueCallback
+	- 设置mInputQueue
+	}
+- 若需要接收事件，创建事件接收器。WindowInputEventReceiver
 }@ViewRootImpl.java
 
 
-ViewRootImpl(在应用进程中创建)：
-ViewRootImpl{
-- getWindowSession //获取一个session的代理(与windowManager通信)
-
-}
-
-
 ================================
-view布局：
+//view布局：
 sendAppVisibilityToClients-->win.mClient.dispatchAppVisibility@AppWindowToken.java-->
 W.dispatchAppVisibility-->dispatchAppVisibility-->mHandler.sendMessage(MSG_DISPATCH_APP_VISIBILITY)
 -->handleAppVisibility(mAppVisible 发生变化)-->scheduleTraversals-->mChoreographer.postCallback
@@ -37,7 +59,7 @@ doCallbacks(Choreographer.CALLBACK_TRAVERSAL)-->c.run@Choreographer.java-->Trave
 -->doTraversal-->performTraversals{
 - 
 - 第一次执行{
-	- 设置期望窗口的高宽，(屏幕或应用自己说明)
+	- 设置高宽为res.getDisplayMetrics,desiredWindowWidth,desiredWindowHeight//(屏幕或应用自己说明)
 	- 初始attachInfo
 	- 获取最后配置，mLastConfiguration
 	- 设置contentIsert，fitSystemWindows	
@@ -50,9 +72,9 @@ doCallbacks(Choreographer.CALLBACK_TRAVERSAL)-->c.run@Choreographer.java-->Trave
 	- 否则{
 		- 判断mContentInsets是否变化
 		- 更新mAttachInfo.mVisibleInsets
-		- 设置期望高宽desiredWindowWidth，desiredWindowHeight 
+		- 设置期望高宽,desiredWindowWidth，desiredWindowHeight 
 		}
-	- 执行测量measureHierarchy
+	- 执行测量measureHierarchy(desiredWindowWidth, desiredWindowHeight)
 	}
 - 第一次或可视变化{
 	- 窗口是否自动调整大小(有输入窗口时)，保存属性在params		
@@ -62,8 +84,9 @@ doCallbacks(Choreographer.CALLBACK_TRAVERSAL)-->c.run@Choreographer.java-->Trave
 	- 若需布局，则测量measureHierarchy
 	}
 - 若mFirst || windowShouldResize || insetsChanged{
-	- 计算窗口relayoutWindow-->sWindowSession.relayout(mWindow){
+	- relayoutWindow-->sWindowSession.relayout(mWindow,mView.getMeasuredWidth,mView.getMeasuredHeight,mSurface){
 		- 设置了窗口，显示的帧mWinFrame，contentInsert
+		- 返回mSurface用于绘制
 		}
 	}
 - 若需要布局{
@@ -71,39 +94,28 @@ doCallbacks(Choreographer.CALLBACK_TRAVERSAL)-->c.run@Choreographer.java-->Trave
 	}
 }
 
-_________________________________
-服务端窗口变化：
-updateResizingWindows
 
-通知client窗口大小：
-performLayoutAndPlaceSurfacesLockedInner-->win.mClient.resized@WindowManagerService.java-->W.resized-->
-dispatchResized-->mHandler.sendMessage-->handleMessage(MSG_RESIZED_REPORT)(更新大小)@ViewRootImpl.java
-
-
-getContentInsetHintLw
 =================================
-测量布局：
+//measure设置view大小：rootView的大小值：DisplayMetrics packageMetrics = mView.getContext().getResources().getDisplayMetrics()
+performTraversals-->measureHierarchy(LayoutParams,desiredWindowWidth,desiredWindowHeight){
+- 布局为WRAP_CONTENT{
+	- com.android.internal.R.dimen.config_prefDialogWidth//若是对话框窗口限制对话框布局成全屏
+	- 计算baseSize
+	- 将值和模式值合并在一个变量中，getRootMeasureSpec(basesize,LayoutParams.width)
+	- performMeasure
+	}
 
-rootView的大小值：DisplayMetrics packageMetrics = mView.getContext().getResources().getDisplayMetrics()
-应该是在WindowManagerServcie.computeScreenConfigurationLocked设置。
-
-测量measure：
-
-performTraversals-->measureHierarchy-->performMeasure-->mView.measure@ViewRootImpl.java-->
-measureChildren-->measureChild-->child.measure@ViewGroup.java-->measure-->onMeasure-->setMeasuredDimension@View.java
-
-
-
-performMeasure-->mView.measure{
-- 
-	
-}
-
-
-
-performLayout-->host.layout(mView.layout){
-- 
-}
+- 普通窗口{
+	- 将值和模式值合并在一个变量中，getRootMeasureSpec(desiredWindowWidth,desiredWindowHeight)
+	- performMeasure(childWidthMeasureSpec, childHeightMeasureSpec)-->
+	performMeasure-->measure{
+		- 创建缓存，LongSparseLongArray
+		- 没有缓存，onMeasure-->setMeasuredDimension
+		- 存在缓存，setMeasuredDimension
+		- 测量值存入缓存，mMeasureCache.put
+		}@View.java
+	}
+}@ViewRootImpl.java
 
 
 _________________________________
@@ -117,6 +129,91 @@ getChildMeasureSpec{
 
 invalidateChildInParent
 
-_________________________________
-view:
+=================================
+//窗口大小变化，窗口移除
+服务端窗口变化：
+updateResizingWindows
 
+通知client窗口大小：
+performLayoutAndPlaceSurfacesLockedInner-->win.mClient.resized@WindowManagerService.java
+-->W.resized-->dispatchResized-->mHandler.sendMessage-->handleMessage(MSG_RESIZED_REPORT)
+(更新大小)@ViewRootImpl.java
+
+W.resized(传入大小参数)-->dispatchResized-->viewAncestor.dispatchResized-->
+dispatchResized{
+- mPendingOverscanInsets发生改变
+- sendMessage(MSG_RESIZED)-->requestLayout{
+	- 请求布局，mLayoutRequested
+	- scheduleTraversals
+	}
+	
+}
+
+scheduleTraversals-->TraversalRunnable.run-->doTraversal-->performTraversals{
+- 
+- 第一次布局或窗口大小,可见变化，relayoutWindow{
+	- mView.getMeasuredWidth/getMeasuredHeight //获取请求布局的宽高
+	- 获取帧大小并设置surface，mWindowSession.relayout(requestedWidth,requestedHeight,mSurface)
+	- 通知绘制完成，mWindowSession.finishDrawing
+	}
+}@ViewRootImpl.java
+
+
+performTraversals-->performDraw-->draw
+
+
+
+frameworks/base/core/java/android/view/WindowManagerImpl.java
+frameworks/base/core/java/android/view/WindowManagerGlobal.java
+frameworks/base/core/java/android/view/ViewRootImpl.java
+frameworks/base/services/java/com/android/server/wm/Session.java
+
+=================================
+//绘制：
+setAppVisibility-->wtoken.sendAppVisibilityToClients@WindowManagerService.java-->
+sendAppVisibilityToClients@AppWindowToken.java-->win.mClient.dispatchAppVisibility
+-->dispatchAppVisibility-->mHandler.sendMessage(MSG_DISPATCH_APP_VISIBILITY)-->
+handleAppVisibility{
+- mAppVisible
+- scheduleTraversals
+}@ViewRootImpl.java
+
+
+performTraversals-->performDraw--draw{
+- surface = mSurface //将数据绘制到mSurface.从windowManagerService返回
+- mHardwareRenderer没有创建则{
+	ttachInfo.mHardwareRenderer.initializeIfNeeded
+	}
+- 硬件attachInfo.mHardwareRenderer.draw(mView, attachInfo){
+	- buildDisplayList-->(View进行绘制)view.getDisplayList
+	- drawDisplayList
+	- onHardwarePostDraw@ViewRootImpl.java
+	- swapBuffers
+	}@HardwareRenderer.java
+- 软件drawSoftware(surface){
+	- canvas = mSurface.lockCanvas
+	- mView.draw{
+		- 绘制自己onDraw
+		- 绘制子View，dispatchDraw-->drawChild-->child.draw
+		}
+	- surface.unlockCanvasAndPost
+	}
+}
+
+getDisplayList{
+- 
+- 创建，mAttachInfo.mHardwareRenderer.createDisplayList
+- LAYER_TYPE_HARDWARE{
+	- 
+	- canvas.drawHardwareLayer
+ }LAYER_TYPE_SOFTWARE{
+	- buildDrawingCache
+	- 
+ }没有设置layer的情况{
+	- 跳过绘制，dispatchDraw
+	- draw
+ }
+- 
+}
+
+frameworks/base/core/java/android/view/HardwareRenderer.java

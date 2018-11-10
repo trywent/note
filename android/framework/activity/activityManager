@@ -8,6 +8,20 @@ systemReady{
 -  mStackSupervisor.resumeTopActivitiesLocked
 }
 
+//配置
+updateConfiguration{
+- values = mWindowManager.computeNewConfiguration() //计算配置
+- updateConfigurationLocked(values){
+	- mSystemThread.applyConfigurationToResources
+	- 遍历mLruProcesses{//遍历最近进程,更新资源
+	- ProcessRecord app = mLruProcesses.get(i)
+	- app.thread.scheduleConfigurationChanged(Configuration)-->
+		handleConfigurationChanged@ActivityThread.java--applyConfigurationToResourcesLocked(config)
+		}
+- mWindowManager.setNewConfiguration //更新窗口配置
+}@ActivityManagerService.java
+
+
 启动launcher：
 resumeTopActivitiesLocked@ActivityStackSupervisor.java-->resumeTopActivityLocked
 @ActivityStack.java-->resumeHomeActivity@ActivityStackSupervisor.java

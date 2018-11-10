@@ -1,15 +1,30 @@
 //
-WindowManagerService{
+startOtherServices@SystemServer.java-->WindowManagerService.main(mSystemContext)
+-->new WindowManagerService{
 - 
 - 获取动画速度，mWindowAnimationScale
-}
+}@WindowManagerService.java
 
-- activityManagerService启动时创建主stack
-- 启动activity时将对应token加入到windowManagerService,确定token在栈中位置
-- resumeActivity时将窗口，事件接收器加入到windowManagerService，执行布局，显示
+/*应用端
+ - 全局静态sDefaultWindowManager
+ - 创建rootViewImpl.通过mWindowSession与windowManagerService交互
+
+*/
+getSystemService("WindowManager")-->WindowManagerImpl@WindowManagerImpl.java-->
+static sDefaultWindowManager@WindowManagerGlobal.java
+
+_____________
+//计算config
+computeNewConfiguration-->computeNewConfigurationLocked-->
+computeScreenConfigurationLocked@WindowManagerService.java
+
+//更新config到activityManager
+startOtherServices@SystemServer.java-->displayReady-->mActivityManager.updateConfiguration
+@WindowManagerService.java-->updateConfiguration(null)@ActivityManagerService.java
+
+
 ==============
 //窗口管理
-
 加入栈：
 setWindowManager(默认栈)-->createStack@AcivityManagerService-->createStack{
 - 
@@ -69,14 +84,14 @@ die-->doDie-->dispatchDetachedFromWindow-->mWindowSession.remove@ViewRootImpl.ja
 ______________
 //设置应用开始窗口：
 startActivityLocked@ActivityStack.java-->
-setAppStartingWindow{
+setAppStartingWindow(transferFrom,createIfNeeded){
 - transferFrom不为空，使用前一个应用的开始窗口{
 	- 
 	}
 - sendMessage(ADD_STARTING)-->handleMessage(ADD_STARTING){
-	- 创建窗口并加入到窗口服务，mPolicy.addStartingWindow
+	- 创建窗口并加入到窗口服务，view = mPolicy.addStartingWindow
 	- 若已经加入了则移除，removeStartingWindowTimeout
-	- 设置wtoken.startingView为新窗口的View
+	- wtoken.startingView = View
 		
 	}
 }
@@ -91,11 +106,19 @@ mPolicy.removeStartingWindow
 ______________
 //设置应用窗口可见
 setAppVisibility{
-- 若设置了动画，加入mOpeningApps/mClosingApps
+- 找到窗口findAppWindowToken
+- 已经显示，且应用正在切换{
+	- 显示,加入到mOpeningApps
+	- 隐藏，加入到mClosingApps
+	}
 - 通知应用端使应用开始绘制，wtoken.sendAppVisibilityToClients-->dispatchAppVisibility
 	@AppWindowToken.java-->dispatchAppVisibility-->handleMessage(MSG_DISPATCH_APP_VISIBILITY)
 	-->handleAppVisibility@ViewRootImpl.java
-- setTokenVisibilityLocked(设置窗口动画)
+- setTokenVisibilityLocked{//设置窗口动画
+	- 可见，设置动画TRANSIT_ENTER
+	- 隐藏，设置动画TRANSIT_EXIT
+	- 若需重新调整布局，performLayoutAndPlaceSurfacesLocked
+	}
 - wtoken.updateReportedVisibilityLocked
 }
 
@@ -215,17 +238,18 @@ newDisplayContentLocked{
 
 
 
-relayoutWindow{
+relayoutWindow(Session,Surface outSurface){
 - 设置显示(viewVisibility == View.VISIBLE){
 	- toBeDisplayed，设置动画applyEnterAnimationLocked
-	- 创建surface，winAnimator.createSurfaceLocked。传递到ViewRootImp(outSurface)
+	- 创建surface，winAnimator.createSurfaceLocked。
+	- outSurface.copyFrom(surfaceControl)//传递到ViewRootImp(outSurface)
 	}否则{
 	- 
 	- 清除surface，outSurface.release()
 	}
 - 获取systemui设置，systemUiVisibility
 - 设置窗口大小到View，outFrame.set(win.mCompatFrame)
-}
+}@WindowManagerService.java
 
 
 
@@ -320,3 +344,4 @@ assignLayersLocked{
 adjustWallpaperWindowsLocked
 
 frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/core/java/android/view/WindowManagerGlobal.java
