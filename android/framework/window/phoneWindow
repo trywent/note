@@ -1,4 +1,4 @@
-activity窗口的建立：
+//activity窗口的建立：
 //创建的窗口用来保存应用窗口的布局信息
 performLaunchActivity(初始化activity，并启动)-->activity.attach@ActivityThread.java-->
 attach(设置activity相关信息，context,app,title){
@@ -16,20 +16,25 @@ mDecor = generateDecor()-->new DecorView@PhoneWindow.java
 onCreate@Activity-->setContentView{
 - view容器为空mContentParent，installDecor{
 		- 创建mDecor，generateDecor	
-		- 创建容器mContentParent，generateLayout(mDecor){
+		- 创建容器mContentParent = generateLayout(mDecor){
 			- 
 			- 从mDecor中查找mContentParent(是mDecor本身或子类)，
 				contentParent = (ViewGroup)findViewById(ID_ANDROID_CONTENT)
 			- 
 		}
-		-
+		- decorContentParent = mDecor.findViewById(R.id.decor_content_parent)//ActionBarOverlayLayout.java
+		- mDecorContentParent = decorContentParent
 	}
 - 根据view的资源id装入View，mLayoutInflater.inflate(layoutResID, mContentParent)
 }@PhoneWindow.java
 
+setLogo(id)-->mDecorContentParent.setLogo@PhoneWindow.java-->setLogo(id)-->mDecorToolbar.setLogo
+@ActionBarOverlayLayout.java-->setLogo-->setLogo(getContext().getDrawable(resId))-->
+setLogo(Drawable)@Toolbar.java
+
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindow.java
-
-
+frameworks/base/core/java/com/android/internal/widget/ActionBarOverlayLayout.java
+frameworks/base/core/java/android/widget/Toolbar.java
 _______________________
 获取contentInset，侧边：
 setView-->sWindowSession.add(..mAttachInfo.mContentInsets..)@ViewRootImpl.java

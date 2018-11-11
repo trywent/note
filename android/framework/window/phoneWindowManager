@@ -1,4 +1,11 @@
 //
+mPolicy = new PhoneWindowManager()@WindowManagerService.java
+WindowManagerService-->initPolicy-->mPolicy.init@WindowManagerService.java-->
+init(mContext,this){
+- mContext = context
+- mWindowManager = windowManager
+}@PhoneWindowManager.java
+
 setInitialDisplaySize{
         if(SystemProperties.get("ro.fytorientation.portrait","false").equals("true")) {//fyt 
             mStatusBarHeight =SystemProperties.getInt("ro.fystatusbar",60);
@@ -155,6 +162,22 @@ layoutWindowLw(WindowState){
 - 计算大小，win.computeFrameLw(pf, df, of, cf, vf, dcf)
 }
 
+/** 
+inset距离上下左右边框的值。计算时减除可得可用的空间
+outContentInsets //去除systemui的inset。考虑当前systemui是否可见
+outStableInsets  //去除systemui的inset
+outOutsets   //一直不可见部分。模具被挡？
+**/
+getInsetHintLw(outContentInsets,outStableInsets,outOutsets){
+- outset = ScreenShapeHelper.getWindowOutsetBottomPx //获取底部outset高度
+- outOutsets.bottom +=outset
+- (FLAG_LAYOUT_IN_SCREEN | FLAG_LAYOUT_INSET_DECOR){//全屏布局
+	- outContentInsets.set
+	}
+
+//
+- outStableInsets.set(mStableLeft, mStableTop,availRight - mStableRight, availBottom - mStableBottom)
+}
 
 //starting窗口
 addStartingWindow(IBinder appToken, String packageName, int theme,
@@ -164,9 +187,17 @@ addStartingWindow(IBinder appToken, String packageName, int theme,
 - win = new PhoneWindow(context)//创建窗口
 - win.setIsStartingWindow(true)
 - win.setType(TYPE_APPLICATION_STARTING)
+- win.setDefaultIcon(icon)
+- win.setDefaultIcon(logo)-->
 - params.setTitle("Starting " + packageName) //设置名字
 - wm.addView(view, params)
 }@PhoneWindowManager.java
+
+//移除starting
+removeAppStartingWindow-->scheduleRemoveStartingWindowLocked-->hanldeMessage(REMOVE_STARTING)
+-->mPolicy.removeStartingWindow@WindowManagerService.java-->removeStartingWindow(window)-->
+m.removeView(window)@PhoneWindowManager.java
+
 =================
 设置overscan：
 //开机设置

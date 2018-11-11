@@ -1,3 +1,5 @@
+//DVB - Digital Video Broadcasting 数字视频广播
+//VBI - Vertical Blanking Interval 场消隐期(利用视频的场消隐期发送文字信息)
 //Structure of a driver
 ---------------------
 

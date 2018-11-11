@@ -15,6 +15,7 @@ ContextImpl{
 - mContentResolver = new ApplicationContentResolver
 }@ContextImpl.java
 
+//android6.1
 getTopLevelResource(resDir,overlayDirs,libDir){
 - assets = new AssetManager
 - assets.addAssetPath(resDir)//设置资源路径
@@ -30,6 +31,15 @@ getTopLevelResource(resDir,overlayDirs,libDir){
 -->android_content_AssetManager_init@android_util_AssetManager.cpp-->
 addDefaultAssets-->addAssetPath("/system/framework/framework-res.apk")-->
 mAssetPaths.add@AssetManager.cpp
+
+//android7.1
+getTopLevelResources-->mResourcesManager.getResources@ActivityThread.java-->getResources{
+- new ResourcesKey(resDir,splitResDirs,overlayDirs,libDirs)
+- getOrCreateResources{
+	- 
+	- createResourcesImpl-->createAssetManager
+	}
+}@ResourcesManager.java
 
 //display信息：
 getDisplayMetricsLocked(DEFAULT_DISPLAY){
@@ -62,8 +72,13 @@ applyConfigurationToResourcesLocked{
 
 //获取值
 getDimensionPixelSize-->getValue-->mAssets.getResourceValue@Resource.java
--->loadResourceValue@AssetManager.java-->android_content_AssetManager_loadResourceValue
--->res.getResource
+
+//drawable
+getDrawable-->getResources().getDrawable(id, getTheme())@Context.java-->getDrawable{
+- impl.getValue(id, value, true) //获取value
+- mResourcesImpl.loadDrawalbe-->loadDrawalbe(id,value)@ResourcesImpl.java
+}@Resources.java
+
 
 //查找对应id的View：
 findViewById-->getWindow().findViewById(id)@Activity.java-->findViewById-->
@@ -80,10 +95,40 @@ AssetManager{
 - ensureSystemAssets-->init(true)//系统资源
 }
 
-init{
+//初始化
+init@AssetManager.java-->android_content_AssetManager_init{
+- am = new AssetManager()
+- am->addDefaultAssets()-->addDefaultAssets{//加入系统默认资源
+	- addAssetPath("framework/framework-res.apk")-->mAssetPaths.add
+	}
+- env->SetLongField(clazz, gAssetManagerOffsets.mObject,am)
+}@android_util_AssetManager.cpp
 
-}
+//设置config
+setConfiguration@AssetManager.java-->android_content_AssetManager_setConfiguration@android_util_AssetManager.cpp
+setConfiguration(config, locale8){
+- mConfig = config
+- setLocaleLocked(locale)
+}@AssetManager.cpp
 
+
+//加入资源路径
+addAssetPath-->addAssetPathInternal-->addAssetPathNative@AssetManager.java
+android_content_AssetManager_addAssetPath@android_util_AssetManager.cpp-->
+addAssetPath{
+
+}@AssetManager.cpp
+
+getValue(id,value,true/*resolve*/)@Resouces.java-->getResourceValue-->loadResourceValue@AssetManager.java
+-->android_content_AssetManager_loadResourceValue(jint ident,jshort density, jobject outValue,jboolean resolve){
+- res= am->getResources(true)-->getResTable{
+	- loadFileNameCacheLocked
+	- mResources = new ResTable()
+	- 遍历资源路径mAssetPaths，appendPathToResTable(mAssetPaths.itemAt(i))
+	}
+- res.getResource(ident, &value, density,&config)
+- res.resolveReference(&value, block, &ref, &typeSpecFlags, &config)
+}android_util_AssetManager.cpp
 
 
 
@@ -92,9 +137,11 @@ frameworks/base/core/java/android/app/ResourcesManager.java
 frameworks/base/core/java/android/app/LoadedApk.java
 frameworks/base/core/java/android/hardware/display/DisplayManagerGlobal.java
 frameworks/base/core/java/android/content/res/Resources.java
+frameworks/base/core/java/android/content/res/ResourcesImpl.java
 frameworks/base/core/java/android/content/res/AssetManager.java
 frameworks/base/core/jni/android_util_AssetManager.cpp
 frameworks/base/libs/androidfw/AssetManager.cpp
+frameworks/base/libs/androidfw/ResourceTypes.cpp
 ==================
 
 

@@ -1,30 +1,27 @@
-//videox操作接口  https://linuxtv.org/downloads/v4l-dvb-apis-new/uapi/v4l/v4l2.html
-
-#include <fcntl.h>
-
-int open(const char *device_name, int flags)
-int ioctl(int fd, int request, void *argp)
-int close(int fd)
-
-//查询设备功能。open后必须的操作
-int ioctl(int fd, VIDIOC_QUERYCAP, struct v4l2_capability *argp)
+//V4L2操作接口
+通用流程
+1. 打开设备
+2. 设置设备属性，选择一个视频/音频输入设备，视频标准，图片亮度..
+3. 协商设置数据格式
+4. 获取输入/输出处理函数
+5. 循环处理输入/输出数据
+6. 关闭设备
 
 
-/*输入设备有很多，cvbs，s-video，sensor*/
-/*查询当前设备输入，输出设备的信息 ioctl(fd, VIDIOC_ENUMINPUT, struct v4l2_input)
-  查询支持的视频格式
-*/
-VIDIOC_ENUMINPUT ，VIDIOC_ENUMOUTPUT 
-//查询当前输入输出设备号 ioctl(fd, VIDIOC_G_INPUT, &index)
-VIDIOC_G_INPUT and VIDIOC_G_OUTPUT 
-//设置当前输入输出 ioctl(fd, VIDIOC_S_INPUT, &index)
- VIDIOC_S_INPUT and VIDIOC_S_OUTPUT 
-
-//tuner 调谐器(选台)
+设备编号是随机，除非配置CONFIG_VIDEO_FIXED_MINOR_RANGES
 
 
-//modulator 调制器(output)
+VIDIOC_QUERYCAP //查询设备功能。open后必须的操作
+VIDIOC_G_PRIORITY and VIDIOC_S_PRIORITY //获取权限值，设置权限
+VIDIOC_ENUMINPUT and ioctl VIDIOC_ENUMOUTPUT //设备的输入输出属性(设备类型，功能)
+VIDIOC_G_INPUT and VIDIOC_G_OUTPUT  //获取当前的input/output的编号
+VIDIOC_S_INPUT and VIDIOC_S_OUTPUT  //选择input/output
 
+VIDIOC_ENUMAUDIO and VIDIOC_ENUMAUDOUT  //音频设备属性
+ 
+VIDIOC_G_TUNER and VIDIOC_S_TUNER //获取tuner 调谐器(input，信号解调？). radio只有一个tuner
+VIDIOC_G_MODULATOR and VIDIOC_S_MODULATOR//modulator 调制器(output)
+VIDIOC_G_FREQUENCY and VIDIOC_S_FREQUENCY //设置或获取（tuner/modulator）频率
 
 
 //支持的视屏格式标准
