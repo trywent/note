@@ -244,6 +244,7 @@ com.android.internal.R.styleable.WindowAnimation_wallpaperOpenExitAnimation//17
 com.android.internal.R.styleable.WindowAnimation_wallpaperCloseEnterAnimation//18
 com.android.internal.R.styleable.WindowAnimation_wallpaperCloseExitAnimation//19
 
+target/common/R/com/android/internal/R.java
 ____________________
 属性动画
 <set

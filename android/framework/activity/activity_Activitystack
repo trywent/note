@@ -5,8 +5,6 @@ mWaitingActivityLaunched   //等待activity启动完成结果的进程集合
 mStoppingActivities      //将要执行stop的activity
 mFinishingActivities     //将要结束的activity
 
-
-
 onCreate - onDestroy //完整生命周期
 onStart - onStop   //可见
 onResume - onPause //用户可交互
@@ -73,8 +71,7 @@ activityPausedLocked-->completePauseLocked{
 
 }@ActivityStack.java
 
-___________
-finish:
+//finish:
 finish-->ActivityManagerNative.getDefault().finishActivity@Activity.java-->
 finishActivity@ActivityManagerService.java-->requestFinishActivityLocked-->
 finishActivityLocked{
@@ -93,10 +90,23 @@ finishCurrentActivityLocked{
 	}
 }@ActivityStack.java
 
-___________
-stop:
+//stop:
 activityIdleInternalLocked@ActivityStackSupervisor.java-->stopActivityLocked-->
 
+=====================
+/* configuration
+ 每个ActivityStack拥有一个mOverrideConfig,分屏时每个stack中的窗口都不一样
+ 将stack中的mOverrideConfig应用到栈中的每个应用
+*/
+resizeStackLocked{
+- overrideConfig = mWindowManager.resizeStack(stackId, bounds) //获取新配置
+- updateOverrideConfiguration(overrideConfig)-->mOverrideConfig= overrideConfig@ActivityStack.java//更新配置
+}ActivityStackSupervisor.java
 
-___________
-ensureActivitiesVisibleLocked
+//更新配置
+ensureActivityConfigurationLocked-->scheduleActivityConfigurationChanged(mOverrideConfig)
+@ActivityStack.java
+
+//更新配置
+relaunchActivityLocked-->scheduleRelaunchActivity(mConfiguration,mOverrideConfig)@ActivityStack.java
+

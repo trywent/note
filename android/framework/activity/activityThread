@@ -10,11 +10,19 @@ ApplicationThread{
 startProcessLocked@ActivityManagerService.java-->Process.start("android.app.ActivityThread")-->
 main{
 - 设置looper，Looper.prepareMainLooper()
-- attach-->(关联到服务端)mgr.attachApplication(mAppThread)-->attachApplicationLocked
-	@ActivityManagerService.java-->bindApplication-->handleBindApplication{
-	- 
-	}
-	
+- attach(system){
+	- !system{
+		- ViewRootImpl.addFirstDrawHandler
+		- ActivityManagerNative.getDefault().attachApplication(mAppThread)
+		}
+	- system{
+		- mInstrumentation = new Instrumentation()
+		- getSystemContext()-->ContextImpl.createSystemContext(this)
+		- ContextImpl.createAppContext(getSystemContext().mPackageInfo)		
+		- mInitialApplication = context.mPackageInfo.makeApplication
+		}
+	- ViewRootImpl.addConfigCallback
+	}@ActivityThread.java
 - 设置sMainThreadHandler
 - Looper.loop
 }@ActivityThread.java
@@ -74,6 +82,24 @@ handleCreateService{
 
 //idle状态
 activityIdleInternal-->activityIdleInternalLocked
+
+
+//更新configuration.资源配置
+scheduleActivityConfigurationChanged(overrideConfig)-->sendMessage(H.ACTIVITY_CONFIGURATION_CHANGED)
+-->handleActivityConfigurationChanged-->performConfigurationChanged(activity,configuration){
+- activity.onConfigurationChanged(config){
+	- mWindow.onConfigurationChanged
+	- mActionBar.onConfigurationChanged
+	}@Activity.java
+- activity.mCurrentConfig = new Configuration(config)
+}@ActivityThread.java
+
+updateConfigurationLocked-->app.thread.scheduleConfigurationChanged(configuration)@ActivityManagerService.java-->
+scheduleConfigurationChanged-->sendMessage(H.CONFIGURATION_CHANGED-->handleConfigurationChanged
+-->applyConfigurationToResourcesLocked(更新mResConfiguration)@ActivityThread.java
+updateConfiguration-->updateConfiguration@Resources.java
+
+
 
 ================
 startActivity(Intent)-->startActivity(Intent,Bundle)-->

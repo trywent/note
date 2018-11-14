@@ -1,4 +1,4 @@
-=============================================
+//=============================================
 开始launcher:
 ActivityManagerService.self().systemReady@SystemServer.java-->systemReady-->
 mMainStack.resumeTopActivityLocked@ActivityManagerService.java-->resumeTopActivityLocked-->

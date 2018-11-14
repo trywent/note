@@ -1,39 +1,37 @@
 //========================
 Context:
-关于应用程序环境的全局信息的接口。它能够访问应用的资源和类，能够进行应用层的操作
-如，启动activity，发送广播，接收intent。
 
-ContextWrapper extends Context:
-是另一个context的代理，所有的操作都是通过传入的另一context进行。这个类的功能是，
-可以继承这个类改变其中的操作，而不改变原始的context。
+ContextWrapper extends Context
+ContextThemeWrapper extends ContextWrapper //封装了对theme的操作。
 
-ContextThemeWrapper extends ContextWrapper :
-封装了对theme的操作。
-
-________________________
-systemServer中初始context:
+//系统context：
+//android4.4
 context = ActivityManagerService.main(factoryTest)@SystemServer.java-->main-->
 at.getSystemContext()@ActivityManagerService.java-->(ActivityThread.systemMain开始的主线程)
 -->getSystemContext-->ContextImpl.createSystemContext(this)@ActivityThread.java-->
 createSystemContext-->init(初始化资源，主线程，mContentResolver)@ContextImpl.java
 
+//android6.0
+getSystemContext()-->ContextImpl.createSystemContext(this)@ActivityThread.java
+-->createSystemContext{
+- packageInfo = new LoadedApk
+- context = new ContextImpl //创建context
+- context.mResources.updateConfiguration
+}ContextImpl.java
 
-mContentResolver = new ApplicationContentResolver@ContextImpl.java
+//应用context
+performLaunchActivity-->createBaseContextForActivity-->ContextImpl.createActivityContext
+@ActivityThread.java-->
+createActivityContext{
+- context = new ContextImpl //创建context
+}ContextImpl.java
 
-----------------------
-系统context：
-systemMain(创建ActivityThread)-->attach(创建app，和context)@ActivityThread.java
-
-
-----------------------
-应用的context：
-main(创建ActivityThread)-->attach-->mgr.attachApplication(mAppThread)@ActivityThread.java
--->attachApplication-->attachApplicationLocked(设置app线程)@ActivityManagerService.java
-
-performLaunchActivity(创建context)@ActivityThread.java-->attach@Activity.java-->attachBaseContext
-(设置context)@ContextThemeWrapper.java
-
-获取主题：
+//startingWindow.根据packageName创建context
+createPackageContext-->createPackageContextAsUser{
+- LoadedApk pi = mMainThread.getPackageInfo(packageName)
+- new ContextImpl(this, mMainThread, pi)
+}@ContextImpl.java
+//获取主题：
 getTheme{
 - 根据目标sdk获取资源，Resources.selectDefaultTheme{
 		- selectDefaultTheme{
@@ -45,17 +43,23 @@ getTheme{
 
 设备默认主题：
 frameworks/base/core/res/res/values/themes_device_defaults.xml
-//========================systemService
+
+//========================获取系统服务systemService
 SystemServiceRegistry{
 - 
 - registerService(Context.WINDOW_SERVICE,WindowManagerImpl)
 - 
 }@SystemServiceRegistry.java
 
+
+//获取系统服务
 getSystemService(name)@ContextImpl.java-->SystemServiceRegistry.getSystemService
 -->SYSTEM_SERVICE_FETCHERS.get(name)@SystemServiceRegistry.java
 
 
+//获取packageManager
+getPackageManager-->ActivityThread.getPackageManager()@ContextImpl.java
+-->IPackageManager.Stub.asInterface(ServiceManager.getService("package"))@ActivityThread.java
 
 
 frameworks/base/core/java/android/content/Context.java

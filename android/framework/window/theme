@@ -1,10 +1,10 @@
-android-sdk-linux/docs/guide/topics/ui/themes.html
+//android-sdk-linux/docs/guide/topics/ui/themes.html
 
 style:作用在view上的显示属性
 theme:作用在activity和app的显示属性
 
-文件位置：res/values/*.xml
-访问方法：@style/*.xml
+文件位置：res/values/ *.xml  
+访问方法：@style/ *.xml  
 可继承：<style name="xxx" parent="@android:style/yyy">
 继承自己定义的style：<style name="yyy.xxx"> //xxx继承自yyy
 
@@ -31,7 +31,7 @@ getTheme{
 activity设置自定义themem：
 performLaunchActivity{
 - r.activityInfo.getThemeResource
--  activity.setTheme(theme)
+- activity.setTheme(theme)
 }
 
 应用主题：

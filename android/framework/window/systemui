@@ -143,7 +143,9 @@ start{
 setSystemUiVisibility-->H.handleMesssage(MSG_SET_SYSTEMUI_VISIBILITY/MSG_SHOW_RECENT_APPS)-->mCallbacks.get(i)
 @CommandQueue.java-->setSystemUiVisibility{
 - computeStatusBarMode
-- notifyUiVisibilityChanged
+- notifyUiVisibilityChanged-->statusBarVisibilityChanged-->adjustSystemUiVisibilityLw@WindowManagerService.java-->
+	adjustSystemUiVisibilityLw@PhoneWindowManager.java-->adjustSystemUiVisibilityLw-->
+	setBarShowingLw-->mWin.showLw@BarController.ja
 }@StatusBar.java
 
 //调用systemui接口

@@ -34,7 +34,7 @@ RuntimeInit.zygoteInit{
 	- TimeZone.setDefault
 	}
 - nativeZygoteInit
-- applicationInit(com.android.server.SystemServer)-->invokeStaticMain(className){
+- applicationInit(com.android.server.SystemServer)-->invokeStaticMain(className){//执行main函数
 	- Class.forName(className)//class
 	- throw new ZygoteInit.MethodAndArgsCaller-->MethodAndArgsCaller.run-->mMethod.invoke
 	}@ZygoteInit.java	

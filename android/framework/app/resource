@@ -5,6 +5,8 @@ PRODUCT_AAPT_PREF_CONFIG := xhdpi
 ldpi
 mdpi  //density 160
 hdpi
+
+resource ID是一个32位数.格式为:PPTTNNNN. PP资源包; TT资源类型; NNNN资源名. 应用中PP值为0x7f
 ===================
 //创建
 ContextImpl{
@@ -146,6 +148,8 @@ frameworks/base/libs/androidfw/ResourceTypes.cpp
 
 
 
+
+target/common/R/com/android/internal/R.java
 
 //设置displayInfo中appWidth
 computeScreenConfigurationLocked-->mPolicy.getNonDecorDisplayWidth@WindowManagerService.java

@@ -1,0 +1,21 @@
+//
+parsePackage{
+- 目录parseClusterPackage{
+	- PackageLite lite = parseClusterPackageLite(packageDir)
+	- assets = new AssetManager()
+	- loadApkIntoAssetManager(assets, lite.baseCodePath)-->assets.addAssetPath(apkPath)
+	- pkg = parseBaseApk(baseApk, assets)
+	}
+- 文件parseMonolithicPackage{
+	
+	}
+}@PackageParser.java
+
+
+
+frameworks/base/core/java/android/content/pm/PackageParser.java
+frameworks/base/core/java/android/app/ApplicationPackageManager.java
+frameworks/base/core/java/android/content/pm/PackageManager.java
+frameworks/base/core/java/android/content/pm/PackageItemInfo.java
+
+

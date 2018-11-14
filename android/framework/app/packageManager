@@ -1,0 +1,260 @@
+//=====================================
+//LI必须获得锁lock install。LP必须获得锁lock package
+package服务:
+startBootstrapServices-->PackageManagerService.main@SystemServer.java-->
+main/*加入系统服务ServiceManager.addService("package", m)*/-->
+PackageManagerService{
+- mPackageDexOptimizer = new PackageDexOptimizer(this)
+- mHandlerThread = new ServiceThread
+- mAppDataDir,mAppInstallDir...//初始化目录
+- frameworkFiles = frameworkDir.list(){//遍历/system/framework/下jar
+	- libPath = new File(frameworkDir, frameworkFiles[i])
+	- mInstaller.dexopt(libPath)
+	}
+- scanDirLI("/vendor/overlay")
+- scanDirLI("/system/framwork")
+...
+- 
+}@PackageManagerService.java
+
+
+startOtherServices{
+- mPackageManagerService.performBootDexOpt
+- mPackageManagerService.systemReady
+}@SystemServer.java
+
+performBootDexOpt{
+- ms = PackageHelper.getMountService不为空{
+	- doTrim  = isUpgrade = isUpgrade() //是否执行优化
+	- doTrim //若超过默认时间也执行优化,3day
+	- ActivityManagerNative.getDefault().showBootMessage//非第一次启动,显示优化信息
+	- ms.runMaintenance() //执行优化
+	}
+- pkgs = mPackageDexOptimizer.clearDeferredDexOptPackages
+
+}@PackageManagerService.java
+
+systemReady{
+
+}@PackageManagerService.java
+
+
+scanDirLI(dir/*遍历dir下文件*/)-->
+scanPackageLI(file){
+- pp = new PackageParser()
+- PackageParser.Package pkg = pp.parsePackage(scanFile)
+- 初始化pkg.applicationInfo //设置代码路径,资源路径
+- scanPackageLI(pkg)-->scanPackageDirtyLI//解包Package
+}@PackageManagerService.java
+
+scanPackageDirtyLI(Package pkg){
+- 
+- mActivities.add(activity)
+}@PackageManagerService.java
+
+//dexopt
+将apk加入要dex的容器：
+scanPackageLI(PackageParser.Package, parseFlags, scanMode, currentTime)-->scanPackageDirtyLI
+-->performDexOptLI(若!forceDex && defer则将apk加入容器)
+
+
+-->performDexOptLI-->mInstaller.dexopt@PackageManagerService.java-->
+dexopt(发送命令dexopt)-->execute-->transaction-->(mOut是连接"installd"地址套接字的输出流)mOut.writeCommand
+@Installer.java-->
+
+installd守护程序：
+main-->accept(接收消息)-->execute(处理消息，执行cmds[i].func)-->(若是dexopt命令)do_dexopt@install.c
+-->dexopt-->run_dexopt-->execl(执行"/system/bin/dexopt")@commands.c-->main-->fromZip-->
+processZipFile-->extractAndProcessZip@OptMain.cpp-->dvmContinueOptimization-->rewriteDex@DexPrepare.cpp
+
+
+vm虚拟机:
+main@Main.cpp-->JNI_CreateJavaVM@Jni.cpp-->dvmStartup-->processOptions@Init.cpp
+
+dalvik/dexopt/OptMain.cpp
+dalvik/vm/analysis/DexPrepare.cpp
+dalvik/vm/Init.cpp
+
+______________________
+外部存储扫描：
+onDaemonConnected-->mPms.scanAvailableAsecs()@MountService.java-->scanAvailableAsecs-->
+updateExternalMediaStatusInner@PackageManagerService.java-->getSecureContainerList@PackageHelper.java
+-->getSecureContainerList@MountService.java-->executeForList("asec", "list")@NativeDaemonConnector.java
+--通过socket-->AsecCmd::runCommand-->AsecCmd::listAsecsInDirectory("/mnt/secure/asec")@CommandListener.cpp
+-->返回.asec文件列表
+
+挂载/mnt/secure/asec/xxx.asec文件到/mnt/asec/xxx：
+updateExternalMediaStatusInner-->loadMediaPackages-->AsecInstallArgs.doPreInstall-->
+PackageHelper.mountSdDir@PackageManagerService.java-->getMountService().mountSecureContainer
+@PackageHelper.java-->Connector.execute@MountService.java-->execute.NativeDaemonConnector.java-->
+(通过socket)-->mountAsec(创建/mnt/asec/xxx挂载点)@VolumeManager.cpp
+
+安装codePath，scanPackageLI(File)
+
+——————————————————————
+
+应用的设置mSetting:
+PackageManagerService-->new Settings()@PackageManagerService.java-->this(Environment.getDataDirectory())
+-->(创建/data/system文件夹，在文件夹中创建package***.xml文件)Settings("/data")@Settings.java
+
+
+readLPw(优先使用backsetting)--readPackageLPw(读取<package>标签中的内容，如果是sharedId加入PendingPackage)
+--getPackageLPw(处理PendingPackage，将)-->(package被重命名?)mRenamedPackages.put@Settings.java
+
+readLPw-->mRenamedPackages.put
+
+writeLPr--写package.xml(将原来的设置package.xml保存到packages-backup.xml)--
+写package.list
+
+getPackageLPw(处理packageSetting，)-->addPackageSettingLPw(保存packageSetting)-->mPackages.put
+
+addPackageLPw-->mPackages.put
+
+//创建应用id：
+newUserIdLPw--Process.FIRST_APPLICATION_UID + i(查找mUserIds中没有用的的id值i，再加上10000)@Setting.java
+
+
+frameworks/base/services/java/com/android/server/pm/Settings.java
+//读取偏好设置：
+startActivityMayWait-->resolveActivity@ActivityStack.java-->resolveIntent-->
+chooseBestActivity(查找合适的app，没有找到则返回选择对话框)-->findPreferredActivity
+(查找以前选择过的app)@PackageManagerService.java
+
+保存偏好应用设置:
+onButtonClick-->startSelected-->onIntentSelected-->getPackageManager().
+addPreferredActivity@ResolverActivity.java-->addPreferredActivity(将偏好保存)
+->scheduleWriteSettingsLocked-->mHandler.sendEmptyMessageDelayed(WRITE_SETTINGS..)
+-->PackageHandler.sendEmptyMessageDelayed-->handleMessage-->doHandleMessage-->
+mSettings.writeLPr@PackageManagerService.java-->writeLPr-->writePreferredActivitiesLPr
+@Setting.java
+
+//替换偏好设置
+replacePreferredActivity@PackageManagerService.java
+
+ApplicationPackageManager
+
+相关文件：
+data/system/packages.xml
+data/system/packages-backup.xml
+data/system/packages.list
+================================
+解析package中activity,service,provider,BroadcastReceiver信息：
+
+//收集保存activity信息：
+ActivityIntentResolver.addActivity-->ActivityIntentResolver.addFilter@PackageManagerService.java-->
+addFilter(保存activity中的过滤器信息)-->(分类过滤信息)register_intent_filter--register_mime_types
+@IntentResolver.java
+
+//查询activity
+resolveIntent-->queryIntentActivities(Intent intent, int flags){
+- ComponentName comp = intent.getComponent()
+- comp不为空,getActivityInfo(comp, flags, userId){
+	- PackageParser.Activity a = mActivities.mActivities.get(component)
+	- PackageParser.generateActivityInfo(a)
+	}
+- packageName为空{
+	- querySkipCurrentProfileIntents
+	- mActivities.queryIntent(intent)
+	}
+- 通过packageName获取,mPackages.get(pkgName)
+}@PackageManagerService.java
+
+//service
+resolveService-->queryIntentServices(Intent intent, int flags)@PackageManagerService.java
+//broadcast
+queryBroadcastReceivers(Intent intent, int flags)
+//provider
+queryContentProviders(String processName,int uid, int flags)
+
+
+广播会自动设置FLAG_EXCLUDE_STOPPED_PACKAGES，过滤掉stop状态的app。
+解析intent：
+resolveIntent(传入当前用户ID，一般为0)-->queryIntentActivities-->ActivityIntentResolver.queryIntent-->
+super.queryIntent@PackageMangerService.java-->queryIntent-->(保存满足条件的目标)
+buildResolveList@IntentResolver.java
+
+
+scanPackageLI{
+
+}
+
+解析AndroidManifest.xml
+parseApplication{
+
+- 解析provider，parseProvider并加入owner.providers.add
+}
+
+
+
+
+
+
+
+================================
+开机提示：Android is upgrading...
+run{
+- startBootstrapServices-->PackageManagerService.main
+- startOtherServices-->mPackageManagerService.performBootDexOpt
+}@SystemServer.java
+//扫描模式scanMode = SCAN_MONITOR | SCAN_NO_PATHS | SCAN_DEFER_DEX | SCAN_BOOTING
+main-->PackageManagerService-->scanDirLI-->scanPackageLI-->performDexOptLI{
+- dalvik.system.DexFile.isDexOptNeeded-->Dalvik_dalvik_system_DexFile_isDexOptNeeded
+	@dalvik_system_DexFile.cpp-->dvmDexCacheStatus@JarFile.cpp
+}
+
+dvmDexCacheStatus{
+- 查看apk路径下是否有odex文件
+- 没有则解压apk，dexZipFindEntry
+- 获取cache文件路径，/data/dalvik-cache/system@app@appname@
+}
+@dalvik/vm/native/dalvik_system_DexFile.cpp
+@dalvik/vm/JarFile.cpp
+
+ServerThread.run()-->pm.performBootDexOpt(处理mDeferredDexOpt中的apk)@SystemServer.java
+-->performBootDexOpt-->(不是第一次启动)ActivityManagerNative.getDefault().showBootMessage
+@PackageManagerService.java-->showBootMessage-->mWindowManager.showBootMessage
+@ActivityManagerService.java-->showBootMessage(判断是否要显示消息)-->mPolicy.showBootMessage
+@WindowManagerService.java-->showBootMessage{
+- 若没有创建则创建new ProgressDialog().setMessage
+- 已经创建则设置消息字符，setMessage
+}@PhoneWindowManager.java
+
+
+结束动画打开显示：
+showBootMessage-->performEnableScreen(判断是否是显示启动消息，是否系统还没有启动)-->
+mPolicy.enableScreenAfterBoot@ActivityManagerService.java
+
+
+
+-----------------
+判断是否显示消息：
+mAllowBootMessages=WindowManagerService.mAllowBootMessages=WMThread.mAllowBootMessages
+=WindowManagerService.main(!firstBoot)=PackageManagerService.isFirstBoot//不是第一次启动允许显示消息框
+
+WindowManagerService.main(!firstBoot)@System_server.java-->main-->new WMThread(传入allowBootMsgs)-->
+WMThread.run(设置值mAllowBootMessages)-->WindowManagerService(传入值mAllowBootMessages)-->
+mAllowBootMessages = showBootMsgs
+
+hideBootMessagesLocked-->mShowingBootMessages = fasle@WindowManagerService.java
+
+显示“正在启动应用”：
+pm.performBootDexOpt--ActivityManagerNative.getDefault().showBootMessage@System_server.java
+
+-------------------
+关闭启动消息：
+enableScreenAfterBoot-->hideBootMessagesLocked@WindowManagerService.java
+================================
+
+错误原因是apk命名问题(多个点):
+rewriteDex(DexOpt没有成功)@DexPrepare.cpp
+
+
+dalvik/vm/analysis/DexPrepare.cpp
+
+
+================================
+安装apk：
+onCreate-->initiateInstallfyt-->startInstallConfirmfyt@PackageInstallerActivity.java
+
+
+package/app/PackageInstaller/src/com/android/packageInstaller/PackageInstallerActivity.java

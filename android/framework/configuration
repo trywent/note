@@ -82,7 +82,7 @@ frameworks/base/core/jni/android_util_AssetManager.cpp
 frameworks/base/libs/androidfw/AssetManager.cpp
 frameworks/base/libs/androidfw/ResourceTypes.cpp
 ____________________________
-设置语言：
+//设置语言：
 onItemSelected{
 - 选择语言，new UserDictionaryLocalePicker{
 	- 设置选择监听器为UserDictionaryLocalePicker，setLocaleSelectionListener。
@@ -127,7 +127,7 @@ frameworks/opt/telephony/src/java/com/android/internal/telephony/gsm/GsmServiceS
 //
 persist.sys.timezone Asia/shanghai
 =============================
-方位变化：
+//方位变化：
 
 屏幕尺寸原始值：
 mBaseDisplayHeight = mCurDisplayHeight = mAppDisplayHeight = mInitialDisplayHeight=mDisplay.getRawWidth
@@ -206,8 +206,8 @@ sendNewConfiguration(通知activityManager更新)-->mActivityManager.updateConfi
 WindowMangerService.java
 
 
-=====================================
-传感器服务：
+================================
+//传感器服务：
 获取服务：
 getServcie-->ServiceFetcher.createService-->new SystemSensorManager@ContextImpl.java
 
@@ -240,7 +240,7 @@ frameworks/base/core/java/android/hardware/SystemSensorManager.java
 frameworks/base/core/java/android/view/WindowOrientationListener.java
 fameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
 ================================
-服务端更新配置：
+//activityManagerService服务端更新配置：
 (通常是方向改变)sendNewConfiguration@WindowManagerServcie.java-->updateConfiguration
 @ActivityManagerServcie.java
 
@@ -251,10 +251,10 @@ updateConfiguration{
 			- 更新最近的应用的配置，app.thread.scheduleConfigurationChanged 		
 			- 设置窗口端的新配置，mWindowManager.setNewConfiguration
 		}
-}
+}@ActivityManagerServcie.java
 
 ================================
-activity更新配置：
+//activity更新配置：
 updateConfigurationLocked-->app.thread.scheduleConfigurationChanged@ActivityManagerService.java
 -->scheduleConfigurationChanged-->H.handleMessage(CONFIGURATION_CHANGED)-->
 handleConfigurationChanged-->performConfigurationChanged-->cb.onConfigurationChanged
@@ -262,18 +262,20 @@ handleConfigurationChanged-->performConfigurationChanged-->cb.onConfigurationCha
 
 
 frameworks/base/core/java/android/app/ActivityThread.java
-
-
 =================================
-resource更新配置：
-updateConfiguration-->updateConfiguration@Resources.java
-
-设置：
-handleConfigurationChanged-->applyConfigurationToResourcesLocked(更新mResConfiguration)@ActivityThread.java
-
-更新resource:
+//resource更新配置：
+//创建时更新
 main-->thread.attach-->attach-->context.init(getSystemContext)-->
 getSystemContext-->context.getResources().updateConfiguration@ActivityThread.java
+
+//更新configuration
+scheduleConfigurationChanged-->sendMessage(H.CONFIGURATION_CHANGED-->handleConfigurationChanged
+-->applyConfigurationToResourcesLocked(更新mResConfiguration)@ActivityThread.java
+updateConfiguration-->updateConfiguration@Resources.java
+
+
+scheduleActivityConfigurationChanged@ActivityThread.java
+
 
 frameworks/base/core/java/android/content/res/Resources.java
 

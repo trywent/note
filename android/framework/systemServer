@@ -1,9 +1,26 @@
+//android4.1
 main-->system_init@system_main.cpp-->system_init-->(JNI调用)init2@system_init.cpp-->
 init2-->new ServerThread-->thr.start-->ServerThread.run(启动服务)@SystemServer.java
 
+//android6.0
+startSystemServer-->Zygote.forkSystemServer-->/*pid=0*/handleSystemServerProcess{
+  //类/system/framework/services.jar:/system/framework/ethernet-service.jar:/system/framework/wifi-service.jar
+- systemServerClasspath = Os.getenv("SYSTEMSERVERCLASSPATH") 
+- performSystemServerDexOpt(systemServerClasspath)
+- cl = new PathClassLoader(systemServerClasspath
+- RuntimeInit.zygoteInit(cl)-->main
+}@ZygoteInit.java
 
-同一进程中的服务：
-
+main-->SystemServer().run{
+- mSystemServiceManager = new SystemServiceManager(mSystemContext)
+- createSystemContext(){//创建系统上下文
+	- activityThread = ActivityThread.systemMain()
+	- mSystemContext = activityThread.getSystemContext()
+	}
+- startBootstrapServices
+- startCoreServices
+- startOtherServices
+}@SystemServer.java
 
 
 

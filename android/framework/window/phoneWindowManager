@@ -36,9 +36,8 @@ setInitialDisplaySize{
 
 
 //布局时使用的变量
-    // During layout, the current screen borders accounting for any currently
-    // visible system UI elements.
-    int mSystemLeft, mSystemTop, mSystemRight, mSystemBottom; //所有可见的用户界面
+    //所有可见的界面
+    int mSystemLeft, mSystemTop, mSystemRight, mSystemBottom; 
     // For applications requesting stable content insets, these are them.
     int mStableLeft, mStableTop, mStableRight, mStableBottom;
     // For applications requesting stable content insets but have also set the
@@ -48,11 +47,7 @@ setInitialDisplaySize{
     // During layout, the current screen borders with all outer decoration
     // (status bar, input method dock) accounted for.
     int mCurLeft, mCurTop, mCurRight, mCurBottom;
-    // During layout, the frame in which content should be displayed
-    // to the user, accounting for all screen decoration except for any
-    // space they deem as available for other content.  This is usually
-    // the same as mCur*, but may be larger if the screen decor has supplied
-    // content insets.
+    // 应用当前可用的显示界面(systemui)
     int mContentLeft, mContentTop, mContentRight, mContentBottom;
     // During layout, the current screen borders along which input method
     // windows are placed.
@@ -179,12 +174,23 @@ getInsetHintLw(outContentInsets,outStableInsets,outOutsets){
 - outStableInsets.set(mStableLeft, mStableTop,availRight - mStableRight, availBottom - mStableBottom)
 }
 
-//starting窗口
+/*starting窗口
+
+    <!-- 应用启动页(StartingWindow)的theme -->
+    <style name="AppTheme.StartingWindowTheme" parent="AppTheme">
+        <!-- 可以设置成纯颜色（设置一个和Activity UI相似的背景） -->
+        <!--<item name="android:windowBackground">@color/startingwindow_bgcolor</item>-->
+         <!--也可以设置成一张图片 -->
+        <item name="android:windowBackground">@drawable/startingwindow_bg</item>
+    </style>
+
+*/
 addStartingWindow(IBinder appToken, String packageName, int theme,
             CompatibilityInfo compatInfo, CharSequence nonLocalizedLabel, int labelRes,
             int icon, int windowFlags) {
-- theme是否和context中主题不一致，则context中theme设置为theme
-- win = new PhoneWindow(context)//创建窗口
+- context= context.createPackageContext(packageName, 0)//创建对应apk的上下文
+- context.setTheme(theme) //设置主题.包含了启动窗口背景图
+- win = new PhoneWindow(context)//创建窗口,传入对应包的上下文
 - win.setIsStartingWindow(true)
 - win.setType(TYPE_APPLICATION_STARTING)
 - win.setDefaultIcon(icon)

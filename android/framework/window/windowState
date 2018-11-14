@@ -36,7 +36,15 @@ computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overlayFrame,
 }
 
 
-mRequestedWidth
+//configuration变化
 
+//更新taskStack的configuration
+setBounds-->updateOverrideConfiguration{
+- mOverrideConfig.screenWidthDp
+- mOverrideConfig.smallestScreenWidthDp
+- mOverrideConfig.orientation
+}@TaskStack.java
 
+//windowState
+reportResized-->setConfiguration(mCurConfiguration,taskStack.mOverrideConfig)@WindowState.java
 
