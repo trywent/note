@@ -77,7 +77,7 @@ createWindowContainer-->new AppWindowContainerController@ActivityRecord.java-->
 AppWindowContainerController(token){
 - mToken = token
 - createAppWindow-->new AppWindowToken
-}
+}@AppWindowContainerController.java
 
 
 

@@ -1,4 +1,4 @@
-
+//
 windowsVisible{
 - 设置状态为可见，nowVisible = true
 - 若不是在idle状态，则stack.processStoppingActivitiesLocked

@@ -1,3 +1,9 @@
+/*
+ro.sf.hwrotation=90                                                            
+qemu.hw.mainkeys=0
+ro.sf.swrotation=90 
+*/
+
 //4种大小：456 ， 682 ， 744， 675
 第一种：1280x800
 -----182   //statusBar
@@ -42,5 +48,7 @@ public int getNavigationBarHeight() {
 	}
 	return 0;
 }
+
+
 
 

@@ -1,4 +1,4 @@
-//display service
+//android 4.4 display service
 onStart-->publishBinderService(Context.DISPLAY_SERVICE)@DisplayManagerService.java
 
 
@@ -63,7 +63,7 @@ frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
 
 //===================
 //android5.1
-ActivityContainer.attachToDisplayLocked-->mWindowManager.attachStack@ActivityStackSupervisor.java
+createStackOnDisplay-->ActivityContainer.attachToDisplayLocked-->mWindowManager.attachStack@ActivityStackSupervisor.java
 -->attachStack{
 - new TaskStack //创建对应activityService stackId的window端stack
 - stack.attachDisplayContent(displayContent)-->updateDisplayInfo(设置栈的大小为display)@TaskStack.java

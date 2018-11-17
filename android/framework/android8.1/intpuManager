@@ -1,0 +1,22 @@
+//
+NativeInputManager{
+- mLocked //初始化部分值
+- eventHub = new EventHub()
+- mInputManager = new InputManager(eventHub)
+}
+
+setDisplayViewports@LocalService.java-->setDisplayViewportsInternal-->setDisplayViewport-->
+nativeSetDisplayViewport@InputManagerService.java-->setDisplayViewport(type,viewport){
+- type == ViewportType::VIEWPORT_EXTERNAL: mLocked.externalViewport = viewport
+- type == ViewportType::VIEWPORT_INTERNAL: mLocked.internalViewport = viewport
+- ontroller = mLocked.pointerController.promote
+- controller->setDisplayViewport
+- mInputManager->getReader()->requestRefreshConfiguration
+}@com_android_server_input_InputManagerService.cpp
+
+nativeSetDisplayViewport
+
+obtainPointerController
+
+frameworks/base/services/core/java/com/android/server/input/InputManagerService.java
+frameworks/base/services/core/jni/com_android_server_input_InputManagerService.cpp

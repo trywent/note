@@ -48,7 +48,7 @@ kernel/drivers/misc/sprd_camera/cpp/lite_r1p0/cpp_core.c
 
 //=======================HAL
 HAL_MODULE_INFO_SYM{
-- common = hw_module_t camera_common {
+- common = camera_common {
 	- id = CAMERA_HARDWARE_MODULE_ID
 	- methods = mModuleMethods
 	}
@@ -61,8 +61,10 @@ HAL_MODULE_INFO_SYM{
 }@SprdCamera3Hal.cpp
 
 
-mModuleMethod0s.open-->camera_device_open{
-
+mModuleMethods.open-->camera_device_open{
+- isSingleIdExposeOnMultiCameraMode
+- gSprdCamera3Wrapper->cameraDeviceOpen
+- gSprdCamera3Factory.cameraDeviceOpen
 }@SprdCamera3Factory.cpp
 
 

@@ -1,0 +1,52 @@
+//=============hwservicemanager
+start hwservicemanager@init.rc-->/system/bin/hwservicemanager@hwservicemanager.rc
+-->main{
+- new ServiceManager()
+- new BnHwServiceManager(manager)
+}@service.cpp
+
+//加入服务
+ServiceManager::add{
+- service->interfaceChain //获取调用者的标识descripter
+- ifaceMap = mServiceMap[fqName] //获取对应的服务map
+- ifaceMap.insertService //加入到map
+}
+
+
+
+//=============hal servcice
+main{//HAL层只需实现该方法.用于启动服务
+- android::ProcessState::initWithDriver("/dev/vndbinder");
+- return defaultPassthroughServiceImplementation<Ixxx>();//IGNSS,ICameraProvider
+}@Ixx/service.cpp
+
+defaultPassthroughServiceImplementation<Ixxx>(name,thread){
+- configureRpcThreadpool(maxThreads)//配置线程数
+- registerPassthroughServiceImplementation<Ixxx>(name = "default"){
+	- service = Ixxx::getService(name) //IGNSS,ICamerProvider 获取对应的服务
+	- service->registerAsService(name) //注册服务
+	}
+}@LegacySupport.h
+
+//hidl自动生成文件实现该函数
+Ixxx::getService{
+- dlopen("android.hardware.xxx@1.0-impl.so")//加载hidl库文件.用户实现加载vendor库文件(原来的老方式库文件)
+- generator = dlsym(handle, "HIDL_FETCH_Ixxx")//获取函数HIDL_FETCH_Ixxx
+- interface = generator("default")-->HIDL_FETCH_Ixxx{
+	- hw_get_module(xxx_HARDWARE_MODULE_ID) //加载库
+	- module->methods->open
+	- 返回Ixxx //ICameraProvider ,IGnss
+	}
+}
+
+system/hwservicemanager/service.cpp
+system/libhidl/transport/ServiceManager.cpp
+system/hwservicemanager/Vintf.cpp
+system/libhidl/transport/include/hidl/LegacySupport.h
+system/hwservicemanager/Vintf.cpp
+system/libvintf/VintfObject.cpp
+system/libhidl/transport/ServiceManagement.cpp
+
+//============client使用HAL接口
+IGnss::getService()
+ICameraProvider::getService()

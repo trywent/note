@@ -1,39 +1,196 @@
-//
-___________________________________
-更新配置信息：
+/*
+屏幕方位
+系统设置:ACCELEROMETER_ROTATION = "accelerometer_rotation";
+重力感应设置：关闭后重力感应不起作用，除非应用主动请求。打开后起作用，除非应用主动请求不使用。
 
-H.handleMessage(BULK_UPDATE_PARAMETERS)
+应用设置:setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+*/
+
+//设置屏幕
+setForcedDisplayScalingModeLocked/setForcedDisplaySizeLocked/setForcedDisplayDensityLocked
+reconfigureDisplayLocked{
+- configureDisplayPolicyLocked
+- updateOrientationFromAppTokensLocked
+- computeScreenConfigurationLocked
+- performLayoutAndPlaceSurfacesLocked
+}
+
+//应用设置方位
+setRequestedOrientation{
+- mWindowManager.setAppOrientation(r.appToken, requestedOrientation) //设置方位
+- updateOrientationFromAppTokens@WindowManagerService.java
+}@ActivityManagerService.java
 
 
 
-sendNewConfiguration(更新配置)-->mActivityManager.updateConfiguration@WindowManagerService.java-->
-updateConfiguration-->updateConfigurationLocked@ActivityManagerService.java
 
-_____________________________________
-创建surface：
-createSurfaceLocked(设置相应的变量)-->mSurface = new SurfaceTrace()@WindowStateAnimator.java
+/*向外提供的接口，ActivityManagerService,ActivityStack使用*/
+updateOrientationFromAppTokens(Configuration currentConfig, IBinder freezeThisOneIfNeeded)-->
+updateOrientationFromAppTokensLocked@WindowManageService.java
 
-销毁surface：
-destroySurfaceLocked@WindowStateAnimator.java
+updateOrientationFromAppTokensLocked(currentConfig, IBinder){
+- 执行updateOrientationFromAppTokensLocked(false)，方位发生改变
+	-需要冻结屏幕，执行startAppFreezingScreenLocked
+	-computeNewConfigurationLocked{
+		- computeScreenConfigurationLocked,计算新配置	
+	}
+- 方位没有发生改变，当前配置存在
+	- 获取屏幕配置computeScreenConfigurationLocked，判断新配置是否与当前配置不一致。
+	  则执行startFreezingDisplayLocked
+- 返回新配置config
 
+}-->
+/*
+判断方位是否改变，若改变更新方位值
+*/
+updateOrientationFromAppTokensLocked(boolean){
+- computeForcedAppOrientationLocked，查找窗口方位,设置为应用强制方位mForcedAppOrientation
+- mForcedAppOrientation方位发生改变
+	- 更新mForcedAppOrientation 为当期窗口方位值
+	- mPolicy.setCurrentOrientationLw 设置policy中当期应用方位
+	- updateRotationUncheckedLocked{
+		-mDeferredRotationPauseCount方位变化被延迟，正在执行方位切换动画，屏幕没使能。返回
+		-mPolicy.rotationForOrientationLw，从policy获取方位
+		-mPolicy.rotationHasCompatibleMetricsLw，判断方位是否兼容
+		-方位没有改变返回
+		-mPolicy.setRotationLw
+		-sendMessageDelayed(WINDOW_FREEZE_TIMEOUT),发送屏幕冻结超时消息
+		-startFreezingDisplayLocked
+		-mInputManager.setDisplayOrientation，//更新输入方位，用于触摸坐标匹配
+		-computeScreenConfigurationLocked	
+		-Surface.setOrientation，设置surface方位
+		-rebuildBlackFrame，方位发生变化原来的帧大小已不适用
+		-通知所有的窗口方位发生变化，通知所有的监听器方位发生变化		
+	}
+	- 方位发生改变，返回true。
+- 返回false
+}
 
-//回收的surface所占内存
-reclaimSomeSurfaceMemoryLocked{
--回收窗口的surface后，设置mHasSurface为false
+/*
+返回当前应用请求的方位，(若是应用窗口，就是获取当前要显示的应用的requestedOrientation)
+
+*/
+computeForcedAppOrientationLocked{
+- getOrientationFromWindowsLocked:查找mWindows中第一个可视，且方向确定的窗口的方向。
+	返回该窗口方向mLastWindowForcedOrientation=req
+- 上面方法没有确定方位，getOrientationFromAppTokensLocked{
+	- 应用或将被隐藏，且不是查找下个窗口的方位，则继续查找
+	- 若遇到新一组应用(不同进程中应用)，若前一组应用是全屏，则使用前一组应用方位
+	- 窗口将被隐藏，继续
+	- 设置组
+	- 获取当前窗口方位，窗口是全屏且不是查找下个窗口方位则返回。
+	  若当期窗口方位值不为空，则返回该方位
+	- 设置是否是查找下个窗口方位
+
+	}
+- 返回查找到的窗口方位，有可能没有查找到则返回SCREEN_ORIENTATION_UNSPECIFIED
+
+}
+
+//policy获取屏幕方位
+rotationForOrientationLw{
+- 获取方位感应器的值，
+- 确定preferredRotation的值
+	- 若lid打开，使用mLidOpenRotation
+	- 若在car dock中，判断是否是mCarDockRotation，或感应器方向
+	- 若在desk dock，判断是否mDeskDockRotation，或感应器方向
+	- 若插入HDMI，则使用mHdmiRotation
+	- mUserRotationMode打开，若允许旋转，则使用重力感应的方位，否则使用上次方位
+	- mUserRotationMode没有打开，使用用户说明的方位
+	- 方向未定
+- 若preferredRotation与请求的方位，在横屏或竖屏是一致的则返回preferredRotation。否则返回请求的方向
+
+}@PhoneWindowMangerService.java
+
+mAltOrientation= rotationHasCompatibleMetricsLw{
+- 判断请求的方位mForcedAppOrientation与实际返回的方位rotation是否一致
+
+}@PhoneWindowMangerService.java
+
+//暂停更新方位
+pauseRotationLocked{
+mDeferredRotationPauseCount += 1;
 }
 
 
+//更新屏幕配置：
+computeScreenConfigurationLocked{
+- 若屏旋转了90或270则屏长宽值调换。若mAltOrientation为true，则将长宽最长的值除1.3，再赋值。
+	(使横竖进行转换，与mForcedAppOrientation一致)
+- 根据长宽设置config的方位值
+- 计算应用能够使用的屏的长宽，并设置动画中的长宽值
+- 计算兼容模式下应用的长宽。computeCompatibleScaling{
+				- 系统默认屏最小长度320像素，长宽比例最大默认为(854f/480f)
+				- 获取最小的长宽值，原来的长宽和新长宽比值最小的为缩放比例
+				- 保存新的最小长宽值，返回缩放比例值
+			   }
+- 传入的config不为空，设置config中的值{
+		- 设置屏长宽
+		- 计算最小屏长，computeSizeRangesAndScreenLayout{
+			- 计算各个方位，屏最小，最大长度,adjustDisplaySizeRanges。最终获得最小长度值
+			- reduceConfigLayout{
+				- longSize < 470，小屏布局SCREENLAYOUT_SIZE_SMALL
+				- longSize >= 960 && shortSize >= 720，SCREENLAYOUT_SIZE_XLARGE
+				- longSize >= 640 && shortSize >= 480，SCREENLAYOUT_SIZE_LARGE
+				- 其他SCREENLAYOUT_SIZE_NORMAL
+				- shortSize > 321 || longSize > 570，兼容模式screenLayoutCompatNeeded	
+				- 返回布局值
+			}	
+			- 设置screenLayout
+		}
+		- 设置兼容模式屏长宽
+		- 设置兼容模式屏最小长度值，computeCompatSmallestWidth{
+			-
+		}
+		- 设置触摸屏，按键类型
+		- 	
+	}
 
-===========================================================
-更新焦点：
-updateFocusedWindowLocked@WindowManagerService.java
 
-===========================================================
+}
 
+
+//方位变化更改窗口大小：
+performLayoutAndPlaceSurfacesLockedInner-->updateResizingWindows{
+- 
+
+}@WindowManagerServcie.java
+
+
+//设置方位：
+
+setRequestedOrientation{
+	//设置窗口方位值
+- mWindowManager.setAppOrientation(r.appToken, requestedOrientation) 
+	//服务从窗口中，更新方位值
+-  mWindowManager.updateOrientationFromAppTokens( mConfiguration,r.mayFreezeScreenLocked(r.app)
+	 ? r.appToken : null)
+
+}@ActivityManagerService.java
+
+设置初始方位值：
+Surface.ROTATION_0;   //0
+Surface.ROTATION_180; //1
+Surface.ROTATION_90;  //2
+Surface.ROTATION_270; //3
+
+//设置视图初始角度
+setInitialDisplaySize{
+  mLandscapeRotation 
+  mSeascapeRotation 
+  mPortraitRotation 
+  mUpsideDownRotation 
+}@PhoneWindowManager.java
+
+
+/*
+*判断orientation(应用窗口的角度)，是否与rotation(surface的角度)是同一类型视图，竖屏横屏
+*/
+rotationHasCompatibleMetricsLw(int orientation, int rotation)@PhoneWindowManager.java
 
 
 ===================================
-窗口切换：
+//窗口切换：
 allowAppAnimationsLw(判断是否是锁屏状态，则不进行切换动画)@PhoneWindowManager.java
 
 
@@ -112,7 +269,7 @@ W.dispatchAppVisibility-->dispatchAppVisibility-->mHandler.sendMessage(MSG_DISPA
 -->handleAppVisibility-->scheduleTraversals(遍历View)@ViewRootImpl.java
 
 ===================================
-布局：
+//布局：
 performTraversals-->relayoutWindow-->sWindowSession.relayout(mWindow)@ViewRootImpl.java-->
 relayout-->mService.relayoutWindow@Session.java-->relayoutWindow@WindowMangerService.java
 
@@ -149,7 +306,7 @@ relayoutWindow(Session session, IWindow client, int seq,
 - 可能移动输入法窗口moveInputMethodWindowsIfNeededLocked
 - 壁纸窗口可能变化，调整壁纸adjustWallpaperWindowsLocked
 - 调整窗口层次，assignLayersLocked
-- 更新方位，updateOrientationFromAppTokensLocked
+- updateOrientationFromAppTokensLocked//更新方位
 - 执行布局，调整surface，performLayoutAndPlaceSurfacesLocked
 - 是壁纸窗口，则调整壁纸大小updateWallpaperOffsetLocked
 - win.mAppToken.updateReportedVisibilityLocked
@@ -247,192 +404,30 @@ SubLayer //为负数时则窗口在父窗口之下，否则在父窗口之上
 assignLayersLocked(分配窗口层次。其中输入法和壁纸窗口层次，是根据应用的窗口设置的，并没有根据自己的属性值设置。
 设置mLayer)@WindowManagerService.java
 
-=========================================
-设置初始方位值：
-Surface.ROTATION_0;   //0
-Surface.ROTATION_180; //1
-Surface.ROTATION_90;  //2
-Surface.ROTATION_270; //3
 
-//设置视图初始角度
-setInitialDisplaySize{
-  mLandscapeRotation 
-  mSeascapeRotation 
-  mPortraitRotation 
-  mUpsideDownRotation 
-}@PhoneWindowManager.java
+===================================
+//创建surface：
+createSurfaceLocked(设置相应的变量)-->mSurface = new SurfaceTrace()@WindowStateAnimator.java
+
+销毁surface：
+destroySurfaceLocked@WindowStateAnimator.java
 
 
-/*
-*判断orientation(应用窗口的角度)，是否与rotation(surface的角度)是同一类型视图，竖屏横屏
-*/
-rotationHasCompatibleMetricsLw(int orientation, int rotation)@PhoneWindowManager.java
+//回收的surface所占内存
+reclaimSomeSurfaceMemoryLocked{
+-回收窗口的surface后，设置mHasSurface为false
+}
+
+
+
+===================================
+//更新焦点：
+updateFocusedWindowLocked@WindowManagerService.java
+
+===================================
 
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
-=========================================
-配置发生变化：mWaitingForConfig = true
-
-重力感应设置：关闭后重力感应不起作用，除非应用主动请求。打开后起作用，除非应用主动请求不使用。
-ACCELEROMETER_ROTATION = "accelerometer_rotation";
-
-
-rotationForOrientationLw{
-- 获取方位感应器的值，
-- 确定preferredRotation的值
-	- 若lid打开，使用mLidOpenRotation
-	- 若在car dock中，判断是否是mCarDockRotation，或感应器方向
-	- 若在desk dock，判断是否mDeskDockRotation，或感应器方向
-	- 若插入HDMI，则使用mHdmiRotation
-	- mUserRotationMode打开，若允许旋转，则使用重力感应的方位，否则使用上次方位
-	- mUserRotationMode没有打开，使用用户说明的方位
-	- 方向未定
-- 若preferredRotation与请求的方位，在横屏或竖屏是一致的则返回preferredRotation。否则返回请求的方向
-
-}@PhoneWindowMangerService.java
-
-mAltOrientation= rotationHasCompatibleMetricsLw{
-- 判断请求的方位mForcedAppOrientation与实际返回的方位rotation是否一致
-
-}@PhoneWindowMangerService.java
-
-
-
-更新方位：
-updateRotationUncheckedLocked-->updateOrientationFromAppTokensLocked(currentConfig,freezeThisOneIfNeeded)
-
-
-/*向外提供的接口，ActivityManagerService,ActivityStack使用*/
-updateOrientationFromAppTokens(Configuration currentConfig, IBinder freezeThisOneIfNeeded){
-- updateOrientationFromAppTokensLocked(currentConfig,freezeThisOneIfNeeded)
-
-}-->
-
-updateOrientationFromAppTokensLocked(currentConfig, IBinder){
-- 执行updateOrientationFromAppTokensLocked，方位发生改变
-	-需要冻结屏幕，执行startAppFreezingScreenLocked
-	-computeNewConfigurationLocked{
-		- computeScreenConfigurationLocked,计算新配置	
-	}
-- 方位没有发生改变，当前配置存在
-	- 获取屏幕配置computeScreenConfigurationLocked，判断新配置是否与当前配置不一致。
-	  则执行startFreezingDisplayLocked
-- 返回新配置config
-
-}-->
-/*
-判断方位是否改变，若改变更新方位值
-*/
-updateOrientationFromAppTokensLocked(boolean){
-- computeForcedAppOrientationLocked，查找窗口方位,设置为应用强制方位mForcedAppOrientation
-- mForcedAppOrientation方位发生改变
-	- 更新mForcedAppOrientation 为当期窗口方位值
-	- mPolicy.setCurrentOrientationLw 设置policy中当期应用方位
-	- updateRotationUncheckedLocked{
-		-mDeferredRotationPauseCount方位变化被延迟，正在执行方位切换动画，屏幕没使能。返回
-		-mPolicy.rotationForOrientationLw，从policy获取方位
-		-mPolicy.rotationHasCompatibleMetricsLw，判断方位是否兼容
-		-方位没有改变返回
-		-mPolicy.setRotationLw
-		-sendMessageDelayed(WINDOW_FREEZE_TIMEOUT),发送屏幕冻结超时消息
-		-startFreezingDisplayLocked
-		-mInputManager.setDisplayOrientation，更新输入法方位，用于触摸坐标匹配
-		-computeScreenConfigurationLocked	
-		-Surface.setOrientation，设置surface方位
-		-rebuildBlackFrame，方位发生变化原来的帧大小已不适用
-		-通知所有的窗口方位发生变化，通知所有的监听器方位发生变化		
-	}
-	- 方位发生改变，返回true。
-- 返回false
-}
-
-/*
-返回当前应用请求的方位，(若是应用窗口，就是获取当前要显示的应用的requestedOrientation)
-
-*/
-computeForcedAppOrientationLocked{
-- getOrientationFromWindowsLocked:查找mWindows中第一个可视，且方向确定的窗口的方向。
-	返回该窗口方向mLastWindowForcedOrientation=req
-- 上面方法没有确定方位，getOrientationFromAppTokensLocked{
-	- 应用或将被隐藏，且不是查找下个窗口的方位，则继续查找
-	- 若遇到新一组应用(不同进程中应用)，若前一组应用是全屏，则使用前一组应用方位
-	- 窗口将被隐藏，继续
-	- 设置组
-	- 获取当前窗口方位，窗口是全屏且不是查找下个窗口方位则返回。
-	  若当期窗口方位值不为空，则返回该方位
-	- 设置是否是查找下个窗口方位
-
-	}
-- 返回查找到的窗口方位，有可能没有查找到则返回SCREEN_ORIENTATION_UNSPECIFIED
-
-}
-
-
-//暂停更新方位
-pauseRotationLocked{
-mDeferredRotationPauseCount += 1;
-}
-
-
-更新屏幕配置：
-computeScreenConfigurationLocked{
-- 若屏旋转了90或270则屏长宽值调换。若mAltOrientation为true，则将长宽最长的值除1.3，再赋值。
-	(使横竖进行转换，与mForcedAppOrientation一致)
-- 根据长宽设置config的方位值
-- 计算应用能够使用的屏的长宽，并设置动画中的长宽值
-- 计算兼容模式下应用的长宽。computeCompatibleScaling{
-				- 系统默认屏最小长度320像素，长宽比例最大默认为(854f/480f)
-				- 获取最小的长宽值，原来的长宽和新长宽比值最小的为缩放比例
-				- 保存新的最小长宽值，返回缩放比例值
-			   }
-- 传入的config不为空，设置config中的值{
-		- 设置屏长宽
-		- 计算最小屏长，computeSizeRangesAndScreenLayout{
-			- 计算各个方位，屏最小，最大长度,adjustDisplaySizeRanges。最终获得最小长度值
-			- reduceConfigLayout{
-				- longSize < 470，小屏布局SCREENLAYOUT_SIZE_SMALL
-				- longSize >= 960 && shortSize >= 720，SCREENLAYOUT_SIZE_XLARGE
-				- longSize >= 640 && shortSize >= 480，SCREENLAYOUT_SIZE_LARGE
-				- 其他SCREENLAYOUT_SIZE_NORMAL
-				- shortSize > 321 || longSize > 570，兼容模式screenLayoutCompatNeeded	
-				- 返回布局值
-			}	
-			- 设置screenLayout
-		}
-		- 设置兼容模式屏长宽
-		- 设置兼容模式屏最小长度值，computeCompatSmallestWidth{
-			-
-		}
-		- 设置触摸屏，按键类型
-		- 	
-	}
-
-
-}
-
-
-_______________________________
-方位变化更改窗口大小：
-performLayoutAndPlaceSurfacesLockedInner-->updateResizingWindows{
-- 
-
-}@WindowManagerServcie.java
-
-===========================================================
-主动设置方位：
-
-setRequestedOrientation{
-	//设置窗口方位值
-- mWindowManager.setAppOrientation(r.appToken, requestedOrientation) 
-	//服务从窗口中，更新方位值
--  mWindowManager.updateOrientationFromAppTokens( mConfiguration,r.mayFreezeScreenLocked(r.app)
-	 ? r.appToken : null)
-
-}@ActivityManagerService.java
-
-
 frmeworks/base/services/java/com/android/server/am/ActivityManagerService.java
-
-
 ===========================================================
 修改：
 

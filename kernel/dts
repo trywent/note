@@ -1,4 +1,10 @@
-//
+/*
+DTB(Device tree blob/binary
+DTC (Device Tree Compiler) 
+ 手动创建一个dtb
+ $ dtc -O dtb -o filename.dtb -I dts filename.dts 
+
+*/
 Linux uses DT data for three major purposes:
 1) platform identification,
 2) runtime configuration, and

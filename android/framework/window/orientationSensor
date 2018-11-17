@@ -1,0 +1,9 @@
+//
+init-->mOrientationListener = new MyOrientationListener(mContext, mHandler)@PhoneWindowManager.java
+
+onProposedRotationChanged-->mHandler.post(mUpdateRotationRunnable){
+- PerformanceManagerInternal
+- updateRotation(false)-->mWindowManager.updateRotation(false,false)
+}@MyOrientationListener
+
+frameworks/base/services/core/java/com/android/server/policy/WindowOrientationListener.java

@@ -24,7 +24,7 @@ ServiceManager::add{
 */
 //=============hal servcice  android/hardware/gnss/1.0/IGnss.h//接口定义
 service gnss_service /vendor/bin/hw/android.hardware.gnss@1.0-service//服务启动
--->main-->defaultPassthroughServiceImplementation<IGnss>@service.cpp-->
+-->main-->defaultPassthroughServiceImplementation<IGnss>@hardware/interfaces/gnss/1.0/default/service.cpp-->
 defaultPassthroughServiceImplementation{
 - registerPassthroughServiceImplementation{
 	- Interface::getService("default")-->IGnss::getService("default",true){//获取stub，本地服务

@@ -1,0 +1,51 @@
+//================================HAL Service
+interface ICameraProvider {//provider接口
+- setCallback(ICameraProviderCallback callback)
+- getVendorTags()
+- getCameraIdList()
+- isSetTorchModeSupported() //闪光灯
+- getCameraDeviceInterface_V1_x  //返回ICameraDevice
+- getCameraDeviceInterface_V3_x
+}
+
+//camera hal service 名"legacy/0"
+service vendor.camera-provider-2-4 /vendor/bin/hw/android.hardware.camera.provider@2.4-service_64
+@android.hardware.camera.provider@2.4-service_64.rc-->main-->
+defaultPassthroughServiceImplementati on<ICameraProvider>("legacy/0")@service.cpp
+
+
+HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
+- hw_get_module(CAMERA_HARDWARE_MODULE_ID, &rawModule) //加载HAL库
+- mModule = new CameraModule(rawModule) //将module封装
+- mModule->init()-->CameraModule::init()-->mModule->init@CameraModule.cpp
+- mModule->setCallbacks(this)
+- mNumberOfLegacyCameras = mModule->getNumberOfCameras-->mModule->get_number_of_cameras@CameraModule.cpp//获取camera个数
+- 遍历,mNumberOfLegacyCameras{
+	- mModule->getCameraInfo(i)-->mModule->get_camera_info@CameraModule.cpp
+	- mModule->openLegacy-->mModule->open_legacy@CameraModule.cpp
+	- mOpenLegacySupported[cameraIdStr] = true
+	- mCameraDeviceNames.add//保存设备名
+	}
+}@CameraProvider.cpp
+
+
+//获取ICameraDevice
+
+
+//device接口
+ICameraDeviceSession{
+- configureStreams_3_4
+- processCaptureRequest_3_4
+}
+
+ICameraDeviceCallback{
+- processCaptureResult_3_4
+}
+
+
+
+hardware/interfaces/camera/provider/2.4/default/service.cpp
+hardware/interfaces/camera/provider/2.4/default/CameraProvider.cpp
+hardware/interfaces/camera/device/3.4/default/CameraDevice.cpp
+hardware/interfaces/camera/device/3.4/default/CameraDeviceSession.cpp
+hardware/interfaces/camera/common/1.0/default/CameraModule.cpp

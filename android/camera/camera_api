@@ -1,0 +1,132 @@
+//android.hardware.camera2
+使用camera{
+- CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE)
+- CameraManager.getCameraIdList //获取摄像头id
+- CameraManager.getCameraCharacteristics (String cameraId) //获取摄像头属性，支持的图像格式大小
+- CameraManager.openCamera(cameraId,CameraDevice.StateCallback){   //打开摄像头,设置回调
+	- onOpened(cameraDevice) //回调打开成功,传入cameraDevice
+	- onDisconnected
+	}
+- surfaceHolder.setFixedSize //设置surface
+//session种传入surface.当提交request后,sesion向每个request提供surface
+- CameraDevice.createCaptureSession(Surface,CameraCaptureSession.StateCallback){ //创建session。设置回调
+	- onConfigured //回调配置成功，传入CameraCaptureSession
+	}
+- CameraDevice.createCaptureRequest //创建请求
+- CameraCaptureSession.setRepeatingRequest/capture  //请求数据
+}
+
+//获取cameraService
+CameraManagerGlobal.getCameraService-->connectCameraServiceLocked{
+- cameraServiceBinder = ServiceManager.getService(CAMERA_SERVICE_BINDER_NAME) //"media.camera"
+- ICameraService cameraService = ICameraService.Stub.asInterface(cameraServiceBinder)
+- cameraService.addListener(this)
+}@CameraManager.java
+
+
+//获取cameraDevice
+openCamera-->openCameraForUid-->openCameraDeviceUserAsync(cameraId,callback,handler{
+- deviceImpl= new CameraDeviceImpl{
+	- mCameraId = cameraId
+        - mDeviceCallback = callback
+        - mDeviceHandler = handler
+	}@CameraDeviceImpl.java
+- supportsCamera2ApiLocked-->supportsCameraApiLocked-->cameraService.supportsCameraApi(API_VERSION_2)
+- 支持API_VERSION_2{
+	- cameraUser = cameraService.connectDevice(callbacks, cameraId,packageName,uid)--> //连接到设备
+		ICameraService.connectDevice
+	}
+- 不支持API_VERSION_2{
+	- cameraUser = CameraDeviceUserShim.connectBinderShim(callbacks, id)
+	}
+- deviceImpl.setRemoteDevice(cameraUser){ //保存remoteDevice
+	- mRemoteDevice = new ICameraDeviceUserWrapper(remoteDevice)
+	- mDeviceHandler.post(mCallOnOpened){
+		- sessionCallback.onOpened
+		- mDeviceCallback.onOpened
+		}
+	- mDeviceHandler.post(mCallOnUnconfigured)
+	}@CameraDeviceImpl.java
+}@CameraManager.java
+
+//返回ICameraDeviceUser
+cameraService.connectDevice(callbacks, cameraId,packageName, uid)
+-->connectDevice{
+- mRemote.transact(Stub.TRANSACTION_connectDevice, _data, _reply, 0)
+- _result = android.hardware.camera2.ICameraDeviceUser.Stub.asInterface(_reply.readStrongBinder())
+- return result
+}@ICameraService.java
+
+
+/*创建CameraCaptureSession
+camrea输出目标:
+- SurfaceView
+- SurfaceTexture //openGL
+- MediaCodec.createInputSurface //录制
+- MediaRecorder.getSurface //录制
+- renderScript //YUV 数据
+- ImagerReader //RAW,未压缩YUV,压缩JPEG
+
+onConfigured(CameraCaptureSession) //camera配置可能需要几百毫秒,配置完调用该函数
+
+*/
+createCaptureSession(Surface,callback,handler,NORMAL_MODE)-->createCaptureSessionInternal{
+- configureSuccess = configureStreamsChecked(OutputConfiguration outputs){
+	- checkInputConfiguration(inputConfig) //检查当前camera是否支持inputconfig
+	- 遍历已经设置的config,mConfiguredOutputs{
+		- deleteList.add(streamId) //将不需要的配置移到deleteList
+		- outputs.remove(outConfig) //移除已经设置的config
+		}
+	- mDeviceHandler.post(mCallOnBusy)
+	- stopRepeating
+	- waitUntilIdle-->mRemoteDevice.waitUntilIdle //等待空状态
+	- mRemoteDevice.beginConfigure()//开始设置
+	- mRemoteDevice.createInputStream //设置input
+	- mRemoteDevice.deleteStream/mConfiguredOutputs.delete//移除需要删除的配置deleteList
+	- mRemoteDevice.createStream//配置outputs
+	- mDeviceHandler.post(mCallOnIdle/mCallOnUnconfigured)
+	}
+- 高速捕获,mCurrentSession = new CameraConstrainedHighSpeedCaptureSessionImpl
+- 否则mCurrentSession = new CameraCaptureSessionImpl(callback, handler, this, mDeviceHandler){
+	- mStateHandler = checkHandler(stateHandler)
+	- mStateCallback = createUserStateCallbackProxy(mStateHandler,callback) //回调
+	- mDeviceImpl = checkNotNull(deviceImpl
+	- mSequenceDrainer = new TaskDrainer
+	- mIdleDrainer = new TaskSingleDrainer
+	- mStateCallback.onConfigured(this)
+	}@CameraCaptureSessionImpl.java
+}@CameraDeviceImpl.java
+
+//创建request
+createCaptureRequest(int templateType){//返回CaptureRequest.Builder 
+- templatedRequest = mRemoteDevice.createDefaultRequest(templateType)
+- builder = new CaptureRequest.Builder(templatedRequest, /*reprocess*/false)
+}@CameraDeviceImpl.java
+
+builder.build-->new CaptureRequest(mRequest)@CaptureRequest.java
+
+//获取数据
+setRepeatingRequest(CaptureRequest request,CameraCaptureSession.CaptureCallback listener, Handler handler){
+- mDeviceImpl.setRepeatingRequest-->setRepeatingRequest@CameraDeviceImpl.java
+- addPendingSequence
+}@CameraCaptureSessionImpl.java
+
+setRepeatingRequest{
+- requestList.add(request)
+- submitCaptureRequest(requestList, callback, handler,/*streaming*/true){
+	- 
+	}
+}@CameraDeviceImpl.java
+
+stopRepeating(). Calling abortCaptures() will also clear the request.
+
+frameworks/base/core/java/android/hardware/camera2/CameraManager.java
+frameworks/base/core/java/android/hardware/camera2/CameraDevice.java
+frameworks/base/core/java/android/hardware/camera2/CameraCaptureSession.java
+frameworks/base/core/java/android/hardware/camera2/impl/CameraDeviceImpl.java
+frameworks/base/core/java/android/hardware/camera2/impl/CameraCaptureSessionImpl.java
+frameworks/base/core/java/android/hardware/camera2/CaptureRequest.java
+frameworks/base/core/java/android/hardware/camera2/legacy/CameraDeviceUserShim.java
+frameworks/av/camera/aidl/android/hardware/ICameraService.aidl
+frameworks/av/camera/aidl/android/hardware/ICameraServiceListener.aidl
+out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/dotdot/av/camera/aidl/android/hardware/ICameraService.java

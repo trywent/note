@@ -185,7 +185,7 @@ rotationHasCompatibleMetricsLw(需要的方位与返回的方位不一致)@Phone
 获取屏幕大小：
 getRealMetrics-->getRealSize-->wm.getRealDisplaySize@Display.java-->getRealDisplaySize
 (返回mCurDisplayWidth，mCurDisplayHeight)@WindowManagerService.java
-_____________________________________
+________________________________
 方向监听器：
 init-->mOrientationListener = new MyOrientationListener@phoneWidnowManager.java
 
