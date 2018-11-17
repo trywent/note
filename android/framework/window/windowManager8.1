@@ -1,0 +1,78 @@
+//layout
+
+
+//应用设置方位
+setRequestedOrientation@ActivityManagerService.java-->setRequestedOrientation{
+- displayConfig = mStackSupervisor.getDisplayOverrideConfiguration
+- mWindowContainerController.setOrientation(requestedOrientation){ //设置方位
+	- mContainer.setOrientation(requestedOrientation) //保存要设置的方位
+	- mService.updateOrientationFromAppTokens(displayConfig,displayId)
+	}@AppWindowContainerController.java
+- service.updateDisplayOverrideConfigurationLocked
+}@ActivityRecord.java
+
+
+updateOrientationFromAppTokens-->updateOrientationFromAppTokensLocked(currentConfig){
+- 计算方位是否改变,updateOrientationFromAppTokensLocked(false,displayId)
+- 若改变,computeNewConfigurationLocked
+- 若没改变,且currentConfig!=null{
+	- displayContent.computeScreenConfiguration
+	}
+}
+
+/*
+ 更新窗口方位.先根据非应用窗口计算,然后再计算应用窗口
+*/
+updateOrientationFromAppTokensLocked{
+- DisplayContent dc = mRoot.getDisplayContent(displayId)
+- req = dc.getOrientation{
+	- 屏幕冻结,返回mLastWindowForcedOrientation
+	- 返回mAboveAppWindowsContainers.getOrientation() //非应用窗口
+	- 返回 mTaskStackContainers.getOrientation //应用窗口
+	}
+- req!=dc.getLastOrientation(){//方位发生变化
+	- dc.setLastOrientation(req) //更新最后一次方位
+	- mPolicy.setCurrentOrientationLw(req){
+		- mCurrentAppOrientation =req //设置app方位	
+		- updateOrientationListenerLp
+		}@PhoneWindowManager.java
+	- dc.updateRotationUnchecked //更新屏幕
+	}
+}
+
+
+
+//传感器更新方位
+updateRotation(false)@PhoneWindowManager-->updateRotationUnchecked{
+- displayContent = getDefaultDisplayContentLocked
+- displayContent.updateRotationUnchecked(false)
+- sendNewConfiguration(displayId)//方位变化更新配置
+}
+
+//打开或关闭传感器listener
+updateOrientationListenerLp{
+- !mOrientationListener.canDetectOrientation() //传感器无效返回
+- needSensorRunningLp{
+	- mOrientationListener.enable	
+	}
+- mOrientationListener.disable
+}@PhoneWindowManager.java
+
+//从传感器获取方位
+rotationForOrientationLw{
+- mOrientationListener.getProposedRotation() //获取传感器方位
+- preferredRotation
+}
+
+
+updateRotationUnchecked{//最终调用位置
+-
+- mService.mPolicy.rotationForOrientationLw(lastOrientation, oldRotation)
+- updateDisplayAndOrientation
+}@DisplayContent.java
+
+
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/core/java/com/android/server/am/ActivityRecord.java
+frameworks/base/services/core/java/com/android/server/wm/AppWindowContainerController.java
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
