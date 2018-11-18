@@ -11,6 +11,20 @@ startSystemServer-->Zygote.forkSystemServer-->/*pid=0*/handleSystemServerProcess
 - RuntimeInit.zygoteInit(cl)-->main
 }@ZygoteInit.java
 
+startService(serviceClass){
+- name = serviceClass.getName()
+- constructor = serviceClass.getConstructor(Context.class)
+- service = constructor.newInstance(mContext)
+- startService(service){
+	- mServices.add(service)
+	- service.onStart{ //在这里发布远程服务，本地服务
+		- publishBinderService
+		- publishLocalService
+		}
+	}
+}SystemServiceManager.java
+
+//启动服务
 main-->SystemServer().run{
 - mSystemServiceManager = new SystemServiceManager(mSystemContext)
 - createSystemContext(){//创建系统上下文
@@ -23,163 +37,31 @@ main-->SystemServer().run{
 }@SystemServer.java
 
 
+startBootstrapServices{
+- mSystemServiceManager.startService(Installer.class)
+- mSystemServiceManager.startService(ActivityManagerService.Lifecycle.class)
+- mSystemServiceManager.startService(DisplayManagerService.class)
+- startSensorService
+}
+
+startCoreServices{
+- 
+}
+
+
+//将服务注册到serviceManager（publish）
+publishBinderService-->ServiceManager.addService@SystemService.java
 
 frameworks/base/cmds/system_server/system_main.cpp
 frameworks/base/cmds/system_server/library/system_init.cpp
 frameworks/base/services/java/com/android/server/SystemServer.java
-====================================
-系统服务生成：
-首先实现aidl文件会自动生成stub类。要实现的服务继承stub类。
-生成的文件位置：/jb/out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/src
-----------------------------
-aidl生成的文件：
-Ixxx.stub在接口Ixxx中实现。Ixxx接口包括要实现的函数，Ixxx.stub继承Binder类和该接口。
-stub extends Binder{
-  asInterface(android.os.IBinder obj)//返回Proxy的实例,远程调用通过remote。Proxy中remote = obj
-  asBinder()                         //返回stub自身
-
-  onTransact(){
-      //由Binder中transact()调用。	
-      //响应远程调用，执行本地实现的函数（Ixxx接口中的函数），返回执行结果
-  }
-	
-  static class Proxy implements android.app.IAlarmManager{
-	//代理类，proxy中remote用于远程调用传输
-	...封装远程调用的方法(即服务实现的方法，在远程端的接口)
-  }	
-}
-
-服务一般继承stub类
-Service extends IService.stub{
-    //实现接口中的函数
-}
-
-============================
-
-
-attachObject-->ObjectManager::attach-->mObjects.add
-
-
-frameworks/native/libs/binder/BpBinder.cpp
-============================
-服务的添加获取都是通过ServiceManager，获取服务后应用在通过服务自己的binder调用服务的方法。
-
-获取ServiceManager的binder：
-获取封装的binder：getIServiceManager-->ServiceManagerNative.asInterface(BinderInternal.getContextObject())
-@ServiceManager.java-->(封装代理)new ServiceManagerProxy(obj)@ServiceManagerNative.java
-
-获取binder：getContextObject@BinderInternal.java-->android_os_BinderInternal_getContextObject-->
-ProcessState::self()->getContextObject@android_util_Binder.cpp-->getStrongProxyForHandle-->
-lookupHandleLocked(获取0号handle的proxy)--(新建ServiceManager的代理)new BpBinder(0)
-
-返回的对象：javaObjectForIBinder(env, b)-->env->SetIntField(BinderProxy实例, gBinderProxyOffsets.mObject, 
-BpBinder)-->return BinderProxy
-
-kBinderProxyPathName = "android/os/BinderProxy";
-
-最终获得ServiceManager的binder：封装BpBInder的BinderProxy@Binder.java。
-____________________________
-添加系统服务：
-ServiceManager.addService@SystemServer.java-->getIServiceManager().addService@ServiceManager.java-->
-ServiceManagerProxy.addService-->mRemote.transact(ADD_SERVICE_TRANSACTION)@ServiceManagerNative.java
--->transact-->android_os_BinderProxy_transact-->(获取封装的BpBinder)target->transact
-@android_util_Binder.cpp-->IPCThreadState::self()->transact@BpBinder.cpp-->transact-->
-waitForResponse(reply)@IPCThreadState.cpp
-
-————————————————————————————
-获取系统服务：
-Context.getSystemService(Context.ALARM_SERVICE)-->getSystemService(name)-->(获取ServiceFetcher)
-SYSTEM_SERVICE_MAP.get(name)--ServiceFetcher.getService-->createService(在注册服务时实现，返回服务的manager)@ContextImpl.java
-
-缓存在SYSTEM_SERVICE_MAP：
-static registerService(SERVICE_NAME,ServiceFetcher或StaticServiceFetcher)@contextImpl.java-->
-SYSTEM_SERVICE_MAP.put(SERVICE_NAME,ServiceFetcher)
-
-StaticServiceFetcher：
-实现的服务没有缓存到mServiceCache中。该类对象保存到SYSTEM_SERVICE_MAP
-
-ServiceFetcher：
-该类型实现的服务都放入缓存mServiceCache。每个ContextImpl的缓存，在package-socpe防止频繁存取。
-该类对象保存到SYSTEM_SERVICE_MAP
-
-ServiceFetcher中createService通常实现：
-1,IBinder b =ServiceManager.getService(SERVICE_NAME);//获取binder(远程调用的代理)
-2,IService service = IService.Stub.asInterface(b);   //封装binder的服务
-3,new ServcieManager(service)                        //封装service的manager
-
-----------------------------
-通过ServiceManager获取服务的binder：
-发送请求(bcTRANSACTION)：ServiceManager.getService(SERVICE_name)@ContextImpl.java-->
-getIServiceManager().getService@ServiceManager.java-->ServiceManagerProxy.getService-->
-mRemote.transact(CHECK_SERVICE_TRANSACTION,)@ServiceManagerNative.java-->transact-->
-android_os_BinderProxy_transact-->(获取封装的BpBinder)target->transact@android_util_Binder.cpp-->
-IPCThreadState::self()->transact@BpBinder.cpp-->transact--> waitForResponse(reply)@IPCThreadState.cpp
-
-获得回复(brREPLY)：waitForResponse(reply)-->reply->ipcSetDataReference@IPCThreadState.cpp-->
-ipcSetDataReference(设置parcel中数据)@Parcel.cpp
-
-从回复获取binder：reply.readStrongBinder@ServiceManagerNative.java-->readStrongBinder@Parcel.java
--->nativeReadStrongBinder-->android_os_Parcel_readStrongBinder(封装binder)@android_os_Parcel.cpp-->
-readStrongBinder-->unflatten_binder@Parcel.cpp-->getStrongProxyForHandle(handle)-->new BpBinder
-@ProcessState.cpp
-
-获得BinderProxy：javaObjectForIBinder(封装binder成BinderProxy@Binder.java)@android_os_Parcel.cpp
-
-封装服务代理：Service.Stub.asInterface(BinderProxy)-->由AIDL文件自动生成文件中封装。
-
-frameworks/base/core/java/android/os/ServiceManager.java
-frameworks/base/core/java/android/os/ServiceManagerNative.java
-frameworks/base/core/java/com/android/internal/os/BinderInternal.java
-frameworks/base/core/jni/android_util_Binder.cpp
-frameworks/native/libs/binder/ProcessState.cpp
-frameworks/base/core/java/android/os/Binder.java
-frameworks/native/libs/binder/Parcel.cpp
-----------------------------
-
-____________________________
-系统服务如何响应远程调用：
-SystemServer监听驱动传来的数据，再调用服务。
-
-systemServer中调用servcieManager.addService加入服务。调用init1-->android_server_SystemServer_init1
-@com_android_server_SystemServer.cpp-->system_init()@system_init.cpp。
-init1中：
-    ProcessState::self()->startThreadPool();
-	startThreadPool-->spawnPooledThread(true)-->new PoolThread-->run-->threadLoop-->
-	IPCThreadState::self()->joinThreadPool(mIsMain)
-    IPCThreadState::self()->joinThreadPool();
-	
-joinThreadPool-->talkWithDriver(获取数据)--executeCommand(执行从驱动中获得的命令)
-{
-
-case BR_TRANSACTION：//是获得了一个请求命令
-  binder_transaction_data tr;//接收的数据
-  result = mIn.read(&tr, sizeof(tr));//从mIn中读取数据
-  sp<BBinder> b((BBinder*)tr.cookie);//从tr中获取binder
-  ......
-  b->transact；//执行本地操作
-  sendReply(reply, 0);//发送回复 -->writeTransactionData()
-}
-监听驱动中传来的请求。然后处理消息会调用b->transact-->onTransact。这里调用AIDL自动生成的函数，最终
-会调用请求的service中函数。
-
-响应服务调用：
-main-->init1@SystemServer.java-->android_server_SystemServer_init1@com_android_server_SystemServer.cpp
--->system_init()@system_init.cpp-->ProcessState::self()->startThreadPool--joinThreadPool-->
-joinThreadPool-->talkWithDriver(获取数据)--executeCommand(执行从驱动中获得的命令)-->(获得binder)
-the_context_object->transact@
-
-out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/src/core/java/android/app
-frameworks/base/services/jni/com_android_server_SystemServer.cpp
-frameworks/base/cmds/system_server/library/system_init.cpp
-
+frameworks/base/services/core/java/com/android/server/SystemServiceManager.java
+frameworks/base/services/core/java/com/android/server/SystemService.java
 
 ====================
-dumpsys(输出服务log)：
+//本地服务LocalServices
+addService-->sLocalServiceObjects.put(type, service)@LocalServices.java
 
-main{
-- 获取服务管理器，defaultServiceManager
-- 从参数获取要打印的服务名，services.add
-- 调用服务dump，service->dump(STDOUT_FILENO, args)
-}
+getService-->sLocalServiceObjects.get(type)@LocalServices.java
 
-frameworks/native/cmds/dumpsys/dumpsys.cpp
+frameworks/base/core/java/com/android/server/LocalServices.java

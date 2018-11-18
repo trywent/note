@@ -1,0 +1,48 @@
+//
+DisplayManagerService{
+- mHandler = new DisplayManagerHandler(DisplayThread.get().getLooper())
+- mDefaultDisplayDefaultColorMode
+- pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE)
+}
+
+windowManagerAndInputReady{
+- mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class)
+- mInputManagerInternal = LocalServices.getService(InputManagerInternal.class)
+- scheduleTraversalLocked-->sendEmptyMessage(MSG_REQUEST_TRAVERSAL)
+}
+
+
+LocalService.performTraversal-->performTraversalInternal-->
+performTraversalLocked{
+- clearViewportsLocked //清除viewport
+- 遍历mDisplayDevices{
+	- device = mDisplayDevices.get(i)
+	- configureDisplayLocked(device){
+		- findLogicalDisplayForDeviceLocked(device).configureDisplayLocked
+		- setViewportLocked-->//设置mDefaultViewport，mExternalTouchViewport，virtualViewport
+		}
+	- device.performTraversalLocked(t)
+	}
+- mHandler.sendEmptyMessage(MSG_UPDATE_VIEWPORT)-->mInputManagerInternal.setDisplayViewports //更显inputManager中viewport
+}@DisplayManagerService.java
+
+setViewportLocked-->device.populateViewportLocked@DisplayManagerService.java-->
+populateViewportLocked(viewport){
+- viewport.orientation = mCurrentOrientation
+- viewport.deviceWidth
+- viewport.deviceHeight
+}@DisplayDevice.java
+
+
+configureDisplayLocked-->display.configureDisplayLocked@DisplayManagerService.java-->
+configureDisplayLocked@@LogicalDisplay.java
+
+//displayDevice
+configureDisplayLocked(DisplayDevice){
+- displayDeviceInfo = device.getDisplayDeviceInfoLocked()
+- setProjectionLocked@DisplayDevice.java
+}@LogicalDisplay.java
+
+frameworks/base/services/core/java/com/android/server/display/DisplayManagerService.java
+frameworks/base/services/core/java/com/android/server/display/DisplayDevice.java
+frameworks/base/services/core/java/com/android/server/display/LogicalDisplay.java

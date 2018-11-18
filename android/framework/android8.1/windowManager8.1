@@ -69,6 +69,8 @@ updateRotationUnchecked{//最终调用位置
 -
 - mService.mPolicy.rotationForOrientationLw(lastOrientation, oldRotation)
 - updateDisplayAndOrientation
+- mService.mDisplayManagerInternal.performTraversal(getPendingTransaction()) //DisplayManager设置display
+- scheduleAnimation
 }@DisplayContent.java
 
 

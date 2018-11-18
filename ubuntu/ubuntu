@@ -41,6 +41,8 @@ dpkg -i package-name-here.deb
 dpkg --install package-name-here.deb
 dpkg -i -R /path/to/dir/name/with/lots/of/dot-deb-files/
 dpkg -i --recursive /path/to/dir/name/with/lots/of/dot-deb-files/
+//有依赖问题时使用下面命令：
+sudo apt-get -f install
 
 //磁盘uuid
  ls -l /dev/disk/by-uuid
