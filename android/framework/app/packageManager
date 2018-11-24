@@ -3,26 +3,80 @@
 package服务:
 startBootstrapServices-->PackageManagerService.main@SystemServer.java-->
 main/*加入系统服务ServiceManager.addService("package", m)*/-->
-PackageManagerService{
+PackageManagerService(installer){
+- mSettings = new Settings(mPackages)
 - mPackageDexOptimizer = new PackageDexOptimizer(this)
+- mDexManager = new DexManager(this, mPackageDexOptimizer)
 - mHandlerThread = new ServiceThread
 - mAppDataDir,mAppInstallDir...//初始化目录
+- permConfig,libConfig //读取系统权限,配置信息
+- mFirstBoot = !mSettings.readLPw(sUserManager.getUsers(false)) //读取setting
 - frameworkFiles = frameworkDir.list(){//遍历/system/framework/下jar
 	- libPath = new File(frameworkDir, frameworkFiles[i])
 	- mInstaller.dexopt(libPath)
 	}
-- scanDirLI("/vendor/overlay")
-- scanDirLI("/system/framwork")
+- scanDirTracedLI("/vendor/overlay")
+- scanDirTracedLI("/system/framwork")
+- scanDirTracedLI("priv-app")
+- scanDirTracedLI("app")
 ...
-- 
+- updatePermissionsLPw(UPDATE_PERMISSIONS_ALL) //扫描完成分配所有权限
+}@PackageManagerService.java
+
+scanDirTracedLI-->scanDirLI(dir/*遍历dir下文件*/){
+- parallelPackageParser = new ParallelPackageParser
+- 遍历目录下所有文件,files = dir.listFiles()-->parallelPackageParser.submit(file)-->
+	submit(scanfile){
+	- pp = new PackageParser()
+	- pr.pkg = parsePackage(pp, scanFile)//解析apk
+	- mQueue.put(pr) //加入队列中
+	}@ParallelPackageParser.java
+- 处理解析后的apk{
+	- parseResult = parallelPackageParser.take()
+	- scanPackageLI(parseResult.pkg, parseResult.scanFile)
+	}
 }@PackageManagerService.java
 
 
-startOtherServices{
-- mPackageManagerService.performBootDexOpt
-- mPackageManagerService.systemReady
-}@SystemServer.java
 
+scanPackageLI(PackageParser.Package pkg, File scanFile,
+            int policyFlags, int scanFlags, long currentTime, @Nullable UserHandle user)
+-->scanPackageInternalLI{
+- PackageSetting ps = mSettings.getPackageLPr(pkg.packageName)
+- updatedPkg = mSettings.getDisabledSystemPkgLPr //该apk是否覆盖已存在apk
+- apk升级,isUpdatedSystemPkg{
+	- mSettings.enableSystemPackageLPw(ps.name)
+	}
+- pkg.setApplicationVolumeUuid //设置package信息
+- scanPackageLI(package)-->scanPackageDirtyLI{
+	- 获取pkgSetting = mSettings.getPackageLPr{
+		- 若不存在,pkgSetting = Settings.createNewSetting
+		- 若存在,Settings.updatePackageSetting
+		}
+	- pkg.applicationInfo.processName = fixProcessName //进程名
+	- mSettings.writeUserRestrictionsLPw(pkgSetting, oldPkgSetting) //写入保存应用设置
+	- 非检查apk,commitPackageSettings //保存
+	}
+}@PackageManagerService.java
+
+
+//外部存储扫描：
+onDaemonConnected-->mPms.scanAvailableAsecs()@MountService.java-->scanAvailableAsecs-->
+updateExternalMediaStatusInner@PackageManagerService.java-->getSecureContainerList@PackageHelper.java
+-->getSecureContainerList@MountService.java-->executeForList("asec", "list")@NativeDaemonConnector.java
+--通过socket-->AsecCmd::runCommand-->AsecCmd::listAsecsInDirectory("/mnt/secure/asec")@CommandListener.cpp
+-->返回.asec文件列表
+
+挂载/mnt/secure/asec/xxx.asec文件到/mnt/asec/xxx：
+updateExternalMediaStatusInner-->loadMediaPackages-->AsecInstallArgs.doPreInstall-->
+PackageHelper.mountSdDir@PackageManagerService.java-->getMountService().mountSecureContainer
+@PackageHelper.java-->Connector.execute@MountService.java-->execute.NativeDaemonConnector.java-->
+(通过socket)-->mountAsec(创建/mnt/asec/xxx挂载点)@VolumeManager.cpp
+
+安装codePath，scanPackageLI(File)
+
+===================
+//dexopt
 performBootDexOpt{
 - ms = PackageHelper.getMountService不为空{
 	- doTrim  = isUpgrade = isUpgrade() //是否执行优化
@@ -34,25 +88,7 @@ performBootDexOpt{
 
 }@PackageManagerService.java
 
-systemReady{
 
-}@PackageManagerService.java
-
-
-scanDirLI(dir/*遍历dir下文件*/)-->
-scanPackageLI(file){
-- pp = new PackageParser()
-- PackageParser.Package pkg = pp.parsePackage(scanFile)
-- 初始化pkg.applicationInfo //设置代码路径,资源路径
-- scanPackageLI(pkg)-->scanPackageDirtyLI//解包Package
-}@PackageManagerService.java
-
-scanPackageDirtyLI(Package pkg){
-- 
-- mActivities.add(activity)
-}@PackageManagerService.java
-
-//dexopt
 将apk加入要dex的容器：
 scanPackageLI(PackageParser.Package, parseFlags, scanMode, currentTime)-->scanPackageDirtyLI
 -->performDexOptLI(若!forceDex && defer则将apk加入容器)
@@ -68,53 +104,37 @@ main-->accept(接收消息)-->execute(处理消息，执行cmds[i].func)-->(若�
 processZipFile-->extractAndProcessZip@OptMain.cpp-->dvmContinueOptimization-->rewriteDex@DexPrepare.cpp
 
 
-vm虚拟机:
-main@Main.cpp-->JNI_CreateJavaVM@Jni.cpp-->dvmStartup-->processOptions@Init.cpp
-
+frameworks/base/services/core/java/com/android/server/pm/ParallelPackageParser.java
 dalvik/dexopt/OptMain.cpp
 dalvik/vm/analysis/DexPrepare.cpp
 dalvik/vm/Init.cpp
+===================
+//权限
+updateSettingsLI-->updateSettingsInternalLI-->updatePermissionsLPw-->grantPermissionsLPw
 
-______________________
-外部存储扫描：
-onDaemonConnected-->mPms.scanAvailableAsecs()@MountService.java-->scanAvailableAsecs-->
-updateExternalMediaStatusInner@PackageManagerService.java-->getSecureContainerList@PackageHelper.java
--->getSecureContainerList@MountService.java-->executeForList("asec", "list")@NativeDaemonConnector.java
---通过socket-->AsecCmd::runCommand-->AsecCmd::listAsecsInDirectory("/mnt/secure/asec")@CommandListener.cpp
--->返回.asec文件列表
+installPackageFromSystemLIF-->updatePermissionsLPw
 
-挂载/mnt/secure/asec/xxx.asec文件到/mnt/asec/xxx：
-updateExternalMediaStatusInner-->loadMediaPackages-->AsecInstallArgs.doPreInstall-->
-PackageHelper.mountSdDir@PackageManagerService.java-->getMountService().mountSecureContainer
-@PackageHelper.java-->Connector.execute@MountService.java-->execute.NativeDaemonConnector.java-->
-(通过socket)-->mountAsec(创建/mnt/asec/xxx挂载点)@VolumeManager.cpp
+onNewUserCreated-->updatePermissionsLPw
 
-安装codePath，scanPackageLI(File)
-
-——————————————————————
-
-应用的设置mSetting:
-PackageManagerService-->new Settings()@PackageManagerService.java-->this(Environment.getDataDirectory())
--->(创建/data/system文件夹，在文件夹中创建package***.xml文件)Settings("/data")@Settings.java
-
-
-readLPw(优先使用backsetting)--readPackageLPw(读取<package>标签中的内容，如果是sharedId加入PendingPackage)
---getPackageLPw(处理PendingPackage，将)-->(package被重命名?)mRenamedPackages.put@Settings.java
-
-readLPw-->mRenamedPackages.put
-
-writeLPr--写package.xml(将原来的设置package.xml保存到packages-backup.xml)--
-写package.list
-
-getPackageLPw(处理packageSetting，)-->addPackageSettingLPw(保存packageSetting)-->mPackages.put
-
-addPackageLPw-->mPackages.put
-
-//创建应用id：
-newUserIdLPw--Process.FIRST_APPLICATION_UID + i(查找mUserIds中没有用的的id值i，再加上10000)@Setting.java
+//intall permission
+grantPermissionsLPw(package){
+- PackageSetting ps = (PackageSetting) pkg.mExtras
+- permissionsState = ps.getPermissionsState()
+- 遍历pkg.requestedPermissions{
+	- GRANT_INSTALL{
+		- permissionsState.grantInstallPermission
+		}
+	- GRANT_RUNTIME{
+		- permissionsState.grantRuntimePermission
+		- permissionsState.updatePermissionFlags
+		}
+	}
+}@PackageManagerService.java
 
 
-frameworks/base/services/java/com/android/server/pm/Settings.java
+
+
+===================
 //读取偏好设置：
 startActivityMayWait-->resolveActivity@ActivityStack.java-->resolveIntent-->
 chooseBestActivity(查找合适的app，没有找到则返回选择对话框)-->findPreferredActivity
@@ -137,7 +157,7 @@ ApplicationPackageManager
 data/system/packages.xml
 data/system/packages-backup.xml
 data/system/packages.list
-================================
+===================
 解析package中activity,service,provider,BroadcastReceiver信息：
 
 //收集保存activity信息：
@@ -167,30 +187,64 @@ queryBroadcastReceivers(Intent intent, int flags)
 queryContentProviders(String processName,int uid, int flags)
 
 
-广播会自动设置FLAG_EXCLUDE_STOPPED_PACKAGES，过滤掉stop状态的app。
+//广播会自动设置FLAG_EXCLUDE_STOPPED_PACKAGES，过滤掉stop状态的app。
 解析intent：
 resolveIntent(传入当前用户ID，一般为0)-->queryIntentActivities-->ActivityIntentResolver.queryIntent-->
 super.queryIntent@PackageMangerService.java-->queryIntent-->(保存满足条件的目标)
 buildResolveList@IntentResolver.java
 
 
-scanPackageLI{
 
+===================
+//保存package信息
+Settings("/data"){
+- mRuntimePermissionsPersistence = new RuntimePermissionPersistence
+- mSystemDir = new File(dataDir, "system")
+- mSettingsFilename = new File(mSystemDir, "packages.xml")
+- mBackupSettingsFilename = new File(mSystemDir, "packages-backup.xml")
+- mPackageListFilename = new File(mSystemDir, "packages.list")
 }
 
-解析AndroidManifest.xml
-parseApplication{
+//保存配置
+writeLPr{
 
-- 解析provider，parseProvider并加入owner.providers.add
+}
+//读取配置
+readLPw{
+- FileInputStream str = new FileInputStream(mBackupSettingsFilename)//先打开"packages-backup.xml"
+- backup文件不存在,str = new FileInputStream(mSettingsFilename) //"packages.xml"
+- readPackageLPw //"package"
+- readPermissionsLPw //"permissions"
+}
+
+
+readPackageLPw{
+- 
+- readInstallPermissionsLPr{ //分配权限
+	
+	}
+}
+
+scanPackageDirtyLI-->commitPackageSettings-->addPackageSettingLPw
+
+//创建应用id：
+newUserIdLPw--Process.FIRST_APPLICATION_UID + i(查找mUserIds中没有用的的id值i，再加上10000)@Setting.java
+
+readInstallPermissionsLPr
+
+frameworks/base/services/java/com/android/server/pm/Settings.java
+===================
+//install
+installPackageFromSystemLIF
+
+installPackageTracedLI-->installPackageLI-->installNewPackageLIF{
+- scanPackageTracedLI
+- updateSettingsLI
 }
 
 
 
-
-
-
-
-================================
+===================
 开机提示：Android is upgrading...
 run{
 - startBootstrapServices-->PackageManagerService.main
@@ -243,7 +297,7 @@ pm.performBootDexOpt--ActivityManagerNative.getDefault().showBootMessage@System_
 -------------------
 关闭启动消息：
 enableScreenAfterBoot-->hideBootMessagesLocked@WindowManagerService.java
-================================
+===================
 
 错误原因是apk命名问题(多个点):
 rewriteDex(DexOpt没有成功)@DexPrepare.cpp
@@ -252,7 +306,7 @@ rewriteDex(DexOpt没有成功)@DexPrepare.cpp
 dalvik/vm/analysis/DexPrepare.cpp
 
 
-================================
+===================
 安装apk：
 onCreate-->initiateInstallfyt-->startInstallConfirmfyt@PackageInstallerActivity.java
 

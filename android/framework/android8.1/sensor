@@ -1,0 +1,41 @@
+//
+startBootstrapServices@SystemServer.java-->startSensorService-->android_server_SystemServer_startSensorService
+-->SensorService::instantiate
+
+
+
+
+//sernsorManager
+SystemSensorManager{
+- nativeClassInit
+- nativeCreate
+- 获取sensor{
+	- sensor = new Sensor()
+	- nativeGetSensorAtIndex(sensor,index)
+	- mFullSensorsList.add(sensor)
+	}
+}@SystemSensorManager.java
+
+
+registerListener@SensorManager.java
+registerListenerImpl
+
+
+
+
+
+frameworks/native/services/sensorservice/SensorService.cpp
+frameworks/base/core/java/android/hardware/SensorManager.java
+frameworks/base/core/java/android/hardware/SystemSensorManager.java
+frameworks/base/core/java/android/hardware/LegacySensorManager.java
+//TYPE_DEVICE_ORIENTATION 方位
+WindowOrientationListener{
+- mSensorManager = (SensorManager)context.getSystemService(Context.SENSOR_SERVICE)
+- mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_DEVICE_ORIENTATION)
+- mOrientationJudge = new OrientationSensorJudge
+//若不存在方位传感器
+- mSensor = mSensorManager.getDefaultSensor(USE_GRAVITY_SENSOR? Sensor.TYPE_GRAVITY : Sensor.TYPE_ACCELEROMETER)
+- mOrientationJudge = new AccelSensorJudge
+}
+
+frameworks/base/services/core/java/com/android/server/policy/WindowOrientationListener.java

@@ -38,13 +38,13 @@ connectHelper(cameraCb,cameraId,API_2,client){
 	- 
 	}
 - getDeviceVersion
-- makeClient(this, cameraCb,&client)-->new CameraDeviceClient{
-	- 
-	}
+- makeClient(this, cameraCb,&client)-->new CameraDeviceClient()
 - client->initialize(mCameraProviderManager)
 - device = client
 }@CameraService.cpp
 
+
+CameraDeviceClient
 //------------------------HAL 初始化,获取camera hal service
 CameraService::onFirstRef{
 - BatteryNotifier::getInstance //电池

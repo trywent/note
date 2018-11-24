@@ -33,14 +33,14 @@ openCamera-->openCameraForUid-->openCameraDeviceUserAsync(cameraId,callback,hand
 	}@CameraDeviceImpl.java
 - supportsCamera2ApiLocked-->supportsCameraApiLocked-->cameraService.supportsCameraApi(API_VERSION_2)
 - 支持API_VERSION_2{
-	- cameraUser = cameraService.connectDevice(callbacks, cameraId,packageName,uid)--> //连接到设备
+	- ICameraDeviceUser cameraUser = cameraService.connectDevice(callbacks, cameraId,packageName,uid)--> //连接到设备
 		ICameraService.connectDevice
 	}
 - 不支持API_VERSION_2{
-	- cameraUser = CameraDeviceUserShim.connectBinderShim(callbacks, id)
+	- ICameraDeviceUser cameraUser = CameraDeviceUserShim.connectBinderShim(callbacks, id)
 	}
-- deviceImpl.setRemoteDevice(cameraUser){ //保存remoteDevice
-	- mRemoteDevice = new ICameraDeviceUserWrapper(remoteDevice)
+- deviceImpl.setRemoteDevice(cameraUser){ //设置remoteDevice= cameraUser
+	- mRemoteDevice = new ICameraDeviceUserWrapper(cameraUser)
 	- mDeviceHandler.post(mCallOnOpened){
 		- sessionCallback.onOpened
 		- mDeviceCallback.onOpened
@@ -114,11 +114,17 @@ setRepeatingRequest(CaptureRequest request,CameraCaptureSession.CaptureCallback 
 setRepeatingRequest{
 - requestList.add(request)
 - submitCaptureRequest(requestList, callback, handler,/*streaming*/true){
-	- 
+	- 遍历requestList,判断Surface是否为空
+	- mRemoteDevice.submitRequestList
+	- mCaptureCallbackMap.put(new CaptureCallbackHolder)
 	}
 }@CameraDeviceImpl.java
 
+//停止
 stopRepeating(). Calling abortCaptures() will also clear the request.
+
+
+
 
 frameworks/base/core/java/android/hardware/camera2/CameraManager.java
 frameworks/base/core/java/android/hardware/camera2/CameraDevice.java
@@ -127,6 +133,8 @@ frameworks/base/core/java/android/hardware/camera2/impl/CameraDeviceImpl.java
 frameworks/base/core/java/android/hardware/camera2/impl/CameraCaptureSessionImpl.java
 frameworks/base/core/java/android/hardware/camera2/CaptureRequest.java
 frameworks/base/core/java/android/hardware/camera2/legacy/CameraDeviceUserShim.java
+frameworks/base/core/java/android/hardware/camera2/impl/ICameraDeviceUserWrapper.java
 frameworks/av/camera/aidl/android/hardware/ICameraService.aidl
 frameworks/av/camera/aidl/android/hardware/ICameraServiceListener.aidl
+frameworks/av/camera/aidl/android/hardware/camera2/ICameraDeviceUser.aidl
 out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/dotdot/av/camera/aidl/android/hardware/ICameraService.java

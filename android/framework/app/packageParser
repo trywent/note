@@ -1,21 +1,83 @@
-//
-parsePackage{
-- 目录parseClusterPackage{
+//解析apk
+parsePackage(File packageFile){
+- parseClusterPackage{//目录文件
 	- PackageLite lite = parseClusterPackageLite(packageDir)
 	- assets = new AssetManager()
 	- loadApkIntoAssetManager(assets, lite.baseCodePath)-->assets.addAssetPath(apkPath)
 	- pkg = parseBaseApk(baseApk, assets)
 	}
-- 文件parseMonolithicPackage{
-	
+- parseMonolithicPackage{//文件
+	- parseBaseApk
 	}
 }@PackageParser.java
 
+parseBaseApk(File apkFile, AssetManager assets, int flags){
+- loadApkIntoAssetManager(assets, apkPath, flags)
+- new Resources(assets, mMetrics)
+- parseBaseApk(apkPath, res, parser..){
+	- pkg = new Package(pkgName)
+	- sa = res.obtainAttributes(com.android.internal.R.styleable.AndroidManifest)//AndroidManifest
+	- parseBaseApkCommon
+	}
+}
 
+parseBaseApkCommon{
+- TAG_APPLICATION{//"application"
+	- parseBaseApplication 
+	}
+- TAG_OVERLAY{//"overlay"
+	- 
+	}
+- TAG_PERMISSION_GROUP{//"permission-group"
+	- parsePermissionGroup 
+	}
+- TAG_PERMISSION{//"permission"
+	- parsePermission 
+	}
+- TAG_USES_PERMISSION{//"uses-permission"
+	- parseUsesPermission-->pkg.requestedPermissions.add(name.intern())//加入到 requestedPermissions
+	}
+- TAG_USES_FEATURE{//"uses-feature"
+	- pkg.reqFeatures 
+	}
+}
+
+//权限
+
+//分配安装时权限
+grantInstallPermission-->grantPermission@PermissionsState.java
+//撤销权限
+revokeInstallPermission-->revokePermission@PermissionsState.java
+
+//运行时权限分配
+grantRuntimePermission-->grantPermission@PermissionsState.java
+
+revokeRuntimePermission
+
+
+
+frameworks/base/services/core/java/com/android/server/pm/PermissionsState.java
+
+//dumpsys package
+dump{
+- cmd = args[opti]
+- if ("android".equals(cmd) || cmd.contains(".")) {//dump包名
+                packageName = cmd;
+	}
+- mSettings.dumpPermissionsLPr()-->dumpPermissionsLPr@Settings.java
+- mSettings.dumpPackagesLPr-->dumpPackagesLPr@Settings.java
+}@PackageManagerService.java
+
+
+dumpPackagesLPr(packageName){
+- 查找mPackages中packageName
+- dumpPackageLPr(ps)
+}
 
 frameworks/base/core/java/android/content/pm/PackageParser.java
 frameworks/base/core/java/android/app/ApplicationPackageManager.java
 frameworks/base/core/java/android/content/pm/PackageManager.java
 frameworks/base/core/java/android/content/pm/PackageItemInfo.java
-
+frameworks/base/services/core/java/com/android/server/pm/PackageSetting.java
+frameworks/base/services/core/java/com/android/server/pm/Settings.java
 

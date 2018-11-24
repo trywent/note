@@ -38,6 +38,7 @@ main-->SystemServer().run{
 
 
 startBootstrapServices{
+- SystemServerInitThreadPool.get().submit(SystemConfig::getInstance)//加载系统配置/system/etc/permissions
 - mSystemServiceManager.startService(Installer.class)
 - mSystemServiceManager.startService(ActivityManagerService.Lifecycle.class)
 - mSystemServiceManager.startService(DisplayManagerService.class)
@@ -57,6 +58,7 @@ frameworks/base/cmds/system_server/library/system_init.cpp
 frameworks/base/services/java/com/android/server/SystemServer.java
 frameworks/base/services/core/java/com/android/server/SystemServiceManager.java
 frameworks/base/services/core/java/com/android/server/SystemService.java
+frameworks/base/services/core/jni/com_android_server_SystemServer.cpp
 
 ====================
 //本地服务LocalServices

@@ -75,6 +75,12 @@ reevaluateStatusBarVisibility@WindowManagerService.java-->adjustSystemUiVisibili
 
 //布局完成设置窗口
 finishPostLayoutPolicyLw-->setBarShowingLw
+
+//
+adjustSystemUiVisibilityLw{
+- mStatusBarController.adjustSystemUiVisibilityLw
+- mNavigationBarController.adjustSystemUiVisibilityLw
+}
 ____________________________
 //StatusBar服务（连接到systemui，systemui注册到当期服务mBarService.registerStatusBar(mCommandQueue)）
 
@@ -118,7 +124,8 @@ setSystemUiVisibility-->mBar.setSystemUiVisibility@StatusBarManagerService.java-
 setSystemUiVisibility-->notifyUiVisibilityChanged@PhoneStatusBar.java-->
 statusBarVisibilityChanged-->adjustSystemUiVisibilityLw@WindowManagerService.java-->
 adjustSystemUiVisibilityLw@PhoneWindowManager.java-->adjustSystemUiVisibilityLw{
-- setBarShowingLw-->mWin.showLw@BarController.java
+- mStatusBarController.adjustSystemUiVisibilityLw -->setBarShowingLw-->mWin.showLw@BarController.java
+- mNavigationBarController.adjustSystemUiVisibilityLw
 }@BarController.java
 
 

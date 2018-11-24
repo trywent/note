@@ -1,11 +1,6 @@
-//=========================activity
-updateDisplayOverrideConfiguration{
-- mWindowManager.computeNewConfiguration //计算配置
-- updateDisplayOverrideConfigurationLocked-->updateGlobalConfiguration-->mStackSupervisor.onConfigurationChanged
-}@ActivityManagerService.java
+//=========================activityManager
 
-
-
+//结构
 ActivityStackSupervisor{
 - ActivityStack{	
 	- TaskRecord{
@@ -17,6 +12,15 @@ ActivityStackSupervisor{
 	- mWindowContainerController
 	}
 }
+
+
+createStackOnDisplay-->createStack{
+- PINNED_STACK_ID:new PinnedActivityStack-->super(){
+		- createStackWindowController-->new PinnedStackWindowController
+		}
+- new ActivityStack
+}
+
 
 //------------ ActivityStack ---- TaskStack
 ActivityStack{
@@ -95,10 +99,11 @@ sendNewConfiguration-->mActivityManager.updateDisplayOverrideConfiguration@Windo
 //------------ TaskStack
 StackWindowController(stackId){
 - DisplayContent dc = mRoot.getDisplayContent(displayId) //mRoot为WindowManagerService
-- dc.addStackToDisplay(stackId){
+- TaskStack stack = dc.addStackToDisplay(stackId){
 	- TaskStack stack = getStackById(stackId)
 	- new TaskStack(mService, stackId)
 	}@DisplayContent.java
+- stack.setController(this) //设置controler ,container
 }@StackWindowController.java
 
 addTask(task){ //加入task
@@ -116,16 +121,23 @@ adjustConfigurationForBounds{
 
 //------------ Task
 TaskWindowContainerController{
-- Task task = createTask-->new Task()
+- Task task = createTask-->new Task(this){
+	- setController(controller)//设置controler ,container
+	- setBounds
+	}
 - stack.addTask
 }@TaskWindowContainerController.java
 
 addChild@Task.java-->addChild@WindowContainer.java
 
 //------------ AppWindowToken
+AppWindowToken
+
 AppWindowContainerController(token){
 - mToken = token
-- createAppWindow-->new AppWindowToken
+- createAppWindow-->new AppWindowToken{
+	- setController(controller)//设置controler ,container
+	}
 - task.addChild
 }@AppWindowContainerController.java
 
@@ -133,6 +145,16 @@ onOverrideConfigurationChanged@ActivityReocrd.java-->onOverrideConfigurationChan
 
 setBounds-->updateAdjustedBounds
 onOverrideConfigurationChanged-->onConfigurationChanged@WindowContainer.java
+
+======================
+//configuration
+updateDisplayOverrideConfiguration{
+- mWindowManager.computeNewConfiguration //计算配置
+- updateDisplayOverrideConfigurationLocked-->updateGlobalConfiguration-->mStackSupervisor.onConfigurationChanged
+}@ActivityManagerService.java
+
+
+
 
 frameworks/base/services/core/java/com/android/server/wm/StackWindowController.java
 frameworks/base/services/core/java/com/android/server/wm/TaskWindowContainerController.java

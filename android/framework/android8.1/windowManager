@@ -1,6 +1,38 @@
+//
+WindowManagerService{
+- mRoot = new RootWindowContainer(this)
+- mPolicy = policy
+- mFxSession = new SurfaceSession()
+}
+
+
+onDisplayAdded(displayId){
+- display = mDisplayManager.getDisplay(displayId)
+- createDisplayContentLocked-->mRoot.getDisplayContentOrCreate-->
+	createDisplayContent{
+	- dc = new DisplayContent
+	- displayInfo = dc.getDisplayInfo() //初始化displayinfo
+	- dc.mTapDetector = new TaskTapPointerEventListener //触摸监听
+	- mService.registerPointerEventListener(dc.mTapDetector)
+	}@RootWindowContainer.java
+- displayReady
+}
+
+DisplayContent(WindowManagerService service){
+- super.addChild(mTaskStackContainers) //应用窗口
+- super.addChild(mAboveAppWindowsContainers)
+- super.addChild(mBelowAppWindowsContainers)
+- super.addChild(mImeWindowsContainers)
+- mService.mRoot.addChild(this, null) //加入到mRoot
+}
+
+thawRotation@WindowManagerService.java
+
+
 //layout
 
 
+=====================
 //应用设置方位
 setRequestedOrientation@ActivityManagerService.java-->setRequestedOrientation{
 - displayConfig = mStackSupervisor.getDisplayOverrideConfiguration
@@ -43,14 +75,15 @@ updateOrientationFromAppTokensLocked{
 
 
 //传感器更新方位
-updateRotation(false)@PhoneWindowManager-->updateRotationUnchecked{
+updateRotation(false)@PhoneWindowManager-->updateRotation-->
+updateRotationUnchecked{
 - displayContent = getDefaultDisplayContentLocked
 - displayContent.updateRotationUnchecked(false)
 - sendNewConfiguration(displayId)//方位变化更新配置
-}
+}@WindowManagerService.java
 
-//打开或关闭传感器listener
-updateOrientationListenerLp{
+
+updateOrientationListenerLp{//打开或关闭传感器listener
 - !mOrientationListener.canDetectOrientation() //传感器无效返回
 - needSensorRunningLp{
 	- mOrientationListener.enable	
@@ -58,17 +91,20 @@ updateOrientationListenerLp{
 - mOrientationListener.disable
 }@PhoneWindowManager.java
 
-//从传感器获取方位
-rotationForOrientationLw{
+
+rotationForOrientationLw{//从传感器获取方位
 - mOrientationListener.getProposedRotation() //获取传感器方位
 - preferredRotation
 }
 
-
-updateRotationUnchecked{//最终调用位置
+//最终调用位置,更新方位
+updateRotationUnchecked{
 -
-- mService.mPolicy.rotationForOrientationLw(lastOrientation, oldRotation)
-- updateDisplayAndOrientation
+- mService.mPolicy.rotationForOrientationLw(lastOrientation, oldRotation) //从传感器获取方位
+- updateDisplayAndOrientation{//更新displayManager
+	- 初始化mDisplayInfo
+	- mService.mDisplayManagerInternal.setDisplayInfoOverrideFromWindowManager(mDisplayInfo)
+	}
 - mService.mDisplayManagerInternal.performTraversal(getPendingTransaction()) //DisplayManager设置display
 - scheduleAnimation
 }@DisplayContent.java
@@ -78,3 +114,4 @@ frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.
 frameworks/base/services/core/java/com/android/server/am/ActivityRecord.java
 frameworks/base/services/core/java/com/android/server/wm/AppWindowContainerController.java
 frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
+frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java

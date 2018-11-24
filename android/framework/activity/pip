@@ -1,0 +1,45 @@
+//设置
+R.attr.supportsPictureInPicture = true
+
+//
+enterPictureInPictureMode-->enterPictureInPictureMode(new PictureInPictureParams.Builder().build()
+-->enterPictureInPictureMode{
+- deviceSupportsPictureInPictureMode--> //检查是否支持pip模式
+	getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+- ActivityManagerNative.getDefault().enterPictureInPictureMode(mToken, params)
+}@Activity.java
+
+enterPictureInPictureMode(IBinder token,final PictureInPictureParams params){
+- ActivityRecord r = ensureValidPictureInPictureActivityParamsLocked{ //检查是否支持pip
+	- ActivityRecord r = ActivityRecord.forTokenLocked(token)
+	- mSupportsPictureInPicture //系统是否支持
+	- r.supportsPictureInPicture() //activity是否支持
+	- params.truncateActions
+	}
+- isInPictureInPictureMode(r) //是否已经在pip模式
+- enterPipRunnable{ //Runnable进入pip
+	- Rect sourceBounds = new Rect //计算大小
+	- mStackSupervisor.moveActivityToPinnedStackLocked(r, sourceBounds)//
+	- stack.setPictureInPictureAspectRatio(aspectRatio)
+	- stack.setPictureInPictureActions(actions)
+	}
+- enterPipRunnable.run()
+}@ActivityManagerService.java
+
+setPictureInPictureAspectRatio-->getWindowContainerController().setPictureInPictureAspectRatio@ActivityManagerService.java
+-->setPictureInPictureAspectRatio{
+
+}@PinnedStackWindowController.java
+
+setPictureInPictureActions-->getWindowContainerController().setPictureInPictureActions@ActivityManagerService.java
+-->setPictureInPictureActions{
+
+}@PinnedStackWindowController.java
+
+
+frameworks/base/core/java/android/app/Activity.java
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+
+frameworks/base/core/java/android/app/PictureInPictureParams.java
+frameworks/base/services/core/java/com/android/server/am/PinnedActivityStack.java
+frameworks/base/services/core/java/com/android/server/wm/PinnedStackWindowController.java
