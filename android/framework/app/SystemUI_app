@@ -1,13 +1,4 @@
 //
-status_bar.xml{
-- notification_lights_out
-- system_icons.xml{
-	- statusIcons
-	- signal_cluster_view.xml
-	- battery
-	}
-}
-
 SystemUI启动:
 ServerThread.run-->ActivityManagerService.self().systemReady-->startSystemUi-->
 context.startService@SystemServer.java-->onCreate@SystemUIService.java--> 
@@ -28,8 +19,18 @@ startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
 }@SystemUIApplication.java
 
 
-_______________________
-//窗口：
+=======================
+//statusBar窗口：
+status_bar.xml{
+- notification_lights_out
+- system_icons.xml{
+	- statusIcons
+	- signal_cluster_view.xml
+	- battery
+	}
+}
+
+
 SystemBars.start-->createStatusBarFromConfig{
 - mContext.getString(R.string.config_statusBarComponent)//获取bar名statusbar.phone.StatusBar
 - mStatusBar.start-->start{
@@ -41,7 +42,7 @@ SystemBars.start-->createStatusBarFromConfig{
 }@SystemBars.java
 
 
-createAndAddWindows-->addStatusBarWindow{
+createAndAddWindows-->addStatusBarWindow{//创建view
 - makeStatusBarView{
 	- inflateStatusBarWindow-->mStatusBarWindow = View.inflate(R.layout.super_status_bar)
 	  //设置statusBarFragment为CollapsedStatusBarFragment 折叠的statusBar(正常状态)
@@ -74,6 +75,107 @@ onViewCreated{
 }@CollapsedStatusBarFragment.java
 
 
+
+
+可以通StatusBarManagerService过设置statusBar：
+setIcon@StatusBarManager.java-->setIcon@StatusBarManagerService.java-->
+(通过IStatusBar设置)mBar.setIcon-->setIcon@CommandQueue.java-->updateIcon@TabletStatusBar.java
+
+
+
+
+
+=======================
+//recentTask：
+start{
+- getRecentsComponent-->new AlternateRecentsComponent
+- sAlternateRecents.onStart-->onStart@AlternateRecentsComponent.java
+}
+
+//最近任务按钮触发
+mNavigationBarView.getRecentsButton().setOnClickListener(mRecentsClickListener)-->
+OnClickListener.toggleRecentApps-->toggleRecents@PhoneStatusBar.java-->
+toggleRecents@BaseStatusBar.java-->toggleRecents{
+- 创建intent("com.android.systemui.recent.RecentsActivity")
+- startActivitySafely(intent)
+}@Rcents.java
+
+//最近任务视图
+onCreate{
+- SystemServicesProxy ssp = Recents.getSystemServices()
+- setContentView(R.layout.recents)
+- mRecentsView = findViewById(R.id.recents_view)
+- reloadStackView{
+	- loader = Recents.getTaskLoader()
+	- loadPlan = loader.createLoadPlan(this)
+	- stack = loadPlan.getTaskStack()
+	- mRecentsView.onReload(stack, mIsVisible)-->onReload{
+		- mTaskStackView = new TaskStackView(getContext()){
+			- mStack.setCallbacks(this) //TaskStack.mCb
+			- mViewPool = new ViewPool<>(context, this)
+			- mTouchHandler = new TaskStackViewTouchHandler
+			- mAnimationHelper = new TaskStackAnimationHelper
+			}TaskStackView.java
+		- addView(mTaskStackView)
+		- mTaskStackView.onReload-->requestLayout //重新布局
+		- updateStack(stack, true)-->mTaskStackView.setTasks //设置task
+		}@RecentsView.java
+	}
+}@RecentsActivity.java
+
+onStart{
+-  mRecentsView.setScrimColors(systemColors)
+- mRecentsView.getViewTreeObserver().addOnPreDrawListener(mRecentsDrawnEventListener)
+}@RecentsActivity.java
+
+//设置tasks
+setTasks@TaskStackView.java-->mStack.setTasks-->
+setTasks(List<Task> tasks){
+- 遍历tasks{
+	- 加入addedTasks.add(newTask)
+	- allTasks.add(newTask)
+	}
+- 遍历removedTasks,mCb.onStackTaskRemoved
+- mCb.onStackTasksUpdated //通知TaskStackView更新view
+}@TaskStack.java
+
+//布局,
+onLayout{
+- relayoutTaskViews(AnimationProps.IMMEDIATE)-->bindVisibleTaskViews{
+	- tasks = mStack.getStackTasks()
+	- 遍历tasks{
+		- mViewPool.pickUpViewFromPool(task, task)-->onPickUpViewFromPool
+		- updateTaskViewToTransform
+		}
+	}
+- clipTaskViews
+}
+
+pickUpViewFromPool{
+- TaskView tv = mViewCreator.createView-->createView{
+	- (GridTaskView) mInflater.inflate(R.layout.recents_grid_task_view)//isGridEnabled
+	- (TaskView)mInflater.inflate(R.layout.recents_task_view)
+	}
+- mViewCreator.onPickUpViewFromPool-->onPickUpViewFromPool(tv){
+	- updateTaskViewsList
+	- bindTaskView(tv, task){//从task处获取缩略数据,设置到tv
+		- task.notifyTaskDataLoaded(task.thumbnail, task.icon)
+		- Recents.getTaskLoader().loadTaskData
+		}
+	}
+}@ViewPoll.java
+
+
+
+=======================
+//按钮事件：所有的按钮都是实现KeyButtonView.java
+(重写View中方法)onTouchEvent-->sendEvent(发送事件)-->sendEvent(事件和时间)-->
+InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
+
+
+
+=======================
+
 //信号图标
 onFinishInflate{
 //初始化并设置所有图标的view
@@ -96,46 +198,7 @@ setSubs-->inflatePhoneState{
 	- mNoSimsCombo.setVisibility
 	}
 }
-
-可以通StatusBarManagerService过设置statusBar：
-setIcon@StatusBarManager.java-->setIcon@StatusBarManagerService.java-->
-(通过IStatusBar设置)mBar.setIcon-->setIcon@CommandQueue.java-->updateIcon@TabletStatusBar.java
-
-
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/SystemBars.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/SystemUIService.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/SystemUIApplication.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/SignalClusterView.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/fragments/FragmentHostManager.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/fragments/FragmentService.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/CollapsedStatusBarFragment.java
-
-
-
-
-
-_____________________________________________
-按钮事件：所有的按钮都是实现KeyButtonView.java
-(重写View中方法)onTouchEvent-->sendEvent(发送事件)-->sendEvent(事件和时间)-->
-InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
-
-
-
-
-
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
-frameworks/base/services/java/com/android/server/StatusBarManagerService.java
-frameworks/base/core/java/android/app/StatusBarManager.java
-frameworks/base/core/java/com/android/internal/statusbar/StatusBarIcon.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/KeyButtonView.java
-
-
-
-==============================
 //移动信号控制器
-
 NetworkControllerImpl{
 - mCallbackHandler = new CallbackHandler()
 - mSubscriptionManager = SubscriptionManager.from-->getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) //创建SubscriptionManager
@@ -195,14 +258,9 @@ new MobileSignalController{
 }@MobileSignalController.java
 
 
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkControllerImpl.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/SignalController.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/MobileSignalController.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/CallbackHandler.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/qs/tiles/CellularTile.java
+
 =======================
 wallpaper:(默认的静态壁纸com.android.systemui.ImageWallpaper)
-
 //大小
 setDimensionHints-->wallpaper.connection.mEngine.setDesiredSize@WallpaperManagerService.java
 -->sendMessage(DO_SET_DESIRED_SIZE)-->mEngine.doDesiredSizeChanged{
@@ -220,47 +278,7 @@ attach-->new IWallpaperEngineWrapper@WallpaperService.stub-->executeMessage{
 	- updateSurface(加入窗口)
 	}
 }@WallpaperService.Engine.java
-=======================
-recentTask：
-start{
-- getRecentsComponent-->new AlternateRecentsComponent
-- sAlternateRecents.onStart-->onStart@AlternateRecentsComponent.java
-}
 
-//最近任务按钮触发
-mNavigationBarView.getRecentsButton().setOnClickListener(mRecentsClickListener)-->
-OnClickListener.toggleRecentApps-->toggleRecents@PhoneStatusBar.java-->
-toggleRecents@BaseStatusBar.java-->toggleRecents{
-- 创建intent("com.android.systemui.recent.RecentsActivity")
-- startActivitySafely(intent)
-}@Rcents.java
-
-//最近任务视图
-onCreate{
-- 设置mRecentsPanel
-- 设置任务加载器，RecentTasksLoader，recentTasksLoader.setRecentsPanel
-}@RecentsActivity.java-->onStart{
-- mRecentsPanel.refreshRecentTasksList-->mRecentTasksLoader.loadTasksInBackground
-	loadTasksInBackground@RecentsTaskLoader.java
-- mRecentsPanel.refreshViews
-}@RecentsActivity.java-->loadTasksInBackground{
-- mTaskLoader.executeOnExecutor{
-	- doInBackground{
-		- 获取服务ActivityManager，getSystemService(Context.ACTIVITY_SERVICE)
-		- 获取最近任务，am.getRecentTasks
-		}
-	- onProgressUpdate
-	}
-
-}@RecentsTaskLoader.java
-
-
-
-
-src/com/android/systemui/recent/Recents.java
-src/com/android/systemui/recents/AlternateRecentsComponent.java
-src/com/android/systemui/recents/model/RecentsTaskLoader.java
-src/com/android/systemui/recent/RecentsActivity.java
 =======================
 android4.4:
 makeStatusBarView{
@@ -279,9 +297,22 @@ updateDataNetType()//根据网络类型mDataNetType，更新信号图标
 onReceive(收到信号广播)-->refreshViews-->
 refreshSignalCluster-->(设置信号图标)cluster.setMobileDataIndicators@NetworkController.java
 
-com/android/systemui/statusbar/phone/PhoneStatusBar.java
-com/android/systemui/statusbar/policy/TelephonyIcons.java
-com/android/systemui/statusbar/SignalClusterView.java
-com/android/systemui/statusbar/policy/NetworkController.java
-
-
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/SystemBars.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/SystemUIService.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/SystemUIApplication.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/SignalClusterView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/fragments/FragmentHostManager.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/fragments/FragmentService.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/CollapsedStatusBarFragment.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
+frameworks/base/services/java/com/android/server/StatusBarManagerService.java
+frameworks/base/core/java/android/app/StatusBarManager.java
+frameworks/base/core/java/com/android/internal/statusbar/StatusBarIcon.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/KeyButtonView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkControllerImpl.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/SignalController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/MobileSignalController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/CallbackHandler.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/qs/tiles/CellularTile.java

@@ -1,0 +1,15 @@
+//
+sp7731e-1h20-native.dts{
+- sc7731e.dtsi{
+	- "pike2.dtsi"
+	- "sc7731e-clocks.dtsi"
+	- "sc7731e-modem.dtsi"
+	- <dt-bindings/pinctrl/sc9833_pinctrl.h>	
+	}
+- sp7731e-common.dtsi
+}
+
+
+
+
+echo 1 > /proc/sys/kernel/printk

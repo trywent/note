@@ -196,3 +196,17 @@ system/vold/cryptfs.c
 system/vold/vdc.c
 system/core/init/builtins.c
 
+
+==================
+//位置location
+onRadioButtonClicked@LocationMode.java-->setLocationMode(mode){
+- getActivity().sendBroadcast(MODE_CHANGING_ACTION)
+- refreshLocationMode
+}@LocationSettingsBase.java
+
+
+
+
+packages/apps/Settings/src/com/android/settings/location/LocationMode.java
+packages/apps/Settings/src/com/android/settings/location/LocationSettings.java
+packages/apps/Settings/src/com/android/settings/location/LocationSettingsBase.java

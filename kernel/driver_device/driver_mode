@@ -1,3 +1,4 @@
+//
 总线：
 声明：struct bus_type;//总线名，总线match(用于驱动和设备匹配，可选)
 注册：int bus_register(struct bus_type * bus);//加入到全局总线链表

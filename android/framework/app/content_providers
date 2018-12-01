@@ -1,16 +1,8 @@
-================================
-共享数据：
-ContentProvider：提供结构化的数据，封装数据，提供数据安全的机制。能够跨进程访问数据。
-只有在与其他应用分享数据情况下，才有实现自己的ContentProvider的必要。
-通过ContentResolver访问provider(contentProviders的实例)中数据。provider接收申请，执行申请，返回数据。
-
-获取数据流程：
-ContentResolver-->(系统调用相应的provider)contentProvider-->获取数据库或文件中数据
-________________________________
-Contentesolver提供与关系数据库中表一样的结构数据。
+//================================
+//访问数据ContentResolver-->(系统调用相应的provider)contentProvider-->获取数据库或文件中数据
 
 1,访问provider
-通过ContentResolver类访问provider,ContentResolver提供CRUD(创建，获取，更新，删除)数据的接口。
+ContentResolver有和provider一样命名的方法(query,upate,insert),ContentResolver提供CRUD(创建，获取，更新，删除)数据的接口。
 使用URI定义要访问的表(可以通过ContentUris.withAppendedId定义要访问的列)。
 
 2,从provider获取数据
@@ -42,38 +34,36 @@ ________________________________
 ContentProvider类是provider与应用程序间的接口
 
 创建provider的步骤：
-1，设计提供的数据存储类型，有两种文件数据(提供文件指针给其他应用)，结构化数据(数据库中)
-2，实现ContentProvider类
-3，定义provider中的字符串，URI，列名。intent，访问权限等
+1，数据存储类型，文件数据，结构化数据(数据库中)
+2，实现ContentProvider,query,insert,update...
+3，定义provider中的URI，列名。intent，访问权限等
 4，其他方面，样例数据，或实现AbstractThreadSyncAdapter
 
---------------------------------
-provider只是数据的接口，如何存储由自己定义(不一定是表类型的存储)，android中可用的数据存储：
+//android中可用的数据存储：
 -使用SQLite数据库接口，虽然provider提供的数据像关系表结构，但数据实际存储不一定使用数据库
 -使用文件存储数据
 -用java.net和android.net中类处理网络数据，可以将网络数据先同步到本地，再将这些数据以表的形式提供出去
 
---------------------------------
-URIs：contents://provider/database/tables/column_id
-URI是用来标识一个provider。URIs包含了provider的字符名，和数据表或文件的名字(指向行的id是可选的)。
-在ContentProvider中那些能够访问数据的方法，都要传入一个URI作为参数，以指定要访问的数据。
+//URI 用于识别provider
+URI= provider name(authority)+table/file +row
+authority :一般包名
 
 为了更好处理传入的URI，系统提供UriMatcher类将URI转换成相应的数字。
 
-provider的uri(文件夹名)，使用互联网域名(com.example.provider)
---------------------------------
-实现ContentProvider类：
+
+//实现ContentProvider类：
 ContentProvider提供数据的方法，不过所有的访问都是通过ContentResolver来调用provider中的方法。
 
-实现onCreate函数：
+onCreate()：
 onCreate函数在系统启动provider时执行，一定要快速完成。
 如，使用数据库存放数据，一般在实现onCreate中实现一个SQLiteOpenHelper类。当调用
 SQLiteOpenHelper.getWritableDatabase()会返回数据库，这时会自动调用SQLiteOpenHelper.onCreate()创建表。
 
 SQLiteOpenHelper(传入数据库名称)-->getWritableDatabase(返回创建的数据库)-->onCreate(创建表)
---------------------------------
---------------------------------
-================================
+
+query()://返回Cursor
+
+//================================
 SettingProvider:系统设置中的值
 onCreate-->new DatabaseHelper@SettingsProvider.java-->第一次getWritableDatabase-->onCreate-->loadSettings-->loadSystemSettings@DatabaseHelper.java-->execute@SQLiteStatement.java
 

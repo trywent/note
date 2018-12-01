@@ -42,6 +42,12 @@ parseBaseApkCommon{
 	}
 }
 
+//解析创建Activity
+parseActivity{
+- Activity a = new Activity(cachedArgs.mActivityArgs, new ActivityInfo())
+- a.info //初始化activityInfo
+}
+
 //权限
 
 //分配安装时权限

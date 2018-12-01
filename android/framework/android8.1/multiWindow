@@ -1,6 +1,40 @@
+/*
+多窗口模式下activity的生命周期:
+只有当前操作的activity时RESUMED状态,其它可见的activity是STARTED状态
+
+
+使能应用支持多窗口:
+android:resizeableActivity=["true" | "false"]
+android:supportsPictureInPicture=["true" | "false"]
+
+*/
+
+
+//split-screen
+
+
+
+//freeform mode
+ActivityOptions.setLaunchBounds() //设置应用启动窗口范围
+
+getOverrideBounds-->TaskRecord.validateBounds(options.getLaunchBounds())@ActivityStarter.java
+-->
+
+
+//PIP(picture in picture)
+
+
 //设置
 R.attr.supportsPictureInPicture = true
 
+
+Activity{
+- isInMultiWindowMode()
+- isInPictureInPictureMode
+- enterPictureInPictureMode
+- onMultiWindowModeChanged()
+- onPictureInPictureModeChanged
+}
 //
 enterPictureInPictureMode-->enterPictureInPictureMode(new PictureInPictureParams.Builder().build()
 -->enterPictureInPictureMode{
@@ -18,13 +52,31 @@ enterPictureInPictureMode(IBinder token,final PictureInPictureParams params){
 	}
 - isInPictureInPictureMode(r) //是否已经在pip模式
 - enterPipRunnable{ //Runnable进入pip
-	- Rect sourceBounds = new Rect //计算大小
+	- Rect sourceBounds = new Rect(getSourceRectHint) //计算大小
 	- mStackSupervisor.moveActivityToPinnedStackLocked(r, sourceBounds)//
 	- stack.setPictureInPictureAspectRatio(aspectRatio)
 	- stack.setPictureInPictureActions(actions)
 	}
 - enterPipRunnable.run()
 }@ActivityManagerService.java
+
+moveActivityToPinnedStackLocked(ActivityRecord r, Rect sourceHintBounds, float aspectRatio){
+- PinnedActivityStack stack = getStack(PINNED_STACK_ID)
+- TaskRecord task = r.getTask() //activity所在task
+- resizeStackLocked(PINNED_STACK_ID, task.mBounds) //先将stack设置为应用当前task大小...动画效果
+- task.mActivities.size() == 1{//task中只有一个activity,直接移动到pinStack
+	- task.reparent(PINNED_STACK_ID)
+	}
+- task.mActivities.size() != 1{//不止一个activity,创建新task再移动
+	- TaskRecord newTask = task.getStack().createTaskRecord)
+	- newTask.reparent(PINNED_STACK_ID)
+	}
+- Rect destBounds = stack.getDefaultPictureInPictureBounds(aspectRatio)//获取默认位置
+- stack.animateResizePinnedStack(sourceHintBounds, destBounds) //开始缩变动画
+- ensureActivitiesVisibleLocked
+- resumeFocusedStackTopActivityLocked
+}@ActivityStackSupervisor.java
+
 
 setPictureInPictureAspectRatio-->getWindowContainerController().setPictureInPictureAspectRatio@ActivityManagerService.java
 -->setPictureInPictureAspectRatio{
@@ -37,9 +89,19 @@ setPictureInPictureActions-->getWindowContainerController().setPictureInPictureA
 }@PinnedStackWindowController.java
 
 
+//退出pip
+
+
+
+//退出应用
+
 frameworks/base/core/java/android/app/Activity.java
 frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
-
+frameworks/base/services/core/java/com/android/server/am/ActivityStarter.java
 frameworks/base/core/java/android/app/PictureInPictureParams.java
 frameworks/base/services/core/java/com/android/server/am/PinnedActivityStack.java
 frameworks/base/services/core/java/com/android/server/wm/PinnedStackWindowController.java
+
+
+
+

@@ -1,4 +1,48 @@
 //
+struct workqueue_struct *pm_wq
+
+
+/*
+	runtimepm 以下面的顺序为优先级查找dev_pm_ops
+	pm_domain--type--class--bus(这些为subsystem-level,不包括driver中实现的)
+*/
+struct device {
+- struct dev_pm_domain	*pm_domain{//有该项可执行runtimepm
+	- struct dev_pm_ops	ops;
+	}
+
+- const struct device_type *type{
+	- const struct dev_pm_ops *pm //有该项可执行runtimepm
+	}
+- struct class	*class{
+	- const struct dev_pm_ops *pm//有该项可执行runtimepm
+	}
+
+- struct bus_type	*bus{
+	- const struct dev_pm_ops *pm //有该项可执行runtimepm
+	}
+//若设备没有提供dev_pm_ops.则会调用driver的dev_pm_ops
+- struct device_driver *driver{
+	- const struct dev_pm_ops *pm 
+	}
+- struct dev_pm_info power{
+	-
+	- unsigned int	use_autosuspend:1; //设备驱动是否支持autosuspend
+	}
+
+}
+
+struct dev_pm_ops {
+	...
+	int (*runtime_suspend)(struct device *dev);
+	int (*runtime_resume)(struct device *dev);
+	int (*runtime_idle)(struct device *dev);
+	...
+};
+
+
+
+//
 pm_runtime_init{
 - 初始化dev->power
 - INIT_WORK(&dev->power.work, pm_runtime_work)
@@ -16,6 +60,27 @@ pm_runtime_work{
 
 pm_request_idle(RPM_ASYNC)@pm_runtime.h-->__pm_runtime_idle-->rpm_idle-->(RPM_ASYNC)queue_work(pm_wq, &dev->power.work)
 @runtime.c
+//相关函数
+  int pm_request_idle(struct device *dev);//请求执行idle
+
+  int pm_request_autosuspend(struct device *dev);//请求执行suspend
+
+  int pm_runtime_get(struct device *dev)//增加使用计数
+
+  int pm_runtime_put_autosuspend(struct device *dev);//减少使用计数,执行pm_request_autosuspend
+
+  void pm_runtime_use_autosuspend(struct device *dev);//标记power.use_autosuspend,使能delay
+
+  void pm_runtime_dont_use_autosuspend(struct device *dev);//清除power.use_autosuspend,关闭delay
+
+  void pm_runtime_set_autosuspend_delay(struct device *dev, int delay);//设置delay
+
+  void pm_runtime_enable(struct device *dev);//减power.disable_depth,若为0,PM可以执行回调
+
+  int pm_runtime_disable(struct device *dev);//关闭
+
+//设备驱动
+每次传输数据后调用 pm_runtime_mark_last_busy()更新活跃时间power.last_busy
 
 
 
