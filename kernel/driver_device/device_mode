@@ -1,276 +1,58 @@
-//
-linux设备模型；
-sys下的每个对象都有一个kobject
-kobject总是被用来连接多个对象，以组成一个层次结构，符合子系统中结构的模型。连接的对象有父指针，kset
+//=====================bus
 
-一旦生成一个kset并加入到系统，在sysfs中就一定会有一个目录与之对应。而kobject不一定会在sysfs中显示。
-一般在kset中的kobj_type，会作为kobject的kobj_type。
+struct bus_type {
+	struct device		*dev_root;
+}
 
-子系统：
-kset包含一个子系统指针subsys。
-子系统一般（不是绝对）会显示在sysfs层次的顶层。子系统：block_subsys（sys/block 块设备）devices_subsys
-
-使kobject在sysfs中显示只需调用kobject_add函数。kobject_add也是在将kobject加入到kset时调用的函数。
-调用看object_add后会在sys中显示一个目录。kobject对应一个目录。
-
-struct attribute {
-char *name;
-struct module *owner;
-mode_t mode;
-};
-
-struct kobj_type {
-void (*release)(struct kobject *);
-struct sysfs_ops *sysfs_ops;
-struct attribute **default_attrs;
-};
-基本一下的都是封装属性和操作
-struct bin_attribute {
-struct attribute attr;
-size_t size;
-ssize_t (*read)(struct kobject *kobj, char *buffer,
-loff_t pos, size_t size);
-ssize_t (*write)(struct kobject *kobj, char *buffer,
-loff_t pos, size_t size);
-};
+int __must_check bus_register(struct bus_type *bus)//注册
+void bus_unregister(struct bus_type *bus)
 
 struct bus_attribute {
-struct attribute attr;
-ssize_t (*show)(struct bus_type *bus, char *buf);
-ssize_t (*store)(struct bus_type *bus, const char *buf,
-size_t count);
+	struct attribute	attr;
+	ssize_t (*show)(struct bus_type *bus, char *buf);
+	ssize_t (*store)(struct bus_type *bus, const char *buf, size_t count);
 };
 
+bus_create_file-->sysfs_create_file //创建sysfs文件
 
-name显示在sysfs中的名字。owner实现属性操作的模块。mode该属性是否可读写。
-属性链表的最后一个属性必须填充0。
-
-添加属性int sysfs_create_file(struct kobject *kobj, struct attribute *attr);
-移除属性int sysfs_remove_file(struct kobject *kobj, struct attribute *attr);
-
-热插拔事件产生：
-事件最终是由调用/sbin/hotplug来处理。
-
-kobject的又一主要功能就是产生这些事件。当kobject传入到函数kobject_add或kobject_del会产生相应的事件
-在event被用户空间处理前，处理kobject代码可以加入一些信息传递到用户空间，或完全不产生事件。
-
-处理事件的函数在结构体kset_hotplug_ops中，该结构体赋值到kset的hotplug_ops变量：
-struct kset_hotplug_ops {
-int (*filter)(struct kset *kset, struct kobject *kobj);
-char *(*name)(struct kset *kset, struct kobject *kobj);
-int (*hotplug)(struct kset *kset, struct kobject *kobj,
-char **envp, int num_envp, char *buffer,
-int buffer_size);
-};
-filter函数：内核用来决定是否要产生event
-name函数：当用户空间的hotplug程序被调用时，会被传到相应名字的子系统中，name函数提供这个名字
-hotplug函数：设置热插拔所需的环境变量
-
-总线，设备，驱动：
-总线：
-struct bus_type {
-char *name;
-struct subsystem subsys;
-struct kset drivers;
-struct kset devices;
-int (*match)(struct device *dev, struct device_driver *drv);
-struct device *(*add)(struct device * parent, char * bus_id);
-int (*hotplug) (struct device *dev, char **envp,
-int num_envp, char *buffer, int buffer_size);
-/* Some fields omitted */
-};
-创建和移除总线属性
-int bus_create_file(struct bus_type *bus, struct bus_attribute *attr);
-void bus_remove_file(struct bus_type *bus, struct bus_attribute *attr);
-
-设备：
+//=====================device
 struct device {
-struct device *parent;
-struct kobject kobj;
-char bus_id[BUS_ID_SIZE];
-struct bus_type *bus;
-struct device_driver *driver;
-void *driver_data;
-void (*release)(struct device *dev);
-/* Several fields omitted */
-};
+	struct device		*parent;
+	struct kobject kobj;
 
-****设备的注册****
-设备注册函数>
-int device_register(struct device *dev);
+}
+
+int __must_check device_register(struct device *dev);//注册
 void device_unregister(struct device *dev);
-设备要设置的变量包括：设置总线，设置父指针，设置释放函数
 
-设备驱动：
-struct device_driver {
-char *name;
-struct bus_type *bus;
-struct kobject kobj;
-struct list_head devices;
-int (*probe)(struct device *dev);
-int (*remove)(struct device *dev);
-void (*shutdown) (struct device *dev);
-};
-****驱动注册*****
-int driver_register(struct device_driver *drv);
-void driver_unregister(struct device_driver *drv);
-创建文件函数>
-int driver_create_file(struct device_driver *drv,struct driver_attribute *attr);
-void driver_remove_file(struct device_driver *drv,struct driver_attribute *attr);
+struct device_attribute {}
+int device_create_file(struct device *device,
+			      const struct device_attribute *entry);
+void device_remove_file(struct device *dev,
+			       const struct device_attribute *attr);
 
-Class：
-当设备加入或移除是Classes产生热插拔事件
-创建和删除函数>
-struct class_simple *class_simple_create(struct module *owner, char *name);
-void class_simple_destroy(struct class_simple *cs);
 
-增加删除类函数>
-struct class_device *class_simple_device_add(struct class_simple *cs,dev_t devnum,struct device *device,const char *fmt, ...);
-void class_simple_device_remove(dev_t dev);
+//创建sysfs文件
+struct device *device_create(struct class *class, struct device *parent,
+			     dev_t devt, void *drvdata, const char *fmt, ...)
 
-Full class接口：
+//=====================classs
 struct class {
-char *name;
-struct class_attribute *class_attrs;
-struct class_device_attribute *class_dev_attrs;
-int (*hotplug)(struct class_device *dev, char **envp,
-int num_envp, char *buffer, int buffer_size);
-void (*release)(struct class_device *dev);
-void (*class_release)(struct class *class);
-/* Some fields omitted */
-};
-注册函数
-int class_register(struct class *cls);
-void class_unregister(struct class *cls);
-
-类设备：
-类的目的是作为类中成员的容器，成员封装在struct class_device
-struct class_device {
-struct kobject kobj;
-struct class *class;
-struct device *dev;
-void *class_data;
-char class_id[BUS_ID_SIZE];
-};
-
-类接口：
-struct class_interface {
-struct class *class;
-int (*add) (struct class_device *cd);
-void (*remove) (struct class_device *cd);
-};
-当设备加入到类接口中声明的class时，类接口中的add函数会被调用。当移除class中的设备时remove函数会被调用
-
-×××××××××总览×××××××××：
-
-device_register注册设备：初始化设备中的一些变量，会将kobject注册到kobject核心（会产生热插拔事件）。
-设备被添加到总线的设备列表中，然后会遍历总线的驱动列表中的驱动。调用match函数，查看该驱动是否支持设备
-匹配成功后会将该驱动程序赋值给device中的驱动指针，并调用驱动中probe函数
-
-增加驱动：
-调用driver_register
-移除驱动调用driver_unregister。这个函数会遍历关联到该驱动的设备，调用release函数
-
-热插拔：
-当kobject增加或删除会调用/sbin/hotplug
-
-保证udev正确工作的前提是，保证major和minor号能够通过sysfs导出到用户空间。
-udev通过查找sys/class目录树下的dev，来确定设备的major和minor号。
-=================================
-平台设备：
-总线：
-platform_bus_type = {
-	.name		= "platform",
-	.match		= platform_match,
-};
-platform_match{
-- 匹配表of_match_table
-- 若驱动中有id_table，匹配id_table
-- 最后匹配名字
+	const char		*name;
+	struct module		*owner;
+	struct kobject			*dev_kobj;
 }
 
-平台设备：
-platform_device_register{
-- 初始化，device_initialize(&pdev->dev){
+class_register-->__class_register@class.c
+void class_unregister(struct class *class)
 
-	}
-- 加入设备，platform_device_add{
-	- 设置设备名为平台设备名，dev_set_name
-	- 设置资源名...
-	- device_add
-	}
-}
-
-平台设备驱动：
-platform_driver_register{
-- 设置probe，remove，shutdown回调
-- 注册driver_register
-}
+struct class_attribute {}
+class_create_file-->class_create_file_ns-->sysfs_create_file_ns@class.c//创建sysfs文件
 
 
 
-kernel/drivers/base/platform.c
-=================================
-驱动与设备匹配：@driver/base
-设备注册：
-device_register-->device_add(创建属性文件)@core.c-->bus_probe_device(设备中有bus)@bus.c
--->device_attach{
-- device中已指定驱动，且已经绑定则返回。若没有绑定执行device_bind_driver
-- 没有指定驱动，遍历总线中驱动查找匹配，bus_for_each_drv(dev->bus, NULL, dev, __device_attach)
+kernel/include/linux/device.h
+kernel/drivers/base/bus.c
+kernel/drivers/base/class.c
 
-}-->__device_attach{
-		- 调用driver_match_device, drv->bus->match判断驱动与设备是否匹配
-		- driver_probe_device-->really_probe{
-		- bus存在probe函数则执行bus的probe,dev->bus->probe
-		- 否则执行驱动中，drv->probe
-	}
-}@dd.c
-
-
-驱动注册：
-driver_register{
-- 驱动是否有bus，且bus和驱动都实现的probe函数，则打印警告(使用bus中的probe)。
-- 判断驱动是否已经注册，driver_find
-- 将驱动加入到总线，bus_add_driver{
-	- 获取总线，bus_get
-	- 创建driver_private，并初始化链表节点
-	- kobject_init_and_add
-	- 匹配设备，driver_attach-->(遍历总线上的设备)bus_for_each_dev(__driver_attach)-->__driver_attach{
-		- 判断是否匹配，driver_match_device-->drv->bus->match
-		- 若匹配且设备没有设置驱动，driver_probe_device-->really_probe{
-			- 设置设备驱动为该驱动，dev->driver = drv
-			- driver_sysfs_add
-			- 若总线有probe，则执行dev->bus->probe
-			- 否则若驱动有probe，则执行drv->probe
-			}
-		}@dd.c
-	}
-- 加入属性文件组，bus_add_driver{
-
-	}
-}@driver.c
-
-
-
-类注册：
-class_register@device.h-->__class_register(初始化subsys_private)@class.c-->kset_register
-
-
-include/linux/device.h
-drivers/base/class.c
-lib/kobject.c
-drivers/base/driver.c
-drivers/base/bus.c
-drivers/base/dd.c
-drivers/base/core.c
-_________________________________
-int register_chrdev(unsigned int major, const char *name,struct file_operations *fops)
-调用该方法注册驱动后，所有的次设备号0-255都会被注册，并会为每个次设备号创建cdev结构。所有的设备被打开后
-都是调用fops.open中方法
-
-_________________________________
-热插拔事件：
-kobject_uevent-->kobject_uevent_env@kobject_uevent.c
-
-lib/kobject_uevent.c
 

@@ -1,0 +1,9 @@
+//
+
+热插拔：
+当kobject增加或删除会调用/sbin/hotplug
+
+
+//设备节点创建
+保证udev正确工作的前提是，保证major和minor号能够通过sysfs导出到用户空间。
+udev通过查找sys/class目录树下的dev，来确定设备的major和minor号。

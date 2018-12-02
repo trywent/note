@@ -1,0 +1,70 @@
+//驱动与设备匹配：@driver/base
+//设备注册：
+device_register(struct device *dev){
+- device_initialize(dev){
+	- dev->kobj.kset = devices_kset //kset
+	- kobject_init(&dev->kobj, &device_ktype)//kobject
+	- device_pm_init(dev)
+	}
+- device_add(dev){
+	- kobject_add(&dev->kobj, dev->kobj.parent)
+	- device_create_file(dev, &dev_attr_uevent)
+	- device_add_attrs(dev)
+	- kobject_uevent(&dev->kobj, KOBJ_ADD) //设备时间
+	- bus_probe_device //探测设备驱动
+	}
+
+}@core.c
+
+
+bus_probe_device(设备中有bus)@bus.c
+-->device_attach{
+- device中已指定驱动，且已经绑定则返回。若没有绑定执行device_bind_driver
+- 没有指定驱动，遍历总线中驱动查找匹配，bus_for_each_drv(dev->bus, NULL, dev, __device_attach)
+
+}-->__device_attach{
+		- 调用driver_match_device, drv->bus->match判断驱动与设备是否匹配
+		- driver_probe_device-->really_probe{
+		- bus存在probe函数则执行bus的probe,dev->bus->probe
+		- 否则执行驱动中，drv->probe
+	}
+}@dd.c
+
+
+//驱动注册：
+driver_register{
+- 驱动是否有bus，且bus和驱动都实现的probe函数，则打印警告(使用bus中的probe)。
+- 判断驱动是否已经注册，driver_find
+- 将驱动加入到总线，bus_add_driver{
+	- 获取总线，bus_get
+	- 创建driver_private，并初始化链表节点
+	- kobject_init_and_add
+	- 匹配设备，driver_attach-->(遍历总线上的设备)bus_for_each_dev(__driver_attach)-->__driver_attach{
+		- 判断是否匹配，driver_match_device-->drv->bus->match
+		- 若匹配且设备没有设置驱动，driver_probe_device-->really_probe{
+			- 设置设备驱动为该驱动，dev->driver = drv
+			- driver_sysfs_add
+			- 若总线有probe，则执行dev->bus->probe
+			- 否则若驱动有probe，则执行drv->probe
+			}
+		}@dd.c
+	}
+- 加入属性文件组，bus_add_driver{
+
+	}
+}@driver.c
+
+
+
+//类注册：
+class_register@device.h-->__class_register(初始化subsys_private)@class.c-->kset_register
+
+//字符设备
+cdev_add-->kobj_map@char_dev.c
+
+
+
+
+kernel/include/linux/device.h
+kernel/drivers/base/core.c
+
