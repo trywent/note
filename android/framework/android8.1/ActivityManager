@@ -1,0 +1,83 @@
+/*服务启动
+
+FIRST_STATIC_STACK_ID = 0
+HOME_STACK_ID = FIRST_STATIC_STACK_ID                                    0:home luancher
+FULLSCREEN_WORKSPACE_STACK_ID = 1                                        1:全屏应用位置
+FREEFORM_WORKSPACE_STACK_ID = FULLSCREEN_WORKSPACE_STACK_ID + 1          2:free
+DOCKED_STACK_ID = FREEFORM_WORKSPACE_STACK_ID + 1                        3:分屏应用
+PINNED_STACK_ID = DOCKED_STACK_ID + 1                                    4:PIP
+RECENTS_STACK_ID = PINNED_STACK_ID + 1                                   5:systemui中RecentsActivity
+ASSISTANT_STACK_ID = RECENTS_STACK_ID + 1
+
+//动态栈 从7开始
+FIRST_DYNAMIC_STACK_ID = LAST_STATIC_STACK_ID + 1
+
+*/
+startBootstrapServices{
+- mActivityManagerService = mSystemServiceManager.startService(ActivityManagerService.Lifecycle.class).getService()
+- mActivityManagerService.setSystemServiceManager(mSystemServiceManager)
+- mActivityManagerService.setInstaller(installer)
+}@SystemServer.java
+
+startOtherServices-->mActivityManagerService.systemReady
+
+//设置WindowManager创建stack
+mActivityManagerService.setWindowManager(wm)@SystemServer.java-->setWindowManager{
+- mWindowManager = wm
+- mStackSupervisor.setWindowManager(wm){
+	- mWindowManager = wm
+	- mDisplayManager =(DisplayManager)getSystemService(Context.DISPLAY_SERVICE)
+	- mHomeStack = mFocusedStack = mLastFocusedStack =getStack(HOME_STACK_ID)//创建第一个stack
+	}@ActivityStackSupervisor.java
+- mActivityStarter.setWindowManager(wm){
+	
+	}
+}@ActivityManagerService.java
+
+
+getStack(stackId){
+- 若是DOCKED_STACK_ID,则需创建getStack(RECENTS_STACK_ID)
+- createStackOnDisplay(stackId)-->createStack{
+	- new PinnedActivityStack//PINNED_STACK_ID
+	- new ActivityStack
+	}
+}@ActivityStackSupervisor.java
+
+/*ActivityStarter启动Activity*/
+startActivity-->startActivityForResult@Activity.java-->mInstrumentation.execStartActivity
+-->execStartActivity@Instrumentation.java-->ActivityManager.getService().startActivity-->
+startActivity(IBinder whoThread, String callingPackage,Intent intent, String resolvedType, Bundle bOptions)
+-->mActivityStarter.startActivityMayWait@ActivityManagerService.java-->
+startActivityMayWait{
+
+}@ActivityStarter.java
+
+
+
+startActivityLocked-->startActivity-->startActivityUnchecked{
+- setInitialState{
+	- mLaunchBounds = getOverrideBounds(r, options, inTask) //options是否设置activity窗口范围
+	- mLaunchFlags = adjustLaunchFlagsToDocumentMode
+	}
+- ActivityRecord reusedActivity = getReusableIntentActivity()//可复用的Activity
+//查找stack,创建task
+- setTaskFromReuseOrCreateNewTask{ //新task
+	- mTargetStack = computeStackFocus(mStartActivity, mLaunchBounds)//获取stack
+	}
+- setTaskFromSourceRecord //从sourceRecord获取task
+- setTaskFromInTask
+- setTaskToCurrentTopOrCreateNewTask
+
+- startActivity
+}@ActivityStarter.java
+
+
+computeStackFocus(mStartActivity, mLaunchBounds)
+- 
+}
+
+frameworks/base/core/java/android/app/Activity.java
+frameworks/base/core/java/android/app/Instrumentation.java
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/core/java/com/android/server/am/ActivityStarter.java
+frameworks/base/services/core/java/com/android/server/am/ActivityStackSupervisor.java

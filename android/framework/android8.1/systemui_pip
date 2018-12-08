@@ -1,0 +1,124 @@
+//PIP
+start{
+- mPipManager = com.android.systemui.pip.phone.PipManager.getInstance()
+- mPipManager.initialize{
+	- mActivityManager = ActivityManager.getService()
+	- mWindowManager = WindowManagerGlobal.getWindowManagerService()
+	- mWindowManager.registerPinnedStackListener(mPinnedStackListener){
+		- mTaskStackListeners.add(listener)
+		- mIam.registerTaskStackListener(mTaskStackListener) //注册到ActivityManagerService
+		}
+	- mInputConsumerController = new InputConsumerController(mWindowManager)-->
+		registerInputConsumer{//监听输入事件
+		- inputChannel = new InputChannel()
+		- mWindowManager.createInputConsumer(INPUT_CONSUMER_PIP)
+		- new PipInputEventReceiver(inputChannel)
+		}@InputConsumerController.java
+	- mMediaController = new PipMediaController
+	- mMenuController = new PipMenuActivityController
+	- mTouchHandler = new PipTouchHandler(mInputConsumerController)
+	- mNotificationController = new PipNotificationController
+	- EventBus.getDefault().register(this)
+	}@PipManager.java
+- getComponent(CommandQueue.class).addCallbacks(this){
+	- mCallbacks.add(callbacks)
+	}@CommandQueue.java
+}@PipUI.java
+
+//注册到WidowManagerService
+PinnedStackListener{
+- onMinimizedStateChanged
+- onMovementBoundsChanged(insetBounds,normalBounds)-->mTouchHandler.onMovementBoundsChanged
+}
+
+
+//注册到ActivityManagerService,监听栈
+mTaskStackListener{
+- onActivityPinned(String packageName, int userId, int taskId){
+
+	}
+- onActivityUnpinned()
+}
+
+animateToUnexpandedState-->resizeAndAnimatePipUnchecked(normalBounds)@PipMotionHelper.java
+
+showMenu-->startMenuActivity@PipMenuActivityController.java
+
+
+
+_______________________
+//inputEvent
+InputConsumerController(mWindowManager)-->registerInputConsumer{//监听输入事件
+- inputChannel = new InputChannel()
+- mWindowManager.createInputConsumer(INPUT_CONSUMER_PIP)
+- new PipInputEventReceiver(inputChannel)
+}@InputConsumerController.java
+
+PipTouchHandler(mInputConsumerController)@PipManager.java-->
+PipTouchHandler(PipMenuActivityController menuController,inputConsumerController){
+- mMenuController = menuController
+- mMenuController.addListener(mMenuListener) //设置监听menu
+- mGestures = new PipTouchGesture[] {//触摸事件处
+                mDefaultMovementGesture
+        }
+- mMotionHelper = new PipMotionHelper//pip窗口移动操作
+- inputConsumerController.setTouchListener(this::handleTouchEvent)
+}@PipTouchHandler.java
+
+
+PipInputEventReceiver.onInputEvent-->mListener.onTouchEvent@@InputConsumerController.java-->
+handleTouchEvent{
+- MotionEvent.ACTION_DOWN-->gesture.onDown-->
+	PipTouchGesture.onDown{
+	- mMenuController.pokeMenu()
+	- mDismissViewController.createDismissTarget() //若发生长按,弹出拖动移除提示
+	- mHandler.postDelayed(mShowDismissAffordance
+	}
+- MotionEvent.ACTION_MOVE-->gesture.onMove-->
+	PipTouchGesture.onMove{
+	- 
+	- mMotionHelper.movePip(Rect mTmpBounds){//移动更新窗口位置
+		- resizePipUnchecked
+		- mBounds.set(toBounds)-->mActivityManager.resizePinnedStack(toBounds)
+		}@PipMotionHelper.java
+	}
+- MotionEvent.ACTION_UP{
+	- updateMovementBounds
+	- gesture.onUp{
+		- mMotionHelper.animateDismiss{ //消失
+			- BoundsAnimator = createAnimationToBounds		
+			- mBoundsAnimator.start()		
+			}
+		}
+	}
+}@PipTouchHandler.java
+
+//移除pip
+dismissPip-->mActivityManager.removeStack(PINNED_STACK_ID)
+
+//ActivityManagerService更新窗口位置
+onMovementBoundsChanged{
+- 
+- 
+- updateMovementBounds(mMenuState){
+	- mMovementBounds = isMenuExpanded
+                ? mExpandedMovementBounds //
+                : mNormalMovementBounds //
+	- mPinnedStackController.setMinEdgeSize
+	}
+}@PipTouchHandler.java
+
+
+createAnimationToBounds-->resizePipUnchecked
+
+
+setMinimizedState-->movePip-->resizePipUnchecked
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/PipUI.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipManager.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/recents/misc/SystemServicesProxy.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMotionHelper.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMenuActivity.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/InputConsumerController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipTouchHandler.java

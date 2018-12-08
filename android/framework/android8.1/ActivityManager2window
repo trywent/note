@@ -1,0 +1,263 @@
+/*=========================
+ ActivityManagerService----WindowManagerService
+
+ ActivityStack ---- TaskStack
+ TaskRecord   ---- Task
+ ActivityRecord  ---- AppWindowToken -- windowState
+*/
+ActivityStackSupervisor extends ConfigurationContainer{//结构
+- ActivityStack extends ConfigurationContainer{	
+	- TaskRecord extends ConfigurationContainer{
+		- ActivityRecords extends ConfigurationContainer{
+			- mWindowContainerController
+			}
+		- mWindowContainerController
+		}
+	- mWindowContainerController
+	}
+}
+
+ConfigurationContainer{
+- getConfiguration
+- onConfigurationChanged-->child.onConfigurationChanged
+- onParentChanged
+}@ConfigurationContainer.java
+
+//改变大小接口
+void resizeStackLocked(int stackId, Rect bounds)
+void resizeDockedStackLocked(Rect dockedBounds)
+void resizePinnedStackLocked(Rect pinnedBounds, Rect tempPinnedTaskBounds)
+
+/******************************
+ActivityStack ---- TaskStack
+*/
+getStack-->createStackOnDisplay-->createStack{//创建Activitystack
+- PINNED_STACK_ID:new PinnedActivityStack-->super(){
+		- createStackWindowController-->new PinnedStackWindowController
+		}
+- new ActivityStack{
+	- mWindowContainerController = createStackWindowController-->new StackWindowController//关联window
+	}@ActivityStack.java
+}@ActivityStackSupervisor.java
+
+positionChildAt(TaskRecord,index){
+- TaskRecord.updateOverrideConfiguration-->updateOverrideConfiguration@TaskRecord.java
+- insertTaskAtPosition(task, index)
+}@ActivityStack.java
+
+//改变大小
+resize(Rect bounds)-->setBounds(bounds)
+
+
+/******************************
+TaskRecord   ---- Task
+*/
+setTaskToCurrentTopOrCreateNewTask--> mTargetStack.createTaskRecord@ActivityStarter.java
+-->createTaskRecord{
+- TaskRecord task = new TaskRecord
+- addTask{
+	- mTaskHistory.add(position, task)
+	- task.setStack(this)
+	}
+- task.createWindowContainer{
+	- Rect bounds = updateOverrideConfigurationFromLaunchBounds()	//获取大小getLaunchBounds-->mStack.mBounds 
+	- setWindowContainerController(new TaskWindowContainerController(bounds))//关联window
+	}@TaskRecord
+}@ActivityStack.java
+
+
+updateOverrideConfiguration{
+- newConfig = getOverrideConfiguration
+- computeOverrideConfiguration{//调整configuration
+	- StackWindowController stackController = mStack.getWindowContainerController()
+	- stackController.adjustConfigurationForBounds(bounds)
+	}
+- onOverrideConfigurationChanged{
+	- onConfigurationChanged(newParentConfig){
+		- mFullConfiguration.setTo(newParentConfig)
+		- child = getChildAt(i) //ActivityRecord
+		- child.onConfigurationChanged-->onConfigurationChanged@ActivityRecord.java
+		}
+	- onMergedOverrideConfigurationChanged
+	}@ConfigurationContainer.java
+- mService.mStackSupervisor.scheduleUpdateMultiWindowMode 
+}@TaskRecord.java
+
+
+/******************************
+ActivityRecord  ---- AppWindowToken
+
+当ActivityRecord创建后就加入到WindowManager中进行管理
+*/
+startActivityLocked-->r.createWindowContainer@ActivityStack.java-->
+createWindowContainer-->new AppWindowContainerController(appToken)@ActivityRecord.java//关联window
+
+ensureActivityConfigurationLocked-->
+updateOverrideConfiguration{
+- computeBounds(mBounds)
+- onOverrideConfigurationChanged{
+	- task.computeOverrideConfiguration
+	- onOverrideConfigurationChanged-->mWindowContainerController.onOverrideConfigurationChanged //设置Windows端
+	}
+}@AcvitiyRecord.java
+
+
+
+
+frameworks/base/services/core/java/com/android/server/am/ActivityStarter.java
+frameworks/base/services/core/java/com/android/server/am/ActivityStack.java
+frameworks/base/services/core/java/com/android/server/am/TaskRecord.java
+frameworks/base/services/core/java/com/android/server/wm/AppWindowContainerController.java
+frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
+frameworks/base/services/core/java/com/android/server/am/ConfigurationContainer.java
+/*=========================windowManager
+
+
+TaskStack extends WindowContainer{
+- Task extends WindowContainer{
+  - AppWindowToken extends WindowContainer{
+	- windowState
+	}
+  }
+}
+
+ 窗口宽高比默认改为0.DEFAULT_PRE_O_MAX_ASPECT_RATIO=1.86@PackageParser.java
+*/
+WindowContainerController{
+- void setContainer(E container)
+- removeContainer()
+}@WindowContainerController.java
+
+StackWindowController, TaskWindowContainerController, AppWindowContainerController extends WindowContainerController{
+- mContainer 是一个WindowContainer
+}
+
+TaskStack, Task, AppWindowToken extends WindowContainer{
+- addChild(child){
+	- mChildren.add
+	- child.setParent-->onParentSet
+	}
+}@WindowContainer.java
+
+setController-->controller.setContainer(this)@WindowContainer.java-->mContainer = container
+@WindowContainerController.java
+
+
+sendNewConfiguration-->mActivityManager.updateDisplayOverrideConfiguration@WindowManagerService.java
+
+
+/******************************
+TaskStack
+*/
+StackWindowController(stackId){
+- DisplayContent dc = mRoot.getDisplayContent(displayId) //mRoot为WindowManagerService
+- TaskStack stack = dc.addStackToDisplay(stackId){
+	- TaskStack stack = getStackById(stackId)
+	- stack = new TaskStack(mService, stackId)
+	- mTaskStackContainers.addStackToDisplay(stack){//加入到TaskStackContainers(所有应用窗口的归宿)
+		- addChild(stack)
+		- stack.onDisplayChanged(DisplayContent.this) //通知displayContent变化...通知到所有child
+		}
+	}@DisplayContent.java
+- stack.setController(this) //设置controler ,container
+}@StackWindowController.java
+
+
+
+//调整窗口大小,调整configuration
+computeOverrideConfiguration@TaskRecord.java-->
+adjustConfigurationForBounds{
+- 
+}@StackWindowController.java
+
+
+
+/******************************
+ Task
+*/
+TaskWindowContainerController{
+- TaskStack stack = stackController.mContainer
+- Task task = createTask-->new Task(this,bounds){
+	- setController(controller)//设置controler ,container
+	- setBounds
+	}
+- stack.addTask(task)-->addChild
+}@TaskWindowContainerController.java
+
+
+//当加入到Stack时被调用
+onParentSet{
+- updateDisplayInfo(getDisplayContent()){
+	- setBounds //若屏幕旋转后需要更新大小
+	}
+- forceWindowsScaleable
+}@Task.java
+
+//是否全屏
+isFullscreen{
+- if(useCurrentBounds){//pinned,assistent,freeform	
+	- mFillsParent //设置bounds后为false
+	}
+}
+
+//大小
+getBounds{
+- if(useCurrentBounds()){//当条件满足:不能调整task大小的栈(能被docked调整task的为home,fullscreen)/Dodked栈存在
+	- mBounds
+	}
+- mStack.getDisplayContent().getLogicalDisplayRect(out)
+}@Task.java
+
+resizeLocked-->setBounds //调整大小
+
+/******************************
+ AppWindowToken 对应一个ActivityRecord..
+ WindowManager在displayContent中mTokenMap直接管理窗口
+ 
+*/
+AppWindowToken
+
+AppWindowContainerController(token/*ActivityRecord.appToken*/){
+- mToken = token
+- AppWindowToken atoken = createAppWindow(token,task.getDisplayContent())-->new AppWindowToken{
+	- super()-->WindowToken{
+		- token
+		- onDisplayChanged(dc)-->dc.reParentWindowToken(this) //加入到DisplayContent
+		}@WindowToken.java
+	- setController(controller)//设置controler ,container
+	}@AppWindowToken.java
+- task.addChild(atoken) //加入到task
+}@AppWindowContainerController.java
+
+onOverrideConfigurationChanged@ActivityReocrd.java-->onOverrideConfigurationChanged@WindowContainer.java
+
+setBounds-->updateAdjustedBounds
+onOverrideConfigurationChanged-->onConfigurationChanged@WindowContainer.java
+
+
+/*======================configuration
+*/
+updateDisplayOverrideConfiguration{
+- mWindowManager.computeNewConfiguration //计算配置
+- updateDisplayOverrideConfigurationLocked-->updateGlobalConfiguration-->mStackSupervisor.onConfigurationChanged
+}@ActivityManagerService.java
+
+
+
+/*======================应用窗口大小
+*/
+relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,Surface outSurface){
+- WindowState win = windowForClientLocked-->mWindowMap.get(client) //获取对应窗口
+- mPolicy.adjustWindowParamsLw(attrs) //调整属性
+- createSurfaceControl(outSurface)//surface
+- configChanged = updateOrientationFromAppTokensLocked //更新方位
+- 
+}@WindowManagerService.java
+
+frameworks/base/services/core/java/com/android/server/wm/StackWindowController.java
+frameworks/base/services/core/java/com/android/server/wm/TaskWindowContainerController.java
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
+frameworks/base/services/core/java/com/android/server/wm/WindowContainer.java
+frameworks/base/services/core/java/com/android/server/wm/WindowContainerController.java
+frameworks/base/services/core/java/com/android/server/wm/Task.java
+frameworks/base/services/core/java/com/android/server/am/ConfigurationContainer.java

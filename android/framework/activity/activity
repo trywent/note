@@ -1,39 +1,16 @@
-//
-activity:
-状态间的转变：
-Created-----started(可见)-----Resumed-----Paused-----sopted-----destoryed
-
-只可稳定的处在三种状态：
-Resumed:用户可见可交互操作
-Paused:局部可见用户不可交互
-Stoped:不可见，activity的实例，状态，变量等都被保留。
-
-生命周期：
-整个生命周期：onCreate(Bundle) 到 onDestroy().
-可视生命周期：onStart() 到 onStop().
-前端生命周期：onResume() 到 onPause().（用户正在交互的应用，在所有其他应用的前面） 
-__________________
-task和process：
-
-从主页开始启动一个app，则一个task被开始。在一个task中所有的activities被退入一个stack中。
-使用回退键可以返回到前一个activity。
-
-当启动的activity是singleTask时，会切换Task。
-
-__________________
-Activity类：
-{
-void onCreate (Bundle savedInstanceState); //初始化调用setContentView(int)，findViewById
-void setContentView(int);        //设置activity的View
-View findViewById (int id);       //从被onCreate(Bundle)处理过得xml文件中，查找对应id的View
-
-}
-
-设置内容：
-setContentView (int layoutResID)//从layout的xml文件中设置View
-
-
-
+//activity:生命周期 Created-----started(可见)-----Resumed-----Paused-----sopted-----destoryed
+performLaunchActivity@ActivityThread.java-->
+attach(Context context, ActivityThread aThread,){
+- mWindow = new PhoneWindow(this, window, activityConfigCallback) //创建窗口
+- mWindow.setCallback(this)
+- mWindow.setWindowManager(ontext.getSystemService(Context.WINDOW_SERVICE),mToken,appName)//创建当前窗口的windowManagerImpl.....
+	-->setWindowManager{
+	- mAppToken = appToken //设置token,,,源头ActivtyManager中activityRecord
+	- mAppName = appName
+	- wm.createLocalWindowManager(this)-->new WindowManagerImpl(mContext, parentWindow)
+	}@Window.java 
+- mWindowManager = mWindow.getWindowManager()
+}@Activity.java
 
 ==================
 launcher的启动：

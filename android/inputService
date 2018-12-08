@@ -1,125 +1,4 @@
 //
-Application Not Responding" (ANR)。
-UI thread (which drives the user interface event loop)，所以耗时工作应该在另外的线程中执行。
-通常，当应用不能响应用户输入，系统显示ANR。
-
-满足下列两个条件：弹出ANR
-No response to an input event (such as key press or screen touch events) within 5 seconds.
-A BroadcastReceiver hasn't finished executing within 10 seconds.
-
-耗时操作使用AsyncTask 或则实现自己的Thread，
-
-参考http://developer.android.com/training/articles/perf-anr.html#Avoiding
-
-
-================
-按键：
-listener：1，实现处理方法 2，注册listener 3，触发事件执行处理方法
-view中handler负责处理事件，满足条件执行listener中的方法。
-
-物理按键传送到焦点组件
-Remember that hardware key events are always delivered to the View currently in focus
-在activity可以获得物理按键的操作onKeyDown() and onKeyUp()
-As an alternative to capturing key events through your View, you can also receive all
- of the events inside your Activity with onKeyDown() and onKeyUp().
-
-一些设备只有软件实现的输入，这些按键不会产生onKeyDown等类似事件。（它们的交互通过像IME_ACTION_DONE...）
-it will generally not trigger the onKeyDown() family of events。
-
-使用方向键或滚球时有必要给相应的item以焦点。（可以看出当前操作的是什么）
-
-进入touchmode后
- only Views for which isFocusableInTouchMode() is true will be focusable, such as text
- editing widgets. Other Views that are touchable, like buttons, will not take focus when
- touched; they will simply fire their on-click listeners when pressed.
-
-framework处理view的焦点改变
-
-
-设备(信号)
--->
-driver(转化信号为标准的事件) ，事件类型和编码定义在linux/input.h
--->
-android层转换。EventHub组件打开输入设备的驱动文件，读取输入事件。
-InputReader根据设备类解码输入事件，并生成Android输入事件流。linux输入事件码转换成android输入事件码。
-最后inputReader将事件发送到InputDispatcher，后者将事件分发到相应的窗口
-
-
-
-==============================
-injectkeyevent: 如：input keyevent 4
-在shell中通过exec app_process 启动执行java代码
-
-脚本：
-base=/system
-export CLASSPATH=$base/framework/input.jar
-exec app_process $base/bin com.android.commands.input.Input $*
-
-frameworks/base/cmds/app_process/app_main.cpp
-framework/base/cmds/input/input.java
-framework/base/cmds/input/input
-
-
-
-_____________________
-注入事件：
-injectKeyEvent@input.java-->injectInputEvent@InputManager.java-->IInputManager.injectInputEvent()
--->nativeInjectInputEvent@com_android_server_input_InputManagerService.cpp-->
-injectInputEvent{
-- KEY_EVENT{
-	- 验证， validateKeyEvent
-	- 系统先处理，mPolicy->interceptKeyBeforeQueueing
-	- 创建KeyEntry
-	}
-- MOTION_EVENT{
-	- 验证， validateKeyEvent
-	- 系统先处理，mPolicy->interceptKeyBeforeQueueing
-	- 创建MotionEntry
-	}
-- 加入队列,enqueueInboundEventLocked
-- 等待结果，injectionState->injectionResult。(dispatchKeyLocked-->setInjectionResultLocked中设置结果)
-}@InputDispatcher.cpp
-
-消耗事件：
-threadLoop-->mDispatcher->dispatchOnce-->dispatchOnceInnerLocked（从mInboundQueue中取出event，
-根据不同的事件调用对应的处理函数）-->dispatchKeyLocked(从这里开始处理按键事件，找到处理该事件的目标)
--->dispatchEventLocked-->prepareDispatchCycleLocked-->enqueueDispatchEntriesLocked-->
-InputDispatcher::enqueueDispatchEntryLocked-->connection->inputState.trackKey && connection
-->outboundQueue.enqueueAtTail@InputDispatcher.cpp
-
-InputManagerService实现IInputManager.stub。
-
-injectInputEvent@InputDispatcher.cpp将事件加入队列后，调用分发函数。在一个循环中等待分发结果，并返回。
-其中会检查执行inject进程的权限，不被POLICY_FLAG_TRUSTED的事件不会执行interceptKeyBeforeQueueing，
-也不会执行interceptKeyBeforeDispatching（所以HOME操作不会执行）。
-
-mInboundQueue是event队列
-
-interceptKeyBeforeQueueing一些硬件按键power，volume
-interceptKeyBeforeDispatching处理HOME，SEARCH，MENU（没有BACK）
-
---------------------
-consumed by policy:
-
-injectInputEvent-->
-dispatchOnce-->dispatchOnceInnerLocked{
-- 根据不同事件进行分发
-- 按键事件TYPE_KEY{
-	- 若有DROP_REASON_BLOCKED，设置丢弃原因为blocked
-	- dispatchKeyLocked
-	}
-- 若回复是丢弃事件，dropInboundEventLocked
-}
-
-TAG:
-WindowManager
-InputDispatcher
-KeyguardViewMediator
-
-================================
-input的服务从WindowManagerService开始：
-
-初始化相关类：
 InputManagerService(构造方法)@InputManagerService.java-->nativeInit-->NativeInputManager(构造方法)
 @com_android_server_input_InputManagerService.cpp-->new InputManager@InputManager.cpp-->
 ————————————————————————————————
@@ -188,7 +67,7 @@ setFocusedActivityLocked@ActivityManagerService.java-->setFocusedApp@WindowManag
 -->setFocusedApplication@com_android_server_input_InputManagerService.cpp-->
 setFocusedApplication@InputDispatcher.cpp
 
-====================================
+============================
 Connection注册(建立事件通道和事件接收目标的联系)：
 
 两种注册方式：
@@ -371,7 +250,7 @@ frameworks/base/libs/androidfw/InputTransport.cpp
 frameworks/base/core/java/android/view/InputEventReceiver.java
 frameworks/base/core/jni/android_view_InputEventReceiver.cpp
 
-===============================
+============================
 inputDevice:
 InputDevice::addMapper-->mMappers.add@InputReader.cpp
 
@@ -403,7 +282,56 @@ onKeyUp/onKeyDown
 
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindow.java
 ============================
-显示触摸：Settings.System.SHOW_TOUCHES
+//注入事件
+injectKeyEvent@input.java-->injectInputEvent@InputManager.java-->IInputManager.injectInputEvent()
+-->nativeInjectInputEvent@com_android_server_input_InputManagerService.cpp-->
+injectInputEvent{
+- KEY_EVENT{
+	- 验证， validateKeyEvent
+	- 系统先处理，mPolicy->interceptKeyBeforeQueueing
+	- 创建KeyEntry
+	}
+- MOTION_EVENT{
+	- 验证， validateKeyEvent
+	- 系统先处理，mPolicy->interceptKeyBeforeQueueing
+	- 创建MotionEntry
+	}
+- 加入队列,enqueueInboundEventLocked
+- 等待结果，injectionState->injectionResult。(dispatchKeyLocked-->setInjectionResultLocked中设置结果)
+}@InputDispatcher.cpp
+
+消耗事件：
+threadLoop-->mDispatcher->dispatchOnce-->dispatchOnceInnerLocked（从mInboundQueue中取出event，
+根据不同的事件调用对应的处理函数）-->dispatchKeyLocked(从这里开始处理按键事件，找到处理该事件的目标)
+-->dispatchEventLocked-->prepareDispatchCycleLocked-->enqueueDispatchEntriesLocked-->
+InputDispatcher::enqueueDispatchEntryLocked-->connection->inputState.trackKey && connection
+->outboundQueue.enqueueAtTail@InputDispatcher.cpp
+
+InputManagerService实现IInputManager.stub。
+
+injectInputEvent@InputDispatcher.cpp将事件加入队列后，调用分发函数。在一个循环中等待分发结果，并返回。
+其中会检查执行inject进程的权限，不被POLICY_FLAG_TRUSTED的事件不会执行interceptKeyBeforeQueueing，
+也不会执行interceptKeyBeforeDispatching（所以HOME操作不会执行）。
+
+mInboundQueue是event队列
+
+interceptKeyBeforeQueueing一些硬件按键power，volume
+interceptKeyBeforeDispatching处理HOME，SEARCH，MENU（没有BACK）
+
+--------------------
+consumed by policy:
+
+injectInputEvent-->
+dispatchOnce-->dispatchOnceInnerLocked{
+- 根据不同事件进行分发
+- 按键事件TYPE_KEY{
+	- 若有DROP_REASON_BLOCKED，设置丢弃原因为blocked
+	- dispatchKeyLocked
+	}
+- 若回复是丢弃事件，dropInboundEventLocked
+}
+============================
+//显示触摸：Settings.System.SHOW_TOUCHES
 updateShowTouchesFromSettings-->nativeSetShowTouches@InputManagerService.java
 nativeSetShowTouches-->im->setShowTouches(enabled)-->NativeInputManager::setShowTouches-->
 mInputManager->getReader()->requestRefreshConfiguration@com_android_server_input_InputManagerService.cpp
@@ -426,7 +354,7 @@ frameworks/base/services/jni/com_android_server_input_InputManagerService.cpp
 frameworks/base/services/input/InputReader.cpp
 frameworks/base/services/input/SpriteController.h
 ___________________________
-触摸位置：Settings.System.POINTER_LOCATION
+//触摸位置：Settings.System.POINTER_LOCATION
 
 Settings.System.getInt(Settings.System.POINTER_LOCATION)，发生改变-->
 mHandler.sendEmptyMessage(MSG_ENABLE_POINTER_LOCATION)-->handleMessage-->
@@ -441,7 +369,7 @@ enablePointerLocation{
 
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
 ============================
-获取事件：
+//获取事件：
 创建socket对：InputChannel[0]系统写入事件，InputChannel[1]客户端读取事件
 InputChannel.openInputChannelPair
 

@@ -12,6 +12,7 @@ startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
             VolumeUI.class,
             Divider.class,
             SystemBars.class,
+	    PipUI.class,
 	    .....
 	}
 - SystemUIFactory.getInstance().createInstance(cl) //创建服务对象
@@ -21,6 +22,7 @@ startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
 
 =======================
 //statusBar窗口：
+super_status_bar{
 status_bar.xml{
 - notification_lights_out
 - system_icons.xml{
@@ -28,6 +30,7 @@ status_bar.xml{
 	- signal_cluster_view.xml
 	- battery
 	}
+}
 }
 
 
@@ -41,7 +44,7 @@ SystemBars.start-->createStatusBarFromConfig{
 	}@StatusBar.java
 }@SystemBars.java
 
-
+//创建statusBar,NaviBar
 createAndAddWindows-->addStatusBarWindow{//创建view
 - makeStatusBarView{
 	- inflateStatusBarWindow-->mStatusBarWindow = View.inflate(R.layout.super_status_bar)
@@ -49,6 +52,7 @@ createAndAddWindows-->addStatusBarWindow{//创建view
 	- FragmentHostManager.get(mStatusBarWindow).addTagListener().getFragmentManager().replace(new CollapsedStatusBarFragment)
 	- StatusBarIconControllerImpl.addIconGroup(new IconManager((ViewGroup))
 	- mStatusBarWindow.findViewById(R.id.qs_frame) //快速设置view
+	- createNavigationBar-->NavigationBarFragment.create//创建导航条
 	}
 - mStatusBarWindowManager.add(mStatusBarWindow, getStatusBarHeight())
 }@StatusBar.java
@@ -168,12 +172,48 @@ pickUpViewFromPool{
 
 
 =======================
+//NavigationBar
+NavigationBarFragment.create{ //创建导航条
+- WindowManager.LayoutParams lp = new WindowManager.LayoutParams //布局参数
+- View navigationBarView = inflate(R.layout.navigation_bar_window)//导航条view
+- context.getSystemService(WindowManager.class).addView(navigationBarView, lp) //加入view
+}@NavigationBarFragment.java
+
+//navigation_bar_window对应NavigationBarFragment
+onCreateView{
+- inflater.inflate(R.layout.navigation_bar)
+}@NavigationBarFragment
+
+
+onFinishInflate{
+- inflateChildren{
+	- mRot0 = (FrameLayout) mLayoutInflater.inflate(R.layout.navigation_layout)
+	- addView(mRot0)
+	}
+- inflateLayout(getDefaultLayout())-->inflateButtons{
+	- createView
+	- parent.addView(v)
+	}
+}@NavigationBarInflaterView.java
+
+
+//按钮View
+updateIcons{
+- mBackIcon = getDrawable(ctx, R.drawable.ic_sysbar_back)
+- mHomeDefaultIcon = getDrawable(ctx,R.drawable.ic_sysbar_home)
+- mRecentIcon = getDrawable(ctx,R.drawable.ic_sysbar_recent)
+- mImeIcon = getDrawable(R.drawable.ic_ime_switcher_default)
+}@NavigationBarView.java
+
+
+
 //按钮事件：所有的按钮都是实现KeyButtonView.java
 (重写View中方法)onTouchEvent-->sendEvent(发送事件)-->sendEvent(事件和时间)-->
 InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
 
 
-
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarInflaterView.java
 =======================
 
 //信号图标
@@ -316,3 +356,4 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/Sign
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/MobileSignalController.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/CallbackHandler.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/qs/tiles/CellularTile.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarFragment.java

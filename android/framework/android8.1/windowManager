@@ -3,7 +3,7 @@ WindowManagerService{
 - mRoot = new RootWindowContainer(this)
 - mPolicy = policy
 - mFxSession = new SurfaceSession()
-}
+}@WindowManagerService.java
 
 
 onDisplayAdded(displayId){
@@ -16,24 +16,29 @@ onDisplayAdded(displayId){
 	- mService.registerPointerEventListener(dc.mTapDetector)
 	}@RootWindowContainer.java
 - displayReady
-}
+}@WindowManagerService.java
 
-DisplayContent(WindowManagerService service){
-- super.addChild(mTaskStackContainers) //应用窗口
-- super.addChild(mAboveAppWindowsContainers)
-- super.addChild(mBelowAppWindowsContainers)
-- super.addChild(mImeWindowsContainers)
-- mService.mRoot.addChild(this, null) //加入到mRoot
-}
+
 
 thawRotation@WindowManagerService.java
 
 
-//layout
+//window
+addWindow(IWindow client,WindowManager.LayoutParams attrs){
+- WindowToken token = displayContent.getWindowToken(attrs.token) //获取对应ActivityRecord的WindowToken(本质一个AppWindowToken)
+- AppWindowToken atoken = token.asAppWindowToken() //FIRST_APPLICATION_WINDOW -LAST_APPLICATION_WINDOW 应用窗口
+- WindowState win = new WindowState(token,attrs){
+	- mToken = token
+	}
+- win.attach()
+- mWindowMap.put(client.asBinder(), win)
+- win.mToken.addWindow(win) //将windowState加入到AppWindowToken
+- mPolicy.getInsetHintLw(outOutsets) //获取初始窗口大小
+}@WindowManagerService.java
 
 
 =====================
-//应用设置方位
+/*应用设置方位*/
 setRequestedOrientation@ActivityManagerService.java-->setRequestedOrientation{
 - displayConfig = mStackSupervisor.getDisplayOverrideConfiguration
 - mWindowContainerController.setOrientation(requestedOrientation){ //设置方位
@@ -52,9 +57,7 @@ updateOrientationFromAppTokens-->updateOrientationFromAppTokensLocked(currentCon
 	}
 }
 
-/*
- 更新窗口方位.先根据非应用窗口计算,然后再计算应用窗口
-*/
+//更新窗口方位.先根据非应用窗口计算,然后再计算应用窗口
 updateOrientationFromAppTokensLocked{
 - DisplayContent dc = mRoot.getDisplayContent(displayId)
 - req = dc.getOrientation{
@@ -68,9 +71,9 @@ updateOrientationFromAppTokensLocked{
 		- mCurrentAppOrientation =req //设置app方位	
 		- updateOrientationListenerLp
 		}@PhoneWindowManager.java
-	- dc.updateRotationUnchecked //更新屏幕
+	- dc.updateRotationUnchecked //更新屏幕..最终调用位置
 	}
-}
+}@WindowManagerService.java
 
 
 
@@ -82,8 +85,8 @@ updateRotationUnchecked{
 - sendNewConfiguration(displayId)//方位变化更新配置
 }@WindowManagerService.java
 
-
-updateOrientationListenerLp{//打开或关闭传感器listener
+//打开或关闭传感器listener
+updateOrientationListenerLp{
 - !mOrientationListener.canDetectOrientation() //传感器无效返回
 - needSensorRunningLp{
 	- mOrientationListener.enable	

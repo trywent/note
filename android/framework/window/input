@@ -1,5 +1,39 @@
-输入事件的接收窗口：
+//
+InputChannel[] openInputChannelPair@InputChannel.java//打开inputChannel
+new WindowInputEventReceiver(mInputChannel)//应用读取inputchannel
+registerInputChannel(InputChannel inputChannel,InputWindowHandle inputWindowHandle)//注册inputchannel到inputManagerService
+-->nativeRegisterInputChannel@InputManagerService.java
 
+//
+createInputConsumer(name,inputChannel){
+- new InputConsumerImpl(mService, name, inputChannel){
+	- InputChannel[] channels = InputChannel.openInputChannelPair(name)
+	- mServerChannel = channels[0]
+	- channels[1].transferTo(inputChannel) //切到应用inputChannel
+	- mService.mInputManager.registerInputChannel(mServerChannel)
+	- mWindowHandle = new InputWindowHandle //创建windowHandle
+	}@InputConsumerImpl.java
+- addInputConsumer{
+	- mInputConsumers.put(name, consumer)
+	- updateInputWindowsLw
+	}
+}@InputMonitor.java
+
+
+frameworks/base/services/core/java/com/android/server/input/InputManagerService.java
+frameworks/base/services/core/java/com/android/server/wm/InputMonitor.java
+frameworks/base/services/core/java/com/android/server/wm/InputConsumerImpl.java
+frameworks/base/core/java/android/view/InputChannel.java
+==========================
+//windowState设置inputChannel
+addWindow(InputChannel outInputChannel)@WindowManagerService.java-->
+openInputChannel(outInputChannel){
+- InputChannel[] inputChannels = InputChannel.openInputChannelPair(name)//inputChannel,一个在inputDispatcher一个在应用进程
+- mInputChannel = inputChannels[0]
+- mClientChannel = inputChannels[1]
+- mClientChannel.transferTo(outInputChannel) //转到outInputChannel
+- mService.mInputManager.registerInputChannel(mInputChannel)//注册到inputManager
+}@WindowState
 
 
 窗口设置触摸区域：
@@ -70,11 +104,9 @@ findFocusedWindowLocked{
 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 
 
-frameworks/base/services/java/com/android/server/wm/InputMonitor.java
+
 frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
 frameworks/base/services/java/com/android/server/wm/WindowState.java
-
-
 
 ===================
 setInputFocusLw-->updateInputWindowsLw@InputMonitor.java-->setInputWindows@InputManagerService.java
@@ -82,10 +114,6 @@ setInputFocusLw-->updateInputWindowsLw@InputMonitor.java-->setInputWindows@Input
 @com_android_server_input_InputManagerService.cpp-->InputDispatcher::setInputWindows
 @InputDispatcher.cpp
 
-dump@InputManagerService.java-->nativeDump-->im->dump-->NativeInputManager::dump{
-- mInputManager->getReader()->dump
-- mInputManager->getDispatcher()->dump
-}
 
 
 frameworks/base/services/jni/com_android_server_input_InputManagerService.cpp

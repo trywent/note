@@ -1,4 +1,4 @@
-两种层次的访问控制：
+//两种层次的访问控制：
 - (类)At the top level—public, or package-private (no explicit modifier).
 - (成员)At the member level—public, private, protected, or package-private (no explicit modifier).
 

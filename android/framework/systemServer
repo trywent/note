@@ -49,6 +49,10 @@ startCoreServices{
 - 
 }
 
+startOtherServices{
+- wm = WindowManagerService.main(context, inputManager)//窗口服务
+- ServiceManager.addService(Context.WINDOW_SERVICE, wm)
+}
 
 //将服务注册到serviceManager（publish）
 publishBinderService-->ServiceManager.addService@SystemService.java

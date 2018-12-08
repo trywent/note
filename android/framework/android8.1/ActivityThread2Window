@@ -1,0 +1,81 @@
+/******************************
+activityThread
+Activity进程中执行的操作,启动,加入view
+	
+*/
+attach(Context context, ActivityThread aThread,Window window){
+- mWindow = new PhoneWindow(this, window)
+- mMainThread = aThread
+- mWindow.setWindowManager((WindowManager)context.getSystemService(Context.WINDOW_SERVICE))
+}@Activity.java
+
+handleResumeActivity{
+- ActivityClientRecord r = mActivities.get(token)
+- r.window = r.activity.getWindow()
+- View decor = r.window.getDecorView()
+- ViewManager wm = a.getWindowManager() //从Activity获取WindowManager
+- WindowManager.LayoutParams l = r.window.getAttributes() 
+- wm.addView(decor, l) //加入view到WindowManager
+}ActivityThread.java
+
+
+
+/******************************
+加入窗口到windowManager
+*/
+context.getSystemService(Context.WINDOW_SERVICE)@Context.java-->new WindowManagerImpl
+@SystemServiceRegistry.java
+
+mGlobal = WindowManagerGlobal.getInstance()@WindowManagerImpl.java-->
+sDefaultWindowManager = new WindowManagerGlobal{
+- ArrayList<View> mViews = new ArrayList<View>()
+- MyArrayList<ViewRootImpl> mRoots = new MyArrayList<ViewRootImpl>()
+}@WindowManagerGlobal
+
+//activity加入窗口
+addView(View view)-->mGlobal.addView(view, params, mContext.getDisplay(), mParentWindow)@WindowManagerImpl
+-->addView(View view,mContext.getDisplay(),mParentWindow){
+- parentWindow.adjustLayoutParamsForSubWindow(wparams){
+	- wp.token = mAppToken
+	- wp.setTitle(mAppName)
+	}@Window.java
+- ViewRootImpl root = new ViewRootImpl(view.getContext(), display)
+- mViews.add(view),mRoots.add(root)
+- root.setView(view)-->setView@ViewRootImpl.java
+}@WindowManagerGlobal.java
+
+/******************************
+ViewRootImpl 所有view到WindowManager操作接口
+*/
+ViewRootImpl{
+- IWindowSession mWindowSession = WindowManagerGlobal.getWindowSession(){//Session接口
+	- InputMethodManager imm = InputMethodManager.getInstance
+	- IWindowManager windowManager = getWindowManagerService{
+		- IWindowManager.Stub.asInterface(ServiceManager.getService("window") //获取window服务
+		}
+	- IWindowSession sWindowSession = windowManager.openSession(IWindowSessionCallback,imm)-->
+		openSession-->new Session@WindowManagerService.java
+	}
+- mThread = Thread.currentThread()
+- mWindow = new W(this)
+}@ViewRootImpl
+
+setView(view){
+- mView = view
+- mInputChannel = new InputChannel()
+- mWindowSession.addToDisplay(mWindow,mInputChannel)
+}@ViewRootImpl.java
+
+//IWindowSession接口
+public int add(IWindow window,WindowManager.LayoutParams attrs,, Rect outContentInsets, Rect outStableInsets,
+InputChannel outInputChannel)-->addToDisplay-->mService.addWindow@Session.java
+public int relayout(IWindow window,WindowManager.LayoutParams attrs,int requestedWidth,Surface outSurface)-->
+mService.relayoutWindow@Session.java
+
+
+
+frameworks/base/core/java/android/app/ActivityThread.java
+frameworks/base/services/core/java/com/android/server/wm/Session.java
+frameworks/base/core/java/android/view/WindowManagerImpl.java
+frameworks/base/core/java/android/view/WindowManagerGlobal.java
+frameworks/base/core/java/android/view/ViewRootImpl.java

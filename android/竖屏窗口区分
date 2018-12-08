@@ -2,6 +2,12 @@
 ro.sf.hwrotation=90                                                            
 qemu.hw.mainkeys=0
 ro.sf.swrotation=90 
+
+
+ro.sf.swrotation=90^M
+qemu.hw.mainkeys=0
+sys.lsec.status_bar_height=140
+
 */
 
 //4种大小：456 ， 682 ， 744， 675

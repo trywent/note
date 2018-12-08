@@ -1,4 +1,4 @@
-InputMethodManager封装了InputMethodManagerService，
+//InputMethodManager封装了InputMethodManagerService，
 
 InputMethodService实现输入法
 - 显示界面，onCreateInputView

@@ -3,7 +3,7 @@ DisplayManagerService{
 - mHandler = new DisplayManagerHandler(DisplayThread.get().getLooper())
 - mDefaultDisplayDefaultColorMode
 - pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE)
-}
+}@DisplayManagerService.java
 
 windowManagerAndInputReady{
 - mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class)

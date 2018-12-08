@@ -7,6 +7,12 @@ am start -e "com.fyt.window" "second" com.android.email/.activity.Welcome
 
 am start -e "com.fyt.window" "second" com.android.launcher2/com.android.launcher2.Launcher
 
+am start-activity --ez "force_pip" true -f 0x20000000 com.autonavi.amapauto/com.autonavi.auto.remote.fill.UsbFillActivity 
+
+am start-activity --ez "force_pip" true -f 0x20000000 com.autonavi.amapauto/.MainMapActivity
+
+am start-activity --ez "force_pip" false  --es "test" "xxxfffssss" -f 0x20000000 com.syu.test/.TestActivity 
+
 am start -->runStart-->makeIntent(构建intent)
 
 am startservice -n com.syu.ms/.ServiceMain
