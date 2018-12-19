@@ -1,0 +1,52 @@
+//Drawables(可绘制的对象)：
+Android提供定制的2D图像库android.graphics.drawable，用来绘制图形，图像。
+
+有三种方法定义一个drawable实例。
+1，通过资源图片
+2，通过资源XML
+3，ShapeDrawable 
+
+//通过图片
+最简单的方法引用工程中的图像资源(PNG,JPG,GIF),在代码或xml中通过资源名获取资源
+
+Note:  res/drawable/中资源会被系统优化，res/raw/中资源不会被优化
+
+使用图像资源示例：
+
+  LinearLayout mLinearLayout;
+
+  protected void onCreate(Bundle savedInstanceState) {
+  super.onCreate(savedInstanceState);
+
+  // Create a LinearLayout in which to add the ImageView
+  mLinearLayout = new LinearLayout(this);
+
+  // Instantiate an ImageView and define its properties
+  ImageView i = new ImageView(this);
+  i.setImageResource(R.drawable.my_image);
+  i.setAdjustViewBounds(true); // set the ImageView bounds to match the Drawable's dimensions
+  i.setLayoutParams(new Gallery.LayoutParams(LayoutParams.WRAP_CONTENT,
+  LayoutParams.WRAP_CONTENT));
+
+  // Add the ImageView to the layout and set the layout as the content view
+  mLinearLayout.addView(i);
+  setContentView(mLinearLayout);
+  }
+
+直接获取资源:
+
+    Resources res = mContext.getResources();
+    Drawable myImage = res.getDrawable(R.drawable.my_image);
+  
+
+Note:工程中的资源只有一个实例，其他引用指向该实例。 
+XML中使用资源：
+      <ImageView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:tint="#55ff0000"
+      android:src="@drawable/my_image"/>
+  
+//通过XML
+Creating from resource XML
+当可绘制对象不在代码中初始化，则可在xml中定义它。

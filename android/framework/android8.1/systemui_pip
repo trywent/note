@@ -4,10 +4,11 @@ start{
 - mPipManager.initialize{
 	- mActivityManager = ActivityManager.getService()
 	- mWindowManager = WindowManagerGlobal.getWindowManagerService()
-	- mWindowManager.registerPinnedStackListener(mPinnedStackListener){
+	- mWindowManager.registerPinnedStackListener(mPinnedStackListener) //监听栈状态
+	- SystemServicesProxy.getInstance(mContext).registerTaskStackListener(mTaskStackListener){ //监听task
 		- mTaskStackListeners.add(listener)
-		- mIam.registerTaskStackListener(mTaskStackListener) //注册到ActivityManagerService
-		}
+		- (IActivityManager)mIam.registerTaskStackListener(mTaskStackListener) //注册到ActivityManagerService
+		}@SystemServicesProxy.java
 	- mInputConsumerController = new InputConsumerController(mWindowManager)-->
 		registerInputConsumer{//监听输入事件
 		- inputChannel = new InputChannel()
@@ -28,36 +29,78 @@ start{
 //注册到WidowManagerService
 PinnedStackListener{
 - onMinimizedStateChanged
+//pinStack位置大小发生变化
 - onMovementBoundsChanged(insetBounds,normalBounds)-->mTouchHandler.onMovementBoundsChanged
-}
+}PinnedStackListener@PipManager.java
 
 
 //注册到ActivityManagerService,监听栈
 mTaskStackListener{
 - onActivityPinned(String packageName, int userId, int taskId){
-
+	- mTouchHandler.onActivityPinned
+	- mMenuController.onActivityPinned
+	- SystemServicesProxy.getInstance(mContext).setPipVisibility(true)
 	}
-- onActivityUnpinned()
-}
+- onActivityUnpinned{
+	- mMenuController.onActivityUnpinned()
+	- mTouchHandler.onActivityUnpinned(topActivity)
+	}
+}TaskStackListener@PipManager.java
 
 animateToUnexpandedState-->resizeAndAnimatePipUnchecked(normalBounds)@PipMotionHelper.java
 
 showMenu-->startMenuActivity@PipMenuActivityController.java
 
-
-
 _______________________
-//inputEvent
+//PipMenuActivityController
+showMenu-->startMenuActivity{//启动PipMenuActivity
+- Intent intent = new Intent(mContext, PipMenuActivity.class)
+- intent.putExtra(EXTRA_CONTROLLER_MESSENGER, mMessenger)
+- ActivityOptions options = ActivityOptions.makeCustomAnimation
+- options.setLaunchTaskId(pinnedStackInfo) //启动到pipStack
+- setStartActivityRequested
+}@PipMenuActivityController
+
+
+//PipMenuActivity
+onCreate{
+- mTouchState = new PipTouchState()
+- mMenuContainer = findViewById(R.id.menu_container)
+- mMenuContainer.setOnTouchListener //设置触摸事件处理
+- updateFromIntent{
+	- mToControllerMessenger = intent.getParcelableExtra(EXTRA_CONTROLLER_MESSENGER)
+	- notifyActivityCallback(mMessenger) //设置controller回调
+	- showMenu //显示
+	}
+}@PipMenuActivity.java
+
+//PipMenuActivity通知状态到PipMenuActivityController
+dismissPip/showPipMenu-->sendMessage-->mToControllerMessenger.send@@PipMenuActivity.java
+-->Handler.handleMessage{
+- MESSAGE_MENU_STATE_CHANGED://menuActivity状态变化
+	onMenuStateChanged{
+	- mInputConsumerController.registerInputConsumer //MENU_STATE_NONE menuActivity消失
+	- onPipMenuStateChanged
+	}
+- MESSAGE_EXPAND_PIP
+- MESSAGE_DISMISS_PIP
+}@PipMenuActivityController.java
+
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMenuActivityController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMenuActivity.java
+_______________________
+//touchHandler
 InputConsumerController(mWindowManager)-->registerInputConsumer{//监听输入事件
 - inputChannel = new InputChannel()
 - mWindowManager.createInputConsumer(INPUT_CONSUMER_PIP)
 - new PipInputEventReceiver(inputChannel)
 }@InputConsumerController.java
 
-PipTouchHandler(mInputConsumerController)@PipManager.java-->
+PipTouchHandler(menuController,mInputConsumerController)@PipManager.java-->
 PipTouchHandler(PipMenuActivityController menuController,inputConsumerController){
 - mMenuController = menuController
-- mMenuController.addListener(mMenuListener) //设置监听menu
+- mMenuController.addListener(mMenuListener) //设置监听menuActivity
 - mGestures = new PipTouchGesture[] {//触摸事件处
                 mDefaultMovementGesture
         }
@@ -78,12 +121,12 @@ handleTouchEvent{
 	PipTouchGesture.onMove{
 	- 
 	- mMotionHelper.movePip(Rect mTmpBounds){//移动更新窗口位置
-		- resizePipUnchecked
-		- mBounds.set(toBounds)-->mActivityManager.resizePinnedStack(toBounds)
+		- resizePipUnchecked-->mActivityManager.resizePinnedStack(toBounds)
+		- mBounds.set(toBounds)
 		}@PipMotionHelper.java
 	}
 - MotionEvent.ACTION_UP{
-	- updateMovementBounds
+	- updateMovementBounds //更新位置
 	- gesture.onUp{
 		- mMotionHelper.animateDismiss{ //消失
 			- BoundsAnimator = createAnimationToBounds		
@@ -93,10 +136,21 @@ handleTouchEvent{
 	}
 }@PipTouchHandler.java
 
+animateToExpandedState/animateToUnexpandedState/animateToIMEOffset-->resizeAndAnimatePipUnchecked
+
+flingToMinimizedState/animateToClosestMinimizedState/flingToSnapTarget/animateToClosestSnapTarget/animateDismiss
+-->createAnimationToBounds-->resizePipUnchecked
+
+movePip-->resizePipUnchecked
+
+//设置为最小窗口
+setMinimizedStateInternal-->setMinimizedState@PipMotionHelper.java
+
 //移除pip
 dismissPip-->mActivityManager.removeStack(PINNED_STACK_ID)
 
-//ActivityManagerService更新窗口位置
+
+//ActivityManagerService通知Systemui更新窗口位置
 onMovementBoundsChanged{
 - 
 - 
@@ -108,12 +162,6 @@ onMovementBoundsChanged{
 	}
 }@PipTouchHandler.java
 
-
-createAnimationToBounds-->resizePipUnchecked
-
-
-setMinimizedState-->movePip-->resizePipUnchecked
-
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/PipUI.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipManager.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
@@ -122,3 +170,4 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMotionHe
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMenuActivity.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/InputConsumerController.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipTouchHandler.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/recents/misc/SystemServicesProxy.java

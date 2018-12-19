@@ -31,14 +31,24 @@ createPackageContext-->createPackageContextAsUser{
 - LoadedApk pi = mMainThread.getPackageInfo(packageName)
 - new ContextImpl(this, mMainThread, pi)
 }@ContextImpl.java
+
 //获取主题：
 getTheme{
-- 根据目标sdk获取资源，Resources.selectDefaultTheme{
-		- selectDefaultTheme{
-			- 根据目标版本，选择theme,Theme_Holo,Theme_DeviceDefault		
+- mThemeResource = Resources.selectDefaultTheme(targetSdkVersion){
+		- selectSystemTheme(int orig, int holo,int dark, int deviceDefault){
+			- theme       //HONEYCOMB=11 android3.0
+			- Theme_Holo  //小于ICE_CREAM_SANDWICH = 14 android4.0
+			- Theme_DeviceDefault	//N = 24  android7.0
+			- Theme_DeviceDefault_Light_DarkActionBar //当前默认
 		}
 	}@Resources.java
-- 根据资源获取主题，mTheme.applyStyle
+- initializeTheme{
+	- mTheme = mResources.newTheme()
+	- mTheme.applyStyle(mThemeResource, true){
+		- AssetManager.applyThemeStyle(mTheme, resId)
+		- mKey.append(resId, force)
+		}
+	}
 }@ContextImpl.java
 
 设备默认主题：

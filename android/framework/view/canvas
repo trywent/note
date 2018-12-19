@@ -1,0 +1,61 @@
+//Canvas and Drawables
+两种方法画图：
+a.使用View,由系统绘制
+b.自定义直接使用Canvas。两种途径
+ -在UI线程中，创建自定义的图形组件，调用invalidata()，实现onDraw()回调函数
+ -在另一个线程中，操作SurfaceView，绘画到Canvas上。
+
+//canvas相当一个surface的上层接口，surface是图像绘制的地方。canvas的操作会作用到一个底层的bitmap。
+获取canvas的方法:
+- 通过View.onDraw(Canvas canvas)回调绘制
+- 当处理SurfaceView时，可通过SurfaceHolder.lockCanvas()获取
+- 创建Canvas。必须定义一个bitmap。(相当在bitmap(象素点)上进行画图,canvas提供画图方法)
+  建议在绘制最终图像时，使用View.onDraw() 或 SurfaceHolder.lockCanvas()提供的canvas。
+
+
+例：
+Bitmap b = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
+Canvas c = new Canvas(b);
+
+//On a View(无大量操作，无帧率要求)
+onDraw(Canvas)@View.java
+
+
+Note: 当从非主线程调用invalidate时，通过调用 postInvalidate().
+
+//On a SurfaceView：
+- SurfaceHolder.Callback
+- SurfaceHolder = SurfcaceView.getHolder()
+- addCallback(SurfaceHolder.Callback)
+- Canvas = SurfaceHolder.lockCanvas ()
+- SurfaceHolder.nlockCanvasAndPost(canvas)
+
+Note: 当从SurfaceHolder获取Canvas后，Canvas包含前一次设置的状态。
+
+
+
+==================
+//canvas
+- Bitmap //绘制的数据保存位置
+- Canvas //绘制方法
+- primitive //绘制的源数据,矩形,字符,图像
+- paint  //绘制的风格颜色,
+
+setBitmap(Bitmap bitmap){
+}@Canvas.java
+
+
+
+//paint
+setTypeface(Typeface typeface){
+-typefaceNative = typeface.native_instance
+- nSetTypeface(mNativePaint, typefaceNative)
+- mTypeface = typeface
+- mNativeTypeface = typefaceNative
+}@Paint.java
+
+frameworks/base/graphics/java/android/graphics/Canvas.java
+frameworks/base/graphics/java/android/graphics/Paint.java
+frameworks/base/core/jni/android/graphics/Paint.cpp
+
+

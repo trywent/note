@@ -2,8 +2,10 @@
 //创建的窗口用来保存应用窗口的布局信息
 performLaunchActivity(初始化activity，并启动)-->activity.attach@ActivityThread.java-->
 attach(设置activity相关信息，context,app,title){
-- 创建窗口并初始化，PolicyManager.makeNewWindow-->makeNewWindow-->sPolicy.makeNewWindow
-			@PolicyManager.java-->makeNewWindow-->new PhoneWindow@Policy.java
+- 创建窗口并初始化，PolicyManager.makeNewWindow-->makeNewWindow-->sPolicy.makeNewWindow@PolicyManager.java
+	-->makeNewWindow-->new PhoneWindow{
+			- mLayoutInflater = LayoutInflater //用于解析应用layout.xml
+			}@Policy.java
 - 初始化activity变量
 - 设置窗口管理器，mWindow.setWindowManager-->setWindowManager-->setWindowManager-->
 		WindowManagerImpl.getDefault()--new LocalWindowManager@Window.java
@@ -36,7 +38,7 @@ frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindow.java
 frameworks/base/core/java/com/android/internal/widget/ActionBarOverlayLayout.java
 frameworks/base/core/java/android/widget/Toolbar.java
 _______________________
-获取contentInset，侧边：
+//获取contentInset，侧边：
 setView-->sWindowSession.add(..mAttachInfo.mContentInsets..)@ViewRootImpl.java
 add-->mService.addWindow@Session.java-->addWindow-->mPolicy.getContentInsetHintLw
 @WindowManagerService.java-->getContentInsetHintLw@PhoneWindowManager.java
@@ -46,6 +48,40 @@ performTraversals{
 - 设置值，mFitSystemWindowsInsets.set(mAttachInfo.mContentInsets)
 - 设置到各个View中，host.fitSystemWindows(mFitSystemWindowsInsets)
 }
+=======================
+//从layout.xml解析view
+from(){
+- LayoutInflater =(LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE)
+		-->new PhoneLayoutInflater
+- return LayoutInflater
+}@LayoutInflater.java
 
+
+setContentView(R.layout.id)@Activity.java-->setContentView-->mLayoutInflater.inflate(id,mContentParent)
+@PhoneWindow.java-->inflate-->inflate{
+- res.getLayout(resource)-->getLayout-->loadXmlResourceParser(id, "layout")-->
+	impl.loadXmlResourceParser@Resource.java-->loadXmlResourceParser@ResourceImpl.java
+- inflate(XmlPullParser parser){
+	- attrs = Xml.asAttributeSet(parser) //创建AttributeSet
+	- createViewFromTag(new,attributeSet attrs)-->createView
+	}
+}@LayoutInflater.java
+
+createView(name, attrs){
+- constructor = sConstructorMap.get(name)
+- consturctor==null{
+	- mContext.getClassLoader().loadClass(name)//加载类
+	- constructor = clazz.getConstructor(mConstructorSignature)
+	}
+- args[1] = attrs
+- View view = constructor.newInstance(args)
+}@LayoutInflater.java
+
+
+frameworks/base/core/java/android/view/LayoutInflater.java
+frameworks/base/core/java/com/android/internal/policy/PhoneLayoutInflater.java
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
 frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/core/java/android/util/Xml.java
+frameworks/base/core/java/android/util/XmlPullAttributes.java
+frameworks/base/core/java/android/util/AttributeSet.java

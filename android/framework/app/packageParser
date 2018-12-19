@@ -42,12 +42,9 @@ parseBaseApkCommon{
 	}
 }
 
-//解析创建Activity
-parseActivity{
-- Activity a = new Activity(cachedArgs.mActivityArgs, new ActivityInfo())
-- a.info //初始化activityInfo
-}
 
+
+=====================
 //权限
 
 //分配安装时权限
@@ -79,6 +76,21 @@ dumpPackagesLPr(packageName){
 - 查找mPackages中packageName
 - dumpPackageLPr(ps)
 }
+=====================
+//application
+
+
+
+
+//解析创建Activity
+parseActivity{
+- Activity a = new Activity(cachedArgs.mActivityArgs, new ActivityInfo())
+- a.info //初始化activityInfo
+}
+
+
+
+
 
 frameworks/base/core/java/android/content/pm/PackageParser.java
 frameworks/base/core/java/android/app/ApplicationPackageManager.java

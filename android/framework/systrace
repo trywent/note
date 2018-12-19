@@ -1,0 +1,16 @@
+//
+
+ Systrace工具可以生成应用和系统的潜在的巨大数据，为了限制工具收集的数据量，使数据与分析相关，使用下面的选项：
+    1.限制trace抓取的时间使用-t，--time选项，默认的trace时长是5s
+    2.限制trace抓取数据的size使用-b，--buf-size选项
+    3.指定哪些类型的进程被跟踪。可以被跟踪的进程在不同的Android版本上面略有不同：
+      Android4.2和低于4.2的：使用--set-tags选项和--disk，--cpu-freq，--cpu-idle，--cpu-load选项
+      Android4.3和高于4.3的：使用--list-categories选项来查看类型列表
+
+
+
+ 1.确保设备通过usb调试选项打开，并成功连接到电脑
+     2.指定要抓取的选项来执行trace，例如
+           $ cd android-sdk/platform-tools/systrace
+           $ python systrace.py --time=10 -o mynewtrace.html sched gfx view wm
+     3.在设备上，执行任何你想要被包含进trace信息的操作

@@ -348,7 +348,7 @@ Android.mk语法:
 　　DEVICE_PACKAGE_OVERLAYS: used several products that share a common device model
 
 ====================================
-编译sdk：
+//编译sdk：
 1:
 . build/envsetup.sh
 lunch xx
@@ -356,3 +356,11 @@ make sdk
 
 2:
 make -j8 PRODUCT-sdk-sdk showcommands dist
+
+//.mk文件中配置资源
+PRODUCT_AAPT_CONFIG := hdpi xhdpi normal
+PRODUCT_AAPT_PREF_CONFIG := xhdpi
+
+ldpi
+mdpi  //density 160
+hdpi

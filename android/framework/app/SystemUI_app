@@ -1,7 +1,22 @@
-//
-SystemUI启动:
+//SystemUI启动:
 ServerThread.run-->ActivityManagerService.self().systemReady-->startSystemUi-->
-context.startService@SystemServer.java-->onCreate@SystemUIService.java--> 
+context.startServiceAsUser("com.android.systemui.SystemUIService",UserHandle.SYSTEM)@SystemServer.java
+
+onCreate{
+- mComponents = new HashMap<>()
+- SystemUIFactory.createFromConfig(this);
+- 用户为UserHandle.SYSTEM,registerReceiver(new BroadcastReceiver,SYSTEM_HIGH_PRIORITY)
+- 其它用户{
+	- startServicesIfNeeded(SERVICES_PER_USER)
+	}
+}@SystemUIApplication.java
+
+onCreate{
+- ((SystemUIApplication) getApplication()).startServicesIfNeeded //SystemUIApplication
+- this.registerReceiver(recentTaskReceiver,REMOVE_ALL_RECENT_TASKS)
+}@SystemUIService.java
+
+
 startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
 - 遍历SERVICES{
             Dependency.class,
@@ -16,10 +31,25 @@ startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
 	    .....
 	}
 - SystemUIFactory.getInstance().createInstance(cl) //创建服务对象
+- mServices[i] = (SystemUI) ((newService == null) ? cl.newInstance() : newService) //创建失败new
 - mServices[i].start() //
+- mServices[i].mComponents = mComponents //所有服务共享一个mComponents
+- Dependency.get(PluginManager.class).addPluginListener
 }@SystemUIApplication.java
+=======================
+//Dependency
+Dependency.start{
+- mProviders.put(TIME_TICK_HANDLER)
+- mProviders.put(FragmentService.class), new FragmentService)
+mProviders.put(RotationLockController.class,new RotationLockControllerImpl(mContext) //旋转设置
+}@Dependency.java
 
+//commandQueue
+CommandQueueStart.start-->putComponent(CommandQueue.class, new CommandQueue())
+-->mComponents@CommandQueue.java
 
+frameworks/base/packages/SystemUI/src/com/android/systemui/Dependency.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
 =======================
 //statusBar窗口：
 super_status_bar{
@@ -33,21 +63,39 @@ status_bar.xml{
 }
 }
 
-
-SystemBars.start-->createStatusBarFromConfig{
-- mContext.getString(R.string.config_statusBarComponent)//获取bar名statusbar.phone.StatusBar
+SystemBars.start-->createStatusBarFromConfig(config_statusBarComponent/*获取bar名StatusBar*/){
+- mStatusBar.mComponents = mComponents
+//启动
 - mStatusBar.start-->start{
-	- mNetworkController=Dependency.get(NetworkController)//NetworkControllerImpl
-	- mCommandQueue.addCallbacks(this)
-	- createAndAddWindows
-	- mIconPolicy = new PhoneStatusBarPolicy
-	}@StatusBar.java
+- mNetworkController=Dependency.get(NetworkController)//NetworkControllerImpl
+- mRecents = getComponent(Recents.class)
+- mCommandQueue = getComponent(CommandQueue.class)
+- mCommandQueue.addCallbacks(this)
+- createAndAddWindows
+- mIconPolicy = new PhoneStatusBarPolicy
+}@StatusBar.java
+
 }@SystemBars.java
+
+
 
 //创建statusBar,NaviBar
 createAndAddWindows-->addStatusBarWindow{//创建view
 - makeStatusBarView{
 	- inflateStatusBarWindow-->mStatusBarWindow = View.inflate(R.layout.super_status_bar)
+	- FragmentHostManager.get(mStatusBarWindow).addTagListener-->
+		FragmentService.getFragmentHostManager(view).addTagListener-->new FragmentHostManager(View).addTagListener
+		-->addTagListener(view,listener){
+		- listeners = new ArrayList
+		- mListeners.put(tag, listeners)
+		- listeners.add(listener)
+		}@FragmentHostManager.java
+	- getFragmentManager().replace(R.id.status_bar_container,CollapsedStatusBarFragment)-->
+		FragmentListener.onFragmentViewCreated(TAG,fragment){
+		- statusBarFragment = fragment
+		- mStatusBarView = (PhoneStatusBarView) fragment.getView()
+		}
+	 
 	  //设置statusBarFragment为CollapsedStatusBarFragment 折叠的statusBar(正常状态)
 	- FragmentHostManager.get(mStatusBarWindow).addTagListener().getFragmentManager().replace(new CollapsedStatusBarFragment)
 	- StatusBarIconControllerImpl.addIconGroup(new IconManager((ViewGroup))
@@ -85,21 +133,63 @@ onViewCreated{
 setIcon@StatusBarManager.java-->setIcon@StatusBarManagerService.java-->
 (通过IStatusBar设置)mBar.setIcon-->setIcon@CommandQueue.java-->updateIcon@TabletStatusBar.java
 
+=======================
+//NavigationBar
+NavigationBarFragment.create{ //创建导航条
+- WindowManager.LayoutParams lp = new WindowManager.LayoutParams //布局参数
+- View navigationBarView = inflate(R.layout.navigation_bar_window)//导航条view
+- context.getSystemService(WindowManager.class).addView(navigationBarView, lp) //加入view
+}@NavigationBarFragment.java
 
+//navigation_bar_window对应NavigationBarFragment
+onCreateView{
+- inflater.inflate(R.layout.navigation_bar)
+}@NavigationBarFragment
+
+
+onFinishInflate{
+- inflateChildren{
+	- mRot0 = (FrameLayout) mLayoutInflater.inflate(R.layout.navigation_layout)
+	- addView(mRot0)
+	}
+- inflateLayout(getDefaultLayout())-->inflateButtons{
+	- createView
+	- parent.addView(v)
+	}
+}@NavigationBarInflaterView.java
+
+
+//按钮View
+updateIcons{
+- mBackIcon = getDrawable(ctx, R.drawable.ic_sysbar_back)
+- mHomeDefaultIcon = getDrawable(ctx,R.drawable.ic_sysbar_home)
+- mRecentIcon = getDrawable(ctx,R.drawable.ic_sysbar_recent)
+- mImeIcon = getDrawable(R.drawable.ic_ime_switcher_default)
+}@NavigationBarView.java
+
+
+
+//按钮事件：所有的按钮都是实现KeyButtonView.java
+(重写View中方法)onTouchEvent-->sendEvent(发送事件)-->sendEvent(事件和时间)-->
+InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
+
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarInflaterView.java
 
 
 
 =======================
-//recentTask：
+//Recents：
 start{
-- getRecentsComponent-->new AlternateRecentsComponent
-- sAlternateRecents.onStart-->onStart@AlternateRecentsComponent.java
-}
+- sTaskLoader = new RecentsTaskLoader(mContext)
+- putComponent(Recents.class, this)
+}@Recents.java
 
-//最近任务按钮触发
-mNavigationBarView.getRecentsButton().setOnClickListener(mRecentsClickListener)-->
-OnClickListener.toggleRecentApps-->toggleRecents@PhoneStatusBar.java-->
-toggleRecents@BaseStatusBar.java-->toggleRecents{
+prepareNavigationBarView-->recentsButton.setOnClickListener(this::onRecentsClick)
+-->mCommandQueue.toggleRecentApps@NavigationBarFragment.java-->msg.sendToTarget(MSG_TOGGLE_RECENT_APPS)
+mCallbacks.get(i).toggleRecentApps@CommandQueue.java-->
+toggleRecentApps{
 - 创建intent("com.android.systemui.recent.RecentsActivity")
 - startActivitySafely(intent)
 }@Rcents.java
@@ -170,50 +260,23 @@ pickUpViewFromPool{
 }@ViewPoll.java
 
 
-
+frameworks/base/packages/SystemUI/src/com/android/systemui/recents/Recents.java
 =======================
-//NavigationBar
-NavigationBarFragment.create{ //创建导航条
-- WindowManager.LayoutParams lp = new WindowManager.LayoutParams //布局参数
-- View navigationBarView = inflate(R.layout.navigation_bar_window)//导航条view
-- context.getSystemService(WindowManager.class).addView(navigationBarView, lp) //加入view
-}@NavigationBarFragment.java
-
-//navigation_bar_window对应NavigationBarFragment
-onCreateView{
-- inflater.inflate(R.layout.navigation_bar)
-}@NavigationBarFragment
-
-
-onFinishInflate{
-- inflateChildren{
-	- mRot0 = (FrameLayout) mLayoutInflater.inflate(R.layout.navigation_layout)
-	- addView(mRot0)
-	}
-- inflateLayout(getDefaultLayout())-->inflateButtons{
-	- createView
-	- parent.addView(v)
-	}
-}@NavigationBarInflaterView.java
-
-
-//按钮View
-updateIcons{
-- mBackIcon = getDrawable(ctx, R.drawable.ic_sysbar_back)
-- mHomeDefaultIcon = getDrawable(ctx,R.drawable.ic_sysbar_home)
-- mRecentIcon = getDrawable(ctx,R.drawable.ic_sysbar_recent)
-- mImeIcon = getDrawable(R.drawable.ic_ime_switcher_default)
-}@NavigationBarView.java
+//quickSetting
 
 
 
-//按钮事件：所有的按钮都是实现KeyButtonView.java
-(重写View中方法)onTouchEvent-->sendEvent(发送事件)-->sendEvent(事件和时间)-->
-InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
+//rotation
+handleClick@RotationLockTile.java-->setRotationLocked@RotationLockControllerImpl.java-->
+setRotationLock{
+- IWindowManager wm = WindowManagerGlobal.getWindowManagerService()
+- wm.freezeRotation(rotation)//锁定
+- wm.thawRotation() //自动
+}@RotationPolicy.java
 
-
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarInflaterView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/RotationLockControllerImpl.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/qs/tiles/RotationLockTile.java
+frameworks/base/core/java/com/android/internal/view/RotationPolicy.java
 =======================
 
 //信号图标
@@ -336,6 +399,10 @@ updateDataNetType()//根据网络类型mDataNetType，更新信号图标
 
 onReceive(收到信号广播)-->refreshViews-->
 refreshSignalCluster-->(设置信号图标)cluster.setMobileDataIndicators@NetworkController.java
+
+
+
+
 
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/SystemBars.java

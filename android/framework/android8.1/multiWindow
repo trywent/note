@@ -26,6 +26,8 @@ public void resizePinnedStack(Rect pinnedBounds)
  sys.lsec.force_pip
  (64.0,116.0) 520.0 x 320.0
 
+setprop sys.lsec.pip_rect "80 120 580 420"
+
 */
 PinnedStackController-->
 reloadResources{

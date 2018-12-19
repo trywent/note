@@ -1,14 +1,19 @@
-//.mk文件中配置资源
-PRODUCT_AAPT_CONFIG := hdpi xhdpi normal
-PRODUCT_AAPT_PREF_CONFIG := xhdpi
-
-ldpi
-mdpi  //density 160
-hdpi
+/*
+资源的获取接口
+theme
+TypedArry
+resource
 
 resource ID是一个32位数.格式为:PPTTNNNN. PP资源包; TT资源类型; NNNN资源名. 应用中PP值为0x7f
+*/
 ===================
-//创建
+//theme
+
+theme.obtainStyledAttributes(R.styleable.xxxx/*要获取的属性*/)
+
+
+===================
+//resource创建
 ContextImpl{
 - mResourcesManager = ResourcesManager.getInstance()
 - compatInfo = packageInfo.getCompatibilityInfo()
@@ -89,9 +94,17 @@ getDecorView().findViewById@Window.java-->mDecor.findViewById-->DecorView.findVi
 (是ViewGroup容器)findViewTraversal-->v.findViewById(找到对应id的View)@ViewGroup.java-->findViewById
 -->findViewTraversal(return this)@View.java
 
+===================
+//typedArray 通过Resources获取
+Resources.obtainStyledAttributes(AttributeSet, int[], int, int)
+Resources.obtainAttributes(AttributeSet, int[])
 
 
-//===============Assert
+
+
+
+===============
+//Assert
 AssetManager{
 - init(false) //应用资源
 - ensureSystemAssets-->init(true)//系统资源
@@ -144,23 +157,9 @@ frameworks/base/core/java/android/content/res/AssetManager.java
 frameworks/base/core/jni/android_util_AssetManager.cpp
 frameworks/base/libs/androidfw/AssetManager.cpp
 frameworks/base/libs/androidfw/ResourceTypes.cpp
-==================
 
 
 
-
-target/common/R/com/android/internal/R.java
-
-//设置displayInfo中appWidth
-computeScreenConfigurationLocked-->mPolicy.getNonDecorDisplayWidth@WindowManagerService.java
--->getNonDecorDisplayWidth(设置应用的窗口大小)@PhoneWindowManager.java
-
-//display
-DisplayManager.getDisplay(设置mDefaultDisplay)-->WindowManagerImpl(mDefaultDisplay)
-
-getDisplay-->getOrCreateDisplayLocked@DisplayManager.java-->getCompatibleDisplay
-
-getMetrics@Display.java-->getAppMetrics
 
 
 

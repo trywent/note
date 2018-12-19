@@ -1,0 +1,58 @@
+/*
+资源的文件结构
+style 一些属性集合
+theme作用application或activity所有的view都会影响到
+
+*/
+//定义style
+<style name="parent"></style> 
+<style name="parent.child"></style>  //child继承parent
+
+引用一个资源"@[+][package:]type:name" 
+引用主题中的属性"?[package:][type:]name"
+
+使用style：
+View:      <view style=@style/xxx>
+App:       <application android:theme="@style/xxx">
+Activity:  <activity android:theme="@android:style/xxx">
+
+===================
+<style name="Theme.Material">
+<style name="Theme.DeviceDefaultBase" parent="Theme.Material" >
+<style name="Theme.DeviceDefault" parent="Theme.DeviceDefaultBase" />
+<style name="Theme.DeviceDefault.Light.DarkActionBar" parent="Theme.Material.Light.DarkActionBar"> //当前系统默认
+
+
+
+
+//R.styleable 数据结构..定义属性名及属性拥有的成员  attrs.xml
+<declare-styleable name="xxxxx">//styleable中变量名.可通过R.styleable.xxxx获取
+        <attr name="yyyy" /> //属性名字
+</declare-styleable>
+
+//R.arrt 属性名..styleable中item名.     可以在xml中配置
+    <declare-styleable name="xxxx">
+        <attr name="yyyy" /> //可以在xml中配置
+
+
+//R.style  styleable设置值后(一个实例styleable)
+<style name="xxxx">
+
+
+//从set中获取attrs,(set为指针,theme.attrs为偏移位置)
+Theme.obtainStyledAttributes(attrsAttributeSet set,com.android.internal.R.styleable.xxxx)@Resources.java
+
+TypedArray.a.getResourceId(com.android.internal.R.styleable.xxxx)
+
+frameworks/base/core/res/res/values/attrs.xml //定义styleable的属性
+frameworks/base/core/res/res/values/style.xml //定义一些默认style.style属性已经赋值
+frameworks/base/core/res/res/values/themes.xml
+frameworks/base/core/res/res/values/themes_holo.xml
+frameworks/base/core/res/res/values/themes_device_defaults.xml
+frameworks/base/core/res/res/values/themes_material.xml
+
+
+=====================
+//应用解析
+setContentView(R.layout.id)@Activity.java-->setContentView-->mLayoutInflater.inflate(id,mContentParent)@PhoneWindow.java
+

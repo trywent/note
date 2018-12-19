@@ -1,0 +1,60 @@
+//
+module_platform_driver(musb_sprd_driver)-->
+musb_sprd_probe{
+- struct sprd_glue *glue = devm_kzalloc
+- INIT_WORK(&glue->work, sprd_musb_work)
+- INIT_DELAYED_WORK(&glue->recover_work, sprd_musb_recover_work)
+- struct platform_device_info pinfo{
+	- pinfo.name = "musb-hdrc";
+	- pinfo.res	
+	}
+- musb_sprd_config_vbus_int(glue){ //vbus检测
+	- gpio_to_irq(glue->gpio_device)
+	- devm_request_threaded_irq(glue->dev, musb_sprd_vbus_handler)
+	}
+- glue->musb = platform_device_register_full(&pinfo)
+- musb_sprd_config_usbid_int(glue){//若通过id脚控制主从
+	- irq = gpio_to_irq(glue->gpio_host) //中断
+	- devm_request_threaded_irq(irq,musb_sprd_usbid_handler)//中断处理
+	}
+
+- sysfs_create_groups(&glue->dev->kobj, musb_sprd_groups)
+- pm_runtime_set_active(dev)
+- pm_runtime_enable(dev)
+}@musb_sprd.c
+
+/*
+ 设置usb模式
+*/
+glue->work-->sprd_musb_work
+//id脚中断
+musb_sprd_usbid_handler{
+- glue->wq_mode = USB_DR_MODE_HOST //设置主模式..接地为主,悬空为从
+- schedule_work(&glue->work)
+}
+
+glue->hot_plug_nb.notifier_call-->sprd_musb_ext_notifier{
+- CABLE_STATUS_DEV_CONN
+- CABLE_STATUS_HOST_CONN
+- CABLE_STATUS_DEV_DISCONN
+- CABLE_STATUS_HOST_DISCONN
+- schedule_work(&glue->work)
+}
+
+module_platform_driver(musb_driver){
+- driver{
+	- name = "musb-hdrc"
+	}
+- probe	= musb_probe-->musb_init_controller
+}@musb_core.c
+
+musb_init_controller
+
+
+
+
+
+
+kernel/drivers/usb/musb/musb_sprd.c
+kernel/drivers/usb/musb/musb_core.c
+kernel/drivers/usb/musb/musb_host.c

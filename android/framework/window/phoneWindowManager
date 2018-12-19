@@ -15,8 +15,19 @@ setInitialDisplaySize{
         }else{
 
 }
+========================
+//检查窗口权限
+checkAddPermission(attrs, appOp){
+- !isSystemAlertWindowType,{//非TYPE_PHONE,TYPE_SYSTEM_ALERT,TYPE_APPLICATION_OVERLAY
+	- 一些系统窗口类型,返回true
+	- mContext.checkCallingOrSelfPermission(INTERNAL_SYSTEM_WINDOW)
+	}
+//以下警告窗口
+- 其它类型检查警告窗口,outAppOp[0] = OP_SYSTEM_ALERT_WINDOW
+}@PhoneWindowManager.java
 
 ========================
+//布局
     // The current size of the screen; really; extends into the overscan area of
     // the screen and doesn't account for any system elements like the status bar.
     int mOverscanScreenLeft, mOverscanScreenTop;

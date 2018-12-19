@@ -1,0 +1,165 @@
+/*
+android5.0之前:DroidSansFallback.ttf
+android5.0之后:NotoSansHans-Regular.otf DroidSansFallback.ttf
+
+TextView_fontFamily{
+- font.xml
+}
+
+TextView_textStyle {
+- normal  
+- bold    粗体
+- italic  斜体
+}
+
+TextView_typeface {
+- normal
+- sans       非衬线字体(sans没有,无)
+- serif      衬线字体 (字母笔画开始结束有装饰)
+- monosapce  等宽字体
+}
+
+*/
+TextView(attrs /*layout.xml*/){
+- TypedArray a = theme.obtainStyledAttributes(attrs,R.styleable.TextViewAppearance){//解析默认theme中配置
+	- fontTypeface = appearance.(R.styleable.TextView_fontFamily)
+
+	}
+- TypedArray a =theme.obtainStyledAttributes(attrs,R.styleable.TextView){//再解析自定义配置
+	- fontTypeface = appearance.(R.styleable.TextView_fontFamily) 
+	}
+- setTypefaceFromAttrs(fontTypeface, fontFamily, typefaceIndex, styleIndex)	
+}@TextView.java
+
+//设置字体 setTypeface(Typeface.MONOSPACE,Typeface.ITALIC)
+TextView-->setTypefaceFromAttrs(Typeface fontTypeface, String familyName, int typefaceIndex,int styleIndex)-->
+setTypeface(Typeface,style){
+- fontTypeface为空,familyName不为空,创建fontTypeface = Typeface.create(familyName) //
+- fontTypeface不为空,setTypeface(fontTypeface)//则设置fontTypeface字体
+- setTypeface(fontTypeface){
+	- mTextPaint.setTypeface(tf)-->setTypeface-->nSetTypeface@Paint.java
+	- requestLayout
+	}
+}@TextView.java
+
+
+Typeface.create(tf, style)-->create@Typeface.java-->nativeCreateFromTypeface
+-->Typeface_createFromTypeface@Typeface.cpp-->
+TypefaceImpl_createFromTypeface(src){
+- src为空创建默认字体，TypefaceImpl_resolveDefault-->getDefaultTypefaceOnce{
+	- makeFontCollection ///system/fonts/Roboto-Regular.ttf创建字符
+	- TypefaceImpl* gDefaultTypeface//返回默认字符
+	}
+- 
+- result->fSkiaStyle = style //设置风格italiy，斜体，粗体
+}@TypefaceImpl.cpp
+
+frameworks/base/core/java/android/widget/TextView.java
+frameworks/base/graphics/java/android/graphics/Paint.java
+frameworks/base/graphics/java/android/graphics/Typeface.java
+frameworks/base/core/jni/android/graphics/Typeface.cpp
+frameworks/base/core/jni/android/graphics/TypefaceImpl.cpp
+//================
+setToDefaults()
+
+//预加载
+mian-->preload-->Class.forname(Typeface)@ZygoteInit.java-->
+static{
+- init{
+	- configFilename = new File("system/etc", "fonts.xml")
+	- fontConfig = FontListParser.parse(fontsIn){
+		- 
+		}
+	- 遍历fontConfig, { //获取第0个family,没有名字的family(默认的都没有名字)
+		- FontFamily family = makeFamilyFromParsed(family,bufferForPath){
+			- fontFamily = new FontFamily
+			- bufferForPath.put(fullPathName, fontBuffer) //创建字体的buffer
+			- fontFamily.addFontFromBuffer
+			}
+		- familyList.add(family) //保存到familyList
+		}
+	- sFallbackFonts = familyList.toArray //将familyList设置为fallback
+	- setDefault(Typeface.createFromFamilies(sFallbackFonts)){ //设置默认字体为sFallbackFonts.fonts.xml第一个
+		- sDefaultTypeface
+		- nativeSetDefault-->Typeface_setDefault@Typeface.cpp-->
+			Typeface::setDefault->gDefaultTypeface = face@Typeface.cpp //设置Typeface中默认字体
+		}
+	- 遍历fontConfig{
+		- typeface = sDefaultTypeface //将默认字体放在0位
+		- typeface = Typeface.createFromFamiliesWithDefault(families) //创建其它字体(zh-hans),包含默认字体
+		- systemFonts.put //保存到systemFonts
+		}
+	- sSystemFontMap = systemFonts //
+	}
+- DEFAULT = create()-->Typeface(nativeCreateFromTypeface)
+- DEFAULT_BOLD    = create((String) null, Typeface.BOLD)
+- SANS_SERIF      = create("sans-serif", 0)
+- SERIF           = create("serif", 0)
+- MONOSPACE       = create("monospace", 0)
+- sDefaults = new Typeface[] {
+            DEFAULT,
+            DEFAULT_BOLD,
+            create((String) null, Typeface.ITALIC),
+            create((String) null, Typeface.BOLD_ITALIC),
+        }
+}@Typeface.java
+
+//创建默认字体
+createFromFamilies(sFallbackFonts)-->new Typeface(nativeCreateFromArray())@Typeface.java-->
+nativeCreateFromArray-->Typeface_createFromArray@Typeface.cpp-->
+Typeface::createFromFamilies(families,int weight, int italic){
+- result = new Typeface
+}@Typeface.cpp
+
+//设置默认字体：sDefaults
+DEFAULT-->create-->new Typeface(nativeCreateFromTypeface(null))@Typeface.java-->
+Typeface_createFromTypeface-->Typeface::createRelative-->gDefaultTypeface
+@Typeface.cpp
+
+
+从文件创建：
+createFromFile-->nativeCreateFromFile@Typeface.java-->Typeface_createFromFile-->
+SkTypeface::CreateFromFile-->SkFontHost::CreateTypefaceFromFile@Typeface.cpp
+-->fm->createFromFile@SkFontHost.cpp
+
+frameworks/base/graphics/java/android/graphics/Typeface.java
+frameworks/base/core/jni/android/graphics/Typeface.cpp
+frameworks/base/libs/hwui/hwui/Typeface.cpp
+
+//android4.4
+创建默认字体：sDefaults
+DEFAULT-->create-->nativeCreate@Typeface.java-->Typeface_create-->SkTypeface::Typeface_create
+@Typeface.cpp-->SkTypeface::CreateFromName(NULL, style)-->(返回默认字体)RefDefault-->
+GetDefaultTypeface@SkTypeface.cpp-->SkFontHost::CreateTypeface-->SkFontMgr::legacyCreateTypeface
+-->
+
+
+从文件创建：
+createFromFile-->nativeCreateFromFile@Typeface.java-->Typeface_createFromFile-->
+SkTypeface::CreateFromFile-->SkFontHost::CreateTypefaceFromFile@Typeface.cpp
+-->fm->createFromFile@SkFontHost.cpp
+
+external/skia/src/core/SkTypeface.cpp
+external/skia/src/core/SkFontHost.cpp
+_________________
+"/system/etc/system_fonts.xml"中不支持的字体从"/system/etc/fallback_fonts.xml"
+中查找
+getSingletonInterface{
+- 获取字体，GetFontFamilies-->getSystemFontFamilies-->parseConfigFile(SYSTEM_FONTS_FILE)
+	@SkFontConfigParser_android.cpp
+- 创建并返回接口，SkFontConfigInterfaceAndroid(fontFamilies)
+}@SkFontConfigInterface_android.cpp
+
+
+
+external/skia/src/ports/SkFontConfigInterface_android.cpp
+external/skia/src/ports/SkFontConfigParser_android.cpp
+
+
+=============
+//修改默认汉字字体
+    <family>
+        <fileset>
+            <file lang="zh-Hans">youyuan.TTF</file>
+        </fileset>
+    </family>

@@ -1,0 +1,81 @@
+////SVG(Scalable Vector Graphics)矢量图格式...坐标原点左上角开始
+M：move to 移动绘制点，作用相当于把画笔落在哪一点。
+L：line to 直线，就是一条直线，注意，只是直线，直线是没有宽度的，所以你什么也看不到。
+
+    android:strokeColor="#333330" android:strokeWidth="10" 设置颜色和线宽
+
+Z：close 闭合，嗯，就是把图封闭起来。
+C：cubic bezier 三次贝塞尔曲线
+Q：quatratic bezier 二次贝塞尔曲线 //位置连线的比例觉得某一时刻的位置
+A：ellipse 圆弧
+
+每个命令都有大小写形式，大写代表后面的参数是绝对坐标，小写表示相对坐标，相对于上一个点的位置。参数之间用空格或逗号隔开。
+
+命令详解：
+//M (x y) 把画笔移动到x,y，要准备在这个地方画图了。
+//L (x y) 直线连到x,y，还有简化命令H(x) 水平连接、V(y)垂直连接。
+//Z，没有参数，连接起点和终点
+//C(x1 y1 x2 y2 x y)，控制点（x1,y1）（ x2,y2），终点x,y 。
+
+//Q(x1 y1 x y)，控制点（x1,y1），终点x,y
+
+//A(rx ry x-axis-rotation large-arc-flag sweep-flag x y) 
+A（圆的x轴半径，y轴半径，x轴旋转角度，0/1-小/大弧度，0/1-逆/顺时针，圆的终点位置x点，圆的终点位置y点）
+rx ry 椭圆半径 
+x-axis-rotation x轴旋转角度 
+large-arc-flag 为0时表示取小弧度，1时取大弧度 （舍取的时候，是要长的还是短的）
+sweep-flag 0取逆时针方向，1取顺时针方向 
+x y终点位置
+
+//android
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="5dp"
+        android:height="17.0dp"
+        android:viewportWidth="7.1"
+        android:viewportHeight="24.0"
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.6000004,13.2l-3.6,0.0 3.6,7.3 0.0,0.0 0.0,0.0 0.0,0.0 0.0,0.0 3.5,-7.3z"/>
+</vector>
+
+//vector
+
+    android:name 定义该drawable的名字
+    android:width 定义该 drawable 的内部(intrinsic)宽度,支持所有 Android 系统支持的尺寸，通常使用 dp
+    android:height 定义该 drawable 的内部(intrinsic)高度,支持所有 Android 系统支持的尺寸，通常使用 dp
+    android:viewportWidth 定义矢量图视图的宽度，视图就是矢量图 path 路径数据所绘制的虚拟画布
+    android:viewportHeight 定义矢量图视图的高度，视图就是矢量图 path 路径数据所绘制的虚拟画布
+    android:tint 定义该 drawable 的 tint 颜色。默认是没有 tint 颜色的
+    android:tintMode 定义 tint 颜色的 Porter-Duff blending 模式，默认值为 src_in
+    android:autoMirrored 设置当系统为 RTL (right-to-left) 布局的时候，是否自动镜像该图片。比如 阿拉伯语。
+    android:alpha 该图片的透明度属性
+
+
+//path
+    android:name 定义该 path 的名字，这样在其他地方可以通过名字来引用这个路径
+    android:pathData 和 SVG 中 d 元素一样的路径信息。
+    android:fillColor 定义填充路径的颜色，如果没有定义则不填充路径
+    android:strokeColor 定义如何绘制路径边框，如果没有定义则不显示边框
+    android:strokeWidth 定义路径边框的粗细尺寸
+    android:strokeAlpha 定义路径边框的透明度
+    android:fillAlpha 定义填充路径颜色的透明度
+    android:trimPathStart 从路径起始位置截断路径的比率，取值范围从 0 到1
+    android:trimPathEnd 从路径结束位置截断路径的比率，取值范围从 0 到1
+    android:trimPathOffset 设置路径截取的范围 Shift trim region (allows showed region to include the start and end), in the range from 0 to 1.
+    android:strokeLineCap 设置路径线帽的形状，取值为 butt, round, square.
+    android:strokeLineJoin 设置路径交界处的连接方式，取值为 miter,round,bevel.
+    android:strokeMiterLimit 设置斜角的上限，Sets the Miter limit for a stroked path.
+
+//group
+
+
+    android:name 定义 group 的名字
+    android:rotation 定义该 group 的路径旋转多少度，这样图片就被旋转了，注意写数字的时候别晕了。
+    android:pivotX 定义缩放和旋转该 group 时候的 X 参考点。该值相对于 vector 的 viewport 值来指定的。
+    android:pivotY 定义缩放和旋转该 group 时候的 Y 参考点。该值相对于 vector 的 viewport 值来指定的。
+    android:scaleX 定义 X 轴的缩放倍数
+    android:scaleY 定义 Y 轴的缩放倍数
+    android:translateX 定义移动 X 轴的位移。相对于 vector 的 viewport 值来指定的。
+    android:translateY 定义移动 Y 轴的位移。相对于 vector 的 viewport 值来指定的。
+

@@ -6,20 +6,19 @@ performLaunchActivity@ActivityThread.java-->attach{
 }@Activity.java
 
 
-//创建rootView：
-handleResumeActivity-->(将activity的View加入到窗口)wm.addView(decor)@ActivityThread.java-->
+//创建rootView：并加入decor为DecorView@PhoneWindow.java
+handleResumeActivity-->(将activity的View加入到窗口)wm.addView(decor/*window.getDecorView*/)@ActivityThread.java-->
 addView-->LocalWindowManager.addView(设置LayoutParams)-->super.addView@window.java-->
 CompatModeWrapper.addView-->mWindowManager.addView-->addView(View, ViewGroup.LayoutParams)
--->addView(view, params, null, false)-->addView{
+-->addView(view, params, null, false)-->addView(view){
 - 加入系统属性监听方法
 - 查找View是否已经加入，则找到根root增加计数
 - 若是panel，找到改panel以来的窗口
-- 创建ViewRootImpl
-- 将ViewRootImpl，和要加入的View。加入对应的数组中
+- root = new ViewRootImpl
 - mViews.add(view)
 - mRoots.add(root)
 - mParams.add(wparams)
-- 执行root.setView
+- 执行root.setView(view) //将view加入到viewrootImpl
 }WindowManagerGlobal.java
 
 //在应用进程中创建
@@ -192,7 +191,7 @@ performTraversals-->performDraw--draw{
 	}@HardwareRenderer.java
 - 软件drawSoftware(surface){
 	- canvas = mSurface.lockCanvas
-	- mView.draw{
+	- mView.draw(canvas){ //传入canvas
 		- 绘制自己onDraw
 		- 绘制子View，dispatchDraw-->drawChild-->child.draw
 		}

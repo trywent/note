@@ -1,17 +1,24 @@
-Session:通常是每个进程有一个Session用来与WindowManager交互
+//Session:应用获取ISession,用来与WindowManager交互
 
-ViewRootImpl-->getWindowSession-->windowManager.openSession@ViewRootImpl.java-->openSession
-@WindowManagerService.java-->new Session()@Session.java
+ViewRootImpl-->WindowManagerGlobal.getWindowSession@ViewRootImpl.java-->windowManager.openSession
+@WindowManagerGlobal.java-->openSession@WindowManagerService.java-->new Session()@Session.java
+
+//警告在窗口上面显示
+setShown@WindowSurfaceController.java-->
+onWindowSurfaceVisibilityChanged{
+- mAlertWindowSurfaces.add/remove
+- mAlertWindowNotification = new AlertWindowNotification
+- if(mShowingAlertWindowNotificationAllowed)mAlertWindowNotification.post
+}@Session.java
 
 
-==============================
 
+setShowingAlertWindowNotificationAllowed(allow){
+- mAlertWindowNotification.post
+- mAlertWindowNotification.remove
+}@Session.java
 
-updateRotationUncheckedLocked-->computeScreenConfigurationLocked(根据屏的高宽，方位计算应用的高宽。
-计算兼容模式下的缩放比mCompatibleScreenScale)@WindowManagerService.java
-
-
-设置显示屏大小：
-setForcedDisplaySize-->setForcedDisplaySizeLocked-->computeScreenConfigurationLocked@WindowManagerService.java
-
+frameworks/base/core/java/android/view/WindowManagerGlobal.java
+frameworks/base/services/core/java/com/android/server/wm/Session.java
 frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/services/core/java/com/android/server/wm/WindowSurfaceController.java

@@ -3,13 +3,19 @@ sp7731e-1h20-native.dts{
 - sc7731e.dtsi{
 	- "pike2.dtsi"
 	- "sc7731e-clocks.dtsi"
-	- "sc7731e-modem.dtsi"
+	- "sc7731e-modem.dtsi"{
+		- sc2720.dtsi
+		}
 	- <dt-bindings/pinctrl/sc9833_pinctrl.h>	
 	}
 - sp7731e-common.dtsi
 }
 
 
+lunch sp7731e_1h20_native-userdebug
 
 
 echo 1 > /proc/sys/kernel/printk
+echo device > sys/devices/platform/soc/soc:ap-ahb/20200000.usb/host_dev
+
+dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/boot bs=1024 count=18000
