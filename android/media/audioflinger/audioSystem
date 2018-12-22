@@ -1,39 +1,33 @@
-//AudioSystem通过audioPolicyService进行操作
+//
+{
+- setDeviceConnectionState/getDeviceConnectionState  //device state
+- initStreamVolume/setStreamVolumeIndex/getStreamVolumeIndex //volume
+- createAudioPatch/releaseAudioPatch/listAudioPatches
+- getDevicesForStream //device
+}AudioSystem.java
 
-AudioSystem::get_audio_flinger  //audioFlinger服务
-AudioSystem::get_audio_policy_service //audioPolicy 服务
 
-AudioSystem::getOutput(streamType){
-- 获取服务，AudioSystem::get_audio_policy_service
-- 获取输出流，aps->getOutput(stream, samplingRate, format, channelMask, flags, offloadInfo)
-}
+{
+//audioflinger
+- get_audio_flinger
+- setStreamVolume/getStreamVolume
+- setParameters/getParameters
+- getInputBufferSize
 
-AudioSystem::startOutput-->{
-- 获取服务，AudioSystem::get_audio_policy_service
-- 获取输出流，aps->startOutput
-}
+//AudioFlingerClient
+- getAudioFlingerClient
+- getInputBufferSize
 
-//根据流获取设备
-getDevicesForStream-->aps->getDevicesForStream
+//audiopolicy
+- get_audio_policy_service
+- setDeviceConnectionState
+- getOutput/getOutputForAttr/startOutput/stopOutput/releaseOutput //output
+- getInputForAttr/startInput/stopInput/releaseInput   //input
 
-===============
-//操作audioFlinger
 
-//设置参数
-setParameters
+}AudioSystem.cpp
 
-//客户端设置音量
-applyAllVolumes@AudioService.java-->setStreamVolumeIndex@AudioSystem.java-->
-AudioSystem::setStreamVolumeIndex@android_media_AudioSystem.cpp-->
-setStreamVolumeIndex-->aps->setStreamVolumeIndex@AudioSystem.cpp-->
-setStreamVolumeIndex-->mpAudioPolicy->set_stream_volume_index@AudioPolicyService.cpp
--->ap_set_stream_volume_index_for_device@audio_policy_hal.cpp-->setStreamVolumeIndex
--->checkAndSetVolume@AudioPolicyManagerBase.cpp-->setStreamVolume@AudioPolicyCompatClient.cpp-->
-(HAL层计算音量后设置回audioPolicy)
-set_stream_volume-->aps_set_stream_volume-->AudioPolicyService::setStreamVolume-->
-AudioCommandThread::volumeCommand-->insertCommand_l(插入命令，移除重复命令)
-@AudioPolicyService.cpp-->(执行命令)AudioCommandThread::threadLoop(SET_VOLUME)-->
-AudioSystem::setStreamVolume-->setStreamVolume@AudioFlinger.cpp
+
 
 
 frameworks\base\media\java\android\media\AudioSystem.java

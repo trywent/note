@@ -1,0 +1,31 @@
+//服务启动
+service audio-hal-2-0 /vendor/bin/hw/android.hardware.audio@2.0-service@android.hardware.audio@2.0-service.rc
+-->int main{
+- registerPassthroughServiceImplementation<IDevicesFactory> //IDevicesFactory
+- registerPassthroughServiceImplementation<IEffectsFactory>
+- registerPassthroughServiceImplementation<ISoundTriggerHw>
+}@service.cpp
+
+
+
+//获取服务
+AudioFlinger-->mDevicesFactoryHal = DevicesFactoryHalInterface::create()-->
+new DevicesFactoryHalHybrid-->new DevicesFactoryHalHidl{
+- mDevicesFactory = IDevicesFactory::getService() 
+}@DevicesFactoryHalHidl.cpp
+
+
+//打开module
+openDevice{
+- audio_hw_device_t *halDevice
+- loadAudioInterface(moduleName, &halDevice){
+	- hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID, if_name, &mod)
+	- audio_hw_device_open(mod, dev)
+	}
+- result = new PrimaryDevice(halDevice)  //返回这个
+}@DevicesFactory.cpp
+
+
+hardware/interfaces/audio/2.0/default/service.cpp
+frameworks/av/media/libaudiohal/DevicesFactoryHalHidl.cpp
+hardware/interfaces/audio/2.0/default/DevicesFactory.cpp

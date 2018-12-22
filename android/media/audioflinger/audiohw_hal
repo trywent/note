@@ -1,4 +1,27 @@
 //audio hw
+//hal提供接口
+{
+- getSupportedDevices
+- setVoiceVolume
+- setMasterVolume/getMasterVolume
+- setParameters/getParameters
+- getInputBufferSize
+- openOutputStream
+- openInputStream
+- supportsAudioPatches/createAudioPatch/releaseAudioPatch
+}@DeviceHalInterface.h
+
+//local hal接口(真正实现接口库文件)
+struct audio_hw_device {
+- get_supported_devices
+- set_voice_volume
+- set_master_volume/get_master_volume
+- set_parameters/get_parameters
+- get_input_buffer_size
+- open_output_stream/close_output_stream
+- open_input_stream/close_input_stream
+}
+
 声音设备:AUDIO_HARDWARE_MODULE_ID
 legacy_adev_open{
 - 创建ladev，(struct legacy_audio_device *)calloc
@@ -26,8 +49,7 @@ AudioFlinger::PlaybackThread::threadLoop-->threadLoop_write@Threads.cpp-->write@
 AudioFlinger::PlaybackThread::threadLoop-->mOutput->stream->common.standby@Threads.cpp-->
 standby@AudioHardware.cpp
 
-hardware/rk29/audio/audio_hw_hal.cpp
-hardware/rk29/audio/AudioHardware.cpp
+
 
 
 =============
@@ -39,3 +61,9 @@ open_input_stream -->adev_open_input_stream{
 
 in_read-->start_input_stream
 
+
+
+
+frameworks/av/media/libaudiohal/include/media/audiohal/DeviceHalInterface.h
+hardware/rk29/audio/audio_hw_hal.cpp
+hardware/rk29/audio/AudioHardware.cpp

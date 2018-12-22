@@ -1,5 +1,4 @@
-==================================
-广播注册：
+//广播注册：
 registerReceiver-->registerReceiverInternal{
 - mPackageInfo.getReceiverDispatcher-->getReceiverDispatcher{
 	- 先从map中查找
@@ -16,12 +15,9 @@ registerReceiver-->registerReceiverInternal{
 	}
 }@ContextImpl
 
-frameworks/base/core/java/android/app/LoadedApk.java
-frameworks/base/core/java/android/app/ContextImpl.java
-frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
-frameworks/base/services/java/com/android/server/am/BroadcastQueue.java
+
 ________________________
-发送：
+//发送：
 sendBroadcast-->ActivityManagerNative.getDefault().broadcastIntent@ContextImpl.java-->
 broadcastIntentLocked{(默认广播不会发送到stoped状态的应用,判断函数Intent.isExcludingStopped)
 - 首先检查广播权限
@@ -69,26 +65,18 @@ processNextBroadcast{
 	}
 }
 
+broadcastIntentLocked(ProcessRecord callerApp,Intent intent){
+-isProtectedBroadcast = AppGlobals.getPackageManager().isProtectedBroadcast(action) //是否protected
+}
 
+checkBroadcastFromSystem
+
+frameworks/base/core/java/android/app/LoadedApk.java
+frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/java/com/android/server/am/BroadcastQueue.java
 frameworks/base/services/java/com/android/server/am/BroadcastQueue.java
 
 
-_________________________
 
-发送启动完成广播：
-activityIdleInternal-->mService.finishBooting@ActivityStack.java-->finishBooting
-(发送广播，设置dev.bootcomplete sys.bootcomplete)@ActivityManagerService.java
-
-(打开显示)activityIdleInternal-->mService.enableScreenAfterBoot@ActivityStack.java
-
-ensureBootCompleted-->finishBooting(发送广播，设置dev.bootcomplete sys.bootcomplete)
-@ActivityManagerService.java
-
-
-
-activityIdleInternal@ActivityStack.java-->finishBooting@ActivityManagerService.java
-attach(应用进程开始，关联到应用)-->mgr.attachApplication@ActivityThread.java-->ActivityManagerProxy.attachApplication@ActivityManagerNative.java-->(跨进程)
-attachApplication(关联应用进程与进程号)-->attachApplicationLocked-->sendPendingBroadcastsLocked
--->queue.sendPendingBroadcastsLocked@ActivityManagerService.java-->sendPendingBroadcastsLocked
--->processCurBroadcastLocked@BroadcastQueue.java
 

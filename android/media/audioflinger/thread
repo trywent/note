@@ -1,9 +1,14 @@
 //创建播放进程 MixerThread : public PlaybackThread
-AudioFlinger::openOutput-->thread = new MixerThread(AudioFlinger,AudioStreamOut)-->
-PlaybackThread(AudioFlinger,AudioStreamOut){
-- ThreadBase(audioFlinger)
-- mOutput = AudioStreamOut
+AudioFlinger::openOutput-->thread = new MixerThread -->
+MixerThread(audioFlinger, AudioStreamOut* output,audio_io_handle_t id, audio_devices_t device){
+- PlaybackThread(AudioFlinger,AudioStreamOut){ //父类
+	- ThreadBase(audioFlinger)
+	- mOutput = AudioStreamOut
+	}
+- mAudioMixer = new AudioMixer
+- mOutputSink = new AudioStreamOutSink(output->stream)
 }
+
 
 
 //thread = new MixerThread

@@ -234,6 +234,10 @@ readInstallPermissionsLPr
 
 frameworks/base/services/java/com/android/server/pm/Settings.java
 ===================
+//protected broadcast
+mProtectedBroadcasts
+
+===================
 //install
 installPackageFromSystemLIF
 

@@ -1,60 +1,66 @@
 //AudioFlinger: 关联到实际hw设备。写播放数据到hw设备。从hw设备读取数据。
 
+
+AudioFlinger{
+- mDevicesFactoryHal = DevicesFactoryHalInterface::create()-->
+	new DevicesFactoryHalHybrid{
+	- mLocalFactory = new DevicesFactoryHalLocal
+	- mHidlFactory = new DevicesFactoryHalHidl{
+			- mDevicesFactory = IDevicesFactory::getService() //获取hidl接口
+			}
+	}
+- mEffectsFactoryHal = EffectsFactoryHalInterface::create()
+- onFirstRef-->mStandbyTimeInNsecs
+}AudioFlinger.cpp
+
 AudioFlinger::instantiate-->publish{
 - 创建，new SERVICE
 - 加入，sm->addService
 }@BinderService.h
 
-onFirstRef-->(设置正常工作时间)mStandbyTimeInNsecs
-
-
-mAudioHwDevs  //audio设备，与库对应
-
-===================
-//提供接口创建audioHardware
-
-//加载模块
-aps_load_hw_module@AudioPolicyService.cpp-->loadHwModule-->loadHwModule_l(加载库，libname){
-- 若mAudioHwDevs有对应名字的模块，返回该模块
-- 获取audio设备，load_audio_interface{
-	- 获取模块，hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID)
-	- 打开设备，audio_hw_device_open
-	}	
-- 获取能否设置主音量，主静音的标记(功能)
-- 生成设备的唯一标识，nextUniqueId //mNextUniqueId的递增，从1开始
-- 创建设备和标记加入容器，mAudioHwDevs.add(new AudioHwDevice)
+/*
+ 获取hal接口.
+ 原来的,获取模块:hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID),
+	获取设备接口:audio_hw_device_open 
+*/
+loadHwModule(name)-->
+loadHwModule_l{
+- sp<DeviceHalInterface> dev //hal设备接口,primary,ad2dp,usb
+- mDevicesFactoryHal->openDevice(name, &dev)-->DevicesFactoryHalHybrid::openDevice-->
+  mHidlFactory->openDevice-->openDevice@DevicesFactory
+- dev->setMasterVolume/dev->setMasterMute
+- mAudioHwDevs.add(handle, new AudioHwDevice(handle, name, dev, flags)) //保存接口到AudioHwDevice
 }
 
 
-//hal层回调，
-getOutput-->aps_open_output_on_module@AudioPolicyService.cpp-->
-AudioFlinger::openOutput{
-- findSuitableHwDev_l(module/*模块*/，dev/*设备*/){
-	- 若模块为0{
-		- 加载设备，loadHwModule_l
-		- 若模块层支持该dev，则返回。get_supported_devices
-		}
-	- 不为0，返回mAudioHwDevs.valueFor(module)
-	}
-- 获取设备，outHwDev->hwDevice
-- 打开流，(HAL层设备)hwDevHal->open_output_stream(&outStream)-->open_output_stream@audio_hw_hal.cpp
-- 流不为空{
-	- 创建new AudioStreamOut
-	- 创建线程thread，new MixerThread(this, output),并加入mPlaybackThreads.add(id, thread)
-	}
-}
 
-//回调设置参数
-setParameters-->thread->setParameters@AudioFlinger.cpp-->MixerThread::checkForNewParameters_l
-mOutput->stream->common.set_parameters@Threads.cpp-->out_set_parameters@audio_hw_hal.cpp-->
-setParameters@AudioHardware.cpp
-
+frameworks/av/media/libaudiohal/DevicesFactoryHalHybrid.cpp
+frameworks/av/media/libaudiohal/DevicesFactoryHalHidl.cpp
+frameworks/av/media/libaudiohal/DevicesFactoryHalLocal.cpp
 ============
-//output
-AudioPolicyService::getOutput-->....-->openOutput-->
-openOutput_l{//创建播放线程
-- outHwDev->openOutputStream(&outputStream)
-- new MixerThread(outputStream) //创建thread
+/*openOutput 
+ audiohw创建一个outStream结构
+*/
+openOutput-->openOutput_l(audio_module_handle_t module,audio_io_handle_t *output,audio_config_t *config,
+		audio_devices_t devices, const String8& address,audio_output_flags_t flags){
+//获取audiohw接口
+- AudioHwDevice *outHwDev = findSuitableHwDev_l(module,devices){
+	- module=0{//老方法
+		- loadHwModule_l //加载module
+		}
+	- module!=0,AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(module) //从mAudioHwDevs查找并返回
+	}
+
+- outHwDev->openOutputStream(&ppStreamOut/*output*/,device){
+	- AudioStreamOut *outputStream = new AudioStreamOut(this)
+	- outputStream->open(handle, devices, config, address){
+		- sp<StreamOutHalInterface> outStream
+		- hwDev()->openOutputStream(&outStream)
+		- stream = outStream
+		}
+	- ppStreamOut = outputStream 
+	}@AudioHwDevice.cpp
+- new MixerThread(this, outputStream, *output/*playThread的句柄*/) //创建thread
 - mPlaybackThreads.add(*output, thread)
 }@AudioFlinger.cpp
 
@@ -171,8 +177,16 @@ AudioFlinger::RecordThread::RecordBufferConverter::convert-->provider->getNextBu
 -->AudioFlinger::RecordThread::ResamplerBufferProvider::getNextBuffer
 
 
+//回调设置参数
+setParameters-->thread->setParameters@AudioFlinger.cpp-->MixerThread::checkForNewParameters_l
+mOutput->stream->common.set_parameters@Threads.cpp-->out_set_parameters@audio_hw_hal.cpp-->
+setParameters@AudioHardware.cpp
+
+
+
 frameworks/av/services/audioflinger/AudioFlinger.cpp
+frameworks/av/services/audioflinger/AudioHwDevice.cpp
+frameworks/av/services/audioflinger/AudioStreamOut.cpp
 frameworks/av/services/audioflinger/Threads.cpp
 frameworks/av/services/audioflinger/Tracks.cpp
-
 frameworks/native/libs/binder/IMemory.cpp

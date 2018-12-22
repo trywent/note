@@ -14,53 +14,11 @@ AudioTrack::set -- AudioSystem::getOutput -- AudioPolicyService::getOutput -- Au
 AudioTrack::start -- TrackHandle::start -- AudioPolicyService::getOutput -- AudioFlinger::openOutput
 
 	
-
-=============
-client:
-
-frameworks/base/media/java/android/media/MediaPlayer.java
-frameworks/base/media/jni/android_media_MediaPlayer.cpp
-frameworks/av/media/libmedia/mediaplayer.cpp
-frameworks/av/media/libmedia/IMediaPlayerService.cpp
-frameworks/av/media/libmedia/IMediaPlayer.cpp
-_____________
-service:
-
-
-
-frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
-frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp
-frameworks/av/media/libmediaplayerservice/StagefrightPlayer.cpp
-frameworks/av/media/libstagefright/AwesomePlayer.cpp
-_____________
-policy:
-
-AudioSystem工具？
-AudioSystem::get_audio_policy_service()
-AudioSystem::get_audio_flinger()
-
-AudioPolicyService管理资源？
-
-
-
-AudioFlinger操作？
-
-
-
 frameworks/av/media/libmedia/AudioTrack.cpp
 frameworks/av/media/libmedia/AudioRecord.cpp
 frameworks/av/media/libmedia/AudioSystem.cpp
 frameworks/av/services/audioflinger/AudioFlinger.cpp
 frameworks/av/services/audioflinger/AudioPolicyService.cpp
-
-=============
-音频设备控制：
-//设备打开关闭
-
-//音量控制
-
-//音频路径
-
 frameworks/base/media/java/android/media/AudioManager.java
 frameworks/base/media/java/android/media/AudioService.java
 =============
@@ -74,60 +32,14 @@ media_router         //MediaRouterService
 
 =============
 stream:
-      STREAM_VOICE_CALL = 0;
-      STREAM_SYSTEM = 1;
-      STREAM_RING = 2;
-      STREAM_MUSIC = 3;
-      STREAM_ALARM = 4;
-      STREAM_NOTIFICATION = 5;
-      STREAM_BLUETOOTH_SCO = 6;
-      STREAM_SYSTEM_ENFORCED = 7;
-      STREAM_DTMF = 8;
-      STREAM_TTS = 9;
+	STREAM_VOICE_CALL = 0;
+	STREAM_SYSTEM = 1;
+	STREAM_RING = 2;
+	STREAM_MUSIC = 3;
+	STREAM_ALARM = 4;
+	STREAM_NOTIFICATION = 5;
+	STREAM_BLUETOOTH_SCO = 6;
+	STREAM_SYSTEM_ENFORCED = 7;
+	STREAM_DTMF = 8;
+	STREAM_TTS = 9;
 
-=============
-device:
-    AUDIO_DEVICE_OUT_EARPIECE                  = 0x1,
-    AUDIO_DEVICE_OUT_SPEAKER                   = 0x2,
-    AUDIO_DEVICE_OUT_WIRED_HEADSET             = 0x4,
-    AUDIO_DEVICE_OUT_WIRED_HEADPHONE           = 0x8,
-    AUDIO_DEVICE_OUT_BLUETOOTH_SCO             = 0x10,  //蓝牙面向连接，主要用于语音
-    AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET     = 0x20,
-    AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT      = 0x40,
-    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP            = 0x80,  //蓝牙音频传输模型协定，音乐？
-    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES = 0x100,
-    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER    = 0x200,
-    AUDIO_DEVICE_OUT_AUX_DIGITAL               = 0x400,
-    AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET         = 0x800,
-    AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET         = 0x1000,
-    AUDIO_DEVICE_OUT_USB_ACCESSORY             = 0x2000,
-    AUDIO_DEVICE_OUT_USB_DEVICE                = 0x4000,
-	AUDIO_DEVICE_OUT_REMOTE_SUBMIX             = 0x8000,
-
-
-
-      DEVICE_BIT_IN = 0x80000000;
-      DEVICE_BIT_DEFAULT = 0x40000000;
-      DEVICE_IN_COMMUNICATION = DEVICE_BIT_IN | 0x1;
-      DEVICE_IN_AMBIENT = DEVICE_BIT_IN | 0x2;
-      DEVICE_IN_BUILTIN_MIC = DEVICE_BIT_IN | 0x4;
-      DEVICE_IN_BLUETOOTH_SCO_HEADSET = DEVICE_BIT_IN | 0x8;
-      DEVICE_IN_WIRED_HEADSET = DEVICE_BIT_IN | 0x10;
-      DEVICE_IN_AUX_DIGITAL = DEVICE_BIT_IN | 0x20;
-      DEVICE_IN_HDMI = DEVICE_IN_AUX_DIGITAL;
-      DEVICE_IN_VOICE_CALL = DEVICE_BIT_IN | 0x40;
-      DEVICE_IN_TELEPHONY_RX = DEVICE_IN_VOICE_CALL;
-      DEVICE_IN_BACK_MIC = DEVICE_BIT_IN | 0x80;
-      DEVICE_IN_REMOTE_SUBMIX = DEVICE_BIT_IN | 0x100;
-      DEVICE_IN_ANLG_DOCK_HEADSET = DEVICE_BIT_IN | 0x200;
-      DEVICE_IN_DGTL_DOCK_HEADSET = DEVICE_BIT_IN | 0x400;
-      DEVICE_IN_USB_ACCESSORY = DEVICE_BIT_IN | 0x800;
-      DEVICE_IN_USB_DEVICE = DEVICE_BIT_IN | 0x1000;
-      DEVICE_IN_FM_TUNER = DEVICE_BIT_IN | 0x2000;
-      DEVICE_IN_TV_TUNER = DEVICE_BIT_IN | 0x4000;
-      DEVICE_IN_LINE = DEVICE_BIT_IN | 0x8000;
-      DEVICE_IN_SPDIF = DEVICE_BIT_IN | 0x10000;
-      DEVICE_IN_BLUETOOTH_A2DP = DEVICE_BIT_IN | 0x20000;
-      DEVICE_IN_LOOPBACK = DEVICE_BIT_IN | 0x40000;
-      DEVICE_IN_IP = DEVICE_BIT_IN | 0x80000;
-      DEVICE_IN_DEFAULT = DEVICE_BIT_IN | DEVICE_BIT_DEFAULT;

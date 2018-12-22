@@ -5,6 +5,19 @@
 - AudioRecord创建时通过getInput/putInput,进行创建或释放
 - 控制音量设置
 
+AudioPolicyService::AudioPolicyService{
+- 创建线程，AudioCommandThread
+- 老方法{
+   - audio模块，hw_get_module(AUDIO_POLICY_HARDWARE_MODULE_ID)
+   - 打开设备，audio_policy_dev_open(module, &mpAudioPolicyDev)-->module->methods->open@audio_policy.h
+   }
+- 新方法{
+   - AudioPolicyClient //实现AudioPolicyClientImpl,对audioflinger的一个封装
+   - createAudioPolicyManager-->new AudioPolicyManager(AudioPolicyClient)	
+   }
+
+}
+
 create_legacy_ap@audio_policy_hal.cpp-->createAudioPolicyManager@AudioPolicyManagerDefault.cpp
 ->new AudioPolicyManagerDefault(new AudioPolicyCompatClient(aps_ops,audioPolicyService)){
 - 设置接口，mpClientInterface = clientInterface
@@ -52,18 +65,40 @@ AudioPolicyManagerBase::getOutput{
 - 若创建不成功，则在mOutputs中查找所有支持的设备并选择最优的outputs
 }
 
-//android8.0
-AudioPolicyManager::getOutputForAttr(&output,selectedDeviceId){
-- strategy = getStrategyForAttr //获取策略
-- device = getDeviceForStrategy(strategy)//获取设备
-- getOutputForDevice(device,stream){
-	- 遍历mOutputs查找合适的output返回
-	- outputDesc = new SwAudioOutputDescriptor(profile)
-	- outputDesc->mDevice = device
-	- mpClientInterface->openOutput(output)
-	- addOutput(output, outputDesc)
-	}
+获取output：
+AudioPolicyService::getOutput-->mpAudioPolicy->get_output@AudioPolicyService.cpp
+-->lap->policy.get_output@audio_policy_hal.cpp
+
+回调getOutput：
+getOutput-->(HAL)aps_ops.open_output_on_module-->aps_open_output_on_module-->af->openOutput
+@AudioPolicyService.cpp
+
+开始output：
+AudioSystem::startOutput-->AudioPolicyService::startOutput-->mpAudioPolicy->start_output-->
+ap_start_output@audio_policy_hal.cpp
+
+回调设置参数：
+setParameters-->mAudioCommandThread->parametersCommand-->threadLoop-->
+AudioSystem::setParameters@AudioPolicyService.cpp-->af->setParameters@AudioSystem.cpp-->
+
+
+
+//设置音量
+setStreamVolumeIndex@audioSystem.cpp-->setStreamVolumeIndex{
+- 有该函数则调用，mpAudioPolicy->set_stream_volume_index_for_device
+	-->ap_set_stream_volume_index_for_device@
+- 否则调用，set_stream_volume_index
 }
+
+//根据流获取设备
+getDevicesForStream-->mpAudioPolicy->get_devices_for_stream@AudioPolicyService.cpp
+-->get_devices_for_stream-->ap_get_devices_for_stream@audio_policy_hal.cpp
+
+
+
+set_stream_volume-->aps_set_stream_volume-->setStreamVolume-->mAudioCommandThread->volumeCommand-->
+AudioCommandThread::volumeCommand-->(执行命令)AudioCommandThread::threadLoop-->AudioSystem::setStreamVolume
+@AudioPolicyService.cpp
 
 _____________________
 volume:

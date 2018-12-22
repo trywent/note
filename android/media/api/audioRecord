@@ -1,0 +1,100 @@
+//
+MediaRecorder{ //数据源
+- DEFAULT 
+- MIC                //microphone
+- REMOTE_SUBMIX      //远程设备(wifi显示器),播放数据也会到远程设备
+- UNPROCESSED
+- VOICE_CALL         //uplink downlink数据
+- VOICE_COMMUNICATION //语音通话voip
+- VOICE_DOWNLINK
+- VOICE_RECOGNITION
+- VOICE_UPLINK
+}
+
+AudioRecord recorder = new AudioRecord.Builder()
+         .setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+         .setAudioFormat(new AudioFormat.Builder()
+                 .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                 .setSampleRate(32000)
+                 .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                 .build())
+         .setBufferSize(2*minBuffSize)
+         .build();
+-->new AudioRecord(mAttributes, mFormat, mBufferSizeInBytes, mSessionId)-->native_setup
+-->android_media_AudioRecord_setup{
+- lpRecorder = new AudioRecord@AudioRecord.cpp
+- lpRecorder->set(sampleRateInHertz,format,localChanMask,recorderCallback)
+}@android_media_AudioRecord.cpp
+
+//获取最小buffer.大小和实际codec缓存大小相关..一帧为一次采样
+int getMinBufferSize (int sampleRateInHz, int channelConfig, int audioFormat)
+-->native_get_min_buff_size-->android_media_AudioRecord_get_min_buff_size{
+- AudioRecord::getMinFrameCount(&frameCount){//获取最小帧数
+	- AudioSystem::getInputBufferSize
+	- frameCount*2 //将帧数翻倍返回..为了交替使用
+	}
+- return frameCount * channelCount * audio_bytes_per_sample(format)// 帧转换bytes
+}
+
+
+//start
+startRecording-->native_start-->android_media_AudioRecord_start-->lpRecorder->start
+@android_media_AudioRecord.cpp-->start@AudioRecord.cpp
+
+
+
+//read
+read(short[] audioData)-->native_read_in_short_array-->android_media_AudioRecord_readInArray
+-->lpRecorder->read(recordBuff)@@android_media_AudioRecord.cpp-->read(buffer)@AudioRecord.cpp
+
+native_read_in_direct_buffer-->android_media_AudioRecord_readInDirectBuffer-->lpRecorder->read
+
+/**********************************
+ audioRecord native
+*/
+AudioRecord::AudioRecord-->set(audio_source_t inputSource, uint32_t sampleRate, audio_format_t format,
+        audio_channel_mask_t channelMask,callback_t cbf){
+- mCbf = cbf不为空{
+	- mAudioRecordThread = new AudioRecordThread
+	- mAudioRecordThread->run
+	}
+- openRecord_l{
+	- AudioSystem::getInputForAttr(根据采样率等参数，创建属性)-->aps->getInputForAttr
+		AudioPolicyManager::getInputForAttr{//获取流
+		- getDeviceAndMixForInputSource-->getDeviceForInputSource//获取input设备
+			-->mEngine->getDeviceForInputSource
+		- config //设置config 采样率，格式，通道
+		- mInputs中查找可用的input，若找到直接返回（实现多应用同时录音）
+		- mpClientInterface->openInput(config)-->AudioFlinger::openInput-->openInput_l
+		-
+		}
+	- audioFlinger->openRecord(input,mSampleRate,mChannelMask,iMem,bufferMem){
+		- iMem  //cblk
+		- bufferMem //flinger端mBuffer地址
+		} //
+	- buffers //设置buffer地址
+	- mProxy = new AudioRecordClientProxy(buffer) //创建proxy，用来读取数据	
+	}
+}@AudioRecord.cpp
+
+AudioPolicyManager::getInputForAttr{
+- device = getDeviceAndMixForInputSource
+- getInputForDevice(device)
+}
+
+
+
+//read数据,读取数据拷贝到 buffer中
+read@AudioRecord.java-->native_read_in_short_array(/*byte,short,float数据格式不同*/)-->
+android_media_AudioRecord_readInArray-->lpRecorder->read@android_media_AudioRecord.cpp-->
+read(buffer,size){
+  //获取数据
+- obtainBuffer(Buffer* audioBuffer,const struct timespec )-->obtainBuffer-->proxy->obtainBuffer-->
+	obtainBuffer(判断是读取还是写入，将mBuffers返回)@AudioTrackShared.cpp
+- memcpy(buffer, audioBuffer.i8)//拷贝到用户buffer中
+}@AudioRecord.cpp
+
+frameworks/base/media/java/android/media/AudioRecord.java
+frameworks/base/core/jni/android_media_AudioRecord.cpp
+frameworks/av/media/libaudioclient/AudioRecord.cpp
+frameworks/base/media/java/android/media/MediaRecorder.java
