@@ -1,4 +1,9 @@
 //service surfaceflinger /system/bin/surfaceflinger@init.rc
+inti1@SystemServcer.java-->android_server_SystemServer_init1@com_android_server_SystemServer.cpp-->
+system_init-->SurfaceFlinger::instantiate@system_init.c-->instantiate-->publish@BinderServcie.h-->
+sm->addService-->addService@BpServiceManager-->BpServiceManager.addService-->remote()->transact
+@IServiceManager.cpp
+
 main{
 - new SurfaceFlinger-->onFirstRef-->(消息队列初始化)mEventQueue.init
 - flinger->init

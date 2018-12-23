@@ -1,0 +1,36 @@
+/*************************************
+  kernel binder
+*/
+
+写入驱动的数据结构为binder_write_read，其中read指向mIn的数据，write指向mOut的数据。驱动处理mOut.data中命令和数据。
+函数writeTransactionData@IPCThreadState.cpp向mOut中写入要传输的数据。
+
+talkWithDriver@IPCThreadState.cpp-->ioctl(mProcess->mDriverFD, BINDER_WRITE_READ, &bwr)-->
+---kernel--->binder_ioctl-->binder_thread_write(根据位置和大小处理传入指针指向的数据)
+-->binder_transaction@binder.c
+___________________________
+serviceManager
+发送端:
+binder_ioctl-->binder_thread_write(传入进程，线程，要处理的数据)--binder_get_thread()创建Thread-->
+binder_transaction(判断是BC_TRANSACTION，或BC_REPLY分别处理)
+--{handle不为0时，binder_get_ref(获取引用，远程引用和本地引用的转换)-->}--
+获得target_node=binder_context_mgr_node-->
+
+---------------------------
+打开驱动的进程，都加入到binder_procs中
+binder_open-->hlist_add_head(&proc->proc_node, &binder_procs)将proc加入到binder_procs首位--
+(分配binder_proc *proc)filp->private_data = proc
+___________________________
+接收端：
+在init.rc中启动service servicemanager /system/bin/servicemanager
+
+打开main@service_manager.c-->binder_open@binder.c
+
+设置为Manager：main@service_manager.c-->binder_become_context_manager-->ioctl(bs->fd,BINDER_SET_CONTEXT_MGR
+, 0)@binder.c-->驱动层binder_ioctl-->binder_context_mgr_node = binder_new_node(proc, NULL, NULL)-->
+binder_new_node(创建binder_node)@binder.c
+
+接收main@service_manager.c-->binder_loop@binder.c
+
+jb/frameworks/base/cmds/servicemanager/service_manager.c
+src/jb/frameworks/base/cmds/servicemanager/binder.c
