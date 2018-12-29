@@ -1,0 +1,75 @@
+//servicemanger
+struct binder_io
+{
+    char *data;            /* pointer to read/write from */
+    binder_size_t *offs;   /* array of offsets */
+    size_t data_avail;     /* bytes available in data buffer */
+    size_t offs_avail;     /* entries available in offsets array */
+
+    char *data0;           /* start of data buffer */
+    binder_size_t *offs0;  /* start of offsets buffer */
+    uint32_t flags;
+    uint32_t unused;
+}
+
+//IPCThreadState
+struct binder_write_read {
+	binder_size_t		write_size;	/* bytes to write */
+	binder_size_t		write_consumed;	/* bytes consumed by driver */
+	binder_uintptr_t	write_buffer;
+	binder_size_t		read_size;	/* bytes to read */
+	binder_size_t		read_consumed;	/* bytes consumed by driver */
+	binder_uintptr_t	read_buffer;
+}
+
+struct flat_binder_object {
+	/* 8 bytes for large_flat_header. */
+	__u32		type;
+	__u32		flags;
+
+	/* 8 bytes of data. */
+	union {
+		binder_uintptr_t	binder;	/* local object */
+		__u32			handle;	/* remote object */
+	};
+
+	/* extra data associated with local object */
+	binder_uintptr_t	cookie;
+}
+
+//kernel
+struct binder_transaction_data {
+	/* The first two are only used for bcTRANSACTION and brTRANSACTION,
+	 * identifying the target and contents of the transaction.
+	 */
+	union {
+		/* target descriptor of command transaction */
+		__u32	handle;
+		/* target descriptor of return transaction */
+		binder_uintptr_t ptr;
+	} target;
+	binder_uintptr_t	cookie;	/* target object cookie */
+	__u32		code;		/* transaction command */
+
+	/* General information about the transaction. */
+	__u32	        flags;
+	pid_t		sender_pid;
+	uid_t		sender_euid;
+	binder_size_t	data_size;	/* number of bytes of data */
+	binder_size_t	offsets_size;	/* number of bytes of offsets */
+
+	/* If this transaction is inline, the data immediately
+	 * follows here; otherwise, it ends with a pointer to
+	 * the data buffer.
+	 */
+	union {
+		struct {
+			/* transaction data */
+			binder_uintptr_t	buffer;
+			/* offsets from buffer to flat_binder_object structs */
+			binder_uintptr_t	offsets;
+		} ptr;
+		__u8	buf[8];
+	} data;
+};
+

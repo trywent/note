@@ -1,0 +1,132 @@
+//进程的启动，监听driver响应ipc
+service zygote /system/bin/app_process@init.rc-->main-->runSelectLoop(监听socket)@ZygoteInit.java
+-->runOnce{
+- Zygote.forkAndSpecialize //fork新进程
+- handleChildProc{
+	- WrapperInit.execApplication //invoke 参数不为空
+	- RuntimeInit.zygoteInit
+	}
+}@ZygoteConnection.java
+
+//fork流程
+runOnce-->Zygote.forkAndSpecialize@ZygoteConnection.java-->nativeForkAndSpecialize
+@Zygote.java-->com_android_internal_os_Zygote_nativeForkAndSpecialize-->
+ForkAndSpecializeCommon-->fork@com_android_internal_os_Zygote.cpp
+
+_____________
+//进程的初始，IPC工作的主线程这里初始化
+RuntimeInit.zygoteInit{
+- nativeZygoteInit-->com_android_internal_os_RuntimeInit_nativeZygoteInit-->
+	gCurRuntime->onZygoteInit@AndroidRuntime.cpp-->
+	ProcessState::self()->startThreadPool(开始主线程)@app_main.cpp
+- applicationInit(targetSdkVersion, argv, classLoader)-->invokeStaticMain(调用main函数)
+	
+}@RuntimeIinit.java
+
+
+frameworks/base/core/java/com/android/internal/os/ZygoteInit.java
+frameworks/base/core/java/com/android/internal/os/ZygoteConnection.java
+frameworks/base/core/jni/com_android_internal_os_Zygote.cpp
+frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
+frameworks/base/core/jni/AndroidRuntime.cpp
+frameworks/base/cmds/app_process/app_main.cpp
+
+
+
+==================
+/*************************************
+  应用进程启动,监听binder
+*/
+ProcessState::self()->startThreadPool(开始主线程)@app_main.cpp-->
+ProcessState::self()->startThreadPool{ //应用进程
+- ProcessState::self(){
+	- 进程已经创建,return gProcess
+	- gProcess = new ProcessState("/dev/binder"){
+		- mDriverName("/dev/binder")
+		- mDriverFD(open_driver(driver))-->open_driver //打开binder节点
+		- mmap(mDriverFD)
+		}
+	}
+- startThreadPool-->spawnPooledThread(true/*main*/)-->new PoolThread(isMain).run-->//ipcThread
+	threadLoop-->IPCThreadState::self()->joinThreadPool@IPCThreadState.cpp
+}@ProcessState
+
+//IPC线程
+IPCThreadState::self()->joinThreadPool{
+- IPCThreadState::self{
+	- pthread_key_create(&gTLS, threadDestructor)
+	}
+- joinThreadPool{
+	- getAndExecuteCommand{//循环执行
+		- talkWithDriver
+		- executeCommand
+		}
+	- mOut.writeInt32(BC_EXIT_LOOPER);
+	- talkWithDriver(false) //退出执行
+	}
+}@IPCThreadState.cpp
+
+//获取BinderProxy,
+getStrongProxyForHandle(handle){
+- andle_entry* e = lookupHandleLocked(handle){
+	- 若不存在entry,创建handle_entry e 
+	- mHandleToObject.insertAt(e, N)
+	- return mHandleToObject.editItemAt(handle)
+	}
+- IBinder* b = e->binder为空, b = new BpBinder(handle) //创建binder
+- e->binder = b //返回binder
+}@ProcessState.cpp
+
+//handel==0为serviceManager
+ProcessState::getContextObject-->getStrongProxyForHandle(0)
+
+//读取并处理消息
+getAndExecuteCommand{
+- talkWithDriver(true/*doReceive*/){//读取
+	- binder_write_read bwr //保存数据的结构体
+	- bwr.write_buffer = (uintptr_t)mOut.data() //填充要写入的数据.mOut中有要写入的数据
+	- bwr.read_buffer = (uintptr_t)mIn.data() //读取数据保存在mIn.data
+	- ioctl(mProcess->mDriverFD, BINDER_WRITE_READ, &bwr)
+	}
+- int32_t cmd = mIn.readInt32()
+- executeCommand(cmd){//处理
+	- BR_ERROR
+	- BR_OK	
+	- BR_TRANSACTION{
+		- binder_transaction_data tr //消息结构
+		- result = mIn.read(&tr, sizeof(tr))
+		}
+	- BR_SPAWN_LOOPER:mProcess->spawnPooledThread(false/*非主*/) //创建新Thread
+	}
+}@IPCThreadState.cpp
+
+
+//发起调用,读取返回值
+transact@BpBinder.cpp-->IPCThreadState::self()->transact(mHandle)-->
+transact(int32_t handle,uint32_t code, const Parcel& data,Parcel* reply){
+- writeTransactionData(BC_TRANSACTION /*cmd*/, flags, handle, code, data){ //写数据到mOut
+	- binder_transaction_data tr //要写入的数据
+	- tr.target.handle = handle
+	- tr.code = code
+	- tr.data.ptr.buffer = data.ipcData() //data
+	- mOut.writeInt32(cmd) //命令BC_TRANSACTION
+	- mOut.write(&tr)
+	}
+-不是单向!TF_ONE_WAY,waitForResponse(reply){
+	- talkWithDriver
+	- executeCommand
+	- BR_REPLY:reply->ipcSetDataReference(onst uint8_t* data, const binder_size_t* objects){
+		- mData = const_cast<uint8_t*>(data)
+		- mObjects = const_cast<binder_size_t*>(objects)
+		}@Parcel.cpp
+	}
+}@IPCThreadState.cpp
+
+
+frameworks/base/core/java/android/os/Process.java
+frameworks/base/core/java/android/os/Binder.java
+frameworks/base/core/jni/android_util_Binder.cpp
+frameworks/native/libs/binder/IPCThreadState.cpp
+frameworks/native/include/binder/BinderService.h
+frameworks/native/libs/binder/ProcessState.cpp
+frameworks/native/libs/binder/BpBinder.cpp

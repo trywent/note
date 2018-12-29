@@ -1,7 +1,7 @@
 //
 
 dd if=/mnt/media_rw/USB0/recovery_w.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/recovery bs=1024 count=32708
-dd if=/mnt/media_rw/USB0/boot.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/boot bs=1024 count=24010
+dd if=/sdcard/boot.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/boot bs=1024 count=24010
 dd if=/mnt/media_rw/USB0/resource.img of=/dev/block/platform/ff0f0000.dwmmc/by-name/resource bs=1024 count=8177
 
 /sys/bus/platform/drivers/usb20_otg/force_usb_mode

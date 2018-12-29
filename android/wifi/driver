@@ -1,0 +1,67 @@
+/*
+  外挂模块wifi driver
+*/
+service rk_wifi_hal /vendor/bin/hw/rk_wifi_hal-->
+main@rk_wifi_hal.c-->wifi_load_driver{
+- check_wifi_chip_type_string{ //获取wifi类型,名字
+	- get_wifi_device_id
+	}@rk_wifi_ctrl.cpp
+- 遍历module_list{
+	- wifi_ko_path //驱动名
+	- wifi_ko_arg //参数
+	}
+- insmod(wifi_ko_path, wifi_ko_arg)
+}@wifi_hal_common.cpp
+
+
+frameworks/opt/net/wifi/rk_wifi_hal/rk_wifi_hal.c
+frameworks/opt/net/wifi/libwifi_hal/wifi_hal_common.cpp
+frameworks/opt/net/wifi/libwifi_hal/rk_wifi_ctrl.cpp
+
+
+/*
+  android4.4
+*/
+wifi_load_driver-->(查找驱动)get_wifi_device_num--(加载驱动模块)rel_load_driver@wifi.c
+get_wifi_device_num-->find_existing_devices-->(设置驱动名)set_driver_property@wifi.c
+
+卸载驱动：
+unloadDriver@WifiStateTracker.java-->unloadDriver@android_net_wifi_wifi.cpp-->android_net_wifi_unloadDriver@android_net_wifi_wifi.cpp-->
+wifi_unload_driver@wifi.c-->close_down_driver@wifi.c
+
+//reltek usb wifi：
+通过vold发现wifi：
+NetlinkHandler::onEvent-->vm->handleBlockEvent@NetlinkHandler.cpp-->wifiUsbVolume->handleBlockEvent
+@VolumeManager.cpp-->mVm->getBroadcaster()->sendBroadcast@DirectVolume.cpp-->(接收到消息)
+handleMessage-->mCallbacks.onEvent@NativeDaemonConnector.java-->sendBroadcast("findWifiUsb")@
+MountService.java
+
+接收广播：
+BroadcastReceiver.onReceive-->setWifiEnabled(打开wifi)@WifiService.java
+
+
+//固件加载：
+固件地址："/etc/firmware","/vendor/firmware"
+ueventd符号连接到init
+
+ueventd@init.rc-->main@init.c-->ueventd_main@ueventd.c-->handle_device_fd-->handle_firmware_event-->process_firmware_event@devices.c
+
+
+system/core/init/devices.c
+system/core/init/ueventd.c
+system/core/init/Android.mk
+
+system/vold/NetlinkHandler.cpp
+system/vold/VolumeManager.cpp
+system/vold/DirectVolume.cpp
+frameworks/base/services/java/com/android/server/NativeDaemonConnector.java
+frameworks/base/services/java/com/android/server/MountService.java
+frameworks/base/services/java/com/android/server/WifiService.java
+
+/*
+  kernel
+*/
+
+//rtl8723ds
+rtw_macaddr_cfg
+

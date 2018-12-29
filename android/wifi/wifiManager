@@ -1,0 +1,192 @@
+/************************
+  wifiManager
+
+  sprd /data/misc/wifi/wifimac.txt
+*/
+mSystemServiceManager.startService("com.android.server.wifi.WifiService")@SystemServer.java-->
+startService{
+- constructor.newInstance(className)-->WifiService{
+	- mImpl = new WifiServiceImpl(new WifiInjector(context),new WifiAsyncChannel(TAG)){
+			- mWifiStateMachine = mWifiInjector.getWifiStateMachine()
+		}@WifiServiceImpl.java
+
+	}@WifiService.java
+- service.onStart-->publishBinderService(WIFI_SERVICE,mImpl)@WifiService.java //启动服务WIFI_SERVICE
+}@SystemServiceManager.java
+
+//获取manager
+WifiManager = Context.getSystemService(Context.WIFI_SERVICE)@ContextImpl.java
+
+
+
+WifiInjector{//注入器
+ //threads
+- mWifiServiceHandlerThread = new HandlerThread("WifiService")
+- mWifiServiceHandlerThread = new HandlerThread("WifiStateMachine")
+ //Native
+- mWifiMonitor = new WifiMonitor
+- mHalDeviceManager = new HalDeviceManager
+- mWifiVendorHal = new WifiVendorHal
+- mSupplicantStaIfaceHal = new SupplicantStaIfaceHal{
+	- mISupplicantStaIfaceCallback = new SupplicantStaIfaceHalCallback
+	}
+- mWificondControl = new WificondControl()
+- mWifiNative = new WifiNative("wlan0",mWifiVendorHal,mSupplicantStaIfaceHal,mWificondControl){
+	- mSupplicantStaIfaceHal = staIfaceHal
+	}@WifiNative.java
+
+ //mWifiStateMachine,controller
+- mWifiStateMachine = new WifiStateMachine(mWifiNative)
+- mWifiController = new WifiController
+}@WifiInjector.java
+
+
+
+enableSupplicant-->mWificondControl.enableSupplicant@WifiNative.java//启动supplicant
+
+
+
+
+/************************
+  wifiController.控制接口管理wifi状态,wifi热点
+*/
+WifiController{
+- addState(mDefaultState)
+}
+
+
+StaEnabledState{//wifi打开
+- enter-->mWifiStateMachine.setSupplicantRunning(true)
+- 
+}
+
+/************************
+  wifi状态wifiStateMachine
+*/
+
+WifiStateMachine(Looper){
+-
+- addState(mDefaultState)//初始state 
+-
+}@WifiStateMachine.java
+
+
+
+setSupplicantRunning-->sendMessage(CMD_START_SUPPLICANT/CMD_STOP_SUPPLICANT)
+
+InitialState{//初始状态
+- processMessage{
+	- CMD_START_SUPPLICANT{ //打开wifi
+		- mClientInterface = mWifiNative.setupForClientMode() //设置wifi模式为client
+		- mWifiNative.enableSupplicant()
+		- mWifiMonitor.startMonitoring
+		}
+	}
+}
+
+
+SoftApState{//AP热点状态
+- enter{
+	- IApInterface apInterface = mWifiNative.setupForSoftApMode()//设置热点
+	- mSoftApManager = mWifiInjector.makeSoftApManager
+	}
+}
+/************************
+  wifiConControl
+*/
+setupDriverForClientMode{
+- mWificond = mWifiInjector.makeWificond{
+	- IBinder binder = ServiceManager.getService(WIFICOND_SERVICE_NAME) //获取服务wificond
+	- IWificond.Stub.asInterface(binder)
+	}
+- clientInterface = mWificond.createClientInterface()
+- mClientInterface = clientInterface
+- mWificondScanner = mClientInterface.getWifiScannerImpl
+}
+
+enableSupplicant-->mWificondControl.enableSupplicant@WifiNative.java
+
+frameworks/base/services/core/java/com/android/server/SystemServiceManager.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiService.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiServiceImpl.java
+frameworks/base/wifi/java/android/net/wifi/WifiManager.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiController.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiStateMachine.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiInjector.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNative.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/SupplicantStaIfaceHal.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WificondControl.java
+
+
+
+/************************
+  wifiAPI
+*/
+//打开wifi(启动过程打开)
+run-->wifi.checkAndStartWifi()@SystemServer.java-->checkAndStartWifi-->setWifiEnabled@WifiService.java
+-->mWifiManager.setWifiEnabled(enable)@wifiEnabler.java-->mService.setWifiEnabled@WifiManager.java
+-->setWifiEnabled-->mWifiController.sendMessage(CMD_WIFI_TOGGLED)
+sendEnableMessage-->WifiHandler--setWifiEnabledBlocking-->mWifiStateTracker.loadDriver@WifiService.java
+ 
+
+setWifiEnabledState@WifiService.java设置wifi状态并广播
+
+//获取MAC地址
+mWifiInfo.setMacAddress(mWifiNative.getMacAddress())-->getMacAddress
+mSupplicantStaIfaceHal.getMacAddress@WifiNative.java-->@SupplicantStaIfaceHal.java
+
+//扫描：
+startScan@wifiManager-->startScan@wifiService-->startScan@WifiStateMachine-->sendMessage
+-->SmHandler.processMsg-->
+
+
+BroadcastReceiver.onReceive()-->updateWifiState(send message)-->doUpdateWifiState-->sendEnableMessage-->setWifiEnabledBlocking@WifiService.java
+
+supplicant没有连接track:
+setWifiEnabledBlocking@WifiService.java-->startEventLoop-->startMonitoring@WifiStateTracker.java
+-->MonitorThread.start-->MonitorThread.run-->notifySupplicantLost-->
+sendEmptyMessage(EVENT_SUPPLICANT_DISCONNECT)
+
+接上MonitorThread.run@WifiMonitor.java-->connectToSupplicant@WifiMonitor.java-->connectToSupplicant@WifiStateTracker.java-->
+WifiNative.connectToSupplicant()
+
+wpa_supplicant_add_iface-->wpa_supplicant_init_iface
+
+//start wifi PM deamon:
+setWifiEnabledBlocking@WifiService.java-->startEventLoop@WifiStateTracker.java-->mWifiPMMonitor.startMonitoring()@WifiStateTracker.java-->
+PMMonitorThread.run@WifiPMMonitro.java-->connectToPMDeamon-->mWifiStateTracker.connectToPMDeamon@WifiStateTracker.java-->
+WifiNative.connectToPMDeamon@cpp-->wifi_start_pm_deamon@wifi.c
+
+
+
+//获取连接信息
+getConnectionInfo@WifiManager.java-->
+
+
+frameworks/base/wifi/java/android/net/wifi/WifiStateTracker.java
+frameworks/base/wifi/java/android/net/wifi/WifiStateMachine.java
+frameworks/base/wifi/java/android/net/wifi/SupplicantStateTracker.java
+
+
+/************************
+ wpa_supplicant
+*/
+开始wpa_supplicant:
+setWifiEnabled-->sendMessage(CMD_START_SUPPLICANT)-->DriverLoadedState.processMessage
+@WifiStateMachine.java-->startSupplicant@WifiNative.java-->android_net_wifi_startSupplicant
+@android_net_wifi_Wifi.cpp-->wifi_start_supplicant-->property_set("ctl.start", supplicant_name)@wifi.c
+
+监听：
+DriverLoadedState.processMessage@WifiStateMachine.java-->startMonitoring-->MonitorThread.run
+-->connectToSupplicant-->mWifiNative.connectToSupplicant@WifiMonitor.java-->
+connectToSupplicant@WifiNative.java-->android_net_wifi_connectToSupplicant-->
+wifi_connect_to_supplicant@android_net_wifi_Wifi.cpp-->wifi_connect_to_supplicant-->
+wifi_connect_on_socket_path@wifi.c
+
+frameworks/base/core/jni/android_net_wifi_Wifi.cpp
+frameworks/base/wifi/java/android/net/wifi/WifiMonitor.java
+hardware/libhardware_legacy/wifi/wifi.c
+
+
+
+

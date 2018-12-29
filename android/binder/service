@@ -81,6 +81,15 @@ new ServiceDispatcher(c, context, handler, flags)--sd.getIServiceConnection-->Se
 getIServiceConnection(返回new InnerConnection)@LoadedApk.java-->
 
 
+//startService
+startService(Intent service)-->startServiceCommon(service,mUser)-->ActivityManager.getService().startService
+@ContextImpl.java-->startService-->mServices.startServiceLocked@ActivityManagerService.java-->
+startServiceLocked(Intent service,boolean fgRequired){
+- ServiceLookupResult res = retrieveServiceLocked(service)
+- ServiceRecord r = res.record
+- startServiceInnerLocked
+}@ActiveService.java
+
 
 frameworks/base/core/java/android/app/ContextImpl.java
 frameworks/base/core/java/android/app/LoadedApk.java

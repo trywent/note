@@ -16,23 +16,91 @@ transact发起一个调用到IBinder,Binder.onTransact()接收一个调用.这�
 2，The pingBinder() method can be called, and will return false if the remote process no longer exists.
 3，The linkToDeath() method can be used to register a IBinder.DeathRecipient with the IBinder, which will be called when its containing process goes away.
 
+//aidl：
+xxx.aidl生成Ixxx.java
+public interface Ixxx extends android.os.IInterface{
+- String DESCRIPTOR ="xxx"
+- public static abstract class Stub extends Binder implements Ixxx{ //本地服务
+	- method实现
+	- asInterface(IBinder){
+		- new Ixxx.Stub.Proxy(obj/*BinderProxy*/) //创建Proxy
+		}
+	- onTransact-->method
+	- private static class Proxy implements Ixxx{ //远程代理
+		- Proxy(obj/*BinderProxy*/){
+			mRemote = obj
+			}
+		- IBinder mRemote //远程接口
+		- method-->mRemote.transact
+		}
+	}
+- 需要实现的method
+}
+
+
 
 /*
- IBinder实现
+ IBinder实现,Binder BinderProxy
 */
+
+//本地实现
 Binder implements IBinder{
+- init-->android_os_Binder_init{ //初始化mObject
+	- JavaBBinderHolder* jbh = new JavaBBinderHolder()
+	- env->SetLongField(gBinderOffsets.mObject, (jlong)jbh)
+	}
+- NoImagePreloadHolder.sRegistry.registerNativeAllocation(this, mObject) //将当前对象和native关联,垃圾回收使用?
+- attachInterface{
+	- mOwner     //this
+	- mDescriptor //一般为类名com.xxx.xxx
+	}
 - transact    //调用到远程
 - onTransact  //处理调动
 - linkToDeath(@NonNull DeathRecipient recipient) //监听remote是不是挂了
 - execTransact
-}
+}@Binder.java
 
-Binder{
-- mObject = getNativeBBinderHolder-->android_os_Binder_getNativeBBinderHolder-->
-	new JavaBBinderHolder-->new JavaBBinder@android_util_Binder.cpp
-- NoImagePreloadHolder.sRegistry.registerNativeAllocation(this, mObject) //将当前对象和native关联,垃圾回收使用?
-}
 
+//远程接口
+BinderProxy implements IBinder{
+- pingBinder
+- transact-->transactNative
+}@Binder.java
+
+register_android_os_Binder{
+- int_register_android_os_Binder{
+	- clazz = FindClassOrDie(env,  "android/os/Binder")
+	- gBinderOffsets.mClass = MakeGlobalRefOrDie(env, clazz)
+	- gBinderOffsets.mExecTransact = GetMethodIDOrDie("execTransact")
+	- gBinderOffsets.mObject = GetFieldIDOrDie( "mObject")
+	- RegisterMethodsOrDie(gBinderMethods) //getCallingPid 之类的方法
+	}
+- int_register_android_os_BinderInternal{
+	- clazz = FindClassOrDie("com/android/internal/os/BinderInternal")
+	- gBinderInternalOffsets.mClass
+	}
+- int_register_android_os_BinderProxy{
+	- clazz = FindClassOrDie(env, "android/os/BinderProxy")
+	- gBinderProxyOffsets.mObject =GetFieldIDOrDie("mObject")
+	- RegisterMethodsOrDie(gBinderProxyMethods)//pingBinder linkToDeath 之类的方法
+	}
+}@android_util_Binder.cpp
+
+
+//proxy发起调用
+BinderProxy.transact-->transactNative@Binder.java-->
+android_os_BinderProxy_transact{
+- IBinder* target = (IBinder*)env->GetLongField(obj, gBinderProxyOffsets.mObject) //获取目标
+- target->transact(code, *data, reply, flags)
+}@android_util_Binder.cpp
+
+//local接收调用
+onTransact-->env->CallBooleanMethod(mObject, gBinderOffsets.mExecTransact)@android_util_Binder.cpp
+-->execTransact-->onTransact@Binder.java
+
+//发起调用
+transact@BpBinder.cpp-->IPCThreadState::self()->transact-->
+transact(int32_t handle,uint32_t code, const Parcel& data,Parcel* reply)@IPCThreadState.cpp
 
 
 frameworks/base/core/java/android/os/Binder.java
@@ -40,12 +108,11 @@ frameworks/base/core/jni/android_util_Binder.cpp
 frameworks/native/libs/binder/Binder.cpp
 frameworks/native/include/binder/IPCThreadState.h
 frameworks/native/libs/binder/IPCThreadState.cpp
-
-
+frameworks/native/libs/binder/BpBinder.cpp
+frameworks/native/libs/binder/Binder.cpp
 /*
   paracel用于binder间传输的数据.打包成一个由基本数据类型组成的数据.另一端重新组合
 */
-Parcel:能够包含扁平化数据和IBinder对象的引用(在另一端会获得一个与这个IBinder对象连接的IBinder的代理，用于IPC通信)
 
 Parcel(int)-->init(int)@Parcel.java-->nativeCreat-->android_os_Parcel_create@android_os_parcel.cpp--new Parcel()@Parcel.cpp
 
@@ -53,31 +120,54 @@ Parcel(int)-->init(int)@Parcel.java-->nativeCreat-->android_os_Parcel_create@and
 obtain(obj)-->Parcel(obj)-->init(obj)@Parcel.java-->mNativePtr=obj 或赋值nativeCreate()-->
 android_os_Parcel_create@android_os_Parcel.cpp
 
-//parcel中函数：
-writeInplace（len）：
-	写入的长度为4的倍数，将len转为4的倍数（加11）padded。当padded等于len，则len刚好本就为4的倍数。
-若padded大于len则len=n*4+[1,2,3]。转换后的padded大于len相应为3，2，1
-finishWrite(len)：
-	mDataPos增加len。
-write-->writeInplace-->finishWrite
-mData数据所在的位置，mDataCapacity容量。mDataPos数据的偏移位置(对mData的读取写入)，mDataSize数据的大小。
 
 //写入Binder：
-writeStrongBinder@Parcel.java-->nativeWriteStrongBinder-->android_os_Parcel_writeStrongBinder
-（判断binder类型，）@android_os_Parcel.cpp-->(通过mNativePtr操作，parcel)
-writeStrongBinder-->flatten_binder(判断是BBinder/BpBinder，封装obj.对应类型BINDER_TYPE_HANDLE/BINDER)
--->finish_flatten_binder@Parcel.cpp
+writeStrongBinder(IBinder val)@Parcel.java-->nativeWriteStrongBinder(mNativePtr, val)-->
+android_os_Parcel_writeStrongBinder(jlong nativePtr, jobject object){
+- Parcel* parcel = reinterpret_cast<Parcel*>(nativePtr)
+- sp<IBinder>& val = ibinderForJavaObject(env, object){ //返回BBinder,BpBinder
+	- Binder{
+		- JavaBBinderHolder* jbh =env->GetLongField(obj, gBinderOffsets.mObject)
+		- jbh->get() //返回 new JavaBBinder继承public BBinder
+		}
+	- BinderProxy{
+		- env->GetLongField(obj, gBinderProxyOffsets.mObject) //返回BinderProxy
+		}
+	}
+- parcel->writeStrongBinder(val/*IBinder*/)-->flatten_binder(const sp<IBinder>& binder, Parcel* out){
+	- flat_binder_object obj
+	- IBinder *local = binder->localBinder() //IBinder返回NULL(BpBinder),BBinder返回本身
+	- !local,BpBinder{
+		- BpBinder *proxy = binder->remoteBinder()
+		- handle = proxy->handle()
+		- obj.type = BINDER_TYPE_HANDLE
+		- obj.handle = handle
+		}
+	- BBinder{
+		- obj.type = BINDER_TYPE_BINDER
+		- obj.binder = reinterpret_cast<uintptr_t>(local->getWeakRefs())
+		- obj.cookie = reinterpret_cast<uintptr_t>(local)
+		}
+	- finish_flatten_binder(binder,obj,out) //将obj写入out
+	}@Parcel.cpp
+}@android_os_Parcel.cpp
 
-//mNativePtr初始化：
-init@Parcel.java-->nativeCreate-->android_os_Parcel_create-->new Parcel()@android_os_Parcel.cpp-->
-生成Parcel@Parcel.cpp
 
 //读出Binder：
 reply.readStrongBinder@ServiceManagerNative.java-->nativeReadStrongBinder-->
-android_os_Parcel_readStrongBinder@android_os_Parcel.java-->
-javaObjectForIBinder(env,___parcel->readStrongBinder())@android_util_Binder.java
-___parcel->readStrongBinder()-->unflatten_binder@Parcel.cpp-->proc->getStrongProxyForHandle(flat->handle)
--->getStrongProxyForHandle(返回new BpBinder(handle)，跨进程通信通过这个代理)@ProcessState.cpp
+android_os_Parcel_readStrongBinder(jlong nativePtr){
+- Parcel* parcel = reinterpret_cast<Parcel*>(nativePtr)
+- sp<IBinder>& val = parcel->readStrongBinder-->readNullableStrongBinder(sp<IBinder> val)
+	-->unflatten_binder(ProcessState::self(), *this, val){
+	- const flat_binder_object* flat = in.readObject(false)
+	- BINDER_TYPE_BINDER:*val = reinterpret_cast<IBinder*>(flat->cookie)  //BBinder
+	- BINDER_TYPE_HANDLE:*val = proc->getStrongProxyForHandle(flat->handle) //ProcessState创建BpBinder
+	}@Parcel.cpp
+- javaObjectForIBinder(val){ //创建java IBinder
+	- object = env->NewObject(gBinderProxyOffsets.mClass, gBinderProxyOffsets.mConstructor) //BinderProxy
+	- env->SetLongField(object, gBinderProxyOffsets.mObject, (jlong)val.get()) //设置mObject 为BpBinder(那个handle)
+	}
+}@android_os_Parcel.cpp
 
 
 /home/wangbo/src/jb/frameworks/base/core/java/android/os/Parcel.java
@@ -86,176 +176,119 @@ ___parcel->readStrongBinder()-->unflatten_binder@Parcel.cpp-->proc->getStrongPro
 
 
 
-______________________
-______________________|
-______________________|
-Binder:
-new Binder()@Binder.java-->init()-->android_os_Binder_init@android_util_Binder.cpp(将mObject域设为
-JavaBBinderHolder)
-
-register_android_os_Binder-->int_register_android_os_Binder
-
-相关类JavaBBinderHolder，JavaBBinder继承BBinder @android_util_Binder.cpp
-
-BBinder，BpBinder都继承IBinder，分别实现相应的方法（本地localBinder，远程remoteBinder）
 
 
 
-IBinder : public virtual RefBase   //@IBinder.h
--有方法transact
--能够被远程调用的对象，通过transact函数
 
-BBinder : public IBinder           //@Binder.h
--实现transcat，onTransact
-
-BpBinder : public IBinder          //@BpBinder.h
--getStrongProxyForHandle(获取一个与远程进程中handle对应的通信代理，使用这个代理调用远程对象)
-
-BpRefBase : public virtual RefBase //@Binder.h
--提供mRemote(用于跨进程调用)
-
-template<typename SERVICE>
-class BinderService                //BinderService.h
--将服务加入到serviceManager，或添加服务后将服务加入线程池等待运城调用
-
-template<typename INTERFACE>
-class BnInterface : public INTERFACE, public BBinder         //
--供其他需要实现被远程调用的类继承并实现(如camera服务)
-
-template<typename INTERFACE>
-class BpInterface : public INTERFACE, public BpRefBase      //
--代理接口。自己的服务的方法封装后的接口(这个接口中的方法也通过BpBinder进行远程通信)
-
-
-
-frameworks/native/include/binder/BinderService.h
-frameworks/native/include/binder/IBinder.h
-frameworks/native/include/binder/Binder.h
-frameworks/native/include/binder/BpBinder.h
-
-
-
-====================================
-系统服务生成：
-首先实现aidl文件会自动生成stub类。要实现的服务继承stub类。
-生成的文件位置：/jb/out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/src
-----------------------------
-aidl生成的文件：
-Ixxx.stub在接口Ixxx中实现。Ixxx接口包括要实现的函数，Ixxx.stub继承Binder类和该接口。
-stub extends Binder{
-  asInterface(android.os.IBinder obj)//返回Proxy的实例,远程调用通过remote。Proxy中remote = obj
-  asBinder()                         //返回stub自身
-
-  onTransact(){
-      //由Binder中transact()调用。	
-      //响应远程调用，执行本地实现的函数（Ixxx接口中的函数），返回执行结果
-  }
-	
-  static class Proxy implements android.app.IAlarmManager{
-	//代理类，proxy中remote用于远程调用传输
-	...封装远程调用的方法(即服务实现的方法，在远程端的接口)
-  }	
-}
-
-服务一般继承stub类
-Service extends IService.stub{
-    //实现接口中的函数
-}
-调用流程：
-(获取远程对象的代理)Ixx.stub.asInterface(binder)-->(调用远程对象的方法)Ixx.stub.Proxy.xxMethod-->
-(远程对象响应调用)Ixx.stub.onTransact
 
 /*************************************
   ServiceManager获取,添加服务，获取服务
 */
+//serviceManager启动
+service servicemanager /system/bin/servicemanager@servicemanager.rc-->
+main{
+- struct binder_state *bs = binder_open("/dev/binder"){
+	- struct binder_state *bs
+	- bs->fd = open()
+	- bs->mapped = mmap(bs->fd)
+ 	}@binder.c
+- binder_loop(bs, svcmgr_handler) //读取数据解析,回复
+}@service_manager.c
+
+binder_loop(bs, svcmgr_handler){
+- binder_write(bs, BC_ENTER_LOOPER)
+  //循环读取数据
+- ioctl(bs->fd, BINDER_WRITE_READ) //读取信息
+- binder_parse(func){
+	- BR_TRANSACTION{//收到调用
+		- func-->svcmgr_handler
+		- binder_send_reply-->binder_write{//回复
+			- struct binder_write_read bwr
+			- bwr.write_size = len //设置要写入的数据
+			- ioctl(bs->fd, BINDER_WRITE_READ,bwr) 
+			}
+		}
+	- BR_REPLY //收到回复
+	}
+}@binder.c
+
+svcmgr_handler(struct binder_state *bs, struct binder_transaction_data *txn,struct binder_io *msg){
+- uint32_t handle //
+- SVC_MGR_GET_SERVICE/SVC_MGR_CHECK_SERVICE:do_find_service{ //查找服务
+	- s = bio_get_string16(msg, &len)
+	- handle = do_find_service(s){
+		- struct svcinfo *si = find_svc(s, len)
+		- return si->handle
+		}
+	- bio_put_ref(reply /*obj*/, handle){
+		- struct flat_binder_object *obj = bio_alloc_obj
+		- obj->type = BINDER_TYPE_HANDLE
+		- obj->handle = handle
+		}
+	}
+- SVC_MGR_ADD_SERVICE:{//加入服务
+	- s = bio_get_string16(msg, &len) //name
+	- handle = bio_get_ref(msg){ //非handle(BpBinder)时为0
+		- _bio_get_obj-->bio_get(bio, sizeof(struct flat_binder_object))//struct flat_binder_object
+		- (obj->type == BINDER_TYPE_HANDLE),return obj->handle
+		}
+	- do_add_service(handle){
+		- struct svcinfo *si = find_svc
+		- si->handle = handle
+		- 
+		}
+	}
+- SVC_MGR_LIST_SERVICES:svc_can_list
+- bio_put_uint32(reply, 0)//回复0
+}@service_manager.c
+
+frameworks/native/cmds/servicemanager/service_manager.c
+frameworks/native/cmds/servicemanager/binder.c
+
+//获取ServiceManager：获取到一个BpBinder(0) ServiceManagerProxy
+getIServiceManager-->ServiceManagerNative.asInterface(Binder.allowBlocking(BinderInternal.getContextObject())){
+- Binder.allowBlocking(BinderInternal.getContextObject()){
+	- BinderInternal.getContextObject-->android_os_BinderInternal_getContextObject{
+		- sp<IBinder> b = ProcessState::self()->getContextObject //new BpBinder(0)
+		- return javaObjectForIBinder(env, b){ //创建java IBinder对象
+			- object = env->NewObject(gBinderProxyOffsets.mClass, gBinderProxyOffsets.mConstructor)
+			}
+		}@android_util_Binder.cpp
+	- allowBlocking
+	}@Binder.java
+- ServiceManagerNative.asInterface(IBinder obj){
+	- IServiceManager in = (IServiceManager)obj.queryLocalInterface("android.os.IServiceManager")
+	- 否则,return new ServiceManagerProxy(obj)
+	}@ServiceManagerNative.java
+}@ServiceManager.java
 
 
-//获取ServiceManager：
-ServiceManagerNative.asInterface（IBinder），返回ServiceManagerProxy。该代理通过IBinder传输数据。
-IBinder的获取通过：
-getIServiceManager-->ServiceManagerNative.asInterface(BinderInternal.getContextObject())
-@ServiceManager.java-->new ServiceManagerProxy(obj)@ServiceManagerNative.java(最终操作通过obj)
 
 
-getContextObject@BinderInternal.java
-getContextObject-->android_os_BinderInternal_getContextObject@android_util_Binder.cpp-->
-ProcessState::self()->getContextObject-->getStrongProxyForHandle-->lookupHandleLocked(是vector容器)@ProcessState.cpp-->new BpBinder(0)
-传入ServiceManagerNative.asInterface（）是BpBinder，通过以上可知实际中的transact是通过BpBinder实现。
-
-
-设置handle entry(lookupHandleLocked中要获取的)
-mHandleToObject.editItemAt@Vector.h-->editItemLocation@VectorImpl.cpp将对应的handle缓存在vector中。
-取出handle，查看binder是否为null，若为null则new BpBinder(handle)。
 
 //添加系统服务到serviceManager：
 ServiceManager.addService(String name, IBinder service)@SystemService.java-->addService-->
 getIServiceManager().addService-->ServiceManagerNative.asInterface(BinderInternal.getContextObject())
-.addService@ServiceManager.java-->ServiceManagerProxy.addService(通过data.writeStrongBinder写入service。
-传输parcel)@ServiceManagerNative.java-->（mRomote是BpBinder）mRemote.transact-->(通过BpBinder远程调用)BpBinder::transact-->IPCThreadState::self()-->transact@BpBinder.cpp--> 
+.addService@ServiceManager.java-->ServiceManagerProxy.addService(String name, IBinder service){
+- Parcel data = Parcel.obtain()
+- data.writeStrongBinder(service)
+- mRemote.transact(ADD_SERVICE_TRANSACTION, data)
+}@ServiceManagerNative.java
 
-一般在systemServer中添加服务(IBinder的实现)，驱动记录这些服务(对象的引用转换)。
 
 //再从serviceManager获取服务：
-getSystemService-->SYSTEM_SERVICE_MAP.get(name).getService(this)(获取Manager,通过manager调用服务)-->
 ServiceManager.getService@ContextImpl.java-->getService-->getIServiceManager().getService
-@ServcieManager.java-->ServiceManagerProxy.getService@ServiceManagerNative.java-->transact(CHECK_SERVICE_TRANSACTION,)-->（java层在这里获取，IBinder binder =reply.readStrongBinder()）-->
-IPCThreadState::self()->transact@BpBinder.cpp-->transact--> waitForResponse(reply)@IPCThreadState.cpp
--->(reply->ipcSetDataReference)ipcSetDataReference
-
-从serviceManger获取服务的handle，再获取一个代理BpBinder用来与systemServer通信，调用服务。
-readStrongBinder@Parcel.java-->nativeReadStrongBinder-->android_os_Parcel_readStrongBinder
-@android_os_Parcel.cpp-->readStrongBinder-->unflatten_binder@Parcel.cpp-->
-getStrongProxyForHandle{
-- 查找handle对应的实例，lookupHandleLocked(handle){
-	- 从mHandleToObject中获取读应的实例
-	- 若不存在，则新建一个实例并插入到mHandleToObject
-	}
-- 获取到实例，当BpBinder不存在，则新建BpBinder(new BpBinder(handle))
-}@ProcessState.cpp
-
-----------------------
-ServiceManager接收端：service_manager.c
-获取服务：
-main@service_manager.c-->binder_loop-->binder_parse(判断接收的类型)@binder.c-->
-(是BR_TRANSACTION)svcmgr_handler-->
-
-do_add_service(增加服务，保存在这里的服务都是handle类型)
-
-do_find_service(获取服务)-->bio_put_ref(将handle加入reply)
-
-//系统服务响应远程调用：
-SystemServer监听驱动传来的数据，再调用服务。
-
-systemServer中调用servcieManager.addService加入服务。调用init1-->android_server_SystemServer_init1
-@com_android_server_SystemServer.cpp-->system_init()@system_init.cpp。
-init1中：
-    ProcessState::self()->startThreadPool();
-	startThreadPool-->spawnPooledThread(true)-->new PoolThread-->run-->threadLoop-->
-	IPCThreadState::self()->joinThreadPool(mIsMain)
-    IPCThreadState::self()->joinThreadPool();
-	
-joinThreadPool-->talkWithDriver(获取数据)--executeCommand(执行从驱动中获得的命令)
-{
-
-case BR_TRANSACTION：//是获得了一个请求命令
-  binder_transaction_data tr;//接收的数据
-  result = mIn.read(&tr, sizeof(tr));//从mIn中读取数据
-  sp<BBinder> b((BBinder*)tr.cookie);//从tr中获取binder
-  ......
-  b->transact；//执行本地操作
-  sendReply(reply, 0);//发送回复 -->writeTransactionData()
-}
-监听驱动中传来的请求。然后处理消息会调用b->transact-->onTransact。这里调用AIDL自动生成的函数，最终
-会调用请求的service中函数。
+@ServcieManager.java-->ServiceManagerProxy.getService(name){
+- Parcel data = Parcel.obtain()
+- data.writeString(name)
+- mRemote.transact(GET_SERVICE_TRANSACTION, data, reply)
+- IBinder binder = reply.readStrongBinder() //从parcel中读取Binder
+}@ServiceManagerNative.java
 
 
-frameworks/base/core/java/android/os/ServiceManager.java
-frameworks/base/core/java/android/os/ServiceManagerNative.java
-frameworks/base/core/jni/android_util_Binder.cpp
-frameworks/base/cmds/servicemanager/service_manager.c
 
 
-进程死亡处理：
+//进程死亡处理：
 远程代理加入监听：
 BinderProxy.linkToDeath@Binder.java-->android_os_BinderProxy_linkToDeath-->target->linkToDeath
 @android_util_Binder.cpp-->linkToDeath-->(保存处理对象)mObituaries->add@BpBinder.cpp
@@ -266,48 +299,9 @@ IPCThreadState::clearDeathNotification-->mOut.writeInt32(BC_CLEAR_DEATH_NOTIFICA
 executeCommand(BR_DEAD_BINDER)-->proxy->sendObituary()@TPCThreadState.cpp
 sendObituary-->reportOneDeath(取出处理对象，处理进程结束)-->recipient->binderDied@BpBinder.cpp
 
-frameworks/base/core/jni/android_util_Binder.cpp
-______________________
-______________________|
-______________________|
-BpBinder::transact-->IPCThreadState::self()->transact@BpBInder.cpp
-
-与驱动接口的传输流程：
-transact-->writeTransactionData(封装binder_transaction_data，并写入到mOut)--waitForResponse-->
-talkWithDriver-->ioctl(mProcess->mDriverFD, BINDER_WRITE_READ, &bwr)@TPCThreadState.cpp-->
-binder_ioctl@binder.c-->(判断传入数据的读写大小，若是写,比如添加服务)-->binder_thread_write-->
-(case:BC_TRANSACTION)binder_transaction--> binder_get_ref(proc, tr->target.handle)()--
-binder_new_node(类型为Binder时，创建node)
-
-接收端：
-joinThreadPool-->talkWithDriver-->talkWithDriver@IPCThreadState.cpp-->
-IPCThreadState::waitForResponse-->(talkWithDriver获取数据,处理远程调用返回的数据BR_REPLY)
-
-IPCThreadState::waitForResponse-->executeCommand(处理从驱动获取数据,应答请求BR_TRANSACTION)-->
-b->transact(调用binder的相应的函数)
-
-jb/framework/native/libs/binder/IPCThreadState.cpp
 
 
-----------------------------
-通过ServiceManager获取服务的binder：
-发送请求(bcTRANSACTION)：ServiceManager.getService(SERVICE_name)@ContextImpl.java-->
-getIServiceManager().getService@ServiceManager.java-->ServiceManagerProxy.getService-->
-mRemote.transact(CHECK_SERVICE_TRANSACTION,)@ServiceManagerNative.java-->transact-->
-android_os_BinderProxy_transact-->(获取封装的BpBinder)target->transact@android_util_Binder.cpp-->
-IPCThreadState::self()->transact@BpBinder.cpp-->transact--> waitForResponse(reply)@IPCThreadState.cpp
 
-获得回复(brREPLY)：waitForResponse(reply)-->reply->ipcSetDataReference@IPCThreadState.cpp-->
-ipcSetDataReference(设置parcel中数据)@Parcel.cpp
-
-从回复获取binder：reply.readStrongBinder@ServiceManagerNative.java-->readStrongBinder@Parcel.java
--->nativeReadStrongBinder-->android_os_Parcel_readStrongBinder(封装binder)@android_os_Parcel.cpp-->
-readStrongBinder-->unflatten_binder@Parcel.cpp-->getStrongProxyForHandle(handle)-->new BpBinder
-@ProcessState.cpp
-
-获得BinderProxy：javaObjectForIBinder(封装binder成BinderProxy@Binder.java)@android_os_Parcel.cpp
-
-封装服务代理：Service.Stub.asInterface(BinderProxy)-->由AIDL文件自动生成文件中封装。
 
 frameworks/base/core/java/android/os/ServiceManager.java
 frameworks/base/core/java/android/os/ServiceManagerNative.java

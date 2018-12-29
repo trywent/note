@@ -1,9 +1,9 @@
-wpa_supplicant
---------------
+/*
+  wpa_supplicant
+*/
 实现WPA supplicant组件，就是运行在工作站上的部分。实现身份验证，控制漫游。
 
-wpa_supplicant作为守护程序，运行在后台控制无线连接。wpa_supplicant支持前端程序wpa_cli，
-能够使用命令行。
+wpa_supplicant作为守护程序，运行在后台控制无线连接。wpa_supplicant支持前端程序wpa_cli，能够使用命令行。
 
 使用WPA连接AP的步骤：
 - wpa_supplicant requests the kernel driver to scan neighboring BSSes
@@ -91,9 +91,10 @@ wpa_supplicant \
 	-c wpa1.conf -i wlan0 -D hostap -N \
 	-c wpa2.conf -i ath0 -D madwifi
 
+/*
+  Configuration file
+*/
 
-Configuration file
-------------------
 配置文件wpa_supplicant.conf。能够通过发送信号SIGHUP到wap_supplicant,重新加载。
 也可通过wpa_cli reconfigure命令重新加载。
 -

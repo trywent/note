@@ -33,10 +33,18 @@ InputMethodManagerService-->mSettings.enableAllIMEsIfThereIsNoEnabledIME
 -->putEnabledInputMethodsStr@InputMethodUtils.java
 
 
-reset输入法：
-resetAllInternalStateLocked
-resetDefaultImeLocked@InputMethodManagerService.java-->isValidSystemDefaultIme
-@InputMethodUtils.java
+语言变化reset输入法：
+resetStateIfCurrentLocaleChangedLocked-->resetAllInternalStateLocked
+resetDefaultImeLocked{
+- defIm = InputMethodUtils.isValidSystemDefaultIme{ //获取默认输入法
+	
+	}
+- defIm = InputMethodUtils.getMostApplicableDefaultIME //没有获取到,获取系统默认
+- setSelectedInputMethodAndSubtypeLocked{
+	- mSettings.putSelectedSubtype
+	- Settings.putSelectedInputMethod(
+	}
+}@InputMethodManagerService.java
 
 frameworks/base/services/java/com/android/server/InputMethodManagerService.java
 frameworks/base/core/java/com/android/internal/inputmethod/InputMethodUtils.java

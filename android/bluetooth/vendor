@@ -6,3 +6,6 @@ BTA_DM_COD {0x5A, 0x40, 0x08} //设备类型SERVICE_CLASS MAJOR_CLASS MINOR_CLAS
 BTM_LOCAL_IO_CAPS               BTM_IO_CAP_IO//配对方式
 
 @include/bt_target.h
+
+//bt mac
+data/misc/bluedroid/btmac.txt
