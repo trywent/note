@@ -49,26 +49,46 @@ binder_ioctl_write_read(cmd, arg, thread){
 - struct binder_write_read bwr
 - copy_from_user(&bwr, ubuf, sizeof(bwr))
  //写读数据
-- binder_thread_write
+- binder_thread_write(bwr.write_buffer,)
 - binder_thread_read
 }
 
 binder_thread_write(struct binder_proc *proc,struct binder_thread *thread,
 	binder_uintptr_t binder_buffer, size_t size,binder_size_t *consumed){
 - void __user *buffer = (void __user *)(uintptr_t)binder_buffer
+- void __user *ptr = buffer + *consumed //数据位置
 - get_user(cmd, (uint32_t __user *)ptr) //获取命令
-
-- BC_TRANSACTION,BC_REPLY:binder_transaction(proc, thread, &tr,cmd == BC_REPLY, 0)
+- BC_TRANSACTION,BC_REPLY:{
+	- struct binder_transaction_data tr
+	- copy_from_user_preempt_disabled(&tr, ptr, sizeof(tr))//拷贝数据
+	- binder_transaction(proc, thread, &tr,cmd == BC_REPLY, 0)
+	}
 }
 
-
-binder_transaction{
+//BC_TRANSACTION,BC_REPLY
+binder_transaction(struct binder_proc *proc, struct binder_thread *thread,
+		 struct binder_transaction_data *tr, int reply){
 - reply{
 
 	}
 - transaction{
-	
+	- tr->target.handle不为空,binder_get_ref(tr->target.handle) //查找handle索引
 	}
+
+ //解析数据中binder
+- BINDER_TYPE_BINDER:
+  BINDER_TYPE_WEAK_BINDER:{
+	- struct flat_binder_object *fp //binder 的数据结构
+	- struct binder_node *node = binder_get_node(proc, fp->binder) //为binder创建node
+	- struct binder_ref *ref = binder_get_ref_for_node(target_proc, node)
+	- fp->type = BINDER_TYPE_HANDLE //设置为handle
+	- fp->binder = 0,fp->handle = ref->desc
+	}
+
+- BINDER_TYPE_HANDLE
+  BINDER_TYPE_WEAK_HANDLE:
 }
+
+//BC_ENTER_LOOPER BC_REGISTER_LOOPER
 
 kernel/drivers/android/binder.c

@@ -36,6 +36,10 @@ frameworks/base/cmds/app_process/app_main.cpp
 ==================
 /*************************************
   应用进程启动,监听binder
+
+  将传送的目标保存到binder_transaction_data ,再讲binder_transaction_data写入到mOut(Parcel)
+  最后讲mOut封装到binder_write_read.写入驱动
+  
 */
 ProcessState::self()->startThreadPool(开始主线程)@app_main.cpp-->
 ProcessState::self()->startThreadPool{ //应用进程
@@ -89,7 +93,7 @@ getAndExecuteCommand{
 	- ioctl(mProcess->mDriverFD, BINDER_WRITE_READ, &bwr)
 	}
 - int32_t cmd = mIn.readInt32()
-- executeCommand(cmd){//处理
+- executeCommand(cmd){//处理从kernel回复的数据
 	- BR_ERROR
 	- BR_OK	
 	- BR_TRANSACTION{
@@ -104,16 +108,16 @@ getAndExecuteCommand{
 //发起调用,读取返回值
 transact@BpBinder.cpp-->IPCThreadState::self()->transact(mHandle)-->
 transact(int32_t handle,uint32_t code, const Parcel& data,Parcel* reply){
-- writeTransactionData(BC_TRANSACTION /*cmd*/, flags, handle, code, data){ //写数据到mOut
+- writeTransactionData(BC_TRANSACTION /*kernel cmd*/, flags, handle, code/*要调用的函数*/, data){ //写数据到mOut
 	- binder_transaction_data tr //要写入的数据
-	- tr.target.handle = handle
+	- tr.target.handle = handle  //传送目标
 	- tr.code = code
-	- tr.data.ptr.buffer = data.ipcData() //data
+	- tr.data.ptr.buffer = data.ipcData() //写入要传送的上层data
 	- mOut.writeInt32(cmd) //命令BC_TRANSACTION
 	- mOut.write(&tr)
 	}
 -不是单向!TF_ONE_WAY,waitForResponse(reply){
-	- talkWithDriver
+	- talkWithDriver  //数据写入驱动,传到目标进程
 	- executeCommand
 	- BR_REPLY:reply->ipcSetDataReference(onst uint8_t* data, const binder_size_t* objects){
 		- mData = const_cast<uint8_t*>(data)
