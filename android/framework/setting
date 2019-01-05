@@ -78,13 +78,34 @@ frameworks/base/core/java/android/provider/Settings.java
 
 =======================
 语言：
+getLocales()@AssetManager.java
+
+//6.0
+onCreate{
+- addPreferencesFromResource(R.xml.language_settings)
+- mAutoLanguagePref = (CheckBoxPreference) findPreference(KEY_AUTO_LANGUAGE) //自动设置语言
+- mLanguagePref = findPreference(KEY_PHONE_LANGUAGE) //语言
+}@InputMethodAndLanguageSettings.java
 
 
+frameworks/base/core/java/android/content/res/AssetManager.java
+packages/apps/Settings/src/com/android/settings/inputmethod/InputMethodAndLanguageSettings.java
+packages/apps/Settings/src/com/android/settings/LocalePicker.java
 
-保存：/data/property
-updateConfigurationLocked-->saveLocaleLocked@ActivityManagerService.java
 
-frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+//8.0
+mAddLanguage.setOnClickListener(new View.OnClickListener(){
+	 public void onClick(View v) {
+                final LocalePickerWithRegion selector = LocalePickerWithRegion.createLanguagePicker()
+		}
+	} )
+
+onCreate{
+- mAdapter = new SuggestedLocaleAdapter(mLocaleList)
+}@LocalePickerWithRegion.java
+
+packages/apps/Settings/src/com/android/settings/localepicker/LocaleListEditor.java
+frameworks/base/core/java/com/android/internal/app/LocalePickerWithRegion.java
 =======================
 恢复出厂设置:reset
 

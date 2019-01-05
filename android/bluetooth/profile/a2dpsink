@@ -18,7 +18,8 @@ bt_av_sink_interface-->connect@btif_av.cc
 
 BtifAvrcpAudioTrackCreate@btif_avrcp_audio_track.cc
 
-
+//设置焦点,获取焦点才能播放
+informAudioFocusStateNative-->sBluetoothA2dpInterface->set_audio_track_gain@com_android_bluetooth_a2dp_sink.cpp
 
 frameworks/base/core/java/android/bluetooth/BluetoothA2dpSink.java
 packages/apps/Bluetooth/src/com/android/bluetooth/a2dpsink/A2dpSinkService.java

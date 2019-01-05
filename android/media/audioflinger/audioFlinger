@@ -138,25 +138,86 @@ AudioFlinger::openInput-->openInput_l{
 
 	}
 - new AudioStreamIn //创建流
-- new RecordThread  //创建线程
+- new RecordThread(this,inputStream,devices)  //创建线程
 - mRecordThreads.add(*input, thread) //加入容器
 }
 
 
-AudioFlinger::openRecord{
+AudioFlinger::openRecord(audio_io_handle_t input, uint32_t sampleRate,audio_channel_mask_t channelMask,
+	sp<IMemory>& cblk,sp<IMemory>& buffers,){
 - checkRecordThread_l //获取input对应的线程
-- client = registerPid(pid)//创建clinet 用于分配内存(4K大小)
-- thread->createRecordTrack_l-->RecordTrack@Thread.cpp-->
-	TrackBase::TrackBase{
-	- client->heap()->allocate@Tracks.cpp-->MemoryDealer->allocate//mBuffer
-	- 
+- sp<Client> client = registerPid(pid){//创建clinet 用于分配内存(4K大小)
+	- sp<Client> client = new Client(this, pid){
+		- size_t heapSize = property_get_int32("ro.af.client_heap_size_kbyte", 0) //默认堆
+		- mMemoryDealer = new MemoryDealer(heapSize, "AudioFlinger::Client")
+		}
+	- mClients.add(pid, client)
 	}
-	RecordTrack{
-	- RecordBufferConverter 
-	- AudioRecordServerProxy(mCblk,mBuffer)
-	}@Tracks.cpp
-- recordTrack->getBuffers-->mBufferMemory(返回)@TrackBase.h //获取buffer
+- sp<RecordThread::RecordTrack> recordTrack = thread->createRecordTrack_l(client)@Thread.cpp
+- cblk = recordTrack->getCblk()
+- buffers = recordTrack->getBuffers-->mBufferMemory(返回)@TrackBase.h //获取mBufferMemory,只有fast RecordTrack 
 }
+
+/****************
+ 内存分配
+ audioflinger:通过MemoryDealer获取IMemory
+
+  MemoryDealer{
+	- 内存
+	- 内存管理	
+	}
+
+  audioTrack,audioRecord:工作audioFlinger获取IMemory
+*/
+
+IMemory{
+- void* pointer(){ //获取地址
+	- sp<IMemoryHeap> heap = getMemory(&offset)
+	- void* const base = heap->base()
+	- return static_cast<char*>(base) + offset
+	}
+- size_t size() 
+- ssize_t offset()
+- getMemory //获取指针,由MemoryBase:BnMemory,BpMemory实现
+}
+
+MemoryDealer{
+  //实际内存空间
+- sp<IMemoryHeap> mHeap = new MemoryHeapBase(size, flags, name){
+	- const size_t pagesize = getpagesize()
+	- int fd = ashmem_create_region(name, size)
+	- mapfd(fd, size){
+		-  void* base = (uint8_t*)mmap(0, size,fd)
+		- mBase = base //设置base	
+		}
+	}@MemoryHeapBase.cpp
+  //空间管理类
+- SimpleBestFitAllocator* mAllocator = new SimpleBestFitAllocator(size){
+	- chunk_t* node = new chunk_t(0,mHeapSize/32)
+	- mList.insertHead(node)
+	}
+}@MemoryDealer.cpp
+
+client->heap()->allocate(size)@Track.cpp-->allocate{
+- const ssize_t offset = allocator()->allocate(size)
+	-->mAllocator->allocate-->SimpleBestFitAllocator::allocate-->
+	alloc{
+       	  //遍历mList,找到最小的满足大小的chunk_t
+	- chunk_t* cur = mList.head() 
+	- chunk_t* free_chunk = cur
+	  //将chunk_t分割为请求的大小
+ 	- chunk_t* split = new chunk_t(free_chunk->start, extra),mList.insertBefore(free_chunk, split) //为了对齐分割
+	- chunk_t* split = new chunk_t(),mList.insertAfter(free_chunk, split) //剩下的空间分割
+	- return (free_chunk->start)*kMemoryAlign //返回偏移位置
+	}
+- sp<IMemory> memory = new Allocation(this, heap(),offset,size){
+	- MemoryBase(heap, offset, size){
+		- mHeap = heap
+		}
+	- mDealer(dealer)
+	}
+- return memory
+}@MemoryDealer.cpp
 
 
 RecordThread::start-->AudioSystem::startInput@AudioFlinger.cpp
@@ -189,4 +250,6 @@ frameworks/av/services/audioflinger/AudioHwDevice.cpp
 frameworks/av/services/audioflinger/AudioStreamOut.cpp
 frameworks/av/services/audioflinger/Threads.cpp
 frameworks/av/services/audioflinger/Tracks.cpp
+frameworks/native/libs/binder/MemoryDealer.cpp
+frameworks/native/libs/binder/MemoryHeapBase.cpp
 frameworks/native/libs/binder/IMemory.cpp

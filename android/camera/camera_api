@@ -1,4 +1,6 @@
-//android.hardware.camera2
+/**********************
+ android.hardware.camera2
+*/
 使用camera{
 - CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE)
 - CameraManager.getCameraIdList //获取摄像头id
@@ -58,7 +60,8 @@ cameraService.connectDevice(callbacks, cameraId,packageName, uid)
 }@ICameraService.java
 
 
-/*创建CameraCaptureSession
+/***********************
+创建CameraCaptureSession
 camrea输出目标:
 - SurfaceView
 - SurfaceTexture //openGL

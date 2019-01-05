@@ -1,4 +1,6 @@
-//创建播放进程 MixerThread : public PlaybackThread
+/****************
+ 创建播放进程 MixerThread : public PlaybackThread
+*/
 AudioFlinger::openOutput-->thread = new MixerThread -->
 MixerThread(audioFlinger, AudioStreamOut* output,audio_io_handle_t id, audio_devices_t device){
 - PlaybackThread(AudioFlinger,AudioStreamOut){ //父类
@@ -109,16 +111,6 @@ AudioFlinger::PlaybackThread::createTrack_l{
 PlaybackThread::Track::start@Tracks.cpp-->addTrack_l{
 - 开始播放，AudioSystem::startOutput
 - mActiveTracks.add
-}
-=================
-//record
-AudioFlinger::RecordThread::start
-
-
-
-AudioFlinger::RecordThread::threadLoop{
-- 
-- mInput->stream->read(mInput->stream,mRsmpInBuffer)
 }
 
 frameworks/av/services/audioflinger/Threads.cpp

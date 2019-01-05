@@ -1,6 +1,6 @@
-//=========================CameraService
-/*
-  service通过hardware::camera::provider::V2_4::ICameraProvider获取HIDL接口CameraProvider 
+/**********************
+ CameraService
+ service通过hardware::camera::provider::V2_4::ICameraProvider获取HIDL接口CameraProvider 
 */
 service cameraserver@cameraserver.rc-->main{
 - sm = defaultServiceManager()

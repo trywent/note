@@ -19,3 +19,10 @@ echo 1 > /proc/sys/kernel/printk
 echo device > sys/devices/platform/soc/soc:ap-ahb/20200000.usb/host_dev
 
 dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/boot bs=1024 count=18000
+dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/recovery bs=1024 count=22082
+dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/uboot bs=1024 count=488
+
+//声音
+i2s0---->8288
+
+bta_av_sink_data_cback

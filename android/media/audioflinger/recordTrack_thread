@@ -1,0 +1,44 @@
+/****************
+ record
+*/
+RecordThread(AudioStreamIn *input, audio_devices_t outDevice,audio_devices_t inDevice){
+- mInputSource = new AudioStreamInSource(input->stream)
+
+}
+
+RecordThread::onFirstRef-->run-->threadLoop{
+- inputStandBy
+- mInput->stream->read(mInput->stream,mRsmpInBuffer)
+}
+
+AudioFlinger::openRecord-->
+AudioFlinger::RecordThread::createRecordTrack_l(const sp<AudioFlinger::Client>& client,){
+- sp<RecordTrack> track = new RecordTrack(this, client, sampleRate,TrackBase::TYPE_DEFAULT){
+	- TrackBase(ThreadBase *thread,const sp<Client>& client,ALLOC_CBLK){
+		- mThread(thread)
+		- mClient(client)
+		- mCblkMemory = client->heap()->allocate(size) //设置mCblkMemory
+		- mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->pointer()))
+		- new(mCblk) audio_track_cblk_t() //将回调函数结构放到mCblk内存中
+		  //
+		- ALLOC_CBLK:mBuffer = (char*)mCblk + sizeof(audio_track_cblk_t)
+		}
+	- mServerProxy = new AudioRecordServerProxy(mCblk, mBuffer, frameCount
+	- mResamplerBufferProvider = new ResamplerBufferProvider(this)
+	}@Tracks.cpp
+- mTracks.add(track)
+}@Threads.cpp
+
+//内存
+client->heap()->allocate(size){
+- const ssize_t offset = allocator()->allocate(size)-->SimpleBestFitAllocator::allocate-->
+	alloc{
+
+	}
+- 
+}@MemoryDealer.cpp
+
+AudioFlinger::RecordThread::start
+
+frameworks/av/services/audioflinger/Threads.cpp
+frameworks/av/services/audioflinger/Tracks.cpp

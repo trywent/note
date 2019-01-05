@@ -54,6 +54,7 @@ native_read_in_direct_buffer-->android_media_AudioRecord_readInDirectBuffer-->lp
 */
 AudioRecord::AudioRecord-->set(audio_source_t inputSource, uint32_t sampleRate, audio_format_t format,
         audio_channel_mask_t channelMask,callback_t cbf){
+- mReqFrameCount //根据参数计算帧数
 - mCbf = cbf不为空{
 	- mAudioRecordThread = new AudioRecordThread
 	- mAudioRecordThread->run
@@ -68,12 +69,18 @@ AudioRecord::AudioRecord-->set(audio_source_t inputSource, uint32_t sampleRate, 
 		- mpClientInterface->openInput(config)-->AudioFlinger::openInput-->openInput_l
 		-
 		}
-	- audioFlinger->openRecord(input,mSampleRate,mChannelMask,iMem,bufferMem){
+	- size_t frameCount = mReqFrameCount
+	- audioFlinger->openRecord(input,mSampleRate,mChannelMask,frameCount,iMem,bufferMem){
 		- iMem  //cblk
 		- bufferMem //flinger端mBuffer地址
-		} //
-	- buffers //设置buffer地址
-	- mProxy = new AudioRecordClientProxy(buffer) //创建proxy，用来读取数据	
+		}@AudioFlinger.cpp //
+	  //设置地址
+	- void *iMemPointer = iMem->pointer() //IMemory->pointer获取IMemoryHeap,获取地址
+	- audio_track_cblk_t* cblk = static_cast<audio_track_cblk_t*>(iMemPointer) //第一部分为回调
+	- buffers = cblk + 1 //buffer位置随后
+	- mCblkMemory = iMem 
+	- mBufferMemory = bufferMem
+	- mProxy = new AudioRecordClientProxy(cblk, buffers, mFrameCount, mFrameSize) //创建proxy，用来读取数据	
 	}
 }@AudioRecord.cpp
 
@@ -88,9 +95,14 @@ AudioPolicyManager::getInputForAttr{
 read@AudioRecord.java-->native_read_in_short_array(/*byte,short,float数据格式不同*/)-->
 android_media_AudioRecord_readInArray-->lpRecorder->read@android_media_AudioRecord.cpp-->
 read(buffer,size){
-  //获取数据
-- obtainBuffer(Buffer* audioBuffer,const struct timespec )-->obtainBuffer-->proxy->obtainBuffer-->
-	obtainBuffer(判断是读取还是写入，将mBuffers返回)@AudioTrackShared.cpp
+- Buffer audioBuffer
+- obtainBuffer(Buffer* audioBuffer,const struct timespec )
+	-->obtainBuffer{
+	- sp<AudioRecordClientProxy> proxy = mProxy
+	- sp<IMemory> iMem = mCblkMemory
+	- sp<IMemory> bufferMem = mBufferMemory
+	- proxy->obtainBuffer(&buffer, requested)-->obtainBuffer()@AudioTrackShared.cpp
+	}
 - memcpy(buffer, audioBuffer.i8)//拷贝到用户buffer中
 }@AudioRecord.cpp
 
@@ -98,3 +110,4 @@ frameworks/base/media/java/android/media/AudioRecord.java
 frameworks/base/core/jni/android_media_AudioRecord.cpp
 frameworks/av/media/libaudioclient/AudioRecord.cpp
 frameworks/base/media/java/android/media/MediaRecorder.java
+frameworks/av/media/libaudioclient/AudioTrackShared.cpp

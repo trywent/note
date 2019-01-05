@@ -1,4 +1,6 @@
-//================================HAL Service
+/**********************
+ HAL Service
+*/
 interface ICameraProvider {//provider接口
 - setCallback(ICameraProviderCallback callback)
 - getVendorTags()
@@ -29,10 +31,11 @@ HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
 }@CameraProvider.cpp
 
 
-//获取ICameraDevice
 
-
-//device接口
+/**********************
+ 获取ICameraDevice
+ device接口
+*/
 ICameraDeviceSession{
 - configureStreams_3_4
 - processCaptureRequest_3_4
