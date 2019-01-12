@@ -1,9 +1,16 @@
-//i2c
-列出i2c设备:i2c -r  bus_num
+/****************
+ i2c bus
+ i2c tools:列出i2c设备:i2c -r  bus_num
 
+*/
+struct i2c_adapter {
+- const struct i2c_algorithm *algo
+- int nr //编号
+- char name[48] //名字
+}
 
+//加入adapter,动态编号
+i2c_add_adapter
 
-
-//
-
-
+//加入adapter, 使用指定编号()
+i2c_add_numbered_adapter(struct i2c_adapter *adap)

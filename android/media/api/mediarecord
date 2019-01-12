@@ -1,6 +1,11 @@
+//
+
 new MediaRecorder();
 setAudioSource(MediaRecorder.AudioSource.MIC);
 setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
 setOutputFile(mFileName);
 setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
 
+
+//创建文件失败,先删除文件
+prepare-->RandomAccessFile

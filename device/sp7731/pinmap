@@ -1,0 +1,33 @@
+//一个io的控制,在两个寄存器中.
+
+#define BITS_PIN_DS(_x_)                ( ((_x_) << 19) & (BIT_19|BIT_20|BIT_21|BIT_22) )
+#define BIT_PIN_SLP_WTLCP               ( BIT_15 )
+#define BIT_PIN_SLP_PUBCP               ( BIT_14 )
+#define BIT_PIN_SLP_AP                  ( BIT_13 )
+#define BIT_PIN_SLP_NONE		( (~(0x7 << 13)) & (BIT_13|BIT_14|BIT_15) )
+#define BITS_PIN_SLP(_x_)               ( ((_x_) << 13) & (BIT_13|BIT_14|BIT_15) )
+#define BIT_PIN_WPUS                    ( BIT_12 )
+#define BIT_PIN_SE                      ( BIT_11 )
+#define BIT_PIN_WPU                     ( BIT_7 )
+#define BIT_PIN_WPD                     ( BIT_6 )
+#define BITS_PIN_AF(_x_)                ( ((_x_) << 4) & (BIT_4|BIT_5) )
+#define BIT_PIN_SLP_WPU                 ( BIT_3 )
+#define BIT_PIN_SLP_WPD                 ( BIT_2 )
+#define BIT_PIN_SLP_IE                  ( BIT_1 )
+#define BIT_PIN_SLP_OE                  ( BIT_0 )
+
+//Central Pin Control Register Bit Info
+PIN_NAME_slp_oe[0]     //output enable control in chip deep sleep mode
+PIN_NAME_slp_ie[1]     //Input enable control in chip deep sleep mode
+PIN_NAME_fun_sel[5:4]  //功能选择,一般3为gpio
+PIN_NAME_slp_en[16:13] //Sleep mode enable:BIT0: Sleep with AP sleep BIT1: Sleep with CP sleep
+
+//Side Band Pin Control Register Bit
+PIN_NAME_slp_wpdo[2]   //Weak pull down control in chip deep sleep mode
+PIN_NAME_slp_wpu[3]    //Weak pull up control in chip deep sleep mode
+PIN_NAME_fun_wpdo[6]   //Weakly pull down for function mode
+PIN_NAME_fun_wpu[7]    //Weakly pull up for function mode
+PIN_NAME_fun_se[11]    //Schmitt trigger input enable
+PIN_NAME_fun_wpus[12]  //上拉电阻
+PIN_NAME_drv[22:19]    //驱动强度
+

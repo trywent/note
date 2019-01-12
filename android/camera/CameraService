@@ -1,0 +1,184 @@
+/**********************
+ CameraService
+
+ java----cameraService----cameraProvider----hal
+ 
+*/
+//CameraService接口
+{
+- int getNumberOfCameras(int type)
+- CameraInfo getCameraInfo(int cameraId)
+- ICameraDeviceUser connectDevice(ICameraDeviceCallbacks callbacks,
+            String cameraId,
+            String opPackageName,
+            int clientUid)
+- ICamera connectLegacy
+- CameraStatus[] addListener(ICameraServiceListener listener)
+- void setTorchMode
+}@ICameraService.aidl
+
+
+service cameraserver@cameraserver.rc-->main{
+- sm = defaultServiceManager()
+- CameraService::instantiate()-->publish-->sm->addService(getServiceName("media.camera"),new CameraService)@BinderService.h
+}@main_cameraserver.cpp
+
+//CameraService
+CameraService::onFirstRef{
+- BatteryNotifier::getInstance //电池
+- enumerateProviders{//获取camera
+	- mCameraProviderManager = new CameraProviderManager()->initialize(this,sHardwareServiceInteractionProxy)
+	- mCameraProviderManager->getCameraDeviceIds
+	- mCameraProviderManager->getResourceCost,mCameraStates.emplace //获取资源保存
+	- onDeviceStatusChanged(PRESENT)//更新
+	}	
+- pingCameraServiceProxy
+}@CameraService.cpp
+
+
+
+
+//------------------------响应client java层
+//获取camerDevice
+connectDevice{
+- mRemote.transact(Stub.TRANSACTION_connectDevice, _data, _reply, 0)
+- _result = android.hardware.camera2.ICameraDeviceUser.Stub.asInterface(_reply.readStrongBinder())
+- return result
+}@ICameraService.java
+
+connectDevice(id,_aidl_return){
+- BpCameraService::connectDevice{//proxy
+	- remote()->transact(ICameraService::CONNECTDEVIC)//
+	- _aidl_ret_status = _aidl_status.readFromParcel(_aidl_reply)//读取
+	- _aidl_ret_status = _aidl_reply.readStrongBinder(_aidl_return)
+	}	
+- BnCameraService::onTransact(_aidl_data,_aidl_reply){//native
+	- CONNECTDEVICE-->connectDevice(id,&_aidl_return)@CameraService.cpp
+	- _aidl_reply->writeStrongBinder(_aidl_return)
+	}
+}@ICameraService.cpp
+
+connectDevice(cameraCb,cameraId,clientPackageName,clientUid,ICameraDeviceUser* device/*out 返回值*/)-->
+connectHelper(callback,id,/* halVersion */CAMERA_HAL_API_VERSION_UNSPECIFIED,/*apiLevel*/API_2
+	/*legacyMode*/ false, /*shimUpdateOnly*/ false,/*out*/client){
+- validateConnectLocked //检查权限
+- handleEvictionsLocked{ //关闭一些配置冲突的client
+	- getCameraState(cameraId)
+	- CameraClientManager::makeClientDescriptor(cameraId)
+	- mActiveClientManager.wouldEvict(clientDescriptor) //查找要关闭的client
+	- 遍历要断开的client,clientSp->notifyError(ERROR_CAMERA_DISCONNECTED)
+	- 
+	}
+- int deviceVersion = getDeviceVersion(cameraId, /*out*/&facing){//获取设备最高版本信息
+	- mCameraProviderManager->getHighestSupportedVersion(cameraId.string(), &maxVersion)
+	- mCameraProviderManager->getCameraInfo(cameraId.string(), &info)
+	}
+- makeClient(this,cameraCb,&client,halVersion,deviceVersion, effectiveApiLevel)-->new CameraDeviceClient()
+- client->initialize(mCameraProviderManager) //初始化client
+- device = client
+}@CameraService.cpp
+
+/**********************
+ CameraProviderManager
+
+ camera HIDL接口ICameraProvider(HAL服务"legacy/0")
+ 
+ //服务启动初始化时创建
+ provider: mInterface //ICameraProvider
+ cameraInfo: mInterface //ICameraDevice
+
+ //打开设备时创建
+ Camera3Device: mInterface //ICameraDeviceSession
+
+*/
+CameraProviderManager::initialize(CameraService listener,ServiceInteractionProxy sHardwareServiceInteractionProxy ){
+- mListener=listener
+  //hal接口
+- mServiceProxy = sHardwareServiceInteractionProxy{//封装了接口
+	- hardware::camera::provider::V2_4::ICameraProvider::registerForNotifications
+	- hardware::camera::provider::V2_4::ICameraProvider::getService
+	}@CameraProviderManager.h
+  //注册监听器. hidl服务回调onRegistration
+- mServiceProxy->registerForNotifications(this)-->hardware::camera::provider::V2_4::ICameraProvider::registerForNotifications
+  //加入默认provider
+- addProviderLocked(newProvider/*"legacy/0"*/){//获取camera HAL services :CameraProvider
+	- ICameraProvider inerface = mServiceProxy->getService("legacy/0")-->hardware::camera::provider::V2_4::ICameraProvider::getService
+	- providerInfo = new ProviderInfo(name"legacy/0",inerface,this){
+		- mProviderName = name
+		- ICameraProvider mInterface = interface //HAL接口,CameraProvider
+		- mManager = this
+		}
+	- providerInfo->initialize //加入cameraProvider
+	- mProviders.push_back(providerInfo) //保存
+	}
+}@CameraProviderManager.cpp
+
+ //provider中加入camera设备
+CameraProviderManager::ProviderInfo::initialize{
+- parseProviderName
+- mInterface->setCallback(this) //设置回调
+- mInterface->linkToDeath(this)
+- devices = mInterface->getCameraIdList //从HAL获取设备名
+- 遍历device,addDevice(name) //加入camera
+}
+
+onRegistration{//监听器回调,加入cameraProvider
+- addProviderLocked
+- listener = getStatusListener()
+- listener->onNewProviderRegistered
+}@CameraProviderManager.cpp
+
+
+/**********************
+  DeviceInfo,保存设备信息,hal层设备接口
+
+  ICameraProvider.getCameraDeviceInterface_V3_x 返回cameraDevice HAL接口 ICameraDevice
+*/
+CameraProviderManager::ProviderInfo::addDevice(name){
+- parseDeviceName(name, &major, &minor, &type) //通过name获取设备版本
+- major==1,initializeDeviceInfo<DeviceInfo1>
+- major==3,deviceInfo = initializeDeviceInfo<DeviceInfo3>{
+	- getDeviceInterface(name){
+		- mInterface->getCameraDeviceInterface_V3_x(name,callback/*返回值 ICameraDevice*/) //从HAL获取信息
+		- 设置返回值状态,接口status = s,
+		- ICameraDevice cameraInterface = interface
+		}
+	- resourceCost = cameraInterface->getResourceCost//
+	- return new DeviceInfo3(resourceCost ,cameraInterface){//返回设备
+		- ICameraDevice ICameraDevice = cameraInterface
+		}
+	}
+- mDevices.push_back(deviceInfo)
+}@CameraProviderManager
+
+supportsCameraApi(apiVersion){//支持的Api version
+- deviceVersion = getDeviceVersion{
+	- getMultiCameraDeviceVersion //sprd
+	- mCameraProviderManager->getHighestSupportedVersion
+	}
+- deviceVersion == {//apiVersion==API_VERSION_1
+	CAMERA_DEVICE_API_VERSION_1_0
+	CAMERA_DEVICE_API_VERSION_3_0
+	CAMERA_DEVICE_API_VERSION_3_1
+	}
+- deviceVersion == {//apiVersion==API_VERSION_2
+	CAMERA_DEVICE_API_VERSION_3_2
+	CAMERA_DEVICE_API_VERSION_3_3
+	CAMERA_DEVICE_API_VERSION_3_4
+	}
+}
+
+
+
+
+frameworks/av/camera/cameraserver/main_cameraserver.cpp
+frameworks/native/include/binder/BinderService.h
+frameworks/av/services/camera/libcameraservice/CameraService.cpp
+frameworks/av/services/camera/libcameraservice/common/CameraProviderManager.cpp
+frameworks/av/services/camera/libcameraservice/common/CameraProviderManager.h
+vendor/sprd/platform/frameworks/av/service/camera/libcameraservice/CameraServiceEx.cpp
+frameworks/av/camera/aidl/android/hardware/ICameraService.aidl
+frameworks/av/camera/aidl/android/hardware/camera2/ICameraDeviceUser.aidl
+out/soong/.intermediates/frameworks/av/camera/libcamera_client/android_x86_64_silvermont_shared_core/gen/aidl/frameworks/av/camera/aidl/android/hardware/ICameraService.cpp
+frameworks/av/services/camera/libcameraservice/api2/CameraDeviceClient.cpp
+

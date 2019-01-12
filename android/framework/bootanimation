@@ -1,4 +1,5 @@
-zip -Z store bootanimation.zip part0/*PNG part1/*PNG desc.txt
+//
+zip -Z store bootanimation.zip part0/ *PNG part1/ *PNG desc.txt
 存放在：
 /system/media/bootanimation.zip
 或

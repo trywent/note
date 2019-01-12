@@ -1,22 +1,54 @@
 /**********************
  android.hardware.camera2
+
+ 1-cameraManager获取CameraDevice.
+ 2-CameraDevice创建session //对应native的stream
+ 3-创建请求,一些键值对,CaptureRequest {
+	- sensor配置
+	- lens镜头peiz
+	- flash闪光
+	- pipeline处理管道
+	- 控制
+	- output buffer //必须是在createCaptureSession中提供的
+	}
+ 4-session提交请求
 */
 使用camera{
-- CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE)
+- CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE/*"camera"*/)
 - CameraManager.getCameraIdList //获取摄像头id
-- CameraManager.getCameraCharacteristics (String cameraId) //获取摄像头属性，支持的图像格式大小
-- CameraManager.openCamera(cameraId,CameraDevice.StateCallback){   //打开摄像头,设置回调
-	- onOpened(cameraDevice) //回调打开成功,传入cameraDevice
+  //获取摄像头属性
+- CameraCharacteristics characteristics = CameraManager.getCameraCharacteristics (String cameraId) 
+- StreamConfigurationMap configs = characteristics.get(SCALER_STREAM_CONFIGURATION_MAP) //获取设备支持的流配置,支持的图像格式大小
+  //打开摄像头,设置回调
+- CameraManager.openCamera(cameraId,CameraDevice.StateCallback{   
+	- onOpened(cameraDevice camera) //回调打开成功,传入cameraDevice
 	- onDisconnected
-	}
+	- onError(CameraDevice camera)
+	})
+  //session中传入surface.当提交request后,sesion向每个request提供surface
 - surfaceHolder.setFixedSize //设置surface
-//session种传入surface.当提交request后,sesion向每个request提供surface
-- CameraDevice.createCaptureSession(Surface,CameraCaptureSession.StateCallback){ //创建session。设置回调
-	- onConfigured //回调配置成功，传入CameraCaptureSession
-	}
-- CameraDevice.createCaptureRequest //创建请求
-- CameraCaptureSession.setRepeatingRequest/capture  //请求数据
+- CameraDevice.createCaptureSession(Surface,CameraCaptureSession.StateCallback{ //创建session。设置回调
+	- onConfigured(CameraCaptureSession session) //回调配置成功，传入CameraCaptureSession
+	- onActive(CameraCaptureSession session) //开始处理请求
+	  //prepare(surface)预分配buffer,防止预览时的延迟
+	- onSurfacePrepared(CameraCaptureSession session,Surface surface)//调用prepare(surface)成功的回调
+	})
+  //创建请求
+- CameraDevice.createCaptureRequest 
+- CameraCaptureSession.setRepeatingRequest/capture(CaptureRequest request,
+	CameraCaptureSession.CaptureCallback{//capture的回调
+	- onCaptureCompleted //onCaptureProgressed调用完后会调用该接口
+	- onCaptureProgressed
+	})  //请求数据
 }
+
+//camera服务
+registerService(Context.CAMERA_SERVICE, CameraManager.class,
+                new CachedServiceFetcher<CameraManager>() {
+            @Override
+            public CameraManager createService(ContextImpl ctx) {
+                return new CameraManager(ctx);
+}})@SystemServiceRegistry.java
 
 //获取cameraService
 CameraManagerGlobal.getCameraService-->connectCameraServiceLocked{
@@ -25,9 +57,11 @@ CameraManagerGlobal.getCameraService-->connectCameraServiceLocked{
 - cameraService.addListener(this)
 }@CameraManager.java
 
-
-//获取cameraDevice
-openCamera-->openCameraForUid-->openCameraDeviceUserAsync(cameraId,callback,handler{
+/***********************
+ cameraDevice
+ 获取 CameraDeviceImpl 
+*/
+openCamera-->openCameraForUid-->openCameraDeviceUserAsync(cameraId,callback,handler){
 - deviceImpl= new CameraDeviceImpl{
 	- mCameraId = cameraId
         - mDeviceCallback = callback
@@ -61,19 +95,26 @@ cameraService.connectDevice(callbacks, cameraId,packageName, uid)
 
 
 /***********************
-创建CameraCaptureSession
+ CameraCaptureSession
 camrea输出目标:
-- SurfaceView
-- SurfaceTexture //openGL
-- MediaCodec.createInputSurface //录制
-- MediaRecorder.getSurface //录制
-- renderScript //YUV 数据
-- ImagerReader //RAW,未压缩YUV,压缩JPEG
-
-onConfigured(CameraCaptureSession) //camera配置可能需要几百毫秒,配置完调用该函数
+	- SurfaceView
+	- SurfaceTexture //openGL
+	- MediaCodec.createInputSurface //录制
+	- MediaRecorder.getSurface //录制
+	- renderScript //YUV 数据
+	- ImagerReader //RAW,未压缩YUV,压缩JPEG
 
 */
-createCaptureSession(Surface,callback,handler,NORMAL_MODE)-->createCaptureSessionInternal{
+createCaptureSession(List<Surface> outputs,callback,handler,NORMAL_MODE){
+- List<OutputConfiguration> outConfigurations = new ArrayList<>(outputs.size())
+- for (Surface surface : outputs){ //遍历outputs,
+	outConfigurations.add(new OutputConfiguration(surface))
+	}
+- createCaptureSessionInternal(outConfigurations,callback,handler)
+}@CameraDeviceImpl.java
+
+createCaptureSessionInternal(List<OutputConfiguration> outputConfigurations){
+  //创建native Stream.保存StreamId
 - configureSuccess = configureStreamsChecked(OutputConfiguration outputs){
 	- checkInputConfiguration(inputConfig) //检查当前camera是否支持inputconfig
 	- 遍历已经设置的config,mConfiguredOutputs{
@@ -86,10 +127,13 @@ createCaptureSession(Surface,callback,handler,NORMAL_MODE)-->createCaptureSessio
 	- mRemoteDevice.beginConfigure()//开始设置
 	- mRemoteDevice.createInputStream //设置input
 	- mRemoteDevice.deleteStream/mConfiguredOutputs.delete//移除需要删除的配置deleteList
-	- mRemoteDevice.createStream//配置outputs
+	- for (OutputConfiguration outConfig : outputs){ //遍历outputs
+		- int streamId = mRemoteDevice.createStream(outConfig)//配置outputs
+		- mConfiguredOutputs.put(streamId, outConfig)
+		}
 	- mDeviceHandler.post(mCallOnIdle/mCallOnUnconfigured)
 	}
-- 高速捕获,mCurrentSession = new CameraConstrainedHighSpeedCaptureSessionImpl
+- 若是高速捕获,mCurrentSession = new CameraConstrainedHighSpeedCaptureSessionImpl
 - 否则mCurrentSession = new CameraCaptureSessionImpl(callback, handler, this, mDeviceHandler){
 	- mStateHandler = checkHandler(stateHandler)
 	- mStateCallback = createUserStateCallbackProxy(mStateHandler,callback) //回调
@@ -100,25 +144,34 @@ createCaptureSession(Surface,callback,handler,NORMAL_MODE)-->createCaptureSessio
 	}@CameraCaptureSessionImpl.java
 }@CameraDeviceImpl.java
 
-//创建request
+/*
+ 创建request,到native创建
+ request也可以设置surface(预览一般不设置)
+*/
 createCaptureRequest(int templateType){//返回CaptureRequest.Builder 
-- templatedRequest = mRemoteDevice.createDefaultRequest(templateType)
+- CameraMetadataNative templatedRequest = mRemoteDevice.createDefaultRequest(templateType){ //创建requeset
+	- mRemoteDevice.createDefaultRequest
+	}
 - builder = new CaptureRequest.Builder(templatedRequest, /*reprocess*/false)
 }@CameraDeviceImpl.java
 
 builder.build-->new CaptureRequest(mRequest)@CaptureRequest.java
 
-//获取数据
+/*
+ 请求数据
+
+*/
 setRepeatingRequest(CaptureRequest request,CameraCaptureSession.CaptureCallback listener, Handler handler){
 - mDeviceImpl.setRepeatingRequest-->setRepeatingRequest@CameraDeviceImpl.java
 - addPendingSequence
 }@CameraCaptureSessionImpl.java
 
-setRepeatingRequest{
+//重复抓取数据,采用streaming
+setRepeatingRequest(){
 - requestList.add(request)
 - submitCaptureRequest(requestList, callback, handler,/*streaming*/true){
 	- 遍历requestList,判断Surface是否为空
-	- mRemoteDevice.submitRequestList
+	- mRemoteDevice.submitRequestList(/*streaming*/true)
 	- mCaptureCallbackMap.put(new CaptureCallbackHolder)
 	}
 }@CameraDeviceImpl.java
@@ -126,7 +179,8 @@ setRepeatingRequest{
 //停止
 stopRepeating(). Calling abortCaptures() will also clear the request.
 
-
+//reprocess 获取inputSurface,用于写入数据拱camera处理
+getInputSurface
 
 
 frameworks/base/core/java/android/hardware/camera2/CameraManager.java

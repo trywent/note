@@ -30,25 +30,88 @@ HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
 	}
 }@CameraProvider.cpp
 
+//hal和camera接口
+CameraModule{
+- getCameraInfo
+- getDeviceVersion
+- getNumberOfCameras
+- open(const char* id, struct hw_device_t** device)
+- setCallbacks(const camera_module_callbacks_t *callbacks)
+}
 
+//获取CameraDevice name
+getCameraIdList{
+- 遍历mCameraDeviceNames,deviceNamePair
+- deviceNameList.push_back(deviceNamePair.second
+}
+//获取CameraDevice interface
+getCameraDeviceInterface_V3_x(cameraDeviceName){
+- matchDeviceName(cameraDeviceName, &deviceVersion, &cameraId) //检查名字,获取cameraid
+- index = mCameraDeviceNames.indexOf(cameraDeviceName)
+- CameraDevice deviceImpl = new CameraDevice(mModule, cameraId, mCameraDeviceNames)
+}
 
 /**********************
- 获取ICameraDevice
- device接口
+ ICameraDevice
+
+*/
+interface ICameraDevice {
+- getResourceCost
+- getCameraCharacteristics
+- open(ICameraDeviceCallback callback) //返回ICameraDeviceSession
+}@3.2::ICameraDevice.hal
+
+//打开,返回session
+CameraDevice::open(sp<ICameraDeviceCallback>& callback){
+- camera3_device_t *device
+- mModule->open(mCameraIdInt,&device)
+- mModule->getCameraInfo(mCameraIdInt, &info)
+- sp<CameraDeviceSession> session = createSession(device, callback)-->
+	new CameraDeviceSession
+- mSession = session
+}
+
+/**********************
+ ICameraDeviceSession
+ device接口 session
 */
 ICameraDeviceSession{
-- configureStreams_3_4
-- processCaptureRequest_3_4
-}
+- constructDefaultRequestSettings
+- configureStreams
+- processCaptureRequest
+- getCaptureRequestMetadataQueue
+- getCaptureResultMetadataQueue
+}@3.3::ICameraDeviceSession.hal
+
+
+ICameraDeviceSession extends @3.2::ICameraDeviceSession{
+- configureStreams_3_3
+}@3.3::ICameraDeviceSession.hal
+
 
 ICameraDeviceCallback{
-- processCaptureResult_3_4
+- processCaptureResult_3_3
 }
 
+//创建session
+CameraDeviceSession(camera3_device_t* device,const camera_metadata_t* deviceInfo,
+        const sp<V3_2::ICameraDeviceCallback>& callback){
+- mDevice(device)
+- mDeviceInfo = deviceInfo
+- initialize-->mDevice->ops->initialize
+}
 
+//处理请求
+processCaptureRequest(hidl_vec<CaptureRequest>& requests){
+- 遍历requests,processOneCaptureRequest(requests[i]){
+	- 
+	- mDevice->ops->process_capture_request(mDevice, &halRequest)
+	}
+- mResultBatcher.registerBatch(requests)
+}
 
 hardware/interfaces/camera/provider/2.4/default/service.cpp
 hardware/interfaces/camera/provider/2.4/default/CameraProvider.cpp
-hardware/interfaces/camera/device/3.4/default/CameraDevice.cpp
-hardware/interfaces/camera/device/3.4/default/CameraDeviceSession.cpp
+hardware/interfaces/camera/device/3.3/default/CameraDevice.cpp
+hardware/interfaces/camera/device/3.3/default/CameraDeviceSession.cpp
 hardware/interfaces/camera/common/1.0/default/CameraModule.cpp

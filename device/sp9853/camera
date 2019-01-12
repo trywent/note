@@ -60,17 +60,59 @@ HAL_MODULE_INFO_SYM{
 - set_torch_mode = setTorchMode
 }@SprdCamera3Hal.cpp
 
-
-mModuleMethods.open-->camera_device_open{
+//打开设备
+mModuleMethods.open-->camera_device_open(id,struct hw_device_t **){
 - isSingleIdExposeOnMultiCameraMode
-- gSprdCamera3Wrapper->cameraDeviceOpen
-- gSprdCamera3Factory.cameraDeviceOpen
+- gSprdCamera3Wrapper->cameraDeviceOpen //id大于5,一些自定义的东西?
+- gSprdCamera3Factory.cameraDeviceOpen(id, struct hw_device_t **hw_device){
+	- SprdCamera3HWI *hw = new SprdCamera3HWI(id){//创建CameraDevice
+		- mCameraDevice.common
+		- mCameraDevice.ops = &mCameraOps
+		- mCameraDevice.priv = this
+		}
+	- 若是多摄像头模式,hw->setMultiCameraMode 
+	- hw->openCamera(hw_device)
+	}
 }@SprdCamera3Factory.cpp
 
+openCamera(hw_device){
+- openCamera(){
+	- mSetting = new SprdCamera3Setting(mCameraId);
+	- mOEMIf = new SprdCamera3OEMIf(mCameraId, mSetting)
+	- mOEMIf->camera_ioctrl(CAMERA_IOCTRL_SET_MULTI_CAMERAMODE, &mMultiCameraMode)
+	- mOEMIf->openCamera()
+	- mOEMIf->isIspToolMode()==1{
+		- mOEMIf->ispToolModeInit()
+		- startispserver(mCameraId)
+		- ispvideo_RegCameraFunc
+		}
+	}
+- *hw_device = &mCameraDevice.common //返回设备
+}@SprdCamera3HWI.cpp
 
+//设备操作函数
+volatile uint32_t gHALLogLevel = 4;
+
+camera3_device_ops_t SprdCamera3HWI::mCameraOps = {
+    .initialize = SprdCamera3HWI::initialize,
+    .configure_streams = SprdCamera3HWI::configure_streams,
+    .register_stream_buffers = NULL, // SprdCamera3HWI::register_stream_buffers,
+    .construct_default_request_settings =
+        SprdCamera3HWI::construct_default_request_settings,
+    .process_capture_request = SprdCamera3HWI::process_capture_request,
+    .get_metadata_vendor_tag_ops =
+        NULL, // SprdCamera3HWI::get_metadata_vendor_tag_ops,
+    .dump = SprdCamera3HWI::dump,
+    .flush = SprdCamera3HWI::flush,
+}
+
+process_capture_request{//处理请求
+- SprdCamera3HWI *hw = reinterpret_cast<SprdCamera3HWI *>(device->priv)
+- hw->processCaptureRequest(request)-->SprdCamera3HWI::processCaptureRequest
+}
 
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Hal.cpp
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Factory.cpp
-
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3HWI.cpp
 
 

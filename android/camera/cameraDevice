@@ -1,0 +1,185 @@
+/**********************
+ camera3Device{
+	- HalInterface mInterface //hal层接口,ICameraDeviceSession
+	}
+ ICameraDeviceUserWrapper封装ICameraDeviceUser
+*/
+
+{//cameraDevice接口
+- beginConfigure/endConfigure
+- createDefaultRequest
+- createStream/deleteStream
+- submitRequest/cancelRequest
+- disconnect
+}@ICameraDeviceUser.aidl
+
+
+//CameraDevice 创建
+connectDevice-->connectHelper(callback,id,/* halVersion */CAMERA_HAL_API_VERSION_UNSPECIFIED,/*apiLevel*/API_2
+	/*legacyMode*/ false, /*shimUpdateOnly*/ false,/*out*/client)-->
+makeClient(cameraId,halVersion,deviceVersion,effectiveApiLevel){
+- (halVersion < 0 || halVersion == deviceVersion) { //默认流程
+	- CAMERA_DEVICE_API_VERSION_1_0:if(effectiveApiLevel == API_1) client = new CameraClient
+	- CAMERA_DEVICE_API_VERSION_3_0/1/2/3/4:
+		- API_1:*client = new Camera2Client
+		- API_2:*client = new CameraDeviceClient(cameraService,cameraId) //默认
+   }else {
+  	- CAMERA_DEVICE_API_VERSION_1_0:*client = new CameraClient
+   }
+- 
+}@CameraService.cpp
+
+connectHelper-->makeClient@CameraService.cpp-->new CameraDeviceClient//CameraDeviceClient:Camera2ClientBase
+-->Camera2ClientBase{
+- TClientBase(cameraService, remoteCallback, clientPackageName,cameraId)
+- mSharedCameraCallbacks(remoteCallback)
+- mDeviceVersion(cameraService->getDeviceVersion(TClientBase::mCameraIdStr)
+- mInitialClientPid = clientPid
+- mDevice = new Camera3Device(cameraId)
+}@Camera2ClientBase.cpp
+
+//初始化cameraDevice,
+connectHelper-->client->initialize(mCameraProviderManager)@CamersService.cpp-->initialize-->initializeImpl-->
+Camera2ClientBase::initialize@CameraDeviceClient.cpp-->initialize-->initializeImpl
+@Camera2ClientBase.cpp-->mDevice->initialize(providerPtr)-->
+initialize(manager){
+- sp<ICameraDeviceSession> session
+  //HAL
+- manager->openSession(mId.string(), /*out*/ &session){ //session
+	- deviceInfo = findDeviceInfoLocked(id)-->从mProviders中device查找
+	- deviceInfo3->mInterface->open(callback)-->ICameraDevice.open //返回session
+	}@CameraProviderManager.cpp
+- manager->getCameraCharacteristics(mId.string(), &mDeviceInfo) //info
+- std::shared_ptr<RequestMetadataQueue> queue
+- session->getCaptureRequestMetadataQueue
+- session->getCaptureResultMetadataQueue
+- HalInterface mInterface = new HalInterface(session, queue){
+	- mHidlSession(session)
+	}
+- initializeCommonLocked{
+	- mBufferManager = new Camera3BufferManager
+	- mRequestThread = new RequestThread
+	- mPreparerThread = new PreparerThread
+	}
+}@Camera3Device.cpp
+
+//创建stream,返回StreamId  对应CameraCaptureSession
+CameraDeviceClient::createStream(
+        const hardware::camera2::params::OutputConfiguration){
+  //bufferProducers
+- std::vector<sp<IGraphicBufferProducer>>& bufferProducers = outputConfiguration.getGraphicBufferProducers()
+- int surfaceType = outputConfiguration.getSurfaceType() //只支持surfaceView,texture
+- for (auto& bufferProducer : bufferProducers){
+	- sp<IBinder> binder = IInterface::asBinder(bufferProducer)
+	- sp<Surface> surface
+	- createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer) //初始化streamInfo
+	- binders.push_back(IInterface::asBinder(bufferProducer))
+	- surfaces.push_back(surface)
+	}
+  //创建stream,获取id
+- mDevice->createStream(surfaces, deferredConsumer, streamInfo.format,&streamId)-->Camera3Device::createStream
+- 遍历binders,mStreamMap.add(binder,streamId)
+- mStreamInfoMap[streamId] = streamInfo
+}@CameraDeviceClient.cpp
+
+createStream(sp<Surface>& consumers,uint32_t width, uint32_t height, int format,int streamSetId){
+- format == HAL_PIXEL_FORMAT_BLOB{
+	- ssize_t blobBufferSize = getJpegBufferSize(width, height)
+	- newStream = new Camera3OutputStream
+	}
+- HAL_PIXEL_FORMAT_RAW_OPAQUE{
+	- newStream = new Camera3OutputStream	
+	}
+- share{
+	- newStream = new Camera3SharedOutputStream
+	}
+- newStream->setStatusTracker(mStatusTracker)
+- newStream->setBufferManager(mBufferManager)
+- mOutputStreams.add(mNextStreamId, newStream)
+}Camera3Device.cpp
+
+//创建默认请求. 创建一个容器让上层填写图像数据的参数
+createDefaultRequest(int templateId,/*out*/CameraMetadataNative* request){
+- CameraMetadata metadata
+- mDevice->createDefaultRequest(templateId, &metadata){
+	- mInterface->constructDefaultRequestSettings
+	}
+- request->swap(metadata)
+}@CameraDeviceClient.cpp
+
+//请求数据
+submitRequestList(vector<hardware::camera2::CaptureRequest>& requests,bool streaming){
+- CameraMetadata metadata(request.mMetadata)
+- 遍历requests,for (auto&& request: requests){
+		for (sp<Surface> surface : request.mSurfaceList){ //普通流程中request中没有surface
+		- sp<IGraphicBufferProducer> gbp = surface->getIGraphicBufferProducer()
+		- int idx = mStreamMap.indexOfKey(IInterface::asBinder(gbp))
+		- StreamSurfaceId& streamSurfaceId = mStreamMap.valueAt(idx)
+		- surfaceMap[streamSurfaceId.streamId()].push_back(streamSurfaceId.surfaceId())
+		}	
+	- metadata.update(ANDROID_REQUEST_OUTPUT_STREAMS)
+	- metadataRequestList.push_back(metadata) 
+	}
+- if(streaming)mDevice->setStreamingRequestList-->
+	submitRequestsHelper(requests, surfaceMaps, /*repeating*/true){
+	- convertMetadataListToRequestListLocked(requests, surfaceMaps,repeating, /*out*/&requestList)
+	- mRequestThread->setRepeatingRequests(requestList)
+	}@Camera3Device.cpp
+- else mDevice->captureList{}
+}CameraDeviceClient.cpp
+
+
+/*******************
+ camera3Device
+
+
+*/
+Camera3Device::initializeCommonLocked{
+- mBufferManager = new Camera3BufferManager
+- mRequestThread = new RequestThread
+- mPreparerThread = new PreparerThread
+}
+
+Camera3Device::RequestThread::threadLoop() {
+- waitForNextRequestBatch{
+	- NextRequest nextRequest
+	- nextRequest.captureRequest = waitForNextRequestLocked{
+		- mRepeatingRequests填充到mRequestQueue
+		- 从mRequestQueue中取出第一个请求
+		}
+	- nextRequest.halRequest = camera3_capture_request_t
+	- mNextRequests.add(nextRequest) //保存
+	}
+- prepareHalRequests{
+	- 遍历mNextRequests
+	- auto& nextRequest = mNextRequests.editItemAt(i)
+	}
+  //发送请求到HAL
+- sendRequestsBatch{}
+- sendRequestsOneByOne{
+	- 遍历mNextRequests,nextRequest
+	- mInterface->processCaptureRequest(&nextRequest.halRequest)
+	}
+}
+
+Camera3Device::HalInterface::processCaptureRequest(camera3_capture_request_t)-->
+processBatchCaptureRequests(std::vector<camera3_capture_request_t*>& requests){
+- hardware::hidl_vec<device::V3_2::CaptureRequest> captureRequests //hal使用的request
+- wrapAsHidlRequest(requests[i], /*out*/&captureRequests[i])
+- mHidlSession->processCaptureRequest(captureRequests
+}
+
+waitForNextRequestBatch-->waitForNextRequestLocked
+
+isStreamPending
+//提交请求
+RequestThread::setRepeatingRequests(RequestList &requests){
+- mRepeatingRequests.clear()
+- mRepeatingRequests.insert(requests.begin(), requests.end())
+}
+
+
+frameworks/av/services/camera/libcameraservice/api2/CameraDeviceClient.cpp
+frameworks/av/services/camera/libcameraservice/common/Camera2ClientBase.cpp
+frameworks/av/services/camera/libcameraservice/device3/Camera3Device.cpp
+frameworks/av/camera/aidl/android/hardware/camera2/ICameraDeviceUser.aidl
