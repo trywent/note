@@ -1,5 +1,3 @@
-//
-
 /*
 ActivityManager启动app完成后，设置应用可见WindowManager.setAppVisibility
 
@@ -8,12 +6,12 @@ WindowManager知道窗口被设置可见后，通知应用进程进行布局，�
 动画管理中显示窗口WindowStateAnimator.performShowLocked
 
 */
-窗口管理器设置应用显示：
+//窗口管理器设置应用显示：
 setTokenVisibilityLocked-->wtoken.sendAppVisibilityToClients@WindowManagerService.java
 -->dispatchAppVisibility()-->handleAppVisibility-->scheduleTraversals-->mTraversalRunnable.run
 -->doTraversal-->performTraversals@ViewRootImpl.java
 
-创建surface：
+//创建surface：
 performTraversals-->(先布局)
 relayoutWindow@ViewRootImpl.java-->relayout@Session.java-->relayoutWindow-->
 relayoutWindow{
@@ -79,7 +77,10 @@ setAppStartingWindow(IBinder token, String pkg,
 	}
 }
 __________________________
-将可见性发生变化的窗口加入到mOpeningApps,或mClosingApps容器中
+/*********************
+ 将可见性发生变化的窗口加入到mOpeningApps,或mClosingApps容器中
+ 设置相应隐藏,显示动画
+*/
 setAppVisibility{
 - 检查是否有权限执行
 - 从mWindowMap中查找对应的AppWindowToken
@@ -123,7 +124,7 @@ setAppVisibility{
 	}
 
 - 更新Activity状态，wtoken.updateReportedVisibilityLocked@AppWindowToken.java
-}
+}@WindowManagerService.java
 
 
 更新activityManager端状态:

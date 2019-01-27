@@ -1,52 +1,7 @@
-//host
+/***********************
+ HAL
 
-module_platform_driver-->
-sprd_img_probe{
-- misc_register(&image_dev) //"sprd_image"
-- sprd_cam_pw_domain_init
-- sprd_dcam_parse_dt
-- sprd_isp_parse_dt
-- sprd_dcam_drv_init{
-	- dcam_mod_lock //设置各种lock
-	}@dcam_drv.c
-- sprd_isp_drv_init{
-	- isp_mod_lock //各种锁
-	}@isp_drv.c
-}@dcam_core.c
-
-
-//sensor
-sprd_sensor_core_module_init{
-- sprd_sensor_register_driver
-- csi_api_mipi_phy_cfg
-- misc_register(&sensor_dev) //"sprd_sensor"
-- device_create_file //创建sys文件
-}@sprd_sensor_core.c
-
-
-sprd_sensor_file_ioctl
-
-
-sprd_sensor_file_ioctl-->sprd_sensor_io_if_cfg{
-- sprd_sensor_mipi_if_open-->csi_api_open
-- sprd_sensor_mipi_if_close
-}
-
-//cpp
-module_init(sprd_cpp_init)-->platform_driver_register(&sprd_cpp_driver)
--->sprd_cpp_probe{
-- 初始化sprd_cpp_dev
-- misc_register(&sprd_cpp_dev->md) //"sprd_cpp"
-}@cpp_core.c
-
-
-kernel/drivers/misc/sprd_camera/dcam/dcam_if_r3p0v2/dcam_core.c
-kernel/drivers/misc/sprd_camera/dcam/dcam_if_r3p0v2/dcam_drv.c
-kernel/drivers/misc/sprd_camera/dcam/isp_r6p10v2/isp_drv.c
-kernel/drivers/misc/sprd_camera/sensor/sprd_sensor_core.c
-kernel/drivers/misc/sprd_camera/cpp/lite_r1p0/cpp_core.c
-
-//=======================HAL
+*/
 HAL_MODULE_INFO_SYM{
 - common = camera_common {
 	- id = CAMERA_HARDWARE_MODULE_ID
@@ -104,15 +59,26 @@ camera3_device_ops_t SprdCamera3HWI::mCameraOps = {
         NULL, // SprdCamera3HWI::get_metadata_vendor_tag_ops,
     .dump = SprdCamera3HWI::dump,
     .flush = SprdCamera3HWI::flush,
-}
+}@SprdCamera3HWI.cpp
 
 process_capture_request{//处理请求
 - SprdCamera3HWI *hw = reinterpret_cast<SprdCamera3HWI *>(device->priv)
-- hw->processCaptureRequest(request)-->SprdCamera3HWI::processCaptureRequest
+- hw->processCaptureRequest(request)-->
+SprdCamera3HWI::processCaptureRequest{
+- mFrameNum = request->frame_number
+- meta = request->settings
+- mMetadataChannel->request(meta)
+- mMetadataChannel->getCapRequestPara(meta, &capturePara)
+- switch(capturePara.cap_intent){
+	- mOEMIf->setCapturePara(CAMERA_CAPTURE_MODE, mFrameNum)
+	}
+- mOldCapIntent = capturePara.cap_intent
 }
+}@SprdCamera3HWI.cpp
 
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Hal.cpp
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Factory.cpp
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3HWI.cpp
-
-
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3OEMIf.cpp
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Channel.cpp
+vendor/sprd/modules/libcamera/oem2v1/src/SprdOEMCamera.c

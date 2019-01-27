@@ -1,0 +1,16 @@
+/*********************
+ a2dpsource
+*/
+static const btav_source_interface_t bt_av_src_interface = {
+    sizeof(btav_source_interface_t),
+    init_src,
+    src_connect_sink,
+    disconnect,
+    codec_config_src,
+    cleanup_src,
+};
+
+init_src{
+- btif_av_init(BTA_A2DP_SINK_SERVICE_ID)
+- bt_av_sink_callbacks = callbacks
+}

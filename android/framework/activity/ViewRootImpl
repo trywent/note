@@ -1,3 +1,14 @@
+/*****************
+ ViewRootImpl
+ 
+ view{
+  session  用于和WindowManager交互,加入,移除窗口
+  IWindow  用于WindowManager通知View,窗口变化,布局,可见等
+  }
+
+
+*/
+
 //activity创建view
 performLaunchActivity@ActivityThread.java-->attach{
 - mWindow = PolicyManager.makeNewWindow(this)

@@ -146,6 +146,9 @@ find . -name .svn -exec ls {} \;
 
 删除：
 find . -name .svn -exec rm -rf {} \;
+
+//查找大于100M文件
+find . -type f -size +100000k 
 __________________________
 字符转二进制：
 echo -n 5a | sed 's/\([0-9A-F]\{2\}\)/\\\\\\x\1/gI' | xargs printf

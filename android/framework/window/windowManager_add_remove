@@ -1,7 +1,8 @@
 //mWindows Z轴上排序的窗口，序号为0的项为最底层
 
-应用等加入窗口：
-addWindow{
+//应用等加入窗口：
+addWindow(Session session, IWindow client){
+- WindowToken token = mTokenMap.get(attrs.token) //获取对应ActivityRecord.apptoken 的WindowToken
 - 若是子窗口，获取关联窗口attachedWindow = windowForClientLocked
 - 从mTokenMap获取token没有获取到,则根据attr.token创建一个WindowToken，加入到容器。
   若token已经加入，判断加入类型是否合法。
@@ -19,9 +20,15 @@ addWindow{
 - 是否更新配置，sendNewConfiguration
 }@WindowManagerService.java
 
+//加入ActivityRecord
+addAppToken(int addPos, IApplicationToken token, int taskId, int stackId){
+- AppWindowToken atoken = new AppWindowToken(this, token, voiceInteraction) //
+- Task task = createTaskLocked(taskId, stackId, userId, atoken)//task
+- task.addAppToken(addPos, atoken)
+- mTokenMap.put(token.asBinder(), atoken)
+}
 
-
-输入法窗口：
+//输入法窗口：
 addInputMethodWindowToListLocked{
 - findDesiredInputMethodWindowIndexLocked(true)
 - 若查找到{

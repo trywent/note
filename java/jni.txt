@@ -104,8 +104,9 @@ D				 double
 L fully-qualified-class ;	 fully-qualified-class
 [ type				 type[]
 ( arg-types ) ret-type		 method type
-For example, the Java method:
+V                                void
 
+For example, the Java method:
 long f (int n, String s, int[] arr);
 has the following type signature:
 

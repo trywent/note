@@ -76,7 +76,8 @@ enterPictureInPictureMode(IBinder token,final PictureInPictureParams params){
 - enterPipRunnable{ //进入pip
 	- float aspectRatio = r.pictureInPictureArgs.getAspectRatio()
 	- Rect sourceBounds = new Rect(getSourceRectHint) //计算大小
-	- mStackSupervisor.moveActivityToPinnedStackLocked(r, sourceBounds)//
+	- mStackSupervisor.moveActivityToPinnedStackLocked(r, sourceBounds)//移动activity到PINNED_STACK
+	- PinnedActivityStack stack = mStackSupervisor.getStack(PINNED_STACK_ID) //pinned stack
 	- stack.setPictureInPictureAspectRatio(aspectRatio)
 	- stack.setPictureInPictureActions(actions)
 	}
@@ -139,6 +140,11 @@ setPictureInPictureActions-->getWindowContainerController().setPictureInPictureA
 //窗口变化
 notifyMovementBoundsChanged
 
+//更新状态
+scheduleUpdatePictureInPictureModeIfNeeded@ActivityStackSupervisor.java-->
+updatePictureInPictureMode-->schedulePictureInPictureModeChanged@ActivityRecord.java-->
+schedulePictureInPictureModeChanged-->handlePictureInPictureModeChanged@ActivityThread.java
+-->dispatchPictureInPictureModeChanged-->onPictureInPictureModeChanged@Activity.java
 
 //systemui退出pip
 

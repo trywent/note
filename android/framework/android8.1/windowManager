@@ -1,4 +1,8 @@
-//
+/**********************
+
+
+
+*/
 WindowManagerService{
 - mRoot = new RootWindowContainer(this)
 - mPolicy = policy
@@ -19,12 +23,12 @@ onDisplayAdded(displayId){
 }@WindowManagerService.java
 
 
-
-thawRotation@WindowManagerService.java
-
+//创建session
+getWindowSession@WindowManagerGlobal.java-->openSession-->new Session(IInputMethodClient,IInputContext)
+@WindowManagerServivce.java
 
 //window
-addWindow(IWindow client,WindowManager.LayoutParams attrs){
+addWindow(Session,IWindow client,WindowManager.LayoutParams attrs){
 - WindowToken token = displayContent.getWindowToken(attrs.token) //获取对应ActivityRecord的WindowToken(本质一个AppWindowToken)
 - AppWindowToken atoken = token.asAppWindowToken() //FIRST_APPLICATION_WINDOW -LAST_APPLICATION_WINDOW 应用窗口
 - WindowState win = new WindowState(token,attrs){

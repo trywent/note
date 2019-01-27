@@ -1,6 +1,9 @@
-//target
+/************************
+ target
+ biif_rc中包含target,controller的逻辑
+*/
 
-//接口
+//接口,上层调用(参数传到底层,回复对端controller)
 static const btrc_interface_t bt_rc_interface = {
     sizeof(bt_rc_interface),
     init,
@@ -57,8 +60,9 @@ typedef struct {
 initNative-->btInf->get_profile_interface(BT_PROFILE_AV_RC_ID)@com_android_bluetooth_avrcp.cpp
 -->get_profile_interface@bluetooth.cc-->btif_rc_get_interface-->bt_rc_interface@btif_rc.cc
 
-(jni)init{
-- bt_rc_callbacks@btif_rc.cc//设置回调
+(jni)init{//target
+- bt_rc_callbacks = callbacks//设置回调
+- lbl_init
 }@btif_rc.cc
 
 
@@ -66,7 +70,9 @@ btif_rc_get_interface
 
 
 
-//接收到命令
+/*******************
+ 接收到命令
+*/
 btif_rc_handler{
 - BTA_AV_RC_OPEN_EVT:handle_rc_connect-->handle_rc_ctrl_features-->getcapabilities_cmd(AVRC_CAP_COMPANY_ID)//发送获取CAP命令
 - BTA_AV_META_MSG_EVT{
@@ -75,11 +81,20 @@ btif_rc_handler{
 	}
 }
 
+//收到消息
+handle_rc_metamsg_rsp-->btif_rc_upstreams_rsp_evt{
+- AVRC_PDU_REGISTER_NOTIFICATION
+- AVRC_PDU_SET_ABSOLUTE_VOLUME
+- AVRC_PDU_GET_ELEMENT_ATTR-->HAL_CBACK(bt_rc_ctrl_callbacks,get_element_attr_rsp_cb)//回调更新函数
+}@btif_rc.cc
 
 
 
+/*******************
+ 回复信息
+*/
 
-//回复信息
+
 get_element_attr_rsp 
 
 

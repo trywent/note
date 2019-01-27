@@ -3,11 +3,6 @@ activityThread
 Activity进程中执行的操作,启动,加入view
 	
 */
-attach(Context context, ActivityThread aThread,Window window){
-- mWindow = new PhoneWindow(this, window)
-- mMainThread = aThread
-- mWindow.setWindowManager((WindowManager)context.getSystemService(Context.WINDOW_SERVICE))
-}@Activity.java
 
 handleResumeActivity{
 - ActivityClientRecord r = mActivities.get(token)
@@ -32,10 +27,10 @@ sDefaultWindowManager = new WindowManagerGlobal{
 - MyArrayList<ViewRootImpl> mRoots = new MyArrayList<ViewRootImpl>()
 }@WindowManagerGlobal
 
-//activity加入窗口
+//activity加入窗口,mParentWindow为Phonewindow的父类Window
 addView(View view)-->mGlobal.addView(view, params, mContext.getDisplay(), mParentWindow)@WindowManagerImpl
 -->addView(View view,mContext.getDisplay(),mParentWindow){
-- parentWindow.adjustLayoutParamsForSubWindow(wparams){
+- parentWindow.adjustLayoutParamsForSubWindow(wparams){//设置LayoutParams参数
 	- wp.token = mAppToken
 	- wp.setTitle(mAppName)
 	}@Window.java

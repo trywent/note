@@ -1,22 +1,7 @@
-//
-static const btav_source_interface_t bt_av_src_interface = {
-    sizeof(btav_source_interface_t),
-    init_src,
-    src_connect_sink,
-    disconnect,
-    codec_config_src,
-    cleanup_src,
-};
+/*********************
+ btav
+*/
 
-static const btav_sink_interface_t bt_av_sink_interface = {
-    sizeof(btav_sink_interface_t),
-    init_sink,
-    sink_connect_src,
-    disconnect,
-    cleanup_sink,
-    update_audio_focus_state,
-    update_audio_track_gain,
-};
 //bta接口
 bta_sys_sendmsg-->bta_av_reg->evt_hdlr--> //在线程message_loop_thread_
 bta_av_hdl_event{
@@ -35,9 +20,21 @@ btif_queue_connect-->(切换线程)queue_int_handle_evt{//bt_jni_workqueue_threa
 //回调接口切到jni上下文...上层通知一类
 btif_transfer_context-->btif_sendmsg//线程中bt_jni_workqueue_thread
 
-=============================
-//a2dpsink
-init_sink-->btif_av_init{
+
+/*********************
+ a2dpsink 初始化
+*/
+static const btav_sink_interface_t bt_av_sink_interface = {
+    sizeof(btav_sink_interface_t),
+    init_sink,
+    sink_connect_src,
+    disconnect,
+    cleanup_sink,
+    update_audio_focus_state,
+    update_audio_track_gain,
+};
+
+init_sink-->btif_av_init(BTA_A2DP_SINK_SERVICE_ID){
 - btif_a2dp_sink_startup{
 	- 初始化,btif_a2dp_sink_cb
 	- worker_thread = thread_new("btif_a2dp_sink_worker_thread") //创建线程
@@ -91,25 +88,58 @@ bte_av_callback-->btif_transfer_context(btif_av_handle_event)
 	}
 }@btif_av.cc
 
-/*
+/*********************
 btif中状态机 btif_av_state_handlers(初始状态BTIF_AV_STATE_IDLE)
 bta中状态表(stream state machine) bta_av_a2dp_action
 bta_av_a2dp_action 定义了所有操作函数
 
 */
-bta_av_a2dp_action
+typedef enum { //状态
+  BTIF_AV_STATE_IDLE = 0x0,
+  BTIF_AV_STATE_OPENING,
+  BTIF_AV_STATE_OPENED,
+  BTIF_AV_STATE_STARTED,
+  BTIF_AV_STATE_CLOSING
+}
 
+btif_sm_handler_t btif_av_state_handlers[] = {
+    btif_av_state_idle_handler, btif_av_state_opening_handler,
+    btif_av_state_opened_handler, btif_av_state_started_handler,
+    btif_av_state_closing_handler}
 
-
-//---------------connect
-sink_connect_src-->btif_queue_connect(UUID_SERVCLASS_AUDIO_SINK, bd_addr, connect_int)
--->queue_int_handle_evt-->connect_int-->btif_sm_dispatch(BTIF_AV_CONNECT_REQ_EVT)-->
+//状态切换
+btif_sm_change_state(handle,state)-->
 btif_av_state_idle_handler{
-- BTIF_AV_CONNECT_REQ_EVT{
-	- BTA_AvOpen
-	- btif_sm_change_state
-	}
+- btif_sm_cb_t* p_cb = (btif_sm_cb_t*)handle
+- p_cb->p_handlers[p_cb->state](BTIF_SM_EXIT_EVT) //离开当前状态
+- p_cb->state = state //更新状态
+- p_cb->p_handlers[p_cb->state](BTIF_SM_ENTER_EVT)//进入新状态
 }@btif_av.cc
+
+//获取状态
+btif_sm_get_state-->p_cb->state@btif_sm.cc
+
+//事件处理
+btif_av_handle_event{
+- BTIF_AV_CLEANUP_REQ_EVT{
+	- btif_a2dp_source_shutdown
+	- btif_a2dp_sink_shutdown
+	}
+- default:btif_sm_dispatch(btif_av_cb.sm_handle, event){
+	- p_cb->p_handlers[p_cb->state](event, data)
+	}@btif_sm.cc
+}@btif_av.cc
+
+/*********************
+ idle
+*/
+btif_av_state_idle_handler{
+
+}
+
+//connect
+sink_connect_src-->btif_queue_connect(UUID_SERVCLASS_AUDIO_SINK, bd_addr, connect_int)
+-->queue_int_handle_evt-->connect_int-->btif_sm_dispatch(BTIF_AV_CONNECT_REQ_EVT)
 
 
 BTA_AvOpen{BTA_AV_API_OPEN_EVT}@btif_av_api.cc-->bta_sys_sendmsg-->bta_av_reg->evt_hdlr-->
@@ -119,6 +149,8 @@ bta_av_hdl_event@bta_av_main.cc
 - p_scb->p_act_tbl[action]()-->bta_av_a2dp_action[action] //执行处理
  -->bta_av_connect_req@bta_av_aact.cc
 }@bta_av_ssm.cc
+
+
 
 //处理命令
 avdt_scb_hdl_pkt@avdt_scb.cc-->avdt_scb_hdl_pkt_no_frag-->(*p_scb->cs.p_sink_data_cback)@avdt_scb_act.cc
@@ -156,6 +188,28 @@ btif_dm_upstreams_evt-->btif_dm_execute_service_request@
 
 
 
+/*********************
+ opening
+*/
+
+/*********************
+ opend
+*/
+
+/*********************
+ started
+*/
+btif_av_state_started_handler{
+- BTIF_SM_ENTER_EVT{
+	- btif_report_audio_state
+	- get_element_attr_cmd,register_playstatuschangeByAddr //sprd
+	}
+}
+
+
+/*********************
+ closing
+*/
 //播放状态
 btif_a2dp_on_stopped-->btif_a2dp_sink_on_stopped
 
@@ -171,6 +225,5 @@ bta/av/bta_av_ssm.cc
 bta/av/bta_av_aact.cc
 stack/avdt/avdt_scb_act.cc
 stack/avdt/avdt_scb.cc
-=============================
-//a2dpsource
+
 

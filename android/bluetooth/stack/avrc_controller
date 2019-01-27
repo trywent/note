@@ -1,4 +1,7 @@
-//controller
+/****************************
+ controller
+ biif_rc中包含target,controller的逻辑
+*/
 btInf->get_profile_interface(BT_PROFILE_AV_RC_CTRL_ID)@com_android_bluetooth_avrcp_controller.cpp
 -->get_profile_interface@bluetooth.cc-->btif_rc_ctrl_get_interface-->bt_rc_ctrl_interface@btif_rc.cc
 
@@ -22,23 +25,85 @@ static const btrc_ctrl_interface_t bt_rc_ctrl_interface = {
 }@btif_rc.cc
 
 
-//=============
-(jni)-->bt_rc_ctrl_interface.init_ctrl{
+(jni)-->bt_rc_ctrl_interface.init_ctrl{//controller
 - bt_rc_ctrl_callbacks //设置jni回调
 - btif_rc_cb
 - lbl_init
 }@btif_rc.cc
 
-//sprd add
-get_element_attr_cmd 
+/**********************
+ 发送请求
 
-//获取信息
+  get_element_attr_cmd //sprd add
+*/
+获取功能命令格式:
+{
+- opcode = AVRC_OP_VENDOR;
+- capability_id = AVRC_CAP_COMPANY_ID;
+- pdu = AVRC_PDU_GET_CAPABILITIES
+}
+
+//获取功能 
+handle_rc_ctrl_features-->
+getcapabilities_cmd{
+- avrc_cmd.get_caps.opcode = AVRC_OP_VENDOR;
+- avrc_cmd.get_caps.capability_id = cap_id;
+- avrc_cmd.get_caps.pdu = AVRC_PDU_GET_CAPABILITIES
+- build_and_send_vendor_cmd(&avrc_cmd)
+}
+
+
+get_element_attribute_cmd(num_attribute,p_attr_ids){
+- avrc_cmd.get_elem_attrs.opcode = AVRC_OP_VENDOR
+- avrc_cmd.get_elem_attrs.status = AVRC_STS_NO_ERROR
+- avrc_cmd.get_elem_attrs.num_attr = num_attribute
+- avrc_cmd.get_elem_attrs.pdu = AVRC_PDU_GET_ELEMENT_ATTR
+- avrc_cmd.get_elem_attrs.attrs[count] = p_attr_ids[count]
+- build_and_send_vendor_cmd(avrc_cmd)
+}
+
+/**********************
+ 收到回复
+*/
+btif_rc_handler{
+- BTA_AV_RC_OPEN_EVT:handle_rc_connect //连接
+- BTA_AV_RC_FEAT_EVT:{ //查询功能
+	- btif_rc_get_device_by_handle
+	- handle_rc_features //当前是target
+	- handle_rc_ctrl_features //当前时controller
+	}
+- BTA_AV_META_MSG_EVT:{ //消息
+	  //target
+	- bt_rc_callbacks为空,handle_rc_metamsg_cmd{
+		- btif_rc_get_device_by_handle
+		- handle_rc_metamsg_rsp	
+		}
+	  //controller
+	- bt_rc_callbacks不为空,{
+		- handle_avk_rc_metamsg_rsp //回复
+		- handle_avk_rc_metamsg_cmd //命令
+		}
+	}
+}
+
+//收到消息回复
+handle_avk_rc_metamsg_rsp{
+- AVRC_PDU_REGISTER_NOTIFICATION:handle_notification_response //注册通知回复
+- AVRC_PDU_GET_ELEMENT_ATTR:handle_get_elem_attr_response{    //获取属性回复
+	- HAL_CBACK(bt_rc_ctrl_callbacks, track_changed_cb)@btif_rc.cc
+	}
+- AVRC_PDU_GET_CAPABILITIES:handle_get_capability_response{  //功能回复
+	- 
+	}
+}
+
+//注册通知回复
 handle_notification_response{
-- AVRC_RSP_INTERIM{//临时状态
+- AVRC_RSP_INTERIM{//临时状态,target状态将会变化
 	- AVRC_EVT_PLAY_STATUS_CHANGE
 	}
 
-- AVRC_RSP_CHANGED{
+- AVRC_RSP_CHANGED{//target状态变化
 	- AVRC_EVT_PLAY_STATUS_CHANGE{ //判断event
 		- 若正在播放开始定时获取信息,rc_start_play_status_timer,获取信息get_element_attribute_cmd //获取id3
 		- 若停止播放了,停止信息定时器
@@ -46,28 +111,23 @@ handle_notification_response{
 	- AVRC_EVT_TRACK_CHANGE,获取播放信息get_element_attribute_cmd
 	}
 }
-
-//收到回复
-btif_rc_handler-->andle_avk_rc_metamsg_rsp{
-- AVRC_PDU_REGISTER_NOTIFICATION:handle_notification_response
-- AVRC_PDU_GET_ELEMENT_ATTR:handle_get_elem_attr_response{
-	- HAL_CBACK(bt_rc_ctrl_callbacks, track_changed_cb)@btif_rc.cc
+//查询支持功能回复
+handle_rc_ctrl_features{
+-
+- btif_av_is_sink_enabled,getcapabilities_cmd(AVRC_CAP_COMPANY_ID)//获取支持的功能
+}
+//支持功能回复
+handle_get_capability_response{
+- AVRC_CAP_EVENTS_SUPPORTED:{
+	- p_dev->rc_supported_event_list = list_new //记录支持的event.播放状态,track变化
+	- register_for_event_notification
 	}
-- 
+- AVRC_CAP_COMPANY_ID{ //先发送的命令
+	- getcapabilities_cmd(AVRC_CAP_EVENTS_SUPPORTED) //再次返送命令
+	}
 }
 
 
-handle_get_capability_response(接收到回复AVRC_CAP_COMPANY_ID)-->getcapabilities_cmd(AVRC_CAP_EVENTS_SUPPORTED)-->
-handle_avk_rc_metamsg_rsp-->handle_get_capability_response(AVRC_CAP_EVENTS_SUPPORTED)-->register_for_event_notification
--->register_notification_cmd@btif_rc.c
-
-
-
-handle_rc_metamsg_rsp-->btif_rc_upstreams_rsp_evt{
-- AVRC_PDU_REGISTER_NOTIFICATION
-- AVRC_PDU_SET_ABSOLUTE_VOLUME
-- AVRC_PDU_GET_ELEMENT_ATTR-->HAL_CBACK(bt_rc_ctrl_callbacks,get_element_attr_rsp_cb)//回调更新函数
-}@btif_rc.cc
 
 
 

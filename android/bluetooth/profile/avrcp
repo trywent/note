@@ -19,7 +19,7 @@ Category 4: Menu 菜单信息,播放列表?
 
 
 /*********************
- avrcp controller 客端
+ avrcp controller
 
  PASSTHROUGH_ID_PLAY        = 0x44  68
  PASSTHROUGH_ID_STOP        = 0x45  69
@@ -103,7 +103,7 @@ packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/TrackInfo.java
 packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp_controller.cpp
 
 /*********************
-avrcp 主端
+avrcp target
 */
 //回调接口
 static btrc_callbacks_t sBluetoothAvrcpCallbacks = {

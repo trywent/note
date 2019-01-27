@@ -37,19 +37,19 @@ CameraModule{
 - getNumberOfCameras
 - open(const char* id, struct hw_device_t** device)
 - setCallbacks(const camera_module_callbacks_t *callbacks)
-}
+}@CameraProvider.cpp
 
 //获取CameraDevice name
 getCameraIdList{
 - 遍历mCameraDeviceNames,deviceNamePair
 - deviceNameList.push_back(deviceNamePair.second
-}
+}@CameraProvider.cpp
 //获取CameraDevice interface
 getCameraDeviceInterface_V3_x(cameraDeviceName){
 - matchDeviceName(cameraDeviceName, &deviceVersion, &cameraId) //检查名字,获取cameraid
 - index = mCameraDeviceNames.indexOf(cameraDeviceName)
 - CameraDevice deviceImpl = new CameraDevice(mModule, cameraId, mCameraDeviceNames)
-}
+}@CameraProvider.cpp
 
 /**********************
  ICameraDevice
@@ -61,7 +61,7 @@ interface ICameraDevice {
 - open(ICameraDeviceCallback callback) //返回ICameraDeviceSession
 }@3.2::ICameraDevice.hal
 
-//打开,返回session
+//打开设备,返回session
 CameraDevice::open(sp<ICameraDeviceCallback>& callback){
 - camera3_device_t *device
 - mModule->open(mCameraIdInt,&device)
@@ -69,7 +69,7 @@ CameraDevice::open(sp<ICameraDeviceCallback>& callback){
 - sp<CameraDeviceSession> session = createSession(device, callback)-->
 	new CameraDeviceSession
 - mSession = session
-}
+}@CameraDevice.cpp
 
 /**********************
  ICameraDeviceSession
@@ -99,7 +99,7 @@ CameraDeviceSession(camera3_device_t* device,const camera_metadata_t* deviceInfo
 - mDevice(device)
 - mDeviceInfo = deviceInfo
 - initialize-->mDevice->ops->initialize
-}
+}@CameraDeviceSession.cpp
 
 //处理请求
 processCaptureRequest(hidl_vec<CaptureRequest>& requests){
@@ -108,7 +108,7 @@ processCaptureRequest(hidl_vec<CaptureRequest>& requests){
 	- mDevice->ops->process_capture_request(mDevice, &halRequest)
 	}
 - mResultBatcher.registerBatch(requests)
-}
+}@CameraDeviceSession.cpp
 
 hardware/interfaces/camera/provider/2.4/default/service.cpp
 hardware/interfaces/camera/provider/2.4/default/CameraProvider.cpp

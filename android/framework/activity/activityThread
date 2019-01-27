@@ -79,7 +79,7 @@ ApplicationThread.scheduleLaunchActivity@ActivityThread.java
 scheduleLaunchActivity(Intent intent, IBinder token,ActivityInfo info, Configuration curConfig, int procState){
 - updateProcessState(procState)
 - ActivityClientRecord r = new ActivityClientRecord()
-- r.token.... //设置ActivityClientRecord
+- r.token = token //设置ActivityRecord中 IApplicationToken.Stub appToken
 - sendMessage(H.LAUNCH_ACTIVITY, r)-->handleLaunchActivity{
 	- performLaunchActivity
 	}
@@ -106,7 +106,18 @@ performLaunchActivity(ActivityClientRecord){
 handleResumeActivity{
 - performResumeActivity-->r.activity.performResume@Activity.java
 - 获取窗口，getWindow
-- 获取窗口管理器，加入窗口，wm.addView
+- 获取窗口管理器，加入窗口，
+	wm.addView//activity加入窗口,mParentWindow为Phonewindow的父类Window
+	addView(View view)-->mGlobal.addView(view, params, mContext.getDisplay(), mParentWindow)@WindowManagerImpl
+	-->addView(View view,mContext.getDisplay(),mParentWindow){
+	- parentWindow.adjustLayoutParamsForSubWindow(wparams){//设置参数
+		- wp.token = mAppToken
+		- wp.setTitle(mAppName)
+		}@Window.java
+	- ViewRootImpl root = new ViewRootImpl(view.getContext(), display)
+	- mViews.add(view),mRoots.add(root)
+	- root.setView(view)-->setView@ViewRootImpl.java
+	}@WindowManagerGlobal.java
 - 通知服务端更新状态，ActivityManagerNative.getDefault().activityResumed
 }
 

@@ -235,8 +235,9 @@ AudioPolicyManagerSPRD::startOutput{
 }
 
 
-=============
-//vbc
+/******************
+ vbc
+*/
 vbc_ctrl_open{
 - vbc_ctrl_init{
 	- st_vbc_ctrl_thread_para //分配参数内存

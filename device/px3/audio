@@ -23,8 +23,32 @@ AudioStreamOutALSA::write{
 
 ===============
 //input
+AudioStreamInALSA::setParameters{
+- mInSampleRate //设置需要的采样率
+- set(mHardware, mDevices, &pFormat, &pChannels) //重新配置
+}
+
 adev_open_input_stream-->ladev->hwif->openInputStream@audio_hw_hal.cp-->
-openInputStream-->new AudioStreamInALSA@AudioHardware.cpp
+openInputStream(uint32_t devices, int *format, uint32_t *channels, uint32_t *sampleRate){
+- android::sp <AudioStreamInALSA> in = new AudioStreamInALSA:
+	- mSampleRate(AUDIO_HW_IN_SAMPLERATE) //48000
+	- mReqSampleRate(AUDIO_HW_IN_SAMPLERATE) //48000
+	- mInSampleRate(AUDIO_HW_IN_SAMPLERATE) //48000
+	{}
+- in->set(this, devices, format, channels, sampleRate, acoustic_flags)-->
+	AudioStreamInALSA::set{
+	- *pRate = sampleRate() //当前采样率
+	- rate= AudioHardware::getInputSampleRate(*pRate) //查找最接近的采样率 8000 --- 48000
+	- mReqSampleRate = rate
+	- mSampleRate //当前采样率
+	- mBufferSize = getBufferSize(mSampleRate)
+	- mSampleRate < mInSampleRate{//采样率不匹配
+		- mDownSampler = new AudioHardware::DownSampler(mSampleRate,mInSampleRate)
+		}
+	}
+}@AudioHardware.cpp
+
+
 
 
 //读数据

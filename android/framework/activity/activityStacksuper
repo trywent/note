@@ -86,19 +86,23 @@ resumeTopActivityLocked{
 frameworks/base/services/java/com/android/server/am/ActivityStack.java
 
 ========================
-activity启动流程：
-——————————1)
-startActivityMayWait{
+
+/************
+ activity启动流程：
+*/
+1 startActivityMayWait{
 - 解析，resolveActivity
 - 启动，startActivityLocked
 - 设置启动结果
 }@ActivityStackSupervisor.java
 
-——————————2)
+/************
 * 获取调用者
 * 过滤权限
 
-startActivityLocked{
+ 
+*/
+2 startActivityLocked{
 - 调用者信息，callerApp
 - 结果发送到何处信息，resultRecord
 - 若设置FLAG_ACTIVITY_FORWARD_RESULT,则启动结果传送的caller的reusltTo(调用者的结果接收者)
@@ -112,7 +116,7 @@ startActivityLocked{
 - 启动这次要启动的activity，并reusme，startActivityUncheckedLocked(,doresuem(true),)
 }@ActivityStackSupervisor.java
 
-——————————3)
+/************
 主要是找到对应task，处理task(移除activity，移动task)
 
 boolean addingToTask //启动新activity加入到task中，(task中没有找到要启动的activity)
@@ -130,9 +134,9 @@ boolean addingToTask //启动新activity加入到task中，(task中没有找到�
 	- 当前task不是目标task，启动者task在前台。则移动目标task到前台
 	}
 * 是否要创建activity,加入task中。addingToTask //activity可能不存在
+*/
 
-
-startActivityUncheckedLocked{
+3 startActivityUncheckedLocked{
 - 判断是否清除标记START_FLAG_ONLY_IF_NEEDED，//若启动者和被启动者不是同一个activity则清除
 - 判断是否开启新task，FLAG_ACTIVITY_NEW_TASK
 - 调用者sourceRecord不为空，则保存task信息，newTaskInfo
@@ -180,9 +184,11 @@ startActivityUncheckedLocked{
 - 设置焦点，mService.setFocusedActivityLocked
 }@ActivityStackSupervisor.java
 
-
-——————————4)
-startActivityLocked{
+/************
+ mWindowManager.addAppToken 将ActivityRecord 加入到WindowManager
+ 
+*/
+4 startActivityLocked{
 - 加入新task，insertTaskAtTop
 - 移动窗口管理器中的task,mWindowManager.moveTaskToTop
 - 若activity不是启动新task，{
@@ -198,9 +204,9 @@ startActivityLocked{
 - 若是第一个activity，则不执行动画。mWindowManager.addAppToken
 - doresume，mStackSupervisor.resumeTopActivitiesLocked
 }@ActivityStack.java
-
-——————————5)
-resumeTopActivitiesLocked-->ActivityStack.resumeTopActivityLocked-->
+/************
+*/
+5 resumeTopActivitiesLocked-->ActivityStack.resumeTopActivityLocked-->
 startSpecificActivityLocked{
 - 获取进程，mService.getProcessRecordLocked
 - 若进程不为空，realStartActivityLocked

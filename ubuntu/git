@@ -24,6 +24,7 @@ $ git commit -m 'initial commit'
 $ git remote add origin git@gitserver:/srv/git/project.git
 $ git push origin master
 
+git config core.autocrlf false
 _________________________
 git clone git@192.168.1.126:/fytfile/mstarkernel   pw:git
 git clone bsp@192.168.1.126:/home/bsp/mstar/jb.git   pw:bsp
@@ -124,7 +125,7 @@ git checkout --theirs //保留远程的
 
 _______________________
 //储藏当前分支的修改
-git stash //将当前的储存，修改文件储存
+git stash //将当前的修改文件储存
 git stash --all //将所有文件储存，包括untracked file
 git stash list //查看储存
 git stash apply //应用上一个储存

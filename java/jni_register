@@ -1,0 +1,14 @@
+//
+
+
+jniRegisterNativeMethods@JNIHelp.cpp-->(*env)->RegisterNatives-->
+RegisterNatives(遍历methods注册)-->dvmRegisterJNIMethod@Jni.cpp
+
+
+dvmRegisterJNIMethod{
+- Method* method =dvmFindDirectMethodByDescriptor(clazz, methodName, signature/*"(I)I"*/)
+- method ==NULL,dumpCandidateMethods//没有找到,打印log
+}
+
+libnativehelper/JNIHelp.cpp
+dalvik/vm/Jni.cpp

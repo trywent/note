@@ -1,5 +1,44 @@
-//
+/************************
+ audioTester
+*/
+ //听筒和mic一起(手机状态)
+a. Handset: Voice call of receiver mode for GSM & Narrow band WCDMA
+ //外放
+b. Handsfree: Voice call of speaker mode for GSM & Narrow band WCDMA
+ //耳机带mic
+c. Headset4P: Voice call of 4 pole earphone mode for GSM & Narrow band WCDMA
+ //耳机
+d. Headset3P: Voice call of 3 pole earphone mode for GSM & Narrow band WCDMA
+e. HandsetTD: Voice call of receiver mode for TD
+ //bluetooth headset
+m. BTHSD8K: Voice call of 8K BTHS mode
+
+中国移动: GSM(2G),TD-SCDMA(3G),TD-LTE(4G)
+中国联通: GSM(2G),WCDMA(3G),TD-LTE(4G)/FDD-LTE(4G)
+中国电信: CDMA1X(2G),CDMA2000(3G),TD-LTE(4G)/FDD-LTE(4G)
 
 
-select_devices_signal
+/************************
+ hardware
+
+*/
+//ADC 录制
+AUD_SCLK    //output 复用IISCLK
+AUD_ADD0    //input 复用IIS2DI
+AUD_ADSYNC  //input
+
+//DAC 播放
+AUD_DASYNC   //output 复用IISLRCLK
+AUD_DAD1     //output
+AUD_DAD0     //input 复用IIS2DO
+
+
+//i2c,可以发送,可以读取数据
+sck   //时钟(bit时钟)
+lrck  //左右声道时钟(world时钟)
+sdo   //输出数据
+sdi   //接收数据
+
+setParameters("hfp_enable=true")
+setParameters("handleFm=1")
 

@@ -1,4 +1,21 @@
-//activity:生命周期 Created-----started(可见)-----Resumed-----Paused-----sopted-----destoryed
+/***********************
+ activity:生命周期 Created-----started(可见)-----Resumed-----Paused-----sopted-----destoryed
+ 
+ Activity{//窗口
+  ActivityThread --- IApplicationThread --- ActivityManagerService
+  mToken  --- ActivitRecord.apptoken
+  PhoneWindow --- decorView---ViewRootImpl --- ISession --- WindowManagerService 
+ }
+
+ ActivityRecord{//ActivityManagerService管理生命周期
+	apptoken ---addApptoken--- WindowManagerService
+	}
+
+ ViewRootImple{ //view布局,窗口变化
+	IWindow --- WindowManagerService
+	}
+ 
+*/
 performLaunchActivity@ActivityThread.java-->
 attach(Context context, ActivityThread aThread,){
 - mWindow = new PhoneWindow(this, window, activityConfigCallback) //创建窗口
@@ -7,7 +24,7 @@ attach(Context context, ActivityThread aThread,){
 	-->setWindowManager{
 	- mAppToken = appToken //设置token,,,源头ActivtyManager中activityRecord
 	- mAppName = appName
-	- wm.createLocalWindowManager(this)-->new WindowManagerImpl(mContext, parentWindow)
+	- wm.createLocalWindowManager(this/*parentWindow*/)-->new WindowManagerImpl(mContext, parentWindow)
 	}@Window.java 
 - mWindowManager = mWindow.getWindowManager()
 }@Activity.java

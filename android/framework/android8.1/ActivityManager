@@ -21,12 +21,21 @@ startBootstrapServices{
 
 startOtherServices-->mActivityManagerService.systemReady
 
-//设置WindowManager创建stack
+/***********************
+ 设置WindowManager
+ 创建ActivityDisplay
+ 创建HOMEStack
+*/
 mActivityManagerService.setWindowManager(wm)@SystemServer.java-->setWindowManager{
 - mWindowManager = wm
 - mStackSupervisor.setWindowManager(wm){
 	- mWindowManager = wm
 	- mDisplayManager =(DisplayManager)getSystemService(Context.DISPLAY_SERVICE)
+	- Display[] displays = mDisplayManager.getDisplays() //获取display个数
+	- 遍历displays{
+		- ActivityDisplay activityDisplay = new ActivityDisplay(displayId) //创建
+		- mActivityDisplays.put(displayId, activityDisplay) 
+		}	
 	- mHomeStack = mFocusedStack = mLastFocusedStack =getStack(HOME_STACK_ID)//创建第一个stack
 	}@ActivityStackSupervisor.java
 - mActivityStarter.setWindowManager(wm){
@@ -34,47 +43,120 @@ mActivityManagerService.setWindowManager(wm)@SystemServer.java-->setWindowManage
 	}
 }@ActivityManagerService.java
 
-
+//创建默认Display中stack
 getStack(stackId){
 - 若是DOCKED_STACK_ID,则需创建getStack(RECENTS_STACK_ID)
-- createStackOnDisplay(stackId)-->createStack{
+- createStackOnDisplay(stackId,DEFAULT_DISPLAY)-->createStack{
 	- new PinnedActivityStack//PINNED_STACK_ID
-	- new ActivityStack
+	- new ActivityStack{
+		- mHandler = new ActivityStackHandler
+		- postAddToDisplay(display //加入到display
+		}
 	}
 }@ActivityStackSupervisor.java
 
-/*ActivityStarter启动Activity*/
+/***********************
+ ActivityStarter启动Activity
+*/
 startActivity-->startActivityForResult@Activity.java-->mInstrumentation.execStartActivity
 -->execStartActivity@Instrumentation.java-->ActivityManager.getService().startActivity-->
-startActivity(IBinder whoThread, String callingPackage,Intent intent, String resolvedType, Bundle bOptions)
+startActivity(IBinder whoThread, String callingPackage,Intent intent, String resolvedType, Bundle bOptions,callingUser/*userId*/)
 -->mActivityStarter.startActivityMayWait@ActivityManagerService.java-->
-startActivityMayWait{
-
+startActivityMayWait(caller,intent, null/*inTask*/){
+- intent = new Intent(intent)
+- ResolveInfo rInfo = mSupervisor.resolveIntent(intent)
+- ActivityInfo aInfo = mSupervisor.resolveActivity(intent, rInfo
+- startActivityLocked(caller, intent, aInfo, rInfo)
 }@ActivityStarter.java
 
+startActivityLocked(IApplicationThread caller, Intent intent, ActivityInfo aInfo, ResolveInfo rInfo){
+- mLastStartActivityTimeMs = System.currentTimeMillis()
+- mLastStartActivityResult = startActivity(caller, intent,aInfo, rInfo) 
+}
+
+startActivity(IApplicationThread caller, Intent intent,ActivityInfo aInfo, ResolveInfo rInfo){
+- abort = !mSupervisor.checkStartAnyActivityPermission //检测是否有启动权限
+- ActivityRecord r = new ActivityRecord(mService, callerApp,callingPackage, intent) //创建ActivityRecord
+- startActivity(r, sourceRecord, true, options, null/*inTask*/)
+}
 
 
-startActivityLocked-->startActivity-->startActivityUnchecked{
-- setInitialState{
+startActivityUnchecked{
+- setInitialState(r,options){
+	- mStartActivity = r
+	- mIntent = r.intent
+	- mOptions = options
 	- mLaunchBounds = getOverrideBounds(r, options, inTask) //options是否设置activity窗口范围
 	- mLaunchFlags = adjustLaunchFlagsToDocumentMode
 	}
-- ActivityRecord reusedActivity = getReusableIntentActivity()//可复用的Activity
-//查找stack,创建task
-- setTaskFromReuseOrCreateNewTask{ //新task
+- computeLaunchingTaskFlags //计算启动task
+- computeSourceStack //获取源stack
+- ActivityRecord reusedActivity = getReusableIntentActivity()//找到已存在的task,返回该task的Activity...activity被启动过
+  //已经启动过,使用已启动的Activity
+- reusedActivity!=null{
+	- reusedActivity = setTargetStackAndMoveToFrontIfNeeded(reusedActivity){
+		- 
+		}
+	- setTaskFromIntentActivity //设置task的创建Activity
+	- resumeTargetStackIfNeeded
+	}
+- dontStart{ //已经启动
+	- deliverNewIntent
+	- mSupervisor.handleNonResizableTaskIfNeeded
+	}
+ //查找stack,创建task
+- FLAG_ACTIVITY_NEW_TASK,setTaskFromReuseOrCreateNewTask{ //新task
 	- mTargetStack = computeStackFocus(mStartActivity, mLaunchBounds)//获取stack
 	}
-- setTaskFromSourceRecord //从sourceRecord获取task
-- setTaskFromInTask
-- setTaskToCurrentTopOrCreateNewTask
+- if(mSourceRecord != null)setTaskFromSourceRecord //从sourceRecord获取task
+- if (mInTask != null)setTaskFromInTask
+- setTaskToCurrentTopOrCreateNewTask//放到当前top task
 
-- startActivity
+- mTargetStack.startActivityLocked(mStartActivity, topFocused, newTask,mOptions)
+- mDoResume{
+	- !isFocusable{
+		- mTargetStack.ensureActivitiesVisibleLocked
+		- mWindowManager.executeAppTransition
+		}
+	- mSupervisor.resumeFocusedStackTopActivityLocked
+	}
+- mSupervisor.updateUserStackLocked
+- mSupervisor.handleNonResizableTaskIfNeeded
 }@ActivityStarter.java
 
 
+/***********************
+  stackSuperVisor
+*/
+
+findActivityLocked(mIntent, mStartActivity.info){
+- 遍历mActivityDisplays{
+	- ArrayList<ActivityStack> stacks = mActivityDisplays.valueAt(displayNdx).mStacks
+	-遍历 stacks{
+	- ActivityRecord ar = stacks.get(stackNdx).findActivityLocked-->
+		findActivityLocked{//从栈中查找
+		- 
+		}@ActivityStack.java
+	}
+}@ActivityStackSuperVisor.java
+
+/***********************
+  stack
+*/
+//查找
 computeStackFocus(mStartActivity, mLaunchBounds)
 - 
 }
+
+
+
+
+//移动
+setTargetStackAndMoveToFrontIfNeeded
+
+/***********************
+  task
+*/
 
 frameworks/base/core/java/android/app/Activity.java
 frameworks/base/core/java/android/app/Instrumentation.java

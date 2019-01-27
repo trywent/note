@@ -26,3 +26,6 @@ dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdi
 i2s0---->8288
 
 bta_av_sink_data_cback
+
+//bluetooth
+WCN->CP0->DSP->2731
