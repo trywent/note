@@ -1,3 +1,17 @@
+_____________________
+int open(const char *pathname, int flags, mode_t mode);
+pathname:文件路径
+flags:必须包含O_RDONLY,  O_WRONLY,  or  O_RDWR之一
+	文件打开标识 O_CREAT, O_EXCL,O_NOCTTY, and O_TRUNC
+	文件状态标识，可以通过fcntl进行修改
+mode:需要创建文件时，设置文件的权限
+
+ssize_t read(int fd, void *buf, size_t count);//返回实际读取的数据个数
+ssize_t write(int fd, const void *buf, size_t count);//返回写入的数据个数
+
+//流操作stream
+fdopen 
+
 /************************************
 监听文件描述符，获取数据(等待事件)
 

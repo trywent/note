@@ -1,0 +1,68 @@
+//interprocess communication
+/*******************
+内存共享：
+
+*/
+int segmentid = shmget(key) //创建分配共享内存
+shmat //进程关联共享内存。进程内存地址
+shmdt //进程取关共享内存
+shmctl //控制，移除共享内存（最后一个deattach才会真正移除）
+
+//查看共享内存信息
+ipcs -m
+ipcrm shm id //移除共享内存
+
+//信号量（全局性类似共享内存）
+semget //获取
+semctl //信号量值初始化，移除
+semop(int semid, struct sembuf *sops, unsigned nsops) //信号量加减操作(PV)
+
+ipsc -s //查看信号量
+ipcrm sem id //移除信号量
+
+/*******************
+内存映射(内存共享映射到文件)：
+
+*/
+mmap
+msync //同步修改
+munmap
+
+
+/*******************
+ pipe(管道单向传输，线程程间):
+ 创建的是文件描述符，只能在同一父进程间传递 
+ 
+*/
+int pipe_fds[2]
+pipe(pipe_fds) //创建pipe，pipe_fds[0]读,pipe_fds[1]写
+
+//重定向输入输出
+dup2(to,origin)
+
+/*******************
+FIFOs(类似pipe，非父子进程):在文件系统中有名字的pipe
+
+*/
+mkfifo
+
+/*******************
+Sockets(电脑间进程通信)：
+
+*/
+
+socket //创建socket
+closes  //销毁socket
+connect //连接两个sockets
+bind    //将分配socket地址
+listen  //监听连接 
+accept   //建立连接，返回sockets
+
+
+//locale socket
+
+
+//internet-Domain socket
+
+
+//socketpair 线程间通信

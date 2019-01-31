@@ -1,28 +1,26 @@
-用户空间通过系统调用实现对硬件的操作。
+/*******************
+ 用户空间通过中断，调用kernel接口。
+ 
+ user(system Call number)--> kernel
+*/
 
-系统调用处理程序(system call handler)
-系统调用编号(system call number)
+系统调用处理程序(system call handler){
+- 保存kernel mode栈寄存器
+- 调用system call server routine
+- 加载保存的寄存器，返回user mode
+}
 
-系统调用处理程序及服务例程：
-当用户程序请求一个系统调用时，cpu切换到内核态并执行相应的内核函数(是一个中断过程)。
-80x86中有两种调用系统调用的方式，最终都需要执行系统调用出程序(system call handler)。
-__________________________________
-系统调用处理程序执行以下操作：
--内核态栈保存大多数寄存器内容
--调用系统调用服务例程(system call service routine),处理系统调用
--退出系统调用处理程序：恢复寄存器内容，cpu切换到用户态
+
 
 系统使用一个dispatch table来将系统调用号与相信的服务程序关联。
 sys_call_table数组用来存放dispatch table
 NR_syscalls系统可实现的系统调个数
 
------------------------------------
-进入和退出系统调用：
-两种系统调用方式：
+//进入系统调用方式：
 -执行int $0x80汇编指令。
--执行sysenter汇编指令
+-执行sysenter汇编指令  //更快速
 
-内核退出系统调用(从内核态切换到用户态)：
+//内核退出系统调用(从内核态切换到用户态)：
 -执行iret指令
 -执行sysexit指令
 
