@@ -1,14 +1,37 @@
 /*=========================
  ActivityManagerService----WindowManagerService
 
- ActivityStack ---- TaskStack
- TaskRecord   ---- Task
- ActivityRecord  ---- AppWindowToken -- windowState
+ 管理窗口,管理configuration
+
+ ActivityStack{
+	- StackWindowController{
+		- TaskStack
+		}
+	}
+
+ TaskRecord{
+	- TaskWindowContainerController{
+		- Task
+		}
+	}
+
+ ActivityRecord{
+	- AppWindowContainerController{
+		- AppWindowToken
+		}
+	}
+
 */
-ActivityStackSupervisor extends ConfigurationContainer{//结构
-- ActivityStack extends ConfigurationContainer{	
-	- TaskRecord extends ConfigurationContainer{
-		- ActivityRecords extends ConfigurationContainer{
+ActivityDisplay,ActivityStack,TaskRecord,ActivityRecords extends ConfigurationContainer{}
+ActivityStackSupervisor{//结构
+  //SparseArray<ActivityDisplay> mActivityDisplays
+- ActivityDisplay{        
+  //ArrayList<ActivityStack> mStacks
+  - ActivityStack{  
+	//ArrayList<TaskRecord> mTaskHistory        
+	- TaskRecord {  
+		//ArrayList<ActivityRecord> mActivities  
+		- ActivityRecords {
 			- mWindowContainerController
 			}
 		- mWindowContainerController
@@ -16,17 +39,11 @@ ActivityStackSupervisor extends ConfigurationContainer{//结构
 	- mWindowContainerController
 	}
 }
+}
 
-ConfigurationContainer{
-- getConfiguration
-- onConfigurationChanged-->child.onConfigurationChanged
-- onParentChanged
-}@ConfigurationContainer.java
-
-//改变大小接口
-void resizeStackLocked(int stackId, Rect bounds)
-void resizeDockedStackLocked(Rect dockedBounds)
-void resizePinnedStackLocked(Rect pinnedBounds, Rect tempPinnedTaskBounds)
+/******************************
+ ActivityDisplay
+*/
 
 /******************************
 ActivityStack ---- TaskStack
@@ -102,6 +119,9 @@ updateOverrideConfiguration{
 }@AcvitiyRecord.java
 
 
+//显示隐藏窗口
+setVisibility
+
 
 
 frameworks/base/services/core/java/com/android/server/am/ActivityStarter.java
@@ -110,8 +130,8 @@ frameworks/base/services/core/java/com/android/server/am/TaskRecord.java
 frameworks/base/services/core/java/com/android/server/wm/AppWindowContainerController.java
 frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
 frameworks/base/services/core/java/com/android/server/am/ConfigurationContainer.java
-/*=========================windowManager
-
+/*=========================
+ windowManager
 
 TaskStack extends WindowContainer{
 - Task extends WindowContainer{
@@ -123,7 +143,8 @@ TaskStack extends WindowContainer{
 
  窗口宽高比默认改为0.DEFAULT_PRE_O_MAX_ASPECT_RATIO=1.86@PackageParser.java
 */
-WindowContainerController{
+ 
+WindowContainerController{//控制器
 - void setContainer(E container)
 - removeContainer()
 }@WindowContainerController.java
@@ -132,19 +153,49 @@ StackWindowController, TaskWindowContainerController, AppWindowContainerControll
 - mContainer 是一个WindowContainer
 }
 
-TaskStack, Task, AppWindowToken extends WindowContainer{
+WindowContainer{//容器
+- WindowList<E> mChildren = new WindowList<E>() //child
+- mOverrideConfiguration
+- mFullConfiguration
+- mMergedOverrideConfiguration
 - addChild(child){
 	- mChildren.add
 	- child.setParent-->onParentSet
 	}
+- onConfigurationChanged{
+	- mFullConfiguration.setTo
+	- 遍历child,更新child.onConfigurationChanged
+	}
+- onOverrideConfigurationChanged {//更新配置,包括所有child都会更新
+	- onConfigurationChanged
+	- onMergedOverrideConfigurationChanged	
+	}
+- onMergedOverrideConfigurationChanged{
+	- mMergedOverrideConfiguration
+	- 遍历child,更新child.mMergedOverrideConfiguration
+	}
 }@WindowContainer.java
+
+DisplayContent,TaskStack,Task,AppWindowToken extends WindowContainer{}
+DisplayContent {//容器结构
+- TaskStack{
+	- Task{
+		-AppWindowToken{
+		}
+	}
+}
+}
 
 setController-->controller.setContainer(this)@WindowContainer.java-->mContainer = container
 @WindowContainerController.java
 
+/******************************
+ displaycontent
+*/
 
-sendNewConfiguration-->mActivityManager.updateDisplayOverrideConfiguration@WindowManagerService.java
-
+//更新配置
+performDisplayOverrideConfigUpdate@ActivityManagerService.java-->setNewDisplayOverrideConfiguration@WindowManagerService.java
+-->setDisplayOverrideConfigurationIfNeeded@RootWindowContainer.java-->displayContent.onOverrideConfigurationChanged
 
 /******************************
 TaskStack
@@ -235,16 +286,75 @@ setBounds-->updateAdjustedBounds
 onOverrideConfigurationChanged-->onConfigurationChanged@WindowContainer.java
 
 
-/*======================configuration
+frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
+frameworks/base/services/core/java/com/android/server/wm/StackWindowController.java
+frameworks/base/services/core/java/com/android/server/wm/TaskWindowContainerController.java
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
+frameworks/base/services/core/java/com/android/server/wm/WindowContainer.java
+frameworks/base/services/core/java/com/android/server/wm/WindowContainerController.java
+frameworks/base/services/core/java/com/android/server/wm/Task.java
+frameworks/base/services/core/java/com/android/server/am/ConfigurationContainer.java
+
+/*======================
+ configuration
 */
+
+ //activityManager 配置
+ConfigurationContainer{
+- mOverrideConfiguration //当前容器的override
+- mFullConfiguration //当前容器的完整配置.父容器的mFullConfiguration合并当前mOverrideConfiguration
+- mMergedOverrideConfiguration //父容器的mMergedOverrideConfiguration,合并当前mOverrideConfiguration
+- getConfiguration
+- onConfigurationChanged{
+	- mFullConfiguration.setTo(newParentConfig)
+	- mFullConfiguration.updateFrom(mOverrideConfiguration)
+ 	- child.onConfigurationChanged
+	}
+- onOverrideConfigurationChanged{
+	- mOverrideConfiguration.setTo(overrideConfiguration)
+	- onConfigurationChanged
+	- onMergedOverrideConfigurationChanged
+	}
+- onParentChanged{
+	- 
+	}
+}@ConfigurationContainer.java
+
+ //用户操作更新
+updateConfigurationLocked-->updateGlobalConfiguration 
+ //windowmanager更新
+updateDisplayOverrideConfigurationLocked-->performDisplayOverrideConfigUpdate-->
+updateDisplayOverrideConfiguration@ActivityManagerService.java-->setDisplayOverrideConfiguration-->
+activityDisplay.onOverrideConfigurationChanged@ActivityStackSupervisor.java//更新所有子容器
+
+sendNewConfiguration-->mActivityManager.updateDisplayOverrideConfiguration@WindowManagerService.java-->
 updateDisplayOverrideConfiguration{
 - mWindowManager.computeNewConfiguration //计算配置
-- updateDisplayOverrideConfigurationLocked-->updateGlobalConfiguration-->mStackSupervisor.onConfigurationChanged
+- updateDisplayOverrideConfigurationLocked{
+	 //DEFAULT_DISPLAY
+	- updateGlobalConfiguration{
+		- mStackSupervisor.onConfigurationChanged //更新所有子容器
+		- setDisplayOverrideConfiguration
+		}
+	 //!DEFAULT_DISPLAY
+	- performDisplayOverrideConfigUpdate-->mStackSupervisor.setDisplayOverrideConfiguration
+	}
 }@ActivityManagerService.java
 
 
+//windowManager配置
 
-/*======================应用窗口大小
+//改变大小接口
+void resizeStackLocked(int stackId, Rect bounds)
+void resizeDockedStackLocked(Rect dockedBounds)
+void resizePinnedStackLocked(Rect pinnedBounds, Rect tempPinnedTaskBounds)
+
+
+
+
+
+/*======================
+ 应用窗口大小
 */
 relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,Surface outSurface){
 - WindowState win = windowForClientLocked-->mWindowMap.get(client) //获取对应窗口
@@ -254,10 +364,4 @@ relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,
 - 
 }@WindowManagerService.java
 
-frameworks/base/services/core/java/com/android/server/wm/StackWindowController.java
-frameworks/base/services/core/java/com/android/server/wm/TaskWindowContainerController.java
-frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
-frameworks/base/services/core/java/com/android/server/wm/WindowContainer.java
-frameworks/base/services/core/java/com/android/server/wm/WindowContainerController.java
-frameworks/base/services/core/java/com/android/server/wm/Task.java
-frameworks/base/services/core/java/com/android/server/am/ConfigurationContainer.java
+

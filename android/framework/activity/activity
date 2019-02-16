@@ -11,12 +11,21 @@
 	apptoken ---addApptoken--- WindowManagerService
 	}
 
- ViewRootImple{ //view布局,窗口变化
+ ViewRootImpl{ //view布局,窗口变化
+	session
 	IWindow --- WindowManagerService
 	}
  
 */
-performLaunchActivity@ActivityThread.java-->
+performLaunchActivity{
+- Activity activity = mInstrumentation.newActivity
+- activity.attach(appContext, this, getInstrumentation(), r.token....)
+- int theme = r.activityInfo.getThemeResource()
+- activity.setTheme(theme)
+}@ActivityThread.java
+
+
+
 attach(Context context, ActivityThread aThread,){
 - mWindow = new PhoneWindow(this, window, activityConfigCallback) //创建窗口
 - mWindow.setCallback(this)
@@ -53,17 +62,7 @@ main-->startRunning-->systemReady@ActivityManagerService.java
 
 
 ==================
-activity
-继承关系extends
-java.lang.Object
-   ↳android.content.Context
- 	   ↳android.content.ContextWrapper
- 	 	   ↳android.view.ContextThemeWrapper
- 	 	 	   ↳android.app.Activity
-
-ContextWrapper总实现了抽象类Context中的方法,(实际上实现这些方法的是传入到构造方法的Context)
-
-__________________
+//activity
 
 addResultLocked-->results.add@ActivityRecord.java
 
@@ -227,59 +226,24 @@ handleLaunchActivity-->(从onStart到onResume)handleResumeActivity-->
 Looper.myQueue().addIdleHandler(new Idler())(当MessageQueue空闲时执行)-->
 am.activityIdle@ActivityThread.java-->activityIdle@ActivityManagerService.java-->
 activityIdleInternal@ActivityStack.java
-__________________
-ActivityStack管理一个栈中所有的activites的状态和操作。
-初始化：
-main-->new ActivityStack(m, context, true)@ActivityManagerService.java
 
+//更新启动intent
+deliverNewIntent@ActivityStarter.java-->deliverNewIntentLocked@ActivityRecord.java-->
+scheduleNewIntent-->handleNewIntent-->performNewIntents@ActivityThread.java
 
-最终从activityStack中启动
-__________________
-instrumentation:
-用来观察系统与应用程序间的交互。
+performResumeActivity
 
-__________________
+deliverNewIntents@ActiivtyThread.java-->callActivityOnNewIntent@Instrumentation.java-->
+performNewIntent-->onNewIntent@Activity.java
 
-ensureActivitiesVisibleLocked(显示用户可见的窗口，隐藏其他不可见窗口)@ActivityStack.java
 
 frameworks/base/core/java/android/app/ActivityManagerNative.java
 frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
 frameworks/base/services/java/com/android/server/am/ActivityStack.java
 =====================
-标签：
-<intent-filter>
-<category android:name="string" /> //能够设置组件是否能被浏览器打开，是否显示在launcher上
-<intent-filter>
-=====================================
-管理app：
-
-将应用进程号加入到Array：
-ActivityManagerService.setSystemProcess@SystemServer.java-->setSystemProcess-->mSelf.mPidsSelfLocked.put
-@ActivityManagerService.java
-
-activityManagerService中记录app：
-startProcessLocked(创建ProcessRecord，获取userid)-->this.mPidsSelfLocked.put(关联进程id和应用)
-@ActivityManagerService.java
-
-app进程关联到activityManagerService中的记录：
-mAppThread = new ApplicationThread();
-(开始进程，初始化loop)ActivityThread.main-->thread.attach(false)-->attach-->mgr.attachApplication
-(mAppThread)@ActivityThread.java-->(跨进程)attachApplication-->attachApplicationLocked
--->(如果activity栈中第一activity正等这个进程运行)mMainStack.realStartActivityLocked@ActivityManagerService.java
 
 
-attachApplicationLocked-->(保证activity栈中第一个activity显示)mMainStack.ensureActivitiesVisibleLocked
-@ActivityManagerService.java
-
-=====================================
-显示：
-H.handleMessage(REPORT_APPLICATION_TOKEN_DRAWN)-->wtoken.appToken.windowsDrawn@WindowManagerService.java-->
-windowsDrawn@ActivityRecord.java
-
-frameworks/base/services/java/com/android/server/am/ActivityRecord.java
-frameworks/base/services/java/com/android/server/wm/WindowManagerService.java
-
-=====================================
+===================
 事件：
 处理后退按键：
 onBackPressed-->finish-->(没有父activity)ActivityManagerNative.getDefault().finishActivity

@@ -1,7 +1,19 @@
 /******************************
 activityThread
 Activity进程中执行的操作,启动,加入view
-	
+ Activity{//窗口
+  ActivityThread --- IApplicationThread --- ActivityManagerService
+  mToken  --- ActivitRecord.apptoken
+  PhoneWindow --- decorView---ViewRootImpl --- ISession --- WindowManagerService 
+ }
+
+ ActivityRecord{//ActivityManagerService管理生命周期
+	apptoken ---addApptoken--- WindowManagerService
+	}
+
+ ViewRootImpl{ //view布局,窗口变化
+	IWindow --- WindowManagerService
+	}
 */
 
 handleResumeActivity{

@@ -1,0 +1,16 @@
+//
+BoundsAnimator.onAnimationEnd@BoundsAnimationController.java-->
+onAnimationEnd-->mService.mActivityManager.moveTasksToFullscreenStack@TaskStack.java
+-->moveTasksToFullscreenStack@ActivityManagerService.java
+
+animateResizePinnedStack-->getWindowContainerController().animateResizePinnedStack@PinnedActivityStack.java
+animateResizePinnedStack-->mService.mBoundsAnimationController.getHandler().post-->
+mService.mBoundsAnimationController.animateBounds@PinnedStackWindowController.java
+animateBounds-->animateBoundsImpl-->BoundsAnimator.onAnimationStart@BoundsAnimationController.java
+-->setPinnedStackSize@TaskStack.java
+
+
+frameworks/base/services/core/java/com/android/server/am/PinnedActivityStack.java
+frameworks/base/services/core/java/com/android/server/wm/PinnedStackWindowController.java
+frameworks/base/services/core/java/com/android/server/wm/BoundsAnimationController.java
+frameworks/base/services/core/java/com/android/server/wm/TaskStack.java

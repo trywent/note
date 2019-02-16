@@ -138,6 +138,8 @@ setPictureInPictureActions-->getWindowContainerController().setPictureInPictureA
 }@PinnedStackWindowController.java
 
 //窗口变化
+
+
 notifyMovementBoundsChanged
 
 //更新状态
@@ -158,6 +160,7 @@ frameworks/base/services/core/java/com/android/server/am/PinnedActivityStack.jav
 frameworks/base/services/core/java/com/android/server/wm/PinnedStackWindowController.java
 frameworks/base/services/core/java/com/android/server/wm/PinnedStackController.java
 
+frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMotionHelper.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipTouchHandler.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMenuActivityController.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMenuActivity.java

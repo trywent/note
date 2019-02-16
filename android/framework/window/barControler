@@ -1,6 +1,0 @@
-
-setBarShowingLw-->updateStateLw(更新设置后的状态)
-
-computeStateLw{
-- WINDOW_STATE_HIDING
-}

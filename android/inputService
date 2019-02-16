@@ -1,25 +1,31 @@
-//
-InputManagerService(构造方法)@InputManagerService.java-->nativeInit-->NativeInputManager(构造方法)
-@com_android_server_input_InputManagerService.cpp-->new InputManager@InputManager.cpp-->
-————————————————————————————————
-开始服务：
-WindowManagerService-->mInputManager.start()@WindowManagerService.java-->start@InputManagerService.java
+/***********************
+  开始inputManangerService服务
+*/
+InputManagerService{
+- this.mHandler = new InputManagerHandler
+- mPtr = nativeInit-->NativeInputManager{//返回NativeInputManager
+	- eventHub = new EventHub()
+	- mInputManager = new InputManager(eventHub) //inputManager
+	}@com_android_server_input_InputManagerService.cpp
+}@InputManagerService.java
+
+new InputManager(eventHub){
+- mDispatcher = new InputDispatcher(dispatcherPolicy)
+- mReader = new InputReader(eventHub, mDispatcher)
+- initialize{
+	- mReaderThread = new InputReaderThread(mReader)
+	- mDispatcherThread = new InputDispatcherThread(mDispatcher)
+	}
+}@InputMananger.cpp
+
+//开始读取分发线程
+WindowManagerService-->mInputManager.start@WindowManagerService.java-->start@InputManagerService.java
 -->nativeStart-->im->getInputManager()->start()@com_android_server_input_InputManagerService.cpp-->
-start(读取,分发循环)@InputManager.cpp-->mDispatcherThread->run,mReaderThread->run@Threads.cpp-->[
-(mCanCallJava为true)createThreadEtc-->androidCreateThreadEtc-->gCreateThreadFn-->_threadLoop-->
-self->threadLoop()-->]threadLoop
+start{
+- mDispatcherThread->run("InputDispatcher")
+- mReaderThread->run("InputReader")
+}@InputManager.cpp
 
-创建inputManagerService：
-InputManagerService-->mPtr = nativeInit(this, mContext, mHandler.getLooper().getQueue())
-@InputManagerService-->nativeInit-->new NativeInputManager-->(创建读取，分发对象。分发对象作为监听器传入
-读取对象中)new InputManager(eventHub, this, this)@com_android_server_input_InputManagerService.cpp-->
-initialize(创建读取，分发线程)-->new InputReaderThread--new InputDispatcherThread@InputManager.cpp
-
-创建InputReader:
-InputManager-->new InputReader(eventHub, readerPolicy, mDispatcher)@InputManager.cpp
-
-创建InputDispatcher:
-InputManager-->new InputDispatcher(dispatcherPolicy)@InputManager.cpp
 
 
 
@@ -29,82 +35,108 @@ windowGainedFocus-->mIWindowManager.inputMethodClientHasFocus@InputMethodManager
 -->
 
 
+/***********************
+  接收事件
+  viewRootImpl.InputChannel //读取事件
+  WindowState.InputWindowHandle //用于事件分发.位置计算
 
-____________________________
-更新焦点窗口：
-updateFocusedWindowLocked{
-- computeFocusedWindowLocked-->findFocusedWindowLocked //获取焦点窗口,可见窗口才能获得焦点
-- mInputMonitor.setInputFocusLw-->setInputFocusLw@InputMonitor.java
-}
-@WindowManagerService.java
+*/
 
-更新事件接收窗口：
-addWindow@WindowManagerService.java-->updateInputWindowsLw-->mService.mInputManager.
-setInputWindows@InputMonitor.java-->setInputWindows-->nativeSetInputWindows@InputManagerService.java
--->nativeSetInputWindowsim->setInputWindows-->NativeInputManager::setInputWindows-->mInputManager->
-getDispatcher()->setInputWindows@com_android_server_input_InputManagerService.cpp-->
-setInputWindows@InputDispatcher.cpp
+//注册监听input事件,channel和InputWindowHandle
+registerInputChannel(InputChannel,InputWindowHandle)-->nativeRegisterInputChannel@InputManangerService.java-->
+nativeRegisterInputChannel(InputChannel,InputWindowHandle){
+- sp<InputChannel> inputChannel = android_view_InputChannel_getInputChannel
+- sp<InputWindowHandle> inputWindowHandle = android_server_InputWindowHandle_getHandle
+- im->registerInputChannel(inputChannel,inputWindowHandle)-->NativeInputManager::registerInputChannel-->
+	mInputManager->getDispatcher()->registerInputChannel
+}com_android_server_input_InputManagerService.cpp
 
-创建本地windowHandle：
-NativeInputManager::setInputWindows@com_android_server_input_InputManagerService.cpp-->
-android_server_InputWindowHandle_getHandle-->new NativeInputWindowHandle@
-com_android_server_input_InputWindowHandle.cpp
-
-查找事件接收窗口：
-findFocusedWindowTargetsLocked-->addWindowTargetLocked(设置事件目标)@InputDispatcher.cpp
-
-updateInputWindowsLw(更新窗口的最新信息，是否可视，暂停...)@InputMonitor.java
-
-transferTouchFocus
-
-findTouchedWindowTargetsLocked
-
-setInputWindows
-
-设置焦点应用：
-setFocusedActivityLocked@ActivityManagerService.java-->setFocusedApp@WindowManagerService.java
--->setFocusedAppLw@InputMonitor.java-->setFocusedApplication@InputManagerService.java
--->setFocusedApplication@com_android_server_input_InputManagerService.cpp-->
-setFocusedApplication@InputDispatcher.cpp
-
-============================
-Connection注册(建立事件通道和事件接收目标的联系)：
-
-两种注册方式：
-1.PolicyHandler.handleMessage(MSG_ENABLE_POINTER_LOCATION)-->enablePointerLocation-->
-mWindowManagerFuncs.monitorInput@PhoneWindowManger.java-->monitorInput@WindowManagerService.java
--->monitorInput-->nativeRegisterInputChannel@InputManagerService.java
-
-2.addWindow-->mInputManager.registerInputChannel(inputchannel[0]，InputWindowHandle(窗口位置，大小))
-@WindowManagerService.java-->registerInputChannel-->nativeRegisterInputChannel@InputManagerService.java
-
-本地注册inputchannle：
-nativeRegisterInputChannel-->registerInputChannel@com_android_server_input_InputManagerService.cpp-->
-[mInputManager->getDispatcher()->registerInputChannel]-->registerInputChannel{
-- getConnectionIndexLocked(inputChannel),已经注册则返回
-- 创建链接，new Connection(inputChannel, inputWindowHandle, monitor)
-- 获取通道fd，加入容器mConnectionsByFd.add(fd, connection)
-- mLooper->addFd(...ALOOPER_EVENT_INPUT,handleReceiveCallback)
-@InputDispatcher.cpp
-
-----------------------------
-创建inputChannel：
-addWindow-->InputChannel.openInputChannelPair@WindowManagerService.java-->openInputChannelPair-->
-nativeOpenInputChannelPair@InputChannel.java-->android_view_InputChannel_nativeOpenInputChannelPair
--->InputChannel::openInputChannelPair@android_view_InputChannel.cpp-->openInputChannelPair-->
-socketpair(创建套接字，实际inputChannel封装socket.通信通过socket)--(创建并返回服务端和客户端inputChannel)
-new InputChannel()@InputTransport.cpp
-
-____________________________
-dispatcher处理事件：
-threadLoop-->mDispatcher->dispatchOnce-->dispatchOnceInnerLocked{
-- 若使能重复按键，则复位重复计数
-- 获取一个事件mPendingEvent{
-	- mInboundQueue.dequeueAtHead
-	- 更新用户操作时间，pokeUserActivityLocked
+ //只注册了Channel,没有加入InputWindowHandle...后续加入
+createInputConsumer(String name, InputChannel inputChannel){
+- InputConsumerImpl consumer = new InputConsumerImpl(mService, name, inputChannel){
+	- InputChannel[] channels = InputChannel.openInputChannelPair(name);
+        - mServerChannel = channels[0] //socketPair
+	- mService.mInputManager.registerInputChannel(mServerChannel,null)//注册
+	- mWindowHandle = new InputWindowHandle //创建InputWindowHandle
+	- mWindowHandle.inputChannel = mServerChannel
+	}@InputConsumerImpl.java
+- addInputConsumer{
+	- mInputConsumers.put(name, consumer)
+	- updateInputWindowsLw(true)//更新输入窗口
 	}
-- 是否要丢弃事件
-- 根据事件类型进行分发TYPE_KEY，{
+}@InputMonitor.javas
+
+//加入WindowHandle(包含在WindowState中)...输入事件位置
+updateInputWindowsLw-->mUpdateInputForAllWindowsConsumer.updateInputWindows-->
+updateInputWindows{
+- navInputConsumer = getInputConsumer(INPUT_CONSUMER_NAVIGATION)
+- pipInputConsumer = getInputConsumer(INPUT_CONSUMER_PIP)//画中画
+- wallpaperInputConsumer = getInputConsumer(INPUT_CONSUMER_WALLPAPER)
+- mService.mRoot.forAllWindows(this/*当前类为consumer*/)-->accept(WindowState w){ //遍历窗口执行accept
+	- InputWindowHandle inputWindowHandle = w.mInputWindowHandle //当前窗口InputWindowHandle
+	- 当前窗口位置低于pip,PINNED_STACK_ID{//画中画事件接收
+		- pipInputConsumer.mWindowHandle.touchableRegion.set(pipTouchableBounds) //设置触摸范围
+		- addInputWindowHandle(pipInputConsumer.mWindowHandle)
+		}
+	- 当前窗口位置低于navi,addInputWindowHandle(navInputConsumer.mWindowHandle) //导航
+	- 当前窗口位置低于wallpaper,addInputWindowHandle(wallpaperInputConsumer.mWindowHandle)//wallpaper
+	- addInputWindowHandle(inputWindowHandle, w){ //加入到数组
+		- mInputWindowHandles[mInputWindowHandleCount++] = windowHandle
+		}
+	}
+- mService.mInputManager.setInputWindows(mInputWindowHandles, mFocusedInputWindowHandle)//设置到inputManager
+}@InputMonitor.java
+
+setInputWindows(InputWindowHandle[] windowHandles,InputWindowHandle focusedWindowHandle)@InputManagerService.java-->
+nativeSetInputWindows-->im->setInputWindows-->
+NativeInputManager::setInputWindows{
+- mInputManager->getDispatcher()->setInputWindows
+- 设置newPointerGesturesEnabled
+}@com_android_server_input_InputManagerService.cpp
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/input/InputManagerService.java
+frameworks/base/services/core/java/com/android/server/wm/InputMonitor.java
+frameworks/base/services/jni/com_android_server_input_InputManagerService.cpp
+
+
+
+
+/***********************
+  inputDispatcher
+  
+  inputChannel本质是socketPair
+*/
+InputDispatcher::registerInputChannel{
+- sp<Connection> connection = new Connection(inputChannel, inputWindowHandle
+- int fd = inputChannel->getFd()
+- mConnectionsByFd.add(fd, connection) //保存
+- mLooper->addFd(fd, handleReceiveCallback)
+}@InputDispatcher.cpp
+
+//加入窗口
+setInputWindows(Vector<sp<InputWindowHandle> >& inputWindowHandles){
+- mWindowHandles = inputWindowHandles
+- windowHandle->getInfo()->hasFocus,newFocusedWindowHandle = windowHandle //查找焦点窗口
+- mFocusedWindowHandle = newFocusedWindowHandle
+}@InputDispatcher.cpp
+
+//dispatcher处理事件：
+threadLoop-->mDispatcher->dispatchOnce-->dispatchOnceInnerLocked{
+- resetKeyRepeatLocked
+- mPendingEvent{//获取一个事件
+	- mInboundQueue.dequeueAtHead
+	- pokeUserActivityLocked //更新用户操作时间
+	- resetANRTimeoutsLocked
+	}
+- 设置DropReason//是否要丢弃事件
+ //mPendingEvent->type
+- TYPE_CONFIGURATION_CHANGED:{}
+- TYPE_DEVICE_RESET:{}
+- TYPE_KEY，{
 	- 是app切换时间{
 		- 若是切换app事件(back，home)，重设app切换时间
 		- 若是其它事件，则丢弃该事件
@@ -113,12 +145,16 @@ threadLoop-->mDispatcher->dispatchOnce-->dispatchOnceInnerLocked{
 	- 若有下个非阻塞事件，则丢弃当前事件
 	- 分发事件，dispatchKeyLocked
 	}
+- TYPE_MOTION:{
+	- dispatchMotionLocked
+	}
 - 处理完成，事件是否被丢弃dropInboundEventLocked //输出丢弃原因
 
 }
 
 
-dispatchOnceInnerLocked-->dispatchKeyLocked{
+//按键事件,TYPE_KEY
+dispatchKeyLocked{
 - 事件没有分配，dispatchInProgress==false{
 	- 是否是重复事件
 	}
@@ -129,12 +165,12 @@ dispatchOnceInnerLocked-->dispatchKeyLocked{
 	}
 - 设置注入事件的结果返回目标，setInjectionResultLocked //设置出错状态
 - 加入检测事件的接收目标(不一定是窗口)
-- 分发事件到目标，dispatchEventLocked
-- 消耗事件，startDispatchCycleLocked
+- dispatchEventLocked 1-> //分发事件到connection
+- startDispatchCycleLocked 2-> //从connection发送到client
 }
 
-(分发到不同的目标中)-->dispatchEventLocked(根据传入的目标，找到对应的connection)-->
-prepareDispatchCycleLocked-->enqueueDispatchEntriesLocked-->InputDispatcher::
+->1 dispatchEventLocked //根据传入的目标，找到对应的connection
+-->prepareDispatchCycleLocked-->enqueueDispatchEntriesLocked-->InputDispatcher::
 enqueueDispatchEntryLocked{
 - 创建事件对象，new DispatchEntry
 - 判断按键和触摸事件是否是连续的，不连续的则丢弃
@@ -142,8 +178,7 @@ enqueueDispatchEntryLocked{
 - 加入队列，connection->outboundQueue.enqueueAtTail
 }
 
-消耗事件：
-startDispatchCycleLocked{
+->2 startDispatchCycleLocked{//发送事件到client
 -- connection状态正常，且outboundQueue不为空{
 - 获取队列头事件，connection->outboundQueue.head
 - 判断事件类型{
@@ -160,27 +195,54 @@ startDispatchCycleLocked{
 }
 
 
-
-客户端socket获取事件：
-initialize{
-- 获取接收文件描述符，mInputConsumer.getChannel()->getFd()
-- 加入到消息监听，mMessageQueue->getLooper()->addFd
+//触摸事件,TYPE_MOTION
+InputDispatcher::dispatchMotionLocked(MotionEntry* entry){
+- Vector<InputTarget> inputTargets
+- isPointerEvent坐标事件,findTouchedWindowTargetsLocked(inputTargets,&conflictingPointerActions){//查找接收目标
+- !isPointerEvent,findFocusedWindowTargetsLocked(inputTargets)
+- setInjectionResultLocked
+- addMonitoringTargetsLocked(inputTargets)
+- dispatchEventLocked(entry, inputTargets)
 }
-Looper::pollInner-->response.request.callback->handleEvent-->NativeDisplayEventReceiver::
-handleEvent-->NativeInputEventReceiver::handleEvent-->consumeEvents-->env->CallVoidMethod(gInputEventReceiverClassInfo.dispatchInputEvent)
-@android_view_InputEventReceiver.cpp-->dispatchInputEvent-->onInputEvent@InputEventReceiver.java
 
 
+findTouchedWindowTargetsLocked(inputTargets,&conflictingPointerActions){//查找接收目标
+- action = entry->action
+- maskedAction = action & AMOTION_EVENT_ACTION_MASK
+- mTempTouchState = mTouchStatesByDisplay.indexOfKey(displayId) //获取当前触摸事件,对应屏幕的touchState
+- newGesture{ //鼠标,滚轮,触摸板?
+	- mTempTouchState.reset
+	}
+- newGesture||(AMOTION_EVENT_ACTION_POINTER_DOWN&& isSplit){
+	- 遍历mWindowHandles{
+		- sp<InputWindowHandle> windowHandle = mWindowHandles.itemAt(i)
+		- InputWindowInfo* windowInfo = windowHandle->getInfo()
+		- windowInfo->visible&&
+		}
+	}
+- !newGesture,pointer事件{
+	- 
+	}
+- mTouchStatesByDisplay.add(displayId, mTempTouchState) //保存touchState
+}
 
 加入命令：
 postCommandLocked-->(加入到命令队列)mCommandQueue.enqueueAtTail@InputDispatcher.cpp
 执行命令：
 dispatchOnce-->runCommandsLockedInterruptible-->(this->*command)(commandEntry)@InputDispatcher.cpp
 
-_____________________________
-窗口消耗事件：
 
-设置inputchannel：用来读取事件的socket
+frameworks/base/core/java/android/view/InputChannel.java
+frameworks/base/services/input/InputDispatcher.cpp
+fameworks/base/core/jni/android_view_InputChannel.cpp
+frameworks/base/libs/androidfw/InputTransport.cpp
+
+/***********************
+  应用消耗事件
+
+*/
+
+//设置inputchannel：用来读取事件的socket
 setView(创建InputChannel对象，后面会被替换)-->sWindowSession.add@ViewRootImpl.java-->add@Session.java
 -->addWindow{
 - 创建通道，InputChannel.openInputChannelPair
@@ -192,18 +254,18 @@ setView(创建InputChannel对象，后面会被替换)-->sWindowSession.add@View
 mReceiverPtr = nativeInit(this, inputChannel, mMessageQueue)@InputEventReceiver.java-->
 new NativeInputEventReceiver@android_view_InputEventReceiver.cpp
 
-主线程中的looper接收inputEvent数据：
+//主线程中的looper接收inputEvent数据：
 NativeInputEventReceiver::handleEvent-->consumeEvents@android_view_InputEventReceiver.cpp
 
 
 
-创建inputEvent接收器：
+1. //接收事件：
 setView-->new WindowInputEventReceiver(mInputChannel,Looper.myLooper())@ViewRootImple.java
 new InputEventReceiver-->nativeInit@InputEventReceiver.java-->nativeInit-->receiver->initialize
 NativeInputEventReceiver::initialize-->mMessageQueue->getLooper()->addFd(传入socketpair中消耗端)
 @android_view_InputEventReceiver.java
------------------------------
-处理获取的事件：
+
+2. //处理获取的事件：
 NativeInputEventReceiver::handleEvent-->consumeEvents-->
 env->CallVoidMethod(mReceiverObjGlobal,gInputEventReceiverClassInfo.dispatchInputEvent, seq, inputEventObj)
 @android_view_InputEventReceiver.cpp-->dispatchInputEvent@InputEventReceiver.java-->
@@ -213,23 +275,22 @@ mHandler.sendMessage(MSG_PROCESS_INPUT_EVENTS)-->ViewRootHandler.handleMessage--
 deliverInputEvent(处理按键，触摸...等事件)-->(触摸事件)deliverPointerEvent-->mView.dispatchPointerEvent
 @ViewRootImpl.java-->dispatchTouchEvent@View.java
 
-
-读取事件超时，调用回调处理未处理的事件：
+//读取事件超时，调用回调处理未处理的事件：
 NativeInputEventReceiver::handleEvent-->consumeEvents-->
 env->CallVoidMethod(mReceiverObjGlobal,gInputEventReceiverClassInfo.dispatchBatchedInputEventPending
 @android_view_InputEventReceiver.cpp-->dispatchBatchedInputEventPending-->onBatchedInputEventPending
 @InputEventReceiver.java-->onBatchedInputEventPending-->(注册与帧同步的回调)scheduleConsumeBatchedInput
 @ViewRootImpl.java
 
-窗口主动获取事件(主要是在动画，新一帧前消耗掉所有的事件)：
+//窗口主动获取事件(主要是在动画，新一帧前消耗掉所有的事件)：
 doCallbacks-->c.run@Choreographer.java-->ConsumeBatchedInputRunnable.run-->doConsumeBatchedInput
 -->mInputEventReceiver.consumeBatchedInputEvents@ViewRootImpl.java-->
 nativeConsumeBatchedInputEvents@InputEventReceiver.java-->nativeConsumeBatchedInputEvents-->
 receiver->consumeEvents-->NativeInputEventReceiver::consumeEvents-->mInputConsumer.consume
 @android_view_InputEventReceiver.cpp-->InputConsumer::consume(按键事件直接返回处理，触摸事件
 要处理一次触摸的所有数据)-->(读取事件)mChannel->receiveMessage-->::recv@InputTransport.cpp
-______________________________
-事件被处理完成：
+
+3. //事件被处理完成：
 doProcessInputEvents-->deliverInputEvent-->(处理按键或触摸，触摸球等事件)deliverKeyEvent-->
 finishInputEvent-->q.mReceiver.finishInputEvent@ViewRootImpl.java-->finishInputEvent@
 InputEventReceiver.java->nativeFinishInputEvent-->receiver->finishInputEvent-->finishInputEvent-->
@@ -237,16 +298,24 @@ mInputConsumer.sendFinishedSignal@android_view_InputEventReceiver.cpp-->sendFini
 -->sendUnchainedFinishedSignal@InputTransport.cpp
 
 
-dispatcher获取事件处理结果：
+//dispatcher获取事件处理结果：
 threadLoop-->mDispatcher->dispatchOnce-->mLooper->pollOnce@InputDispatcher.cpp-->pollOnce
 pollInner-->response.request.callback->handleEvent-->mCallback@Looper.cpp-->(dispatcher的回调)
 handleReceiveCallback@InputDispatcher.cpp
 
-frameworks/base/services/input/InputDispatcher.cpp
-frameworks/base/core/java/android/view/InputChannel.java
-fameworks/base/core/jni/android_view_InputChannel.cpp
-frameworks/base/services/jni/com_android_server_input_InputManagerService.cpp
-frameworks/base/libs/androidfw/InputTransport.cpp
+//设置焦点应用：
+setFocusedActivityLocked@ActivityManagerService.java-->setFocusedApp@WindowManagerService.java
+-->setFocusedAppLw@InputMonitor.java-->setFocusedApplication@InputManagerService.java
+-->setFocusedApplication@com_android_server_input_InputManagerService.cpp-->
+setFocusedApplication@InputDispatcher.cpp
+
+
+/***********************
+  其它接口消耗事件
+
+*/
+createInputConsumer-->mInputMonitor.createInputConsumer(name)@WindowManagerService.java
+
 frameworks/base/core/java/android/view/InputEventReceiver.java
 frameworks/base/core/jni/android_view_InputEventReceiver.cpp
 
@@ -368,15 +437,5 @@ enablePointerLocation{
 
 
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
-============================
-//获取事件：
-创建socket对：InputChannel[0]系统写入事件，InputChannel[1]客户端读取事件
-InputChannel.openInputChannelPair
-
-注册到input写入者：InputChannel[0]
-nativeRegisterInputChannel
-
-注册获取者：InputChannel[1]
-InputEventReceiver(InputChannel inputChannel, Looper looper)
 
 

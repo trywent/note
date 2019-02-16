@@ -1,0 +1,24 @@
+//
+Configuration{
+- fontScale
+- mcc  //Mobile Country Code 移动设备国家代码 460mcc6mnc 中国(460)联通(6)
+- mnc  //Mobile Network Code 移动网络代码
+- locale
+- mLocaleList //语言
+- touchscreen //触摸,触摸笔
+- keyboard //键盘模式
+- keyboardHidden 
+- navigation //光标,滚轮,触摸
+- navigationHidden
+- orientation //横竖屏
+- screenLayout //布局模式,大小,从左至右/右至左
+- colorMode //颜色模式
+- uiMode    //夜晚模式
+- screenWidthDp //当前宽度
+- screenHeightDp //当前高度
+- smallestScreenWidthDp //最小宽度
+- densityDpi //像素密度
+- assetsSeq 
+- appBounds //应用大小
+        seq = 0;
+}

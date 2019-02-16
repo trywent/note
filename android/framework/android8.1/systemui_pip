@@ -16,7 +16,7 @@ start{
 		- new PipInputEventReceiver(inputChannel)
 		}@InputConsumerController.java
 	- mMediaController = new PipMediaController
-	- mMenuController = new PipMenuActivityController
+	- mMenuController = new PipMenuActivityController //menuActivity
 	- mTouchHandler = new PipTouchHandler(mInputConsumerController)
 	- mNotificationController = new PipNotificationController
 	- EventBus.getDefault().register(this)
@@ -44,6 +44,9 @@ mTaskStackListener{
 - onActivityUnpinned{
 	- mMenuController.onActivityUnpinned()
 	- mTouchHandler.onActivityUnpinned(topActivity)
+	}
+- onPinnedActivityRestartAttempt{//activity重启,设置全屏
+	- mTouchHandler.getMotionHelper().expandPip
 	}
 }TaskStackListener@PipManager.java
 
@@ -83,7 +86,12 @@ dismissPip/showPipMenu-->sendMessage-->mToControllerMessenger.send@@PipMenuActiv
 	- onPipMenuStateChanged
 	}
 - MESSAGE_EXPAND_PIP
-- MESSAGE_DISMISS_PIP
+- MESSAGE_DISMISS_PIP,mHandler.handleMessage-->mListeners.forEach(l -> l.onPipDismiss())
+	PipMenuListener@PopTouchHandler.java-->mMotionHelper.dismissPip()
+	- cancelAnimations
+	- mMenuController.hideMenuWithoutResize
+	- mHandler.post(mActivityManager.removeStack)
+	}
 }@PipMenuActivityController.java
 
 
@@ -128,9 +136,17 @@ handleTouchEvent{
 - MotionEvent.ACTION_UP{
 	- updateMovementBounds //更新位置
 	- gesture.onUp{
-		- mMotionHelper.animateDismiss{ //消失
+		- 拖曳,mMotionHelper.animateDismiss{ //消失
 			- BoundsAnimator = createAnimationToBounds		
 			- mBoundsAnimator.start()		
+			}
+		- 最小窗口
+		- 其它{
+			- mMenuController.hideMenu
+			- mMotionHelper.expandPip{
+				- mMenuController.hideMenuWithoutResize
+				- mActivityManager.moveTasksToFullscreenStack(PINNED_STACK_ID)/mActivityManager.resizeStack(PINNED_STACK_ID)
+				}
 			}
 		}
 	}
@@ -145,6 +161,12 @@ movePip-->resizePipUnchecked
 
 //设置为最小窗口
 setMinimizedStateInternal-->setMinimizedState@PipMotionHelper.java
+
+//设置全屏
+expandPip-->mActivityManager.resizeStack@PipMotionHelper.java
+
+resizeAndAnimatePipUnchecked-->
+handleMessage(MSG_RESIZE_ANIMATE)-->mActivityManager.resizeStack@PipMotionHelper.java
 
 //移除pip
 dismissPip-->mActivityManager.removeStack(PINNED_STACK_ID)

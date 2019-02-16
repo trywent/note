@@ -46,11 +46,11 @@ performLayout(boolean initial, boolean updateInputWindows){
 - mService.mPolicy.finishLayoutLw
 }
 
-
+//遍历执行回调callback
 forAllWindows(callback,traverseTopToBottom){
 - applyInOrderWithImeWindows(callback)-->callback.apply(this)//没有子窗口
 //有子窗口,
-- forAllWindowTopToBottom(callback)//从上至下
+- forAllWindowTopToBottom(callback)-->callback.apply//从上至下
 - forAllWindowBottomToTop //从下至上
 }@WindowState.java
 
