@@ -1,4 +1,7 @@
-//
+/***********************
+ hal
+
+*/
 struct GnssCallback : public IGnssCallback {
     Return<void> gnssLocationCb(const android::hardware::gnss::V1_0::GnssLocation& location) override;
     Return<void> gnssStatusCb(const IGnssCallback::GnssStatusValue status) override;
@@ -48,10 +51,27 @@ parse_gds_token-->location_callback@gps.c-->
 Gnss::sGnssCb.location_cb-->Gnss::locationCb-->sGnssCbIface->gnssLocationCb@Gnss.cpp
 -->GnssCallback::gnssLocationCb@com_android_server_location_GnssLocationProvider.cpp
 
-
-
-
-
 sp9853/hardware/interfaces/gnss/1.0/default/Gnss.cpp
 vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps.c
 frameworks/base/services/core/jni/com_android_server_location_GnssLocationProvider.cpp
+/***********************
+ GreenEye2/ge2_libgps/gps_lib/src/gps.c
+
+*/
+struct hw_module_t HAL_MODULE_INFO_SYM = {
+    .tag = HARDWARE_MODULE_TAG,
+    .id = GPS_HARDWARE_MODULE_ID,
+    .methods = &hw_module_methods{
+	- .open =open_gps(w_module_t* module ,struct hw_device_t** device){
+		- struct gps_device_t *gps_device = malloc
+		- gps_device->common.module     = module
+		- gps_device->get_gps_interface = gps_get_hardware_interface
+		}
+	}
+}
+
+
+vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps.c
+vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/agps.c
+
+

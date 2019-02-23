@@ -251,8 +251,9 @@ setView(创建InputChannel对象，后面会被替换)-->sWindowSession.add@View
 	nativeRegisterInputChannel
 }@WindowManagerService.java
 
-mReceiverPtr = nativeInit(this, inputChannel, mMessageQueue)@InputEventReceiver.java-->
-new NativeInputEventReceiver@android_view_InputEventReceiver.cpp
+//android8.1
+addWindow-->win.openInputChannel(outInputChannel)@WindowManagerService.java-->
+registerInputChannel@WindowState.java
 
 //主线程中的looper接收inputEvent数据：
 NativeInputEventReceiver::handleEvent-->consumeEvents@android_view_InputEventReceiver.cpp

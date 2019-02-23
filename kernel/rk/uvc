@@ -1,8 +1,0 @@
-
-驱动：
-uvc_init-->usb_register(&uvc_driver.driver)
-
-
-
-
-drivers/media/video/uvc/uvc_driver.c

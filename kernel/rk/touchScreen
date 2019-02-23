@@ -1,4 +1,4 @@
-
+//
 i2c2_info{
 		.type          = "Goodix-TS",
 		.addr          = 0x14,

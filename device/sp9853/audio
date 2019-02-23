@@ -33,7 +33,7 @@ AUD_DAD1     //output
 AUD_DAD0     //input 复用IIS2DO
 
 
-//i2c,可以发送,可以读取数据
+//i2s,可以发送,可以读取数据
 sck   //时钟(bit时钟)
 lrck  //左右声道时钟(world时钟)
 sdo   //输出数据

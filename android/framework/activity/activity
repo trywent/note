@@ -38,140 +38,12 @@ attach(Context context, ActivityThread aThread,){
 - mWindowManager = mWindow.getWindowManager()
 }@Activity.java
 
-==================
-launcher的启动：
-ActivityManagerService.self().systemReady@SystemServer.java-->systemReady-->
-mMainStack.resumeTopActivityLocked@ActivityManagerService.java-->resumeTopActivityLocked-->
-resumeTopActivityLocked(null,null)//没有其他的activity，所以启动launcher-->
-mService.startHomeActivityLocked@ActivityStack.java-->startHomeActivityLocked(设置intent的类型Intent.CATEGORY_HOME)@ActivityManagerService.java-->mMainStack.startActivityLocked
-(都是从ActivityStack开始)-->startActivityLocked(IApplicationThread,
-            Intent, String, ActivityInfo, IBinder, String, int,
-            int, int, int, Bundle, boolean, ActivityRecord[])-->startActivityUncheckedLocked-->
-startActivityLocked(r, newTask, doResume, keepCurTransition, options)-->
-resumeTopActivityLocked(ActivityRecord)--> resumeTopActivityLocked(ActivityRecord, Bundle)
--->ensureActivitiesVisibleLocked-->ensureActivitiesVisibleLocked--(activity没有运行)-->
-startSpecificActivityLocked@ActivityStack.java-->(程序进程没有开始)startProcessLocked-->
-newProcessRecordLocked--startProcessLocked@ActivityManagerService.java-->
-Process.start("android.app.ActivityThread",
-                    app.processName, uid, uid, gids, debugFlags,
-                    app.info.targetSdkVersion, null)
--->ActivityThread.main()
 
-
-main-->startRunning-->systemReady@ActivityManagerService.java
 
 
 ==================
-//activity
+//activity启动流程
 
-addResultLocked-->results.add@ActivityRecord.java
-
-启动的activity结束后，可以返回结果到启动activity：startActivityForResult
-sendActivityResultLocked-->r.app.thread.scheduleSendResult@ActivityStack.java-->(跨进程)
-ApplicationThread.scheduleSendResult-->queueOrSendMessage(H.SEND_RESULT)-->mH.sendMessage
-H.handleMessage(SEND_RESULT)-->handleSendResult(先将activity暂停，再发送结果)-->deliverResults
--->r.activity.dispatchActivityResult@ActivityThread.java-->onActivityResult@Activity.java
-
-启动activity:
-startActivityMayWait-->startActivityLocked{
--查找到返回结果的activityRecord
--创建ActivityRecord
-}
--->startActivityUncheckedLocked{
-1. Flag要求新task，如果不要求返回启动结果，则首先查找其他task中是否有已启动的acivity。
-2. 判断activity是否已经在stack顶部,则直接恢复 
-3. *是否新建task，将task移到stack顶部 *启动activity存在，将新activity加入到启动activity的task中 
-   *没有启动activity，且不是一个新task，则直接加入到最上的task中
-}
--->startActivityLocked{
--存在于已有的task，现在不显示actvity，则加入栈mHistory，并向windowManagerService加入应用标记		     
-  mService.mWindowManager.addAppToken
--有多个activity，判断设置切换动画，并加入应用标记addAppToken
--没有其他activity，加入应标记addAppToken
--在这里会检查是否要延迟5s启动，是则将记录加入mPendingActivityLaunches
-}
--->resumeTopActivityLocked(null)-->resumeTopActivityLocked(
-- 获取栈顶的ActivityRecord，若为空则启动launcher
-- 取得的AcivityRecord是否是已经是mResumedActivity，则返回(已经显示了)
-- 若正在睡眠且，activity状态是正确。把余留的动画执行完，则返回
-- 若正在暂停activity，则等待暂停执行完成
-- 使当前mResumedActivity暂停。
-- 设置应用的状态不为stoped
-- 准备切换动画，mService.mWindowManager.prepareAppTransition
-- activity的应用和进程已经启动，
-	mService.mWindowManager.setAppVisibility;开始显示
-	updateOrientationFromAppTokens()重新计算方位，若配置变了要重新开始acivity。			 
-		执行ensureActivitiesVisibleLocked，并返回
-	scheduleSendResult();发送执行结果
-	scheduleResumeActivity();执行恢复应用	
-	completeResumeLocked;启动完成，更新状态
-- activity进程没有启动，则startSpecificActivityLocked
-}
--->completeResumeLocked-->ensureActivitiesVisibleLocked-->executeAppTransition@ActivityStack.java-->
-executeAppTransition(进行窗口切换)@WindowManagerService.java
-
-startSpecificActivityLocked-->realStartActivityLocked{}
-_____________________________
-开始activity：
-startSpecificActivityLocked{
--进程开始了，执行realStartActivityLocked
--应用进程没有开始，执行开始进程mService.startProcessLocked
-}
--->startProcessLocked{
-Intent.FLAG_FROM_BACKGROUND  //操作是从后台进程发起的，用户不可见的进程发起的操作
-
--是否已经存在应用进程信息，是则向ProcessRecord加入应用信息，返回
--应用不是单独进程，若该应用进程在坏进程列表中，是从后台发起且则直接返回，非后台发起则清楚坏进程标记(让用户可见出错消息)
--新建newProcessRecordLocked，加入应用信息
-}
--->startProcessLocked{
--根据用户id，组id开始新进程。Process.start
--将应用进程ProcessRecord加入到mPidsSelfLocked。并发送进程启动初始处理消息
-}
--->Process.start("android.app.ActivityThread",)-->main()-->new ActivityThreadd().attach(false)
--->mgr.attachApplication@ActivityThread.java-->attachApplication
--->attachApplicationLocked{
--设置processRecord中值，Thread设为当前线程...
--确保apk包被解析，ensurePackageDexOpt
--绑定进程，初始化进程上下文。bindApplication-->handleBindApplication@ActivityThread.java
--检查是否有actviity,service,broadcastReceiver在等待该进程，运行这些组件
-}
--->mMainStack.realStartActivityLocked@ActivityManagerService.java
-
-stopAppSwitches-->(当按HOME键回到主页，设置app不能切换的时间段)@ActivityManagerService.java
-
-==================
-启动activity：
-startActivity(Intent)-->startActivity(Intent,null)-->startActivityForResult(Intent,-1)-->
-startActivityForResult(intent, requestCode, null)@Activity.java--> mInstrumentation.execStartActivity
--->execStartActivity-->ActivityManagerNative.getDefault().startActivity@Instrumentation.java-->
-ActivityManagerProxy.startActivity(getDefault单例模式，获取activity服务封装proxy。执行IPC操作)
--->mRemote.transact(START_ACTIVITY_TRANSACTION, data, reply, 0)@ActivityManagerNative.java
--->startActivity@ActivityManagerService.java-->startActivityMayWait-->startActivityLocked
--->startActivityUncheckedLocked(判断是否以前启动过，直接将以前的显示。是否已经显示？是否启动新任务？doresume)
--->startActivityLocked(ActivityRecored加入到mHistory中)-->resumeTopActivityLocked(null)
--->resumeTopActivityLocked(prev, null)-->(判断要开始的activity的app是否为空，进程是否开始)
-
-(app不为空和进程开始)ensureActivitiesVisibleLocked@ActivityStack.java-->ensureActivitiesVisibleLocked
-(显示那些用户可见的activity(包括部分))-->startSpecificActivityLocked@ActivityStack.java
-
-(app为空)startSpecificActivityLocked@ActivityStack.java-->(判断程序进程是否开始)
-
-(程序进程没有开始)startProcessLocked-->newProcessRecordLocked--startProcessLocked
-@ActivityManagerService.java-->Process.start("android.app.ActivityThread",)-->
-main()-->new ActivityThreadd().attach(false)-->mgr.attachApplication@ActivityThread.java-->
-attachApplication-->attachApplicationLocked-->mMainStack.realStartActivityLocked
-@ActivityManagerService.java
-
-(程序进程开始了)realStartActivityLocked(执行完后执行completeResumeLocked，设置activity状态)
--->app.thread.scheduleLaunchActivity@ActivityStack.java-->
-(远程调用代理)ApplicationThreadProxy.scheduleLaunchActivity@ApplictionThreadNative.java-->
-ApplicationThread.scheduleLaunchActivity-->queueOrSendMessage(发送消息)-->H.handleMessage
--->handleLaunchActivity-->performLaunchActivity@ActivityThread.java
-
-performLaunchActivity(创建activity)@ActivityThread.java===>activity.attach-->attach@Activity.java ===>
-callActivityOnCreate@Instrumentation.java-->performCreate-->onCreate(应用重写该方法)@Activity.java
->>>>>>>>>>>>>>>>>>到这里执行了activity中实现的函数onCreate。
 
 用户重写方法被调用流程：
 performLaunchActivity@ActivityThread.java-->onCreate--performStart-->
@@ -179,24 +51,14 @@ mInstrumentation.callActivityOnStart@Activity.java-->callActivityOnStart-->
 activity.onStart@Instrumentation.java-->onStart@Activity.java
 
 ------------------
-进入performLaunchActivity：
+//进入performLaunchActivity：
 moveToState@LocalActivityManager.java-->startActivityNow-->performLaunchActivity@ActivityThread.java
 
-
-启动activity：
-startActivityLocked(IApplicationThread caller,
-            Intent intent, String resolvedType, ActivityInfo aInfo, IBinder resultTo,
-            String resultWho, int requestCode,
-            int callingPid, int callingUid, int startFlags, Bundle options,
-            boolean componentSpecified, ActivityRecord[] outActivity)-->startActivityUncheckedLocked
--->moveTaskToFrontLocked-->finishTaskMoveLocked-->resumeTopActivityLocked-->
-resumeTopActivityLocked(首先要将前一个activity状态转为pause，然后将当前activity执行resume)--
-startPausingLocked@ActivityStack.java
 
 
 
 __________________
-进入activityIdleInternal：
+//进入activityIdleInternal：
 finishCurrentActivityLocked(ActivityRecord,int)-->finishCurrentActivityLocked-->:
 
 checkReadyForSleepLocked-->:
@@ -231,8 +93,6 @@ activityIdleInternal@ActivityStack.java
 deliverNewIntent@ActivityStarter.java-->deliverNewIntentLocked@ActivityRecord.java-->
 scheduleNewIntent-->handleNewIntent-->performNewIntents@ActivityThread.java
 
-performResumeActivity
-
 deliverNewIntents@ActiivtyThread.java-->callActivityOnNewIntent@Instrumentation.java-->
 performNewIntent-->onNewIntent@Activity.java
 
@@ -240,9 +100,6 @@ performNewIntent-->onNewIntent@Activity.java
 frameworks/base/core/java/android/app/ActivityManagerNative.java
 frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
 frameworks/base/services/java/com/android/server/am/ActivityStack.java
-=====================
-
-
 ===================
 事件：
 处理后退按键：

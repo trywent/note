@@ -1,23 +1,46 @@
+/***********************
+  gnss(Global Navigation Satellite System )
+
+  卫星信号速度50 bit/s.下载卫星数据需要很长时间(通常第一次定位时间30-40s)
+  信号差时定位可能需要12.5min.
+  A-GPS中服务器缓存卫星数据,设备可以通过网络直接下载这些卫星数据
+
+*/
 //卫星：
 azimuth 方位角，航向
 elevation 高度，海拔
 PRN       伪随机码
 SRN       信噪比
-almanac   历书
-ephemeris 星历
+almanac   历书,年历
+ephemeris 星历,日历
 usedInFix 最近定位中被使用
 
-GPS接收机接收到广播星历（Broadcast Ephemeris）与历书（Almanac）两种导航信息,广播星历包含基本轨道参数及摄动改正量,由其确定的卫星位置精度高,可用于定位计算.历书仅提供基本轨道参数,精度低,可用于接收机快速捕捉卫星和预报.
+历书与星历都是表示卫星运行的参数。历书包括全部卫星的大概位置，用于卫星预报；星历只是当前接收机观测到的卫星的精确位置，用于定位。
+历书是从导航电文中提取的，每12.5分钟的导航电文才能得到一组完整的历书.GPS卫星星历参数包含在导航电文的第二和第三子帧中
 
-====================
-kenel:
-service gpsload /system/bin/gps.dat  @init.rc
-相关的固件应该是在这里加载。MStarGPS.bin
+//A-GPS
+两种模式:
+Mobile Station Assisted (MSA) //mobile service provider..设备使用服务器计算的位置?
+Mobile Station Based (MSB) //A-GPS server..设备从服务器获取卫星信息
 
-Location:提供地址，时间等信息
-LocationProvider:地址提供方(提供不同条件的地址，不能直接获取地址)，一般传入LoactionManager来获得想要地址
-LocationManager:加入监听器，获取地址
-====================
+//NMEA格式
+$ <发送器标示,数据类型> {,<数值>} *<校验和> <CR><LF>
+
+GGA //接收机定位数据
+GLL //地理位置——纬度/经度
+GSA //精度因子(DOP)与有效卫星
+GSV //可见卫星
+RMC //推荐的最少专用导航数据
+VTG //对地速度与航向
+ZDA //时间与日期
+GRS //卫星残差
+TXT //文本传送
+
+
+/***********************
+ locationManagerService
+
+*/
 服务启动：
 new LocationManagerService().systemReady--new Thread(null,this,"").run()@SystemServer.java-->
 run-->initialize-->loadProviders-->loadProvidersLocked-->_loadProvidersLocked-->
@@ -37,7 +60,7 @@ requestLocationUpdatesLocked-->requestSingleShotFix-->ProviderHandler.handleMess
 android_location_GpsLocationProvider_start@com_android_server_location_GpsLocationProvider.cpp
 -->start-->mstar_gps_start-->gps_state_start@MstarGps.c
 _____________________
-provider:
+//provider:
 
 加入不同类型的provider：
 _loadProvidersLocked-->addProvider(加入gpsProvider)-->addProvider(加入passiveProvider)--
@@ -105,7 +128,6 @@ jb/frameworks/base/services/java/com/android/server/location/GpsLocationProvider
 frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 
 //===================================== HAL
----------------------
 status回调：
 nmea_reader_parse-->gps_state->callbacks.location_cb@MstarGps.c-->
 location_callback-->method_reportLocation@com_android_server_location_GpsLocationProvider.cpp
@@ -147,52 +169,58 @@ mstar_gps_init-->gps_state_init-->gps_state_thread(循环等待命令，gps消�
 nmea_reader_addc(读取串口消息)-->nmea_reader_parse(根据消息调用回调函数callbacks)@MstarGps.c
 
 
-gps_fd=state->fd=open("/dev/ttyMbx4", O_RDWR)//用来等待串口消息
-control_fd = state->control[1]=socketpair(state->contro)//用来接收上层写入命令
 
-命令：
-sendExtraCommand@LocationManager.java-->sendExtraCommand@LocationManagerService.java-->
-sendExtraCommand@GpsLocationProvider.java-->native_send_io_ctrl_command-->
-android_location_GpsLocationProvider_send_io_ctrl_command-->sGpsIOCtrlInterface->
-send_io_ctrl_command@jni-->mstarGpsIOCtrlInterface->mstar_send_io_ctrl_command-->
-write(s->control[0],cmd)
+/***********************
+ 应用使用位置服务：
 
-------------------------
-回调函数的调用在nmea_reader_parse@MstarGps.c中，处理接收到的字符串nmea,
-只有GPRMC信号才更新时间，它包含日期，时间，毫秒
+*/
 
-时间更新：
-nmea_reader_parse-->nmea_reader_update_date-->nmea_reader_update_time
+LocationManager{
+  //获取provider
+- getProviders(Criteria criteria/*高精度,低精度*/){ 
+	- LocationProvider{
+		- getName()
+		- requiresSatellite() 
+		}
+	}
+  //解析 NMEA 0183
+- addNmeaListener(OnNmeaMessageListener listener, Handler handler){
+	- OnNmeaMessageListener()
+	} 
+  //测量的一次卫星信息
+- registerGnssMeasurementsCallback(GnssMeasurementsEvent.Callback callback){ 
+	- GnssMeasurement{
+		- getSnrInDb() //获取信噪比
+		}
+	}
+  //获取导航信息
+- registerGnssNavigationMessageCallback(GnssNavigationMessage.Callback callback){
+	- onGnssNavigationMessageReceived(GnssNavigationMessage event)-->
+		GnssNavigationMessage{
+		- getData 
+		- getMessageId() 
+		- getType()//获取定位类型,bd,gps,glonass
+		}
+	}
+  //卫星状态
+- registerGnssStatusCallback(GnssStatus.Callback) {
+	-  GnssStatus--GpsSatellite{
+		- getSnr
+		- getAzimuthDegrees //方位
+		- getConstellationType //星座
+		- getElevationDegrees //海拔
+		}
+	}
+  ////位置更新
+- requestLocationUpdates(String provider, LocationListener listener){ 
+	- Location{ //由LocationManager生成的location都包含经纬度,时间戳...
+		- 
+		}
+	}
+}
 
-gps串口/dev/ttyMbx4
-
-
-jb/hardware/mstar/libgps/MstarGps.c
-
-
-
-//gnss service:
-
-
-//=====================================
-应用使用位置服务：
-通过LocationManager可以获得以下功能：
--查询LocationProviders，提供最后可知位置
--注册/注销一个listener，定期从location provider更新的位置
--注册/注销一个listener，能够在接近某个位置时触发的intent
-
-Location Strategies(位置战略，策略)：
-定位能够通过GPS，也可通过Android's Network Location Provider(从信号塔，wifi网络获取地址)
-获得地址更新：
--getSystemService(Context.LOCATION_SERVICE)获取locationManager
--实现LocationListener
--请求地址locationManager.requestLocationUpdates(NETWORK_PROVIDER或GPS_PROVIDER，LocationListener)
 
 __________________________________
-三种监听器：
-LocationManager.addGpsStatusListener(GpsStatus.Listener)
-LocationManager.addNmeaListener(GpsStatus.NmeaListener)
-LocationManager.requestLocationUpdates(ProviderName, LocationListener)
 
 获取LocationProvider：
 LocationManager.getBestProvider-->getProviders-->_getProvidersLocked-->mProviders.get(从mProvider获取)
@@ -249,3 +277,4 @@ frameworks/base/services/java/com/android/server/LocationManagerService.java
 frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
 frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 frameworks/base/telephony/java/com/android/internal/telephony/gsm/GsmServiceStateTracker.java
+

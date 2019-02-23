@@ -42,18 +42,23 @@ vbc_sound0: sound@0 {
             compatible = "sprd,vbc-r2p0-sprd-codec";
 }@kernel/arch/arm/boot/dts/sprd-sound.dtsi
 
-late_initcall_sync(vbc_r2p0_codec_init)-->vbc_r2p0_codec_driver()-->vbc_r2p0_codec_probe
-(/*card设备*/vbc_r2p0_codec_card)@vbc-r2p0-sprd-codec-v4.h-->
-sprd_asoc_probe(vbc_r2p0_codec_card){
-- 设置dai_link{
+late_initcall_sync(vbc_r2p0_codec_init)-->platform_driver_register(&vbc_r2p0_codec_driver)-->
+vbc_r2p0_codec_driver.vbc_r2p0_codec_probe(struct platform_device *pdev)@vbc-r2p0-sprd-codec-v4.h-->
+sprd_asoc_probe(pdev, &vbc_r2p0_codec_card){
+- struct device_node *node = pdev->dev.of_node 
+ //node不为空
+- struct device_node *pcm_node = of_parse_phandle(node, "sprd,pcm", 0)
+- 遍历,card->dai_link{//设置dai_link的dts配置节点
+	- card->dai_link[i].platform_name = NULL
 	- card->dai_link[i].platform_of_node = pcm_node
+	- card->dai_link[i].codec_name = NULL
 	- card->dai_link[i].codec_of_node = codec_node
 	}
 - snd_soc_register_card(vbc_r2p0_codec_card)
 }@sprd-asoc-card.c
 
 //dai link
-vbc_r2p0_codec_dai{
+static struct snd_soc_dai_link vbc_r2p0_codec_dai{
 	{
 	 .name = "vbc(r2)-codec(v4)-ap",
 	 .stream_name = "HiFi",
@@ -115,9 +120,9 @@ sprd_pcm_pointer{
 - 返回dma内存中有效数据位置的偏移值
 }@sprd-pcm.c
 ______________
-//codec模块。和dai接口
+//codec dai driver.模块7731
 
-snd_soc_dai_driver sprd_codec_dai{
+struct snd_soc_dai_driver sprd_codec_dai{
 	{
 	 .name = "sprd-codec-i2s",
 	 .playback = {
@@ -164,12 +169,19 @@ snd_soc_dai_driver sprd_codec_dai{
 	 },
 }@sprd-codec.c
 
+//codec驱动
+static struct snd_soc_codec_driver soc_codec_dev_sprd_codec = {
+	.probe = sprd_codec_soc_probe,
+	.dapm_widgets = sprd_codec_dapm_widgets,
+	.controls = sprd_codec_snd_controls,
+}
 
-//驱动 设备
+//设备
 &sprd_codec {
 	status = "okay";
 }
 
+//注册codec
 sprd_codec_codec_driver(sprd_codec_codec_driver"sprd-codec")-->
 sprd_codec_probe{
 - request_irq
@@ -184,10 +196,8 @@ sprd_codec_probe{
 sci_dma_register_irqhandle(sprd_pcm_dma_irq_ch)@sprd-pcm.c-->snd_pcm_period_elapsed
 snd_pcm_update_hw_ptr0-->substream->ops->pointer@pcm_lib.c
 ______________
-//vbc模块
-
-//cpu dai driver
-snd_soc_dai_driver vbc_dai{
+//cpu dai driver.vbc模块
+struct snd_soc_dai_driver vbc_dai{
 	{
 	 .name = "vbc-r2p0",
 	 .id = 0,
@@ -233,16 +243,25 @@ snd_soc_dai_driver vbc_dai{
 	 }
 }@vbc.c
 
-//驱动 设备
+//codec驱动
+static struct snd_soc_codec_driver soc_codec_dev_vbc_codec = {
+	.probe = vbc_codec_soc_probe,
+	.dapm_widgets = vbc_codec_dapm_widgets,
+	.controls = vbc_codec_snd_controls,
+};
+
+//设备
 &vbc_r2p0 {
 	status = "okay";
 };
 
 platform_driver_register(&vbc_driver"vbc-r2p0")-->vbc_drv_probe{
-- sprd_vbc_codec_probe{
-	- snd_soc_register_codec(&soc_codec_dev_vbc_codec)
+- sprd_vbc_codec_probe(struct platform_device *pdev){
+	 //注册codec
+	- snd_soc_register_codec(&soc_codec_dev_vbc_codec)//struct snd_soc_codec_driver
 	}@vbc-codec.c
-- snd_soc_register_component(&sprd_vbc_component,vbc_dai)
+  //注册component
+- snd_soc_register_component(&sprd_vbc_component,vbc_dai) //struct snd_soc_component_driver ,struct snd_soc_dai_driver
 }@vbc.c
 ______________
 //vaudio driver

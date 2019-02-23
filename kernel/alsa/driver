@@ -1,6 +1,7 @@
-//
-dai_link(接口信息)将codec_dai(关联到codec的驱动),cpu_dai(驱动)关联起来。
+/***********************
 
+*/
+dai_link(接口信息)将codec_dai(codec的驱动),cpu_dai(驱动)关联起来。
 codec和dai基本同时注册（同一个dev上的codec和dai）
 
 //操作流程
@@ -11,41 +12,58 @@ substream-->rtd{
 }
 
 
+static LIST_HEAD(dai_list)       //注册dai,加入该链表..codec,component都是dai
+static LIST_HEAD(platform_list)  //
+static LIST_HEAD(codec_list)     //注册codec,加入该链表
+static LIST_HEAD(component_list) //注册component,加入该链表
 
-
-
-
-
-
-//==============注册codec驱动
-//创建codec 并加入链表。并注册dai
-snd_soc_register_codec(){
-- 创建snd_soc_codec *codec
-- 加入到链表，list_add(&codec->list, &codec_list) 
-- snd_soc_register_dais(snd_soc_dai_driver dai_drv){
-	- 创建snd_soc_dai *dai。设置驱动为当前注册的驱动dai_drv
-	- 查找codec_list中匹配的codec,初始dai->codec
-	- list_add(&dai->list, &dai_list);
+//注册codec,创建dai
+snd_soc_register_codec(struct device *dev,
+			   const struct snd_soc_codec_driver *codec_drv,
+			   struct snd_soc_dai_driver *dai_drv,int num_dai){
+- 创建snd_soc_codec *codec= kzalloc(sizeof(struct snd_soc_codec)
+- codec->driver = codec_drv //设置驱动
+- 加入到链表，list_add(&codec->list, &codec_list) //加入链表codec_list
+- snd_soc_register_dais(struct device *dev,struct snd_soc_dai_driver *dai_drv, size_t count){
+	  //创建count个数dai
+	- snd_soc_dai *dai = kzalloc(sizeof(struct snd_soc_dai)
+	- dai->driver = &dai_drv[i]
+	- 查找codec_list中匹配的codec,dai->codec = codec
+	- list_add(&dai->list, &dai_list)//加入到dai_list
 	}
 }@soc-core.c
 
-//创建cmpnt 并加入链表
-snd_soc_register_component{
+//注册component
+snd_soc_register_component(struct device *dev,
+			 const struct snd_soc_component_driver *cmpnt_drv,
+			 struct snd_soc_dai_driver *dai_drv,
+			 int num_dai){
 - 创建snd_soc_component *cmpnt
+- cmpnt->driver	= cmpnt_drv
 - list_add(&cmpnt->list, &component_list)
   //创建dai 加入链表
-- snd_soc_register_dais(snd_soc_dai_driver dai_drv){
-	- 创建snd_soc_dai *dai。设置驱动为当前注册的驱动dai_drv
-	- 将dai->codec赋值为对应的codec
-	- list_add(&dai->list, &dai_list);
+- snd_soc_register_dais(struct device *dev,struct snd_soc_dai_driver *dai_drv, size_t count){
+	  //创建count个数dai
+	- snd_soc_dai *dai = kzalloc(sizeof(struct snd_soc_dai)
+	- dai->driver = &dai_drv[i]
+	- 查找codec_list中匹配的codec,dai->codec = codec
+	- list_add(&dai->list, &dai_list)//加入到dai_list
 	}
 }@soc-core.c
 
-//platfrom
-snd_soc_register_platform-->snd_soc_add_platform-->list_add(&platform->list, &platform_list)
+//注册platfrom
+snd_soc_register_platform(struct device *dev,
+		const struct snd_soc_platform_driver *platform_drv){
+- struct snd_soc_platform *platform =kzalloc(sizeof(struct snd_soc_platform))
+- snd_soc_add_platform(dev, platform, platform_drv){
+	- platform->driver = platform_drv
+	- list_add(&platform->list, &platform_list)
+	}
+}
 
-
-//============注册soc驱动
+/***********************
+ 注册soc驱动
+*/
 audio_card_init{
 - 创建，platform_device_alloc("soc-audio", -1)
 - 设置设备数据(用于注册声卡设备)，platform_set_drvdata(snd_soc_card)
@@ -58,56 +76,67 @@ snd_soc_init{
 - platform_driver_register(&soc_driver) //soc_driver.driver.name= "soc-audio"
 }@soc-core.c
 
-soc_probe{
-- 获取声卡数据，snd_soc_card=platform_get_drvdata
-- 注册声卡，snd_soc_register_card{
-	- 初始化链表，snd_soc_initialize_card_lists
-	- 加入到链表，list_add(&card->list, &card_list)
-	- card->rtd = devm_kzalloc //创建rtd
-	- 设置rtd的dai_link，为codec的dai_link
-	- 初始化soc_card，snd_soc_instantiate_cards-->snd_soc_instantiate_card
+soc_probe(struct platform_device *pdev){
+- struct snd_soc_card *card = platform_get_drvdata
+- 注册声卡，snd_soc_register_card(card){
+	- snd_soc_initialize_card_lists(card) //初始化链表
+	- card->rtd = devm_kzalloc //struct snd_soc_pcm_runtime 
+	- 遍历dai_link,card->rtd[i].dai_link = &card->dai_link[i]
+	- 初始化soc_card，snd_soc_instantiate_card  1->
 	}
-}
+}@soc-core.c
 
-//初始化所有soc_card,rtd（rtd个数和dai_link一致）
-snd_soc_instantiate_cards(遍历所有card)-->snd_soc_instantiate_card{
-//将dai_link，和codec_dai,cpu_dai关联起来，保存到rtd->cpu_dai和rtd->codec_dai
-- soc_bind_dai_link{
-	- 初始化snd_soc_pcm_runtime rtd
-	  //dai_list中有和dai_link匹配，加入rtd.cpu_dai
-	- 遍历list_for_each_entry(dai_list){
-		- 找到并设置cpu_dai,rtd->cpu_dai		
+//初始化所有soc_card.rtd
+1-> snd_soc_instantiate_card(card){
+  //遍历card->dai_link,设置card->rtd中cpu_dai,codec,platform
+- soc_bind_dai_link(struct snd_soc_card *card,int num){
+	- struct snd_soc_dai_link *dai_link = &card->dai_link[num]
+	- struct snd_soc_pcm_runtime *rtd = &card->rtd[num]	  
+	- list_for_each_entry(cpu_dai,dai_list){//dai_list中有和dai_link匹配的cpu_dai，设置rtd.cpu_dai
+		- rtd->cpu_dai = cpu_dai		
+	  }	  
+	- list_for_each_entry(codec,codec_list){//codec_list中和dail_link匹配的codec ,设置rtd.codec
+		- rtd->codec = codec
+		- list_for_each_entry(codec_dai, &dai_list ){//dai_list中有和dai_link匹配的codec_dai，设置rtd.codec_dai
+			- rtd->codec_dai = codec_dai
+			}
 	  }
-	  //codec_list中和dail_link设置rtd.codec   dai_list有和dai_link匹配项，加入rtd.codec_dai
-	- 遍历list_for_each_entry(codec_list){
-		- 找到并设置codec，rtd->codec = codec;
-		- 查找dai_list，设置rtd->codec_dai 
+	- list_for_each_entry(platform,platform_list){//platform_list中和dail_link匹配的platform ,设置rtd.platform
+		- rtd->platform = platform
 		}
-	  //关联到平台数据
-	- 遍历list_for_each_entry(platform_list),设置rtd->platform  
 	}
+- soc_check_aux_dev //aux
+- list_for_each_entry(codec, &codec_list){
+	- snd_soc_init_codec_cache
+	}
+  //创建card
 - 创建card，snd_card_create{
 	- 创建ctl设备，snd_ctl_create@control.c
 	- snd_info_card_create
 	}@init.c
-
-//创建接口
-- 初始dai，soc_probe_link_components{
-	//probe cpudai中的codec
-	- soc_probe_codec(card, cpu_dai->codec){
-		- 设置codec->card的为card
-		- codec驱动中dapm_widgets不为空，snd_soc_dapm_new_controls
-		- 为dai_list中匹配项创建snd_soc_dapm_new_dai_widgets
+- card->probe(card)
+ //遍历card->dai_link,设置component
+- 初始dai，soc_probe_link_components(num){
+	- struct snd_soc_pcm_runtime *rtd = &card->rtd[num]
+	- struct snd_soc_dai *cpu_dai = rtd->cpu_dai
+	- struct snd_soc_dai *codec_dai = rtd->codec_dai
+	- struct snd_soc_platform *platform = rtd->platform	
+	- soc_probe_codec(card, cpu_dai->codec){//probe cpudai中的codec
+		- const struct snd_soc_codec_driver *driver = codec->driver
+		- codec->card = card
+		- snd_soc_dapm_new_controls
+		- 遍历dai_list,snd_soc_dapm_new_dai_widgets //
+		- driver->probe(codec)
 		- 加入到list_add(card->codec_dev_list)
+		}	
+	- soc_probe_codec(card, codec_dai->codec){//probe codecdai中的codec
+	- soc_probe_platform{
+		- const struct snd_soc_platform_driver *driver = platform->driver
+		- driver->probe(codec)
 		}
-	//probe codecdai中的codec
-	- soc_probe_codec(card, codec_dai->codec){
-		- snd_soc_add_controls 
-		- 加入到list_add(card->codec_dev_list)
-		}
-	- soc_probe_platform
 	}
-//根据card.dai_link创建pcm
+
+  //遍历card->dai_link,设置dai,pcm
 - soc_probe_link_dais{
 	- cpu_dai{
 		- 若不带codec则创建，snd_soc_dapm_new_dai_widgets//rtd中cpu_dai
@@ -125,11 +154,7 @@ snd_soc_instantiate_cards(遍历所有card)-->snd_soc_instantiate_card{
 - snd_soc_add_card_controls{
 
 	}
-//注册声卡snd_card,创建pcm文件节点
-- 创建声卡，snd_card_create(&card->snd_card){
-	- 创建snd_card，分配编号
-	- 
-	}
+  //注册声卡snd_card,创建pcm文件节点
 - snd_card_register(&card->snd_card){
 	- 创建card0/1，device_create(sound_class)
 	  //创建pcm节点
@@ -143,7 +168,10 @@ snd_soc_instantiate_cards(遍历所有card)-->snd_soc_instantiate_card{
 
 
 
-//=============
+/***********************
+ component
+
+*/
 //ctl设备
 snd_ctl_create-->snd_ctl_dev_register@control.c
 
@@ -193,9 +221,9 @@ sound/core/info.c
 sound/core/device.c
 sound/core/pcm.c
 sound/core/pcm_lib.c
-=========================
-//节点操作函数
-
+/***********************
+ 节点操作函数
+*/
 open:
 snd_pcm_f_ops.open(capture)-->snd_pcm_capture_open(snd_lookup_minor_data/*获取snd_pcm pcm*/)-->snd_pcm_open-->
 snd_pcm_open_file(file,pcm,stream/*录制，或播放*/){
@@ -213,12 +241,11 @@ snd_pcm_open_file(file,pcm,stream/*录制，或播放*/){
 }@pcm_native.c
 
 
-________________
-//codec-->dma-->driver read to userbuffer
-
-//codec到dma。。prt以boundary为界
 /*
-   boundary 能够整除buffer_size的最大数(long 类型)
+ 数据流程:codec-->dma-->driver read to userbuffer
+
+ codec到dma。。prt以boundary为界
+ boundary 能够整除buffer_size的最大数(long 类型)
  runtime->status->hw_ptr      初始值为0 snd_pcm_attach_substream
  runtime->hw_ptr_base         codec写到dma的有效数据(未读)起始位置，初始值为0，以boundary为界
  runtime->hw_ptr_interrupt    初始值0
@@ -341,4 +368,8 @@ snd_pcm_f_ops.mmap(file,vm_area_struct)-->snd_pcm_mmap{
 - snd_pcm_mmap_data-->substream->ops->mmap()-->platform->driver->mmap
 }@pcm_native.c
 
-//============ dapm ALSA SoC Dynamic Audio Power Management
+/***********************
+ dapm ALSA SoC Dynamic Audio Power Management
+*/
+
+

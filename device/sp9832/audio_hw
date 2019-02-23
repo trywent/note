@@ -1,5 +1,22 @@
-//audio
+/************************
+ audio
+ 
+ 设备:
+ 通路:
 
+*/
+//设备配置结构体
+struct tiny_dev_cfg {
+    int mask;
+
+    struct route_setting *on; //path on 包含ctl控制
+    unsigned int on_len;
+
+    struct route_setting *off;//path off 包含ctl控制
+    unsigned int off_len;
+}
+
+//设备---设备名...用于解析xml
 dev_names_digitalfm[] = {
     { AUDIO_DEVICE_OUT_SPEAKER | AUDIO_DEVICE_OUT_FM_SPEAKER, "speaker" },
     { AUDIO_DEVICE_OUT_WIRED_HEADSET | AUDIO_DEVICE_OUT_WIRED_HEADPHONE |AUDIO_DEVICE_OUT_FM_HEADSET,
@@ -16,18 +33,27 @@ dev_names_digitalfm[] = {
     { SPRD_AUDIO_IN_DUALMIC_VOICE, "dual-mic-voice" },
 }
 
-//设备配置结构体
-struct tiny_dev_cfg {
-    int mask;
-
-    struct route_setting *on; //path on 包含ctl控制
-    unsigned int on_len;
-
-    struct route_setting *off;//path off 包含ctl控制
-    unsigned int off_len;
+//初始化
+hal_module_methods.open-->adev_open{
+- 创建tiny_audio_device adev
+- 初始化adev->hw_device{ //设置audio_hw_device
+	- adev_set_parameters //设置参数
+	- adev_open_output_stream //打开output
+	- adev_open_output_stream //打开intput
+	}
+  ///system/etc/audio_hw.xml 解析modem信息
+- adev_modem_parse-->adev_modem_parse
+- 设置mixer,adev->mixer = mixer_open
+- 参数vb_effect_getpara //audio_param
+- adev_config_parse //解析tiny_hw.xml
+- vbc_ctrl_open(adev) //vbc
+- vbc_ctrl_voip_open(voip_res) //创建vbc控制线程
+- stream_routing_manager_create-->stream_routing_thread_entry //创建通路设置线程
+- audio_bt_sco_thread_create //bt 
 }
 
-//解析配置 支持的设备在结构体dev_names_digitalfm  
+
+//解析配置tiny_hw.xml 支持的设备在结构体dev_names_digitalfm  
 adev_open-->adev_config_parse{
 - 文件tiny_hw.xml
 - adev_config_start{//解析配置，并保存到adev.dev_cfgs中
@@ -53,23 +79,7 @@ adev_open-->adev_config_parse{
 
 _______________
 //开一个线程处理设备选择
-hal_module_methods.open-->adev_open{
-- 创建tiny_audio_device adev
-- 初始化adev->hw_device{ //设置audio_hw_device
-	- adev_set_parameters //设置参数
-	- adev_open_output_stream //打开output
-	- adev_open_output_stream //打开intput
-	}
-  ///system/etc/audio_hw.xml 解析modem信息
-- adev_modem_parse-->adev_modem_parse
-- 设置mixer,adev->mixer = mixer_open
-- 参数vb_effect_getpara //audio_param
-- adev_config_parse //解析tiny_hw.xml
-- vbc_ctrl_open(adev) //vbc
-- vbc_ctrl_voip_open(voip_res) //创建vbc控制线程
-- stream_routing_manager_create-->stream_routing_thread_entry //创建通路设置进程
-- audio_bt_sco_thread_create //bt 
-}
+
 
 
 //选择路径

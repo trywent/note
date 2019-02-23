@@ -43,17 +43,58 @@ mActivityManagerService.setWindowManager(wm)@SystemServer.java-->setWindowManage
 	}
 }@ActivityManagerService.java
 
-//创建默认Display中stack
-getStack(stackId){
-- 若是DOCKED_STACK_ID,则需创建getStack(RECENTS_STACK_ID)
-- createStackOnDisplay(stackId,DEFAULT_DISPLAY)-->createStack{
-	- new PinnedActivityStack//PINNED_STACK_ID
-	- new ActivityStack{
-		- mHandler = new ActivityStackHandler
-		- postAddToDisplay(display //加入到display
-		}
+
+//启动应用进程
+resumeTopActivityInnerLocked@ActivityStack.java-->startSpecificActivityLocked@ActivityStackSupervisor.java-->
+mService.startProcessLocked(r.processName, r.info.applicationInfo)@ActivityManangerService.java-->
+startProcessLocked(processName,ApplicationInfo){
+- ProcessRecord app
+- !isolated{//非独立进程
+	- app = getProcessRecordLocked(processName)
 	}
-}@ActivityStackSupervisor.java
+- app==null,app = newProcessRecordLocked(info, processName){//创建ProcessRecord保存
+	- ProcessRecord r = new ProcessRecord(stats, info)
+	- addProcessNameLocked(r) 
+	}
+- startProcessLocked(app)-->
+  startProcessLocked(ProcessRecord){
+	- app.gids = gids
+	- entryPoint = "android.app.ActivityThread" //进程入口
+	- ComponentName cn = new ComponentName(app.info.packageName)
+	- startResult = Process.start(entryPoint, app.processName, uid, uid, gids)
+	}
+}@ActivityManangerService.java
+
+//关联进程
+attachApplicationLocked{
+ //监听进程是否挂了
+- AppDeathRecipient adr = new AppDeathRecipient(app)
+- thread.asBinder().linkToDeath(adr
+- app.deathRecipient = adr
+
+- thread.bindApplication(processName
+}@ActivityManangerService.java
+
+//binder监听进程挂
+AppDeathRecipient.binderDied-->appDiedLocked-->appDiedLocked-->
+handleAppDiedLocked{
+- mStackSupervisor.handleAppDiedLocked(app)
+- mStackSupervisor.resumeFocusedStackTopActivityLocked()
+}@ActivityManangerService.java
+
+
+ //应用进程native crash
+startObservingNativeCrashes@SystemServier.java-->NativeCrashListener.run@ActivityManangerService.java
+NativeCrashListener.run{
+ //监听crash信息
+- FileDescriptor serverFd = Os.socket(AF_UNIX, SOCK_STREAM)
+- nixSocketAddress sockAddr = UnixSocketAddress.createFileSystem(DEBUGGERD_SOCKET_PATH)
+- Os.bind(serverFd, sockAddr)
+- Os.listen(serverFd)
+ //应用崩溃
+- consumeNativeCrashData-->NativeCrashReporter.start-->NativeCrashReporter.run-->mAm.handleApplicationCrashInner
+	-->handleApplicationCrashInner
+}@NativeCrashListener.java
 
 /***********************
  ActivityStarter启动Activity
@@ -116,18 +157,34 @@ startActivityUnchecked{
 - if(mSourceRecord != null)setTaskFromSourceRecord //从sourceRecord获取task
 - if (mInTask != null)setTaskFromInTask
 - setTaskToCurrentTopOrCreateNewTask//放到当前top task
-
-- mTargetStack.startActivityLocked(mStartActivity, topFocused, newTask,mOptions)
+  //启动
+- mTargetStack.startActivityLocked(mStartActivity, topFocused, newTask,mOptions) 1-->
 - mDoResume{
 	- !isFocusable{
 		- mTargetStack.ensureActivitiesVisibleLocked
 		- mWindowManager.executeAppTransition
 		}
-	- mSupervisor.resumeFocusedStackTopActivityLocked
+	- mSupervisor.resumeFocusedStackTopActivityLocked 2-->
 	}
 - mSupervisor.updateUserStackLocked
 - mSupervisor.handleNonResizableTaskIfNeeded
 }@ActivityStarter.java
+
+-->1 startActivityLocked{
+- 
+- task.setFrontOfTask() //移动到栈顶
+- 需要启动,设置动画{
+	- mWindowManager.prepareAppTransition
+	- r.setVisibility //设置可见
+	}
+}@ActivityStack.java
+
+-->2 resumeFocusedStackTopActivityLocked-->
+resumeFocusedStackTopActivityLocked{
+- activity状态不是resumed,mFocusedStack.resumeTopActivityUncheckedLocked-->resumeTopActivityInnerLocked@ActivityStack.java
+- activity状态是resumed,mFocusedStack.executeAppTransition
+}@ActivityStackSupervisor.java
+
 
 
 //pinnedStack activity启动通知
@@ -138,6 +195,27 @@ frameworks/base/services/core/java/com/android/server/am/TaskChangeNotificationC
 /***********************
   stackSuperVisor
 */
+//创建默认Display中stack
+getStack(stackId){
+- 若是DOCKED_STACK_ID,则需创建getStack(RECENTS_STACK_ID)
+- createStackOnDisplay(stackId,DEFAULT_DISPLAY)-->createStack{
+	- new PinnedActivityStack//PINNED_STACK_ID
+	- new ActivityStack{
+		- mHandler = new ActivityStackHandler
+		- postAddToDisplay(display //加入到display
+		}
+	}
+}@ActivityStackSupervisor.java
+
+
+//主页
+resumeHomeStackTask{
+- mHomeStack.moveHomeStackTaskToTop()
+- ActivityRecord r = getHomeActivity()
+- moveFocusableActivityStackToFrontLocked(r)//设置焦点
+- resumeFocusedStackTopActivityLocked(mHomeStack)
+}
+
 
 findActivityLocked(mIntent, mStartActivity.info){
 - 遍历mActivityDisplays{
@@ -153,62 +231,8 @@ findActivityLocked(mIntent, mStartActivity.info){
 /***********************
   stack
 */
-//查找
-computeStackFocus(mStartActivity, mLaunchBounds)
-- 
-}
 
-
-
-
-//移动
-setTargetStackAndMoveToFrontIfNeeded(reusedActivity){
-- ActivityStack launchStack = getLaunchStack(),获取启动栈
-- (launchStack == mTargetStack),mTargetStack.moveTaskToFrontLocked //启动栈和目标栈一致,移动task
-- 
-}
-
-/***********************
-  task
-*/
-
-
-
-//activityRecord
-ensureActivityConfigurationLocked{
-- updateOverrideConfiguration //获取最新配置
- //判断mLastReportedConfiguration和当前configuration是否一致
-- mTmpConfig.setTo(mLastReportedConfiguration.getMergedConfiguration())
-- getConfiguration().equals(mTmpConfig)
-- setLastReportedConfiguration //发生变化,设置lastReport
-- relaunchActivityLocked //relaunching non-resumed
-}
-
-
-/***********************
- 焦点栈
-*/
-mHomeStack = mFocusedStack = mLastFocusedStack = getStack(HOME_STACK_ID) //初始为homeStack
-
-moveToFront{
-- mStacks.remove(this)
-- mStacks.add(findStackInsertIndex(ON_TOP))//设置mStacks位置
-- setFocusStackUnchecked-->设置mFocusedStack@ActivityStackSupervisor.java//设置焦点
-}@ActivityStack.java
-
-
-/***********************
- resume 显示
-*/
-//显示主页
-resumeHomeStackTask{
-- mHomeStack.moveHomeStackTaskToTop()
-- ActivityRecord r = getHomeActivity()
-- moveFocusableActivityStackToFrontLocked(r)//设置焦点
-- resumeFocusedStackTopActivityLocked(mHomeStack)
-}
-
-//显示焦点栈中activity
+//resume
 resumeFocusedStackTopActivityLocked(ActivityStack targetStack, ActivityRecord target, ActivityOptions targetOptions){
 - targetStack.resumeTopActivityUncheckedLocked //target不为空,且focusable(非pinstack)
 - mFocusedStack.resumeTopActivityUncheckedLocked
@@ -256,6 +280,45 @@ ensureActivitiesVisibleLocked(ActivityRecord starting,int configChanges,boolean 
 	- makeInvisible
 	}
 }@ActivityStack.java
+
+//移动
+setTargetStackAndMoveToFrontIfNeeded(reusedActivity){
+- ActivityStack launchStack = getLaunchStack(),获取启动栈
+- (launchStack == mTargetStack),mTargetStack.moveTaskToFrontLocked //启动栈和目标栈一致,移动task
+- 
+}
+
+/***********************
+  task
+*/
+
+
+
+//activityRecord
+ensureActivityConfigurationLocked{
+- updateOverrideConfiguration //获取最新配置
+ //判断mLastReportedConfiguration和当前configuration是否一致
+- mTmpConfig.setTo(mLastReportedConfiguration.getMergedConfiguration())
+- getConfiguration().equals(mTmpConfig)
+- setLastReportedConfiguration //发生变化,设置lastReport
+- relaunchActivityLocked //relaunching non-resumed
+}
+
+
+/***********************
+ 焦点栈
+*/
+mHomeStack = mFocusedStack = mLastFocusedStack = getStack(HOME_STACK_ID) //初始为homeStack
+
+moveToFront{
+- mStacks.remove(this)
+- mStacks.add(findStackInsertIndex(ON_TOP))//设置mStacks位置
+- setFocusStackUnchecked-->设置mFocusedStack@ActivityStackSupervisor.java//设置焦点
+}@ActivityStack.java
+
+
+
+
 
 
 //force hide

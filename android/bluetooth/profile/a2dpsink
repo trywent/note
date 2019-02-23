@@ -1,4 +1,26 @@
-//a2dpsink
+/************************
+ a2dpsink
+
+
+*/
+
+a2dp{
+ GAVDP(Generic A/V Distribution Profile){//连接
+	- SRC(INT,ACP,连接过程中src可以作为发起者,接收者)
+	- SINK(INT(可选),ACP,连接过程中sink可以作为接收者,可选作为发起着)
+	}
+ AVDTP(A/V Distribution Transport Protocol){//流传输
+
+	}
+}
+
+
+
+
+
+
+
+
 
 initNative{
 - getBluetoothInterface  //adapter service中初始化

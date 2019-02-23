@@ -105,6 +105,8 @@ InputConsumerController(mWindowManager)-->registerInputConsumer{//监听输入�
 - new PipInputEventReceiver(inputChannel)
 }@InputConsumerController.java
 
+
+//touchHandler接收触摸事件执行操作
 PipTouchHandler(menuController,mInputConsumerController)@PipManager.java-->
 PipTouchHandler(PipMenuActivityController menuController,inputConsumerController){
 - mMenuController = menuController
@@ -113,7 +115,7 @@ PipTouchHandler(PipMenuActivityController menuController,inputConsumerController
                 mDefaultMovementGesture
         }
 - mMotionHelper = new PipMotionHelper//pip窗口移动操作
-- inputConsumerController.setTouchListener(this::handleTouchEvent)
+- inputConsumerController.setTouchListener(this::handleTouchEvent) //监听事件
 }@PipTouchHandler.java
 
 

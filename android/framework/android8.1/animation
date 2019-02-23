@@ -14,3 +14,10 @@ frameworks/base/services/core/java/com/android/server/am/PinnedActivityStack.jav
 frameworks/base/services/core/java/com/android/server/wm/PinnedStackWindowController.java
 frameworks/base/services/core/java/com/android/server/wm/BoundsAnimationController.java
 frameworks/base/services/core/java/com/android/server/wm/TaskStack.java
+
+
+updateDrawnWindowStates@AppWindowToken.java
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java

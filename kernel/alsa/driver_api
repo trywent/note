@@ -1,133 +1,67 @@
-//
-ac97(Audio Codec97),数字/模拟信号分离。
-模拟：“Audio Codec”(多媒体数字信号编解码器)
-数字：“Digital Control”(数字信号控制器)
+/***********************
+  声卡：snd_card
+  Components:snd_device(pcm,mixer,MIDI)
 
-=========================
-卡设备结构：snd_card
-//创建并初始化snd_card结构
-int snd_card_create(int idx, const char *xid,
-		    struct module *module, int extra_size,
-		    struct snd_card **card_ret)
-
-//注册分配给snd_card中的所有devices
-int snd_card_register(struct snd_card *card)
+*/
 
 
-//取消所有提供给用户空间的API的连接
-int snd_card_disconnect(struct snd_card *card)
+kernel 3.10
+//struct snd_card 操作函数
+int snd_card_create
+int snd_card_register
+int snd_card_free
 
-//释放snd_card结构
-int snd_card_free(struct snd_card *card){
-- snd_card_disconnect
-- 释放结构体空间，snd_card_do_free
-}
+//struct snd_device
+int snd_device_new
+void snd_device_free
 
-#define snd_card_set_dev(card, devptr) ((card)->dev = (devptr))
-_________________________
-Components:(pcm,mixer,MIDI)
-
-组件结构：snd_device
-
-//创建一个snd_device
-int snd_device_new(struct snd_card *card, snd_device_type_t type,
-		   void *device_data, struct snd_device_ops *ops)
+kernel 4.4
+//struct snd_card 操作函数
+int snd_card_new
+int snd_card_register
+int snd_card_free
 
 
 
-kernel/sound/core/init.c
+
 kernel/include/sound/core.h
+kernel/sound/core/init.c
 kernel/sound/core/device.c
 
-_________________________
-PCM接口：是ALSA的中间层，每个卡设备有至多4个PCM实例(这个限制是设备编号的原因(64位平台更多))
+/***********************
+ PCM接口：
+*/
+struct snd_pcm
 
-一个pcm实例包含pcm播放，捕获流。每个pcm流有一个或多个子流。有些声卡支持多个流播放，
-若流使用完成再打开会出错。
+int snd_pcm_new(struct snd_card *card,struct snd_pcm ** rpcm) //创建
 
-
-//创建PCM实例，只是对snd_device_new的封装
-int snd_pcm_new(struct snd_card *card, const char *id, int device,
-		int playback_count, int capture_count,
-	        struct snd_pcm ** rpcm)
-
-
-//设置播放，捕获操作snd_pcm_ops
-SNDRV_PCM_STREAM_PLAYBACK
-SNDRV_PCM_STREAM_CAPTURE
-
-void snd_pcm_set_ops(struct snd_pcm *pcm, int direction, struct snd_pcm_ops *ops)
-
-//运行时实例，当打开pcm流后会获得一个pcm流的运行时实例(substream->runtime)
-struct snd_pcm_runtime{}
-
-//硬件描述符
-snd_pcm_hardware
-
-
-//pcm配置，PCM Configurations
-hw_params
-sw_params
 
 kernel/sound/core/pcm.c
 kernel/sound/core/pcm_lib.c
-_________________________
-控制接口：(mixer接口都在此实现)
 
+/***********************
+控制接口：mixer接口
+*/
+struct snd_kcontrol
 
-struct snd_kcontrol_new{
-...
-	snd_ctl_elem_iface_t iface;	//接口类型，MIXER,CARD,HWDEP, PCM, RAWMIDI, TIMER
-
-	snd_kcontrol_info_t *info;	//获取控制的详细信息
-	snd_kcontrol_get_t *get;	//获取控制值
-	snd_kcontrol_put_t *put;	//从用户空间设置值
-...
-}
-
-控制的命名方式：“SOURCE DIRECTION FUNCTION”
+struct snd_kcontrol *snd_ctl_new1(const struct snd_kcontrol_new *ncontrol) //创建
+void snd_ctl_free_one(struct snd_kcontrol *kcontrol)
+int snd_ctl_add(struct snd_card *card, struct snd_kcontrol *kcontrol)
 
 
 kernel/include/sound/control.h
-
-===================
-machine驱动，平台相关代码：连接platform和codec
-
-platform驱动，平台相关代码：
-DMA和DAI控制，配置。
-
-codec驱动，没有平台相关代码：
-音频录制，播放。
+kernel/sound/core/control.c
+/***********************
+ ASoC Machine Driver:(平台驱动和codec的粘合剂)
+*/
 
 
-====================
-ASoC Machine Driver:(平台驱动和codec的粘合剂)
-
-
-/* SoC machine 作为一个平台设备注册*/
 struct snd_soc_card {
-	char *name;
-
-	...
-
-	int (*probe)(struct platform_device *pdev);
-	int (*remove)(struct platform_device *pdev);
-
-	/* the pre and post PM functions are used to do any PM work before and
-	 * after the codec and DAIs do any PM work. */
-	int (*suspend_pre)(struct platform_device *pdev, pm_message_t state);
-	int (*suspend_post)(struct platform_device *pdev, pm_message_t state);
-	int (*resume_pre)(struct platform_device *pdev);
-	int (*resume_post)(struct platform_device *pdev);
-
-	...
-
-	/* CPU <--> Codec DAI links  */
 	struct snd_soc_dai_link *dai_link;
-	int num_links;
+}
+int snd_soc_register_card(struct snd_soc_card *card)
+int snd_soc_unregister_card(struct snd_soc_card *card)
 
-	...
-};
 ____________________
 Machine DAI Configuration:将cpu的ADI接口与codec粘合
 
@@ -363,17 +297,14 @@ Each SoC DAI driver must provide the following features:-
 
 
 ====================
-DAI(digital audio interface):有三种接口
+DAI(digital audio interface):有三种接口ac97,i2s,pcm
 
 ac97：
-
-
 i2s：4线
 Tx 			  发送数据
 Rx 			  接收数据
 bit clock (BCLK) 	  位时钟
 left/right clock (LRC)    左右通道同步时钟(区分数据来自哪个通道)
-
 
 pcm：和i2s类似
 

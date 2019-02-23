@@ -1,4 +1,0 @@
-rk3188_tb_android-4.4_defconfig
-
-make rkpx3_fyt_defconfig
-make kernel.img
