@@ -1,3 +1,7 @@
+/***********************
+ fat
+*/
+
 驱动注册：
 mmc_blk_init@block.c-->(将驱动的bus设置为mmc)mmc_register_driver@bus.c-->
 

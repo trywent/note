@@ -246,9 +246,16 @@ static int wm8974_mute(struct snd_soc_dai *dai, int mute)
 		snd_soc_write(codec, WM8974_DAC, mute_reg);
 	return 0;
 }
-====================
+/***********************
 ASoC Platform Driver:
 可分为：音频数据访问(audio DMA)，数字音频配置(SoC DAI(digit audio interface) configuration),控制(control)
+
+*/
+
+
+
+
+
 ____________________
 audio DMA:
 /* 音频处理函数SoC audio ops */

@@ -1,24 +1,26 @@
-//kobject 像所有内核设备驱动的父类..在sys中一个目录
+/***********************
+ kobject 像所有内核设备驱动的父类..在sys中一个目录
+
+ 通常kobjects都是嵌入到其他结构中(继承),当知道kojbect指针，通过container_of(pointer, type, member)获取容器指针。
+*/
 struct kobject {
 	const char		*name;
 	struct list_head	entry;
 	struct kobject		*parent;
 	struct kset		*kset;
-	struct kobj_type	*ktype;
+	struct kobj_type	*ktype;//用于构建内核文件系统结构
+	struct kernfs_node	*sd; 
+	struct kref		kref;
 }
 
-通常kobjects都是嵌入到其他结构中(继承),当知道kojbect指针，通过container_of(pointer, type, member)获取容器指针。
-
-
-void kobject_init(struct kobject *kobj, struct kobj_type *ktype);//初始化kobjcects：
-int kobject_add(struct kobject *kobj, struct kobject *parent, const char *fmt, ...);//注册到sysfs
-int kobject_rename(struct kobject *kobj, const char *new_name);//add之后更改名字必须通过函数：
-const char *kobject_name(const struct kobject * kobj);//获取名字：
-int kobject_init_and_add(struct kobject *kobj, struct kobj_type *ktype,
-                          struct kobject *parent, const char *fmt, ...);//同时初始化，加入到sysfs：
-
-struct kobject *kobject_create_and_add(const char *name, struct kobject *parent)
-
+//struct attribute子类...获取属性信息
+struct kobj_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct kobject *kobj, struct kobj_attribute *attr,
+			char *buf);
+	ssize_t (*store)(struct kobject *kobj, struct kobj_attribute *attr,
+			 const char *buf, size_t count);
+}
 
 //kobj_type
 struct kobj_type {
@@ -29,8 +31,13 @@ struct kobj_type {
 	const void *(*namespace)(struct kobject *kobj);
 }
 
-
-
+static struct kobj_type dynamic_kobj_ktype = {//默认kobj_type
+.release	= dynamic_kobj_release,
+.sysfs_ops	= &kobj_sysfs_ops = {//获取属性信息接口
+		.show	= kobj_attr_show,
+		.store	= kobj_attr_store,
+		}
+}
 
 //ksets：
 struct kset {
@@ -47,32 +54,73 @@ struct kset * __must_check kset_create_and_add(const char *name,
 						const struct kset_uevent_ops *u,
 						struct kobject *parent_kobj);
 
-如果kset要控制kobject的uevent操作，可以通过kset_uevent_ops来处理：
+//创建初始化kobject，加入到结构
+struct kobject *kobject_create(void){
+- struct kobject *kobj = kobj = kzalloc(sizeof(*kobj), GFP_KERNEL)
+- kobject_init(kobj, &dynamic_kobj_ktype)//设置默认ktype,,,sysfs的操作接口
+}
+void kobject_init(struct kobject *kobj, struct kobj_type *ktype){//初始化kobjcects
+- kobject_init_internal(kobj)
+- kobj->ktype = ktype 
+}
+int kobject_add(struct kobject *kobj, struct kobject *parent, const char *fmt, ...)//加入到结构
+-->kobject_add_varg{
+- kobject_set_name_vargs //设置名字
+- kobj->parent = parent
+- kobject_add_internal(struct kobject *kobj){
+	- struct kobject *parent = kobject_get(kobj->parent) //可能为NULL
+	- create_dir(kobj){
+		- sysfs_create_dir_ns(kobj, kobject_namespace(kobj)){ //创建sysfs文件夹
+			- struct kernfs_node *parent = sysfs_root_kn //父节点为空,设置根节点
+			- struct kernfs_node *kn = kernfs_create_dir_ns(parent,kobj){
+				- kn->priv = kobj
+				}
+			- kobj->sd = kn //设置文件系统结构节点
+			}
+		- sysfs_get(kobj->sd)
+		- const struct kobj_ns_type_operations * ops = kobj_child_ns_ops(kobj)
+		- sysfs_enable_ns(kobj->sd)
+		}
+	}
+}
+
+int kobject_init_and_add(struct kobject *kobj, struct kobj_type *ktype,struct kobject *parent, const char *fmt, ...)
+struct kobject *kobject_create_and_add(const char *name, struct kobject *parent){
+- struct kobject *kobj = kobject_create
+- kobject_add(kobj, parent, "%s", name)
+}
+
+
+
+
+//如果kset要控制kobject的uevent操作，可以通过kset_uevent_ops来处理：
 struct kset_uevent_ops {
-        int (*filter)(struct kset *kset, struct kobject *kobj);
-        const char *(*name)(struct kset *kset, struct kobject *kobj);
-        int (*uevent)(struct kset *kset, struct kobject *kobj,
+ //filter判断事件是否不被传送到用户空间
+int (*filter)(struct kset *kset, struct kobject *kobj);
+ //name函数用来改变uevent传送的kset的默认名。(uevent中有kset的名字，会被传送到用户空间？)
+const char *(*name)(struct kset *kset, struct kobject *kobj);
+ //uevent函数在事件传送用户空间时调用，用来在uevent中加入环境变量。
+int (*uevent)(struct kset *kset, struct kobject *kobj,
                       struct kobj_uevent_env *env);
 };
-filter判断事件是否不被传送到用户空间
-name函数用来改变uevent传送的kset的默认名。(uevent中有kset的名字，会被传送到用户空间？)
-uevent函数在事件传送用户空间时调用，用来在uevent中加入环境变量。
 
 
-//创建sysfs文件
-int sysfs_create_file(struct kobject *kobj, struct attribute *attr);
-int sysfs_remove_file(struct kobject *kobj, struct attribute *attr);
 
-sysfs_create_file@sysfs.h-->sysfs_create_file_ns-->sysfs_add_file_mode_ns-->
-__kernfs_create_file@file.c
 
-//sysfs链接
-int __must_check sysfs_create_link(struct kobject *kobj, struct kobject *target,
-				   const char *name);
 
-========================
-//uevent:
-当是移除操作时，kobject核心会自动产生相应的事件(无需手动),通知用户空间
+
+/***********************
+ uevent:
+ 发送事件到user space.当是移除操作时，kobject核心会自动产生相应的事件(无需手动),通知用户空间
+*/
+
+struct kobj_uevent_env {
+	char *argv[3];
+	char *envp[UEVENT_NUM_ENVP];
+	int envp_idx;
+	char buf[UEVENT_BUFFER_SIZE];
+	int buflen;
+};
 
 enum kobject_action {
 	KOBJ_ADD,
@@ -84,15 +132,22 @@ enum kobject_action {
 	KOBJ_MAX
 }
 
-int add_uevent_var(struct kobj_uevent_env *env, const char *format, ...)//加入属性
+//加入属性
+int add_uevent_var(struct kobj_uevent_env *env, const char *format, ...)
 
-kobject_uevent(struct kobject *kobj, enum kobject_action action)-->kobject_uevent_env(envp_ext){
+
+//发送一个uevent和数据
+kobject_uevent(struct kobject *kobj, enum kobject_action action,char *envp_ext[])-->
+kobject_uevent_env(envp_ext){
+- struct kobj_uevent_env *env = kzalloc(sizeof(struct kobj_uevent_env), GFP_KERNEL)//设置环境变量
+- const struct kset_uevent_ops *uevent_ops
 - kset = top_kobj->kset; //获取kset 获取uevent_ops执行操作
 - uevent_ops = kset->uevent_ops;
 - uevent_ops->filter(kset, kobj)
-- event_ops->name
-- env = kzalloc(sizeof(struct kobj_uevent_env), GFP_KERNEL)//设置环境变量
-- add_uevent_var(env, "ACTION=%s", action_string)...   
+- uevent_ops->name(kset, kobj)
+- add_uevent_var(env, "ACTION=%s", action_string)
+- add_uevent_var(env, "DEVPATH=%s", devpath)
+- add_uevent_var(env, "SUBSYSTEM=%s", subsystem)
 - uevent_ops->uevent(kset, kobj, env) //设置设备的自定义环境变量
 - dd_uevent_var(env, "%s", envp_ext[i]) //设置传入的参数环境变量
 - etlink_broadcast_filtered  //发送到用户空间

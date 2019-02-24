@@ -1,58 +1,162 @@
-//=====================bus
-
+/***********************
+ bus
+*/
 struct bus_type {
 	struct device		*dev_root;
 }
-
-int __must_check bus_register(struct bus_type *bus)//注册
-void bus_unregister(struct bus_type *bus)
-
 struct bus_attribute {
 	struct attribute	attr;
 	ssize_t (*show)(struct bus_type *bus, char *buf);
 	ssize_t (*store)(struct bus_type *bus, const char *buf, size_t count);
 };
 
-bus_create_file-->sysfs_create_file //创建sysfs文件
-
-//=====================device
-struct device {
-	struct device		*parent;
-	struct kobject kobj;
-
+///bus_type注册
+int __must_check bus_register(struct bus_type *bus){
+- struct subsys_private *priv = kzalloc(sizeof(struct subsys_private))
+- priv->subsys.kobj.kset = bus_kset
+- kset_register(&priv->subsys)
+- bus_create_file(bus, &bus_attr_uevent)-->sysfs_create_file//bus属性文件
 }
+void bus_unregister(struct bus_type *bus)
 
-int __must_check device_register(struct device *dev);//注册
-void device_unregister(struct device *dev);
+/***********************
+ classs
+*/
 
-struct device_attribute {}
-int device_create_file(struct device *device,
-			      const struct device_attribute *entry);
-void device_remove_file(struct device *dev,
-			       const struct device_attribute *attr);
-
-
-//创建sysfs文件
-struct device *device_create(struct class *class, struct device *parent,
-			     dev_t devt, void *drvdata, const char *fmt, ...)
-
-//=====================classs
 struct class {
 	const char		*name;
 	struct module		*owner;
-	struct kobject			*dev_kobj;
+	struct kobject		*dev_kobj;
+}
+struct class_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct class *class, struct class_attribute *attr,
+			char *buf);
+	ssize_t (*store)(struct class *class, struct class_attribute *attr,
+			const char *buf, size_t count);
 }
 
-class_register-->__class_register@class.c
+class_register-->__class_register(struct class *cls, struct lock_class_key *key){
+- struct subsys_private *cp =kzalloc(sizeof(*cp))
+- cp->subsys.kobj.ktype = &class_ktype
+- kset_register(&cp->subsys)
+- add_class_attrs(class_get(cls){
+	 //遍历cls->class_attrs
+	- class_create_file(cls, &cls->class_attrs[i])-->class_create_file_ns-->sysfs_create_file_ns //创建sysfs
+	}
+}@class.c
 void class_unregister(struct class *class)
 
-struct class_attribute {}
-class_create_file-->class_create_file_ns-->sysfs_create_file_ns@class.c//创建sysfs文件
+
+/***********************
+ device
+ 创建设备时包含calss,字符设备编号,也可以创建字符设备.
+ 需要注册struct file_operations.讲devt和file_operations关联
+
+*/
+struct device {
+	struct device *parent;
+	struct kobject kobj;
+	struct bus_type	*bus;
+	struct device_driver *driver;
+	dev_t			devt //sysfs devt
+}
+
+struct device_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct device *dev, struct device_attribute *attr,
+			char *buf);
+	ssize_t (*store)(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count);
+}
+
+DEVICE_ATTR_RW(uevent){
+- uevent_show
+- uevent_store
+}
+
+//创建device包含char_dev
+struct device *device_create(struct class *class, struct device *parent,
+			     dev_t devt, void *drvdata, const char *fmt, ...)
+-->device_create_vargs-->device_create_groups_vargs
+{
+- struct device *dev= kzalloc(sizeof(*dev)
+- device_initialize(dev)
+- dev->devt = devt
+- dev->class = class
+- device_add(dev) //加入
+}
+//注册
+int __must_check device_register(struct device *dev){
+- device_initialize(dev)
+- device_add(dev)
+}
+void device_unregister(struct device *dev);
+
+//加入设备
+int device_add(struct device *dev){
+- dev_set_name //设置kobject name
+- kobject_add(&dev->kobj, dev->kobj.parent)  //加入kobj
+- device_create_file(dev, &dev_attr_uevent)-->sysfs_create_file //创建device属性文件,包含字符设备编号
+- device_add_attrs
+}@core.c
 
 
 
 kernel/include/linux/device.h
 kernel/drivers/base/bus.c
 kernel/drivers/base/class.c
+kernel/drivers/base/core.c
+/***********************
+ char_dev:创建字符设备
 
+ 设备号可以自动分配,可以手动创建
+*/
+struct cdev {
+	struct kobject kobj;
+	struct module *owner;
+	const struct file_operations *ops;
+	struct list_head list;
+	dev_t dev;
+	unsigned int count;
+}
 
+static struct kobj_type ktype_cdev_dynamic = {
+	.release	= cdev_dynamic_release,
+}
+//设备号
+int register_chrdev_region(dev_t first, unsigned int count,char *name)
+
+//创建
+struct cdev *cdev_alloc(void)
+{
+- struct cdev *p = kzalloc(sizeof(struct cdev), GFP_KERNEL);
+- kobject_init(&p->kobj, &ktype_cdev_dynamic)
+}
+//初始化
+void cdev_init(struct cdev *cdev, const struct file_operations *fops)
+{
+- kobject_init(&cdev->kobj, &ktype_cdev_default);
+- cdev->ops = fops;
+}
+
+//加入
+int cdev_add(struct cdev *p, dev_t dev, unsigned count)
+{
+- p->dev = dev;
+- kobj_map(cdev_map, dev, count, p) //创建struct kobj_map
+- kobject_get(p->kobj.parent)
+}
+
+//注册设备.major==0自动分配设备号... class设备使用这种方式创建字符设备
+register_chrdev(unsigned int major, const char *name,const struct file_operations *fops)@fs.c-->
+__register_chrdev
+{
+- struct char_device_struct *cd = __register_chrdev_region(major)
+- struct cdev *cdev = cdev_alloc()
+- cdev->ops = fops
+- cdev_add(cdev, MKDEV(cd->major, baseminor)
+}@char_dev.c
+
+kernel/include/linux/cdev.h
+kernel/fs/char_dev.c

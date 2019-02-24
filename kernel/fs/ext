@@ -1,0 +1,51 @@
+/***********************
+ ext
+*/
+
+ext4:
+将磁盘分成一系列的逻辑块(block)，大小为一般为4KB(与x86上的也相同)，通过2 ^ (10 + sb.s_log_block_size)可得出块的大小。
+
+sb(super block),inode(inode表项)
+
+ext4为了防止碎片化将块分成块组进行管理，块组的大小为sb.s_blocks_per_group(也可通过8 * block_size_in_bytes计算)，
+所有的文件以小端保存数据，日志文件以大端保存数据。
+_________________________________
+结构
+Group 0 Padding：	1024 bytes
+ext4 Super Block：	1 block
+Group Descriptors：	many blocks
+Reserved GDT Blocks：	many blocks
+Data Block Bitmap：	1 block
+inode Bitmap：		1 block
+inode Table：		many blocks
+Data Blocks：		many more blocks
+
+				
+=========================================
+出错：
+ext4_fill_super(输出"feature flags set")@super.c
+
+ext4_mount(传入ext4_fill_super)@super.c-->mount_bdev(可能会有以前的superblock)-->
+(没有以前的superblock)fill_super@super.c-->ext4_fill_super@super.c
+
+
+"feature flags set on rev 0 fs" line 3247
+"block to be beyond the end of the filesystem" line 3468
+fs/ext4/super.c
+fs/super.c
+
+01 00           s_rev_level     Revision level  这里变为0
+
+00 5E 01 00 	s_blocks_count_lo	Total block count  00015E00  8960blocks  8960*4K =350M  这里值变为0
+02              Block size is 2 ^ (10 + s_log_block_size). 4K
+
+第一个数据块：
+0x14 s_first_data_block	First data block. 
+This must be at least 1 for 1k-block filesystems and is typically 0 for all other block sizes
+
+
+emmc read.p 0x45000000 recovery 0x800000;
+bootm 0x45000000
+
+dd if=system.img of=superblock bs=512 skip=2 count=10
+https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout

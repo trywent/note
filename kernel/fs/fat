@@ -1,3 +1,10 @@
+/***********************
+ fat
+*/
+module_init(init_vfat_fs)-->init_vfat_fs-->register_filesystem(&vfat_fs_type)@namei_vfat.c
+-->register_filesystem-->find_filesystem(在file_systems链表中查找文件系统结构并赋值)@filesystems.c
+
+
 fat_build_inode-->fat_fill_inode@inode.c-->fat_subdirs-->fat_get_short_entry-->fat_get_entry
 -->fat__get_entry@dir.c-->fat_bmap-->fat_bmap_cluster-->fat_get_cluster@cache.c
 
@@ -7,17 +14,32 @@ fat_ent_read{
 - ops->ent_get
 }@fatent.c
 
+挂载：msdos是FAT16，vfat是FAT32
+vfat_mount@namei_vfat.c-->mount_bdev@super.c-->fat_fill_super(读取boot sector并填充该结构)
+-->parse_options@inode.c
+
+
+
 fat_fill_super-->parse_options@inode.c
 
 __fat_fs_error@misc.c
 
+初始fat文件系统的函数：
+fat_fill_super@inode.c-->fat_ent_access_init(判断fat12，16，32)-->sbi->fatent_ops = &fat32_ops@fatent.c
 
+
+fat_get_cluster@cache.c-->fat_ent_read-->ops->ent_get-->(是fat32文件系统)fat32_ent_get@fatent.c
+
+
+
+输出错误信息：
+fat_fs_error@fat.h-->__fat_fs_error(根据sb->options.errors错误将sb->s_flags设置成只读)@misc.c
 
 kernel/fs/fat/fatent.c
 kernel/fs/fat/misc.c
 kernel/fs/fat/inode.c
 kernel/fs/fat/dir.c
-
+kernel/fs/fat/inode.c
 
 ===================
 出错：

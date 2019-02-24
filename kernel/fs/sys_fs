@@ -1,0 +1,51 @@
+/***********************
+ sys文件系统
+ 
+*/
+
+//属性
+struct attribute {
+	const char		*name;
+	umode_t			mode;
+}
+
+//创建group时参数
+struct attribute_group {
+	const char		*name;
+	struct attribute	**attrs;
+	struct bin_attribute	**bin_attrs;
+}
+
+//创建文件夹
+sysfs_create_dir_ns(struct kobject *kobj, const void *ns){
+- struct kernfs_node *parent = sysfs_root_kn //父节点为空,设置根节点
+- struct kernfs_node *kn = kernfs_create_dir_ns(parent,kobj){
+	- kn->priv = kobj
+	}
+- kobj->sd = kn //设置文件系统结构节点
+}@dir.c
+
+
+//创建属性文件
+static inline int __must_check sysfs_create_file(struct kobject *kobj,const struct attribute *attr)
+static inline void sysfs_remove_file(struct kobject *kobj,const struct attribute *attr)
+int sysfs_create_group(struct kobject *kobj,const struct attribute_group *grp)
+
+sysfs_create_file(struct kobject *kobj,const struct attribute *attr)-->sysfs_create_file_ns(kobj, attr,NULL)
+-->sysfs_add_file_mode_ns(kobj->sd, attr, false, attr->mode, ns)
+-->sysfs_add_file_mode_ns(struct kernfs_node *parent,const struct attribute *attr, bool is_bin,umode_t mode, const void *ns){
+- isbin==false{ 
+	- struct kobject *kobj = parent->priv //struct kernfs_node内核用于构建文件系统结构
+	- const struct sysfs_ops *sysfs_ops = kobj->ktype->sysfs_ops //指向了kobj_sysfs_ops@kobject.c
+	}
+- isbin==true{
+
+	}
+- __kernfs_create_file(parent, attr->name, mode & 0777, size, ops, (void *)attr,)
+}@file.c
+
+
+kernel/include/linux/sysfs.h
+kernel/fs/sysfs/dir.c
+kernel/fs/sysfs/file.c
+kernel/fs/sysfs/group.c

@@ -1,28 +1,42 @@
-//平台设备：
-总线：
-platform_bus_type = {
+/***********************
+ 平台总线,设备,驱动
+ 
+*/
+//总线类型：
+struct bus_type platform_bus_type = {
 	.name		= "platform",
+	.dev_groups	= platform_dev_groups,
 	.match		= platform_match,
-};
+	.uevent		= platform_uevent,
+	.pm		= &platform_dev_pm_ops,
+}
+
 platform_match{
 - 匹配表of_match_table
 - 若驱动中有id_table，匹配id_table
 - 最后匹配名字
 }
 
-平台设备：
-platform_device_register{
-- 初始化，device_initialize(&pdev->dev){
+//平台设备：
+struct platform_device {
+	const char	*name;
+	struct device	dev;
+}
 
+platform_device_register(struct platform_device *pdev){
+- device_initialize(&pdev->dev){//初始化struct device
+	- kobject_init(&dev->kobj, &device_ktype)
 	}
-- 加入设备，platform_device_add{
-	- 设置设备名为平台设备名，dev_set_name
+- arch_setup_pdev_archdata
+- platform_device_add(pdev){
+	- pdev->dev.bus = &platform_bus_type //bus_type
+	- dev_set_name //设置设备名为平台设备名
 	- 设置资源名...
 	- device_add
 	}
 }
 
-平台设备驱动：
+//平台设备驱动：
 platform_driver_register{
 - 设置probe，remove，shutdown回调
 - 注册driver_register
