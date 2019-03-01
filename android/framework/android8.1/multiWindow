@@ -20,20 +20,35 @@ public void resizePinnedStack(Rect pinnedBounds)
 
 
 /******************************
- PIP(picture in picture)
- PINNED_STACK_ID
+ PIP(picture in picture): PINNED_STACK_ID
+
+ PinnedActivityStack //pip对应的Activity容器
+ PinnedStackWindowController //pip对应的Window容器
+ PinnedStackController@DispalyContent.java //控制接口,设置pip比例,大小,位置
 
  sys.lsec.force_pip
  (64.0,116.0) 520.0 x 320.0
-
-setprop sys.lsec.pip_rect "80 120 580 420"
+ setprop sys.lsec.pip_rect "80 120 580 420"
 
 */
-PinnedStackController-->
-reloadResources{
-- mCurrentMinSize = mDefaultMinSize = 108
-- mDefaultAspectRatio = 1.777778
-- screenEdgeInsetsDp = {16,16}
+getStack-->createStackOnDisplay-->createStack{//创建Activitystack
+- PINNED_STACK_ID:new PinnedActivityStack-->super()-->createStackWindowController-->
+  new PinnedStackWindowController{
+	- StackWindowController{
+		- TaskStack stack = dc.addStackToDisplay(stackId, onTop)//加入到displayContent
+		- stack.setController(this)//设置controller,container
+		} 
+	}@PinnedStackWindowController.java
+}@ActivityStackSupervisor.java
+
+PinnedStackController{
+- mSnapAlgorithm = new PipSnapAlgorithm
+- reloadResources{
+	- mCurrentMinSize = mDefaultMinSize = 108
+	- mDefaultAspectRatio = 1.777778
+	- screenEdgeInsetsDp = {16,16}
+	}
+- mAspectRatio
 }
 
 PipSnapAlgorithm{
@@ -41,22 +56,7 @@ PipSnapAlgorithm{
 - mDefaultSizePercent = 0.23 //占屏幕的比例,不会少于mDefaultMinSize
 - mMaxAspectRatioForMinSize = 1.777778
 }
-//应用
-ActivityOptions.setLaunchBounds() //设置应用启动窗口范围
 
-getOverrideBounds-->TaskRecord.validateBounds(options.getLaunchBounds())@ActivityStarter.java
--->
-
-R.attr.supportsPictureInPicture = true
-
-
-Activity{
-- isInMultiWindowMode()
-- isInPictureInPictureMode
-- enterPictureInPictureMode
-- onMultiWindowModeChanged()
-- onPictureInPictureModeChanged
-}
 //
 enterPictureInPictureMode-->enterPictureInPictureMode(new PictureInPictureParams.Builder().build()
 -->enterPictureInPictureMode{
@@ -105,6 +105,17 @@ moveActivityToPinnedStackLocked(ActivityRecord r, Rect sourceHintBounds, float a
 - resumeFocusedStackTopActivityLocked
 }@ActivityStackSupervisor.java
 
+//开始缩变动画
+animateResizePinnedStack(Rect sourceHintBounds, Rect toBounds, int animationDuration,boolean fromFullscreen){
+- skipResizeAnimation(true/*全屏*/),mService.moveTasksToFullscreenStack //全屏跳过动画
+- getWindowContainerController().animateResizePinnedStack(toBounds, sourceHintBounds)-->
+  animateResizePinnedStack{
+	- mContainer.setAnimationFinalBounds(sourceHintBounds, toBounds
+	- mService.mBoundsAnimationController.getHandler().post()-->
+	  mService.mBoundsAnimationController.animateBounds(mContainer, fromBounds)
+  }@PinnedStackWindowController.java
+}@PinnedActivityStack.java
+
 
 //获取窗口位置大小
 getDefaultPictureInPictureBounds@PinnedActivityStack.java-->getWindowContainerController().getPictureInPictureBounds
@@ -148,7 +159,23 @@ updatePictureInPictureMode-->schedulePictureInPictureModeChanged@ActivityRecord.
 schedulePictureInPictureModeChanged-->handlePictureInPictureModeChanged@ActivityThread.java
 -->dispatchPictureInPictureModeChanged-->onPictureInPictureModeChanged@Activity.java
 
-//systemui退出pip
+======================
+//应用
+ActivityOptions.setLaunchBounds() //设置应用启动窗口范围
+
+getOverrideBounds-->TaskRecord.validateBounds(options.getLaunchBounds())@ActivityStarter.java
+-->
+
+R.attr.supportsPictureInPicture = true
+
+
+Activity{
+- isInMultiWindowMode()
+- isInPictureInPictureMode
+- enterPictureInPictureMode
+- onMultiWindowModeChanged()
+- onPictureInPictureModeChanged
+}
 
 
 

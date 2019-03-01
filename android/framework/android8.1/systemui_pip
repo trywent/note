@@ -1,4 +1,6 @@
-//PIP
+/**********************
+ PIP
+*/
 start{
 - mPipManager = com.android.systemui.pip.phone.PipManager.getInstance()
 - mPipManager.initialize{
@@ -26,15 +28,16 @@ start{
 	}@CommandQueue.java
 }@PipUI.java
 
-//注册到WidowManagerService
+//PinedStack 注册到WidowManagerService
 PinnedStackListener{
 - onMinimizedStateChanged
 //pinStack位置大小发生变化
 - onMovementBoundsChanged(insetBounds,normalBounds)-->mTouchHandler.onMovementBoundsChanged
+- onActionsChanged
 }PinnedStackListener@PipManager.java
 
 
-//注册到ActivityManagerService,监听栈
+//TaskStack 注册到ActivityManagerService,监听栈
 mTaskStackListener{
 - onActivityPinned(String packageName, int userId, int taskId){
 	- mTouchHandler.onActivityPinned
@@ -49,6 +52,7 @@ mTaskStackListener{
 	- mTouchHandler.getMotionHelper().expandPip
 	}
 }TaskStackListener@PipManager.java
+
 
 animateToUnexpandedState-->resizeAndAnimatePipUnchecked(normalBounds)@PipMotionHelper.java
 
@@ -195,3 +199,14 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMenuActi
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/InputConsumerController.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipTouchHandler.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/recents/misc/SystemServicesProxy.java
+
+/**********************
+
+*/
+postStartActivityProcessing-->mService.mTaskChangeNotificationController.notifyPinnedActivityRestartAttempt
+@ActivityStarter.java-->notifyPinnedActivityRestartAttempt-->forAllRemoteListeners(mNotifyPinnedActivityRestartAttempt)-->
+mNotifyPinnedActivityRestartAttempt-->l.onPinnedActivityRestartAttempt
+
+
+frameworks/base/services/core/java/com/android/server/am/TaskChangeNotificationController.java
+

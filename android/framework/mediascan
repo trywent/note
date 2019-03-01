@@ -1,5 +1,6 @@
-====================================
+/**********************
 多媒体数据MediaProvider:
+*/
 
 创建provider：
 onCreate-->attachVolume(外部，内部)-->new DatabaseHelper@MediaProvider.java

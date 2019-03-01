@@ -138,6 +138,11 @@ I/USB3G ( 829): event { 'add', '/devices/platform/Mstar-ehci-2.1/usb1', 'usb', '
 I/USB3G ( 829): event { 'add', '/devices/platform/Mstar-ehci-3.2/usb2', 'usb', '', 189, 128 }
 
 //wifi
+打开wifi调试:
+persist.adb.tcp.port
+service.adb.tcp.port 
+
+
 adb connect ip-addr
 
 //拒绝连接

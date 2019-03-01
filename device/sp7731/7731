@@ -22,6 +22,9 @@ dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-na
 dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/recovery bs=1024 count=22082
 dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/uboot bs=1024 count=488
 
+dd if=/sdcard/wmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/w_modem bs=1024 count=16384
+
+
 //声音
 i2s0---->8288
 

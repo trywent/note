@@ -1,12 +1,32 @@
-/*displayContent初始化
-包含4种Container
-mAboveAppWindowsContainers
-mTaskStackContainers //所有应用窗口容器
-mBelowAppWindowsContainers
-mImeWindowsContainers
+/**********************
+ RootWindowContainer
+ 
+
+*/
+RootWindowContainer(WindowManagerService service) {
+- mService = service;
+- mLayersController = new WindowLayersController(mService);
+- mWallpaperController = new WallpaperController(mService);
+}
+
+getDisplayContentOrCreate-->
+createDisplayContent{
+- DisplayContent dc = new DisplayContent(display, mService, mLayersController,mWallpaperController)
+  //设置displayInfo
+- DisplayInfo displayInfo = dc.getDisplayInfo()
+}
+
+/**********************
+  displayContent初始化.加入到root中
+  displayContent包含4种Container
+	mAboveAppWindowsContainers
+	mTaskStackContainers //所有应用窗口容器
+	mBelowAppWindowsContainers
+	mImeWindowsContainers
 */
 
 DisplayContent(WindowManagerService service){
+- mLayersController = layersController //窗口layer设置
 - mDividerControllerLocked = new DockedStackDividerController
 - mPinnedStackControllerLocked = new PinnedStackController
 - mDimLayerController = new DimLayerController
@@ -29,15 +49,17 @@ updateDisplayInfo@DisplayContent.java-->updateDisplayInfo(bounds){
 - setBounds
 }@TaskStack.java
 
-/* layout   */
+/* layout设置窗口大小  */
 performLayout(boolean initial, boolean updateInputWindows){
 - mService.mPolicy.beginLayoutLw(isDefaultDisplay, dw, dh, mRotation)
 - mService.mPolicy.getContentRectLw(mContentRect)
 - forAllWindows(mPerformLayout, true)-->forAllWindows(callback){
 	- ForAllWindowsConsumerWrapper wrapper = obtainConsumerWrapper(callback)
 	- forAllWindows(wrapper){
-		- 遍历mChildren,mChildren.get(i).forAllWindows //最后一级windowState
-		}	
+		- mPerformLayout(windowState w){
+			- w.prelayout()
+			- mService.mPolicy.layoutWindowLw-->win.computeFrameLw@PhoneWindowManager.java// 计算窗口大小
+		}
 	}@WindowContainer.java
 - forAllWindows(mPerformLayoutAttached, true ) //layout关联窗口
 //更新input
@@ -54,15 +76,23 @@ forAllWindows(callback,traverseTopToBottom){
 - forAllWindowBottomToTop //从下至上
 }@WindowState.java
 
-mPerformLayout(windowState w){
-- w.prelayout()
-- mService.mPolicy.layoutWindowLw
-}@DisplayContent.java
+@DisplayContent.java
 
 
-
-
-
+//设置窗口layer
+assignWindowLayers-->mLayersController.assignWindowLayers(this)@DisplayContent.java-->
+assignWindowLayers{
+- dc.forAllWindows(mAssignWindowLayersConsumer)-->mAssignWindowLayersConsumer{ //设置所有窗口layer
+	- mCurBaseLayer = mCurLayer = w.mBaseLayer //mBaseLayer=policy.getWindowLayerLw
+	- assignAnimLayer(WindowState w, int layer){
+		- w.mLayer = layer	
+		- w.mWinAnimator.mAnimLayer = w.getAnimLayerAdjustment()
+                	+ w.getSpecialWindowAnimLayerAdjustment //mLayer + specialAdjustment
+		}
+	- 
+	}
+- adjustSpecialWindows
+}@WindowLayaersController.java
 
 
 

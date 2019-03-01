@@ -1,5 +1,7 @@
-//================================
-//访问数据ContentResolver-->(系统调用相应的provider)contentProvider-->获取数据库或文件中数据
+/**********************
+ 访问数据ContentResolver-->(系统调用相应的provider)contentProvider-->获取数据库或文件中数据
+*/
+
 
 1,访问provider
 ContentResolver有和provider一样命名的方法(query,upate,insert),ContentResolver提供CRUD(创建，获取，更新，删除)数据的接口。

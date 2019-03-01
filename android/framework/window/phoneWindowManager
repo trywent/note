@@ -1,4 +1,6 @@
-//
+/**********************
+
+*/
 mPolicy = new PhoneWindowManager()@WindowManagerService.java
 WindowManagerService-->initPolicy-->mPolicy.init@WindowManagerService.java-->
 init(mContext,this){

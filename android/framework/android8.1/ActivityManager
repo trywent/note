@@ -193,7 +193,7 @@ postStartActivityProcessing@ActivityStarter.java-->notifyPinnedActivityRestartAt
 
 frameworks/base/services/core/java/com/android/server/am/TaskChangeNotificationController.java
 /***********************
-  stackSuperVisor
+  StackSuperVisor
 */
 //创建默认Display中stack
 getStack(stackId){
@@ -228,8 +228,27 @@ findActivityLocked(mIntent, mStartActivity.info){
 	}
 }@ActivityStackSuperVisor.java
 
+==================
+//设置栈大小
+void resizeStackLocked(int stackId, Rect bounds){
+- ActivityStack stack = getStack(stackId)
+- stack.resize(bounds)
+- stack.ensureVisibleActivitiesConfigurationLocked
+}@ActivityStackSupervisor.java
+//设置dock栈
+void resizeDockedStackLocked(Rect dockedBounds)
+
+//设置pin栈
+void resizePinnedStackLocked(Rect pinnedBounds, Rect tempPinnedTaskBounds){
+- PinnedActivityStack stack = getStack(PINNED_STACK_ID)
+- PinnedStackWindowController stackController = stack.getWindowContainerController
+- stack.resize(pinnedBounds)
+- stack.ensureVisibleActivitiesConfigurationLocked
+}@ActivityStackSupervisor.java
+
+
 /***********************
-  stack
+  Activitystack
 */
 
 //resume
@@ -288,11 +307,26 @@ setTargetStackAndMoveToFrontIfNeeded(reusedActivity){
 - 
 }
 
+//设置大小
+resize(Rect bounds, Rect tempTaskBounds, Rect tempTaskInsetBounds){
+- Rect taskBounds = tempTaskBounds != null ? tempTaskBounds : bounds
+- Rect insetBounds = tempTaskInsetBounds != null ? tempTaskInsetBounds : taskBounds
+  //遍历设置task
+- for(int i = mTaskHistory.size() - 1){
+	- TaskRecord task = mTaskHistory.get(i)
+	  //freeform栈,不限制task大小.只限制在当前栈内
+	- FREEFORM_WORKSPACE_STACK_ID{
+		- fitWithinBounds
+		}
+	- task.updateOverrideConfiguration
+	}
+- mFullscreen = mWindowContainerController.resize(bounds) //设置窗口端
+- setBounds(bounds)-->mBounds
+}@ActivityStack.java
+
 /***********************
-  task
+  TaskRecord
 */
-
-
 
 //activityRecord
 ensureActivityConfigurationLocked{
@@ -317,12 +351,12 @@ moveToFront{
 }@ActivityStack.java
 
 
-
-
-
-
 //force hide
 pinnedStack.mForceHidden = true
+
+
+
+
 
 frameworks/base/core/java/android/app/Activity.java
 frameworks/base/core/java/android/app/Instrumentation.java

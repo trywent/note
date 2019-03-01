@@ -1,0 +1,42 @@
+/******************************
+ windowsState
+
+*/
+WindowState(WindowManagerService service, Session s, IWindow c, WindowToken token,
+           WindowState parentWindow, int appOp, int seq, WindowManager.LayoutParams a){
+- mService = service;
+- mSession = s //ViewRootImpl中Isession
+- mClient = c //ViewRootImpl中Window
+- mToken = token
+- mAppToken = mToken.asAppWindowToken()
+- if(SUB_WINDOW){
+	- mBaseLayer = mPolicy.getWindowLayerLw(parentWindow) * TYPE_LAYER_MULTIPLIER + TYPE_LAYER_OFFSET
+	- mSubLayer = mPolicy.getSubWindowLayerFromTypeLw(a.type)
+  }else{
+	- mBaseLayer = mPolicy.getWindowLayerLw(this) * TYPE_LAYER_MULTIPLIER + TYPE_LAYER_OFFSET
+  }
+- mWinAnimator = new WindowStateAnimator(this)
+- mInputWindowHandle = new InputWindowHandle
+}
+
+
+
+computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
+            Rect contentFrame, Rect visibleFrame, Rect decorFrame, Rect stableFrame,
+            Rect outsetFrame){
+- Task task = getTask()
+- boolean inFullscreenContainer = inFullscreenContainer{
+	- mAppToken == null,return true
+	- return !isInMultiWindowMode-->task.isFullscreen
+	}
+- inFullscreenContainer{
+	- mContainingFrame.set(parentFrame)
+  }else{
+	- getContainerBounds(mContainingFrame){
+		- if(isInMultiWindowMode),getTask().getBounds(outBounds) //返回窗口所在task大小
+		- else,mAppToken.getBounds(outBounds)  //否则返回窗口大小
+		}
+	- mDisplayFrame.set(mContainingFrame)
+  }
+- 
+}

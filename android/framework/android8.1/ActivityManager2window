@@ -1,8 +1,11 @@
 /*=========================
  ActivityManagerService----WindowManagerService
 
- 管理窗口,管理configuration
+ Activity中Activitystack,taskRecord,ActivityRecord都包含一个WindowContainerController用于控制窗口
+ WindowContainerController中包含一个WindowContainer,用于管理窗口
+*/
 
+//activity对应窗口管理
  ActivityStack{
 	- StackWindowController{
 		- TaskStack
@@ -21,7 +24,7 @@
 		}
 	}
 
-*/
+//configuration
 ActivityDisplay,ActivityStack,TaskRecord,ActivityRecords extends ConfigurationContainer{}
 ActivityStackSupervisor{//结构
   //SparseArray<ActivityDisplay> mActivityDisplays
@@ -46,14 +49,15 @@ ActivityStackSupervisor{//结构
 */
 
 /******************************
-ActivityStack ---- TaskStack
+ ActivityStack ---- TaskStack
+ stack中包含窗口管理器mWindowContainerController
 */
 getStack-->createStackOnDisplay-->createStack{//创建Activitystack
 - PINNED_STACK_ID:new PinnedActivityStack-->super(){
 		- createStackWindowController-->new PinnedStackWindowController
 		}
 - new ActivityStack{
-	- mWindowContainerController = createStackWindowController-->new StackWindowController//关联window
+	- mWindowContainerController = createStackWindowController-->new StackWindowController
 	}@ActivityStack.java
 }@ActivityStackSupervisor.java
 
@@ -67,7 +71,8 @@ resize(Rect bounds)-->setBounds(bounds)
 
 
 /******************************
-TaskRecord   ---- Task
+ TaskRecord   ---- Task
+ 包含窗口管理器mWindowContainerController
 */
 setTaskToCurrentTopOrCreateNewTask--> mTargetStack.createTaskRecord@ActivityStarter.java
 -->createTaskRecord{
@@ -78,7 +83,10 @@ setTaskToCurrentTopOrCreateNewTask--> mTargetStack.createTaskRecord@ActivityStar
 	}
 - task.createWindowContainer{
 	- Rect bounds = updateOverrideConfigurationFromLaunchBounds()	//获取大小getLaunchBounds-->mStack.mBounds 
-	- setWindowContainerController(new TaskWindowContainerController(bounds))//关联window
+	- controller = TaskWindowContainerController(taskId, this, getStack().getWindowContainerController())
+	- setWindowContainerController(controller){
+		- mWindowContainerController = controller
+		}
 	}@TaskRecord
 }@ActivityStack.java
 
@@ -102,12 +110,17 @@ updateOverrideConfiguration{
 
 
 /******************************
-ActivityRecord  ---- AppWindowToken
+ ActivityRecord  ---- AppWindowToken
 
-当ActivityRecord创建后就加入到WindowManager中进行管理
+ 窗口管理器mWindowContainerController
 */
 startActivityLocked-->r.createWindowContainer@ActivityStack.java-->
-createWindowContainer-->new AppWindowContainerController(appToken)@ActivityRecord.java//关联window
+createWindowContainer{
+- TaskWindowContainerController taskController = task.getWindowContainerController()
+- updateOverrideConfiguration
+- mWindowContainerController = new AppWindowContainerController(taskController,appToken)//关联window
+}@ActivityRecord.java
+
 
 ensureActivityConfigurationLocked-->
 updateOverrideConfiguration{
@@ -198,7 +211,7 @@ performDisplayOverrideConfigUpdate@ActivityManagerService.java-->setNewDisplayOv
 -->setDisplayOverrideConfigurationIfNeeded@RootWindowContainer.java-->displayContent.onOverrideConfigurationChanged
 
 /******************************
-TaskStack
+ StackWindowController -- TaskStack
 */
 StackWindowController(stackId){
 - DisplayContent dc = mRoot.getDisplayContent(displayId) //mRoot为WindowManagerService
@@ -224,7 +237,7 @@ adjustConfigurationForBounds{
 
 
 /******************************
- Task
+ TaskWindowContainerController --Task
 */
 TaskWindowContainerController{
 - TaskStack stack = stackController.mContainer
@@ -235,6 +248,14 @@ TaskWindowContainerController{
 - stack.addTask(task)-->addChild
 }@TaskWindowContainerController.java
 
+//管理栈大小,栈动画
+TaskStack extends WindowContainer<Task> implements DimLayer.DimLayerUser,
+        BoundsAnimationTarget{
+  //栈大小变化动画
+- onAnimationStart
+- onAnimationEnd
+- setPinnedStackSize
+}
 
 //当加入到Stack时被调用
 onParentSet{
@@ -259,10 +280,9 @@ getBounds{
 - mStack.getDisplayContent().getLogicalDisplayRect(out)
 }@Task.java
 
-resizeLocked-->setBounds //调整大小
 
 /******************************
- AppWindowToken 对应一个ActivityRecord..
+ AppWindowContainerController -- AppWindowToken
  WindowManager在displayContent中mTokenMap直接管理窗口
  
 */
@@ -343,25 +363,5 @@ updateDisplayOverrideConfiguration{
 
 
 //windowManager配置
-
-//改变大小接口
-void resizeStackLocked(int stackId, Rect bounds)
-void resizeDockedStackLocked(Rect dockedBounds)
-void resizePinnedStackLocked(Rect pinnedBounds, Rect tempPinnedTaskBounds)
-
-
-
-
-
-/*======================
- 应用窗口大小
-*/
-relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,Surface outSurface){
-- WindowState win = windowForClientLocked-->mWindowMap.get(client) //获取对应窗口
-- mPolicy.adjustWindowParamsLw(attrs) //调整属性
-- createSurfaceControl(outSurface)//surface
-- configChanged = updateOrientationFromAppTokensLocked //更新方位
-- 
-}@WindowManagerService.java
 
 

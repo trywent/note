@@ -1,0 +1,62 @@
+/***********************
+ sc2731
+*/
+
+//controls
+static const struct snd_kcontrol_new _sprd_asoc_card_controls[] = {
+	BOARD_CODEC_FUNC("Speaker Function", BOARD_FUNC_SPK),
+	BOARD_CODEC_FUNC("Speaker1 Function", BOARD_FUNC_SPK1),
+	BOARD_CODEC_FUNC("Earpiece Function", BOARD_FUNC_EAR),
+	BOARD_CODEC_FUNC("HeadPhone Function", BOARD_FUNC_HP),
+	BOARD_CODEC_FUNC("Line Function", BOARD_FUNC_LINE),
+	BOARD_CODEC_FUNC("Mic Function", BOARD_FUNC_MIC),
+	BOARD_CODEC_FUNC("Aux Mic Function", BOARD_FUNC_AUXMIC),
+	BOARD_CODEC_FUNC("HP Mic Function", BOARD_FUNC_HP_MIC),
+	BOARD_CODEC_FUNC("DMic Function", BOARD_FUNC_DMIC),
+	BOARD_CODEC_FUNC("DMic1 Function", BOARD_FUNC_DMIC1),
+	BOARD_CODEC_FUNC("Digital FM Function", BOARD_FUNC_DFM),
+
+	BOARD_CODEC_MUTE("Speaker Mute", BOARD_FUNC_SPK),
+	BOARD_CODEC_MUTE("Speaker2 Mute", BOARD_FUNC_SPK1),
+	BOARD_CODEC_MUTE("HeadPhone Mute", BOARD_FUNC_HP),
+	/* "Earpiece Mute" must be the last one. */
+	BOARD_CODEC_MUTE("Earpiece Mute", BOARD_FUNC_EAR),
+	/*smart amp boost function select*/
+	SOC_ENUM_EXT("SmartAmp Boost", smartamp_boost_enum, smartamp_boost_get,
+				smartamp_boost_set),
+};
+
+struct sprd_array_size sprd_asoc_card_controls = {
+	.ptr = _sprd_asoc_card_controls,
+	.size = ARRAY_SIZE(_sprd_asoc_card_controls),
+}
+
+//snd_soc_card 声卡创建注册
+vbc_rxpx_codec_sc27xx_probe{
+- struct snd_soc_card *card
+  //创建snd_soc_card
+- asoc_sprd_card_probe(pdev, &card){
+	- num_links = of_get_child_count(np) //获取dai_link数目
+	- struct sprd_card_data *priv = devm_kzalloc(dev, sizeof(*priv) + sizeof(*dai_link) * num_links)
+	- asoc_sprd_card_parse_of{//解析dts
+		- snd_soc_of_parse_audio_simple_widgets //widget
+		- snd_soc_of_parse_audio_routing
+		- asoc_sprd_card_dai_link_of //dai_link
+		- 
+		}@sprd-asoc-card-utils.c
+	- priv->snd_card.dai_link = dai_link //设置snd_soc_card
+	- snd_soc_card_set_drvdata(&priv->snd_card, priv)
+	}
+  //control
+- card->controls = sprd_asoc_card_controls.ptr
+- card->dapm_widgets = sprd_asoc_card_widgets.ptr
+- asoc_sprd_register_card(&pdev->dev, card)-->devm_snd_soc_register_card@sprd-asoc-card-utils.c
+}@vbc-rxpx-codec-sc27xx.c
+
+
+
+
+
+sound/soc/sprd/sprd-asoc-card-utils-legacy.c
+sound/soc/sprd/vbc-rxpx-codec-sc27xx.c
+sound/soc/sprd/sprd-asoc-card-utils.c

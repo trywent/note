@@ -1,6 +1,5 @@
 /**********************
-
-
+ 窗口加入删除,布局
 
 */
 WindowManagerService{
@@ -115,6 +114,18 @@ updateRotationUnchecked{
 - mService.mDisplayManagerInternal.performTraversal(getPendingTransaction()) //DisplayManager设置display
 - scheduleAnimation
 }@DisplayContent.java
+
+
+======================
+//应用窗口大小
+
+relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,Surface outSurface){
+- WindowState win = windowForClientLocked-->mWindowMap.get(client) //获取对应窗口
+- mPolicy.adjustWindowParamsLw(attrs) //调整属性
+- createSurfaceControl(outSurface)//surface
+- configChanged = updateOrientationFromAppTokensLocked //更新方位
+- 
+}@WindowManagerService.java
 
 
 frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java

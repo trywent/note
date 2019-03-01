@@ -1,6 +1,16 @@
-//
+/**********************
+
+*/
 WindowState{
-- 
+- mService = service
+
+- subWindow{
+	- mBaseLayer = mPolicy.getWindowLayerLw(parentWindow)
+	- mSubLayer = mPolicy.getSubWindowLayerFromTypeLw(a.type)
+  }else{
+	- mBaseLayer = mPolicy.getWindowLayerLw(this)* TYPE_LAYER_MULTIPLIER + TYPE_LAYER_OFFSET
+	- 设置mIsImWindow,mIsWallpaper
+	}
 - mWinAnimator = new WindowStateAnimator
 }
 
