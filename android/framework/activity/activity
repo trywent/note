@@ -17,15 +17,26 @@
 	}
  
 */
-performLaunchActivity{
-- Activity activity = mInstrumentation.newActivity
-- activity.attach(appContext, this, getInstrumentation(), r.token....)
-- int theme = r.activityInfo.getThemeResource()
-- activity.setTheme(theme)
-}@ActivityThread.java
 
 
 
+
+
+/*
+ ActivtyRecord
+*/
+
+ActivityRecord(ActivityManagerService _service, Intent _intent){
+- ActivityManagerService service = _service
+- IApplicationToken.Stub appToken = new Token(this)
+}@ActivityRecord.java
+
+
+
+/*
+ Activity
+*/
+activity.attach(appContext, this, getInstrumentation(), r.token....)@ActivityThread.java-->
 attach(Context context, ActivityThread aThread,){
 - mWindow = new PhoneWindow(this, window, activityConfigCallback) //创建窗口
 - mWindow.setCallback(this)
@@ -38,68 +49,25 @@ attach(Context context, ActivityThread aThread,){
 - mWindowManager = mWindow.getWindowManager()
 }@Activity.java
 
+//start
 
 
+//finish
+finishActivity@Activity.java-->finishActivity@ActivityManagerNative.java-->
+finishActivity@ActivityManagerService.java-->requestFinishActivityLocked-->
+finishActivityLocked{
+- 设置activity为finishing，r.makeFinishing
+- 当前应用是resumed需先暂停，startPausingLocked-->(应用端执行onPause后)activityPaused-->
+	activityPausedLocked-->	completePauseLocked{
+		- finishCurrentActivityLocked
+		- mStackSupervisor.resumeTopActivitiesLocked
+		}
 
-==================
-//activity启动流程
+- finishCurrentActivityLocked{
+	- 设置r.state= FINISHING
+	}
+}@ActivityStack.java
 
-
-用户重写方法被调用流程：
-performLaunchActivity@ActivityThread.java-->onCreate--performStart-->
-mInstrumentation.callActivityOnStart@Activity.java-->callActivityOnStart-->
-activity.onStart@Instrumentation.java-->onStart@Activity.java
-
-------------------
-//进入performLaunchActivity：
-moveToState@LocalActivityManager.java-->startActivityNow-->performLaunchActivity@ActivityThread.java
-
-
-
-
-__________________
-//进入activityIdleInternal：
-finishCurrentActivityLocked(ActivityRecord,int)-->finishCurrentActivityLocked-->:
-
-checkReadyForSleepLocked-->:
-
-resumeTopActivityLocked(将一activity置顶)-->(暂停当前activity)startPausingLocked-->
-sendMessageDelayed-->handleMessage-->activityPaused-->completePauseLocked-->:
-
-::scheduleIdleLocked-->mHandler.sendMessage(IDLE_NOW_MSG进入)-->handleMessage-->activityIdleInternal-->=
-
-completeResumeLocked-->mHandler.sendMessage(IDLE_TIMEOUT_MSG进入)-->handleMessage-->activityIdleInternal-->=
-
-==activityIdleInternal{
-
-
-}-->resumeTopActivityLocked@ActivityStack.java
- 
-
-handleResumeActivity-->Looper.myQueue().addIdleHandler(new Idler())-->queueIdle-->
-am.activityIdle@ActivityThread.java-->activityIdle@ActivityManagerService.java-->activityIdleInternal@ActivityStack.java
-
-移除IDLE_TIMEOUT_MSG超时消息：
-activityIdleInternal-->mHandler.removeMessages(IDLE_TIMEOUT_MSG, r)
-
--------------------
-activity进入空闲：resume后可进入idle。(进入resume可以从onStart，或onPause)
-handleLaunchActivity-->(从onStart到onResume)handleResumeActivity-->
-Looper.myQueue().addIdleHandler(new Idler())(当MessageQueue空闲时执行)-->
-am.activityIdle@ActivityThread.java-->activityIdle@ActivityManagerService.java-->
-activityIdleInternal@ActivityStack.java
-
-//更新启动intent
-deliverNewIntent@ActivityStarter.java-->deliverNewIntentLocked@ActivityRecord.java-->
-scheduleNewIntent-->handleNewIntent-->performNewIntents@ActivityThread.java
-
-deliverNewIntents@ActiivtyThread.java-->callActivityOnNewIntent@Instrumentation.java-->
-performNewIntent-->onNewIntent@Activity.java
-
-
-frameworks/base/core/java/android/app/ActivityManagerNative.java
-frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
-frameworks/base/services/java/com/android/server/am/ActivityStack.java
 ===================
 事件：
 处理后退按键：
@@ -130,10 +98,4 @@ finishCurrentActivityLocked-->resumeTopActivityLocked(恢复top位置activity)@A
 
 
 frameworks/base/core/java/android/app/Activity.java
-frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
-frameworks/base/services/java/com/android/server/am/ActivityStack.java
 
-================================
-activity状态：
-
-r.makeFinishing@ActivityStack.java-->makeFinishing@ActivityRecord.java

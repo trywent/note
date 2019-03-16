@@ -1,0 +1,23 @@
+/**********************
+ viewRootImpl
+
+*/
+ViewRootImpl(Context context, Display display) {
+- mWindowSession = WindowManagerGlobal.getWindowSession(){
+	- IWindowManager windowManager = getWindowManagerService()
+	- sWindowSession = windowManager.openSession() //windowManager session
+	}WindowManangerGlobal.java
+- mThread = Thread.currentThread()
+- mWindow = new W(this)
+- mChoreographer = Choreographer.getInstance()
+}
+
+setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
+- mView = view
+- mWindowAttributes.copyFrom(attrs)
+- mInputChannel = new InputChannel()
+- mWindowSession.addToDisplay(mWindow, mWindowAttributes)
+}@ViewRootImpl.java
+
+
+w.resized(Rect frame)-->viewAncestor.dispatchResized

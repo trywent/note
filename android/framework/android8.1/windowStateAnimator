@@ -1,0 +1,61 @@
+/******************************
+ WindowStateAnimator
+
+*/
+WindowState-->
+WindowStateAnimator(WindowState win){//windowState中创建
+- WindowManagerService mService = win.mService
+- mWin = win
+}
+
+
+//创建 surfaceControl
+createSurfaceControl@WindowManagerService.java-->
+createSurfaceLocked(windowType){
+  //surfacecontroller
+- mSurfaceController = new WindowSurfaceController(mSession.mSurfaceSession,width, height){
+	- mSurfaceW = w
+	- mSurfaceH = h
+	- mSurfaceControl = new SurfaceControlWithBackground{
+		- super-->new SurfaceControl
+		- mBackgroundControl = new SurfaceControl(s, "Background for")
+		}
+	}
+- w.setHasSurface(true)
+ //surface位置
+- mService.openSurfaceTransaction()
+- mSurfaceController.setPositionInTransaction
+- mSurfaceController.setLayerStackInTransaction
+- mSurfaceController.setLayer(mAnimLayer)
+- mService.closeSurfaceTransaction()
+}@WindowStateAnimator.java
+
+prepareSurfaceLocked{
+- computeShownFrameLocked
+- setSurfaceBoundariesLocked
+}@WindowStateAnimator.java
+
+setSurfaceBoundariesLocked{
+- 
+- mSurfaceController.setSizeInTransaction //设置大小
+- isForceScaled(){
+	- mSurfaceController.setPositionInTransaction //设置位置
+	}
+}@WindowStateAnimator.java
+
+
+//销毁
+destroySurfaces-->win.destroySurface@AppWindowToken.java-->destroySurface@WindowState.java-->
+destroyPreservedSurfaceLocked-->destroyDeferredSurfaceLocked
+
+destroySurfaceLocked{
+- if(mSurfaceDestroyDeferred){
+	- mPendingDestroySurface.destroyInTransaction
+  }else{
+	- destroySurface-->mSurfaceController.destroyInTransaction()
+	}
+- mWin.setHasSurface(false)
+}@WindowStateAnimator.java
+
+frameworks/base/services/core/java/com/android/server/wm/WindowStateAnimator.java
+frameworks/base/services/core/java/com/android/server/wm/WindowSurfaceController.java

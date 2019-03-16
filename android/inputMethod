@@ -1,39 +1,28 @@
-//InputMethodManager封装了InputMethodManagerService，
+/******************************
+ InputMethodManagerService
+*/
 
-InputMethodService实现输入法
-- 显示界面，onCreateInputView
-- 全屏显示(一个单独输入框在输入法之上)，onEvaluateFullscreenMode
-- 产生事件/字符到应用，getCurrentInputConnection
-
-
-==============================
-初始化：
-默认输入法：Settings.Secure.DEFAULT_INPUT_METHOD
-
-
-//设置默认
-putSelectedInputMethod-->设置默认输入法DEFAULT_INPUT_METHOD
-
-服务监听输入法：
+//服务监听输入法：
 SettingsObserver{
 -输入法使能监听器,resolver.registerContentObserver(Settings.Secure.ENABLED_INPUT_METHODS)
 -默认输入法监听器，resolver.registerContentObserver(Settings.Secure.DEFAULT_INPUT_METHOD)
 }@InputMethodManagerService.java
 
 
-_________________
-设置：
-获取使能的输入法列表：
-getEnabledInputMethodsAndSubtypeList-->Settings.Secure.getString(Settings.Secure.ENABLED_INPUT_METHODS)
-packages/apps/Settings/src/com/android/settings/inputmethod/InputMethodAndSubtypeUtil.java
 
-使能输入法：
+//设置默认输入法
+putSelectedInputMethod-->设置默认输入法Settings.Secure.DEFAULT_INPUT_METHOD
+
+//获取使能的输入法列表：
+getEnabledInputMethodsAndSubtypeList-->Settings.Secure.getString(Settings.Secure.ENABLED_INPUT_METHODS)
+
+//使能输入法：
 InputMethodManagerService-->mSettings.enableAllIMEsIfThereIsNoEnabledIME
 @InputMethodManagerService.java(第一次启动使能所有输入法)enableAllIMEsIfThereIsNoEnabledIME
 -->putEnabledInputMethodsStr@InputMethodUtils.java
 
 
-语言变化reset输入法：
+//语言变化reset输入法：
 resetStateIfCurrentLocaleChangedLocked-->resetAllInternalStateLocked
 resetDefaultImeLocked{
 - defIm = InputMethodUtils.isValidSystemDefaultIme{ //获取默认输入法
@@ -165,6 +154,12 @@ setFocusedApp(设置当前焦点应用mFocusedApp)@WindowManagerService.java
 
 ==============================
 输入法应用：
+InputMethodService实现输入法
+- 显示界面，onCreateInputView
+- 全屏显示(一个单独输入框在输入法之上)，onEvaluateFullscreenMode
+- 产生事件/字符到应用，getCurrentInputConnection
+
+
 
 onInitializeInterface() 
 onBindInput() 绑定到一个client.
@@ -177,8 +172,11 @@ onStartInputView(EditorInfo, boolean)
 updateInputViewShown-->(设置输入法UI)setInputView(onCreateInputView)@InputMethodService.java
 
 
-==================
+
+/******************************
 自带latin输入法：
+
+*/
 
 发送键值：
 KeyboardView.onTouchEvent-->(发送键值)InputConnection.sendKeyEvent

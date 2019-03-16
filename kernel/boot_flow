@@ -1,4 +1,7 @@
-//
+/***********************
+ 
+
+*/
 start_kernel{
 - setup_arch(&command_line)
 - setup_command_line(command_line)

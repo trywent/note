@@ -1,113 +1,109 @@
+/***********************
+ app进程启动,Activity关联到进程
+ 
+*/
+
 //应用程序提供的接口
 ApplicationThread extends IApplicationThread.Stub{
+- scheduleLaunchActivity
+- scheduleResumeActivity
 - schedulePauseActivity
 - scheduleStopActivity
+- scheduleDestroyActivity
 - scheduleWindowVisibility
-- scheduleLaunchActivity
 }@ActivityThread.java
 
-//开始应用进程
+
+//system进程入口
+systemMain()
+
+/*
+ start
+ ActivityManagerNative.getDefault().attachApplication
+*/
+
 startProcessLocked@ActivityManagerService.java-->Process.start("android.app.ActivityThread")-->
 main{
-- 设置looper，Looper.prepareMainLooper()
-- attach(system){
+- Looper.prepareMainLooper()
+- ActivityThread thread = new ActivityThread()
+- thread.attach(system/*false*/){
 	- !system{
 		- ViewRootImpl.addFirstDrawHandler
 		- ActivityManagerNative.getDefault().attachApplication(mAppThread)//关联到ActivityManagerService
+		- BinderInternal.addGcWatcher
 		}
 	- system{
 		- mInstrumentation = new Instrumentation()
-		- getSystemContext()-->ContextImpl.createSystemContext(this)
-		- ContextImpl.createAppContext(getSystemContext().mPackageInfo)		
+		- ContextImpl context = ContextImpl.createAppContext(getSystemContext().mPackageInfo){//context
+			- getSystemContext()-->ContextImpl.createSystemContext(this)
+			}	
 		- mInitialApplication = context.mPackageInfo.makeApplication
 		}
-	- ViewRootImpl.addConfigCallback
+	- ViewRootImpl.addConfigCallback //view通知资源变化等....
 	}@ActivityThread.java
-- 设置sMainThreadHandler
+- sMainThreadHandler = thread.getHandler()
 - Looper.loop
 }@ActivityThread.java
 
-//将thread关联到ProcessRecord(activityManagerService管理)
-attachApplication(IApplicationThread)-->attachApplicationLocked(IApplicationThread,pid){
-- 查找对应pid的ProcessRecord app，关联thread。app.makeActive(thread, mProcessStats)
-- mStackSupervisor.attachApplicationLocked//是否有activity等待运行
-	-->realStartActivityLocked{
-	- app.thread.performLaunchActivity-->handleMessage(LAUNCH_ACTIVITY){
-		- getPackageInfoNoCheck-->getPackageInfo{ //创建LoadedApk
-			-new LoadedApk(this, aInfo)
-			}
-		- handleLaunchActivity//启动
-		}
-	- minimalResumeActivityLocked
-	}@ActivityStackSupervisor.java
-- mServices.attachApplicationLocked{//是否有服务等待运行
-	- 
-	}
-}@ActivityManagerService.java
 
-
-//加载并创建类，执行
-performLaunchActivity{
-- createBaseContextForActivity-->ContextImpl.createActivityContext--> //创建上下文
-	-->ContextImpl{
-		- mPackageInfo //LoadedApk
-		- mClassLoader //ClassLoader
-		}
-- appContext.getClassLoader-->mPackageInfo.getClassLoader@ContextImpl.java-->//loader
-	-->getClassLoader-->createOrUpdateClassLoaderLocked@LoadedApk.java
-- mInstrumentation.newActivity-->cl.loadClass(className).newInstance //加载activity
-}@ActivityThread.java
-
-
-//将activityThread进程信息关联到ActivityManagerServices
-attach-->mgr.attachApplication(mAppThread)@ActivityThread.java-->attachApplication-->
-attachApplicationLocked-->thread.bindApplication@ActivityManagerService.java-->
-bindApplication-->handleMessage(BIND_APPLICATION)-->handleBindApplication{
-- 创建LoadedApk,getPackageInfoNoCheck-->getPackageInfo(includeCode){
-	- packageInfo = new LoadedApk //创建
-	- includeCode包含代码，保存到mPackages.put
-	}
-- makeApplication-->getClassLoader-->createOrUpdateClassLoaderLocked(null)@LoadedApk.java
-}@ActivityThread.java
-
-
-
-///接口调用================
+/*
+ launch
+ app.thread.scheduleLaunchActivity--> handleLaunchActivity
+*/
+startSpecificActivityLocked-->realStartActivityLocked-->
 app.thread.scheduleLaunchActivity(new Intent(r.intent), r.appToken)@ActivityStackSupervisor.java-->
-ApplicationThread.scheduleLaunchActivity@ActivityThread.java
-
+ApplicationThread.scheduleLaunchActivity@ActivityThread.java-->
 scheduleLaunchActivity(Intent intent, IBinder token,ActivityInfo info, Configuration curConfig, int procState){
 - updateProcessState(procState)
 - ActivityClientRecord r = new ActivityClientRecord()
 - r.token = token //设置ActivityRecord中 IApplicationToken.Stub appToken
-- sendMessage(H.LAUNCH_ACTIVITY, r)-->handleLaunchActivity{
-	- performLaunchActivity
-	}
+- sendMessage(H.LAUNCH_ACTIVITY, r)-->handleLaunchActivity
 }@ActivityThread.java
 
-performLaunchActivity(ActivityClientRecord){
-- getPackageInfo
-- 设置component，setComponent
-- 若是alias，创建真正component，new ComponentName
-- r.activity = activity，mInstrumentation.newActivity-->newActivity{ //加载apk中代码，创建activity
-	- cl.loadClass(className).newInstance
+//加载并创建类，执行
+handleLaunchActivity(ActivityClientRecord r, Intent customIntent, String reason){
+- handleConfigurationChanged
+- WindowManagerGlobal.initialize()
+- Activity a =performLaunchActivity(r){
+	- ContextImpl appContext = createBaseContextForActivity-->ContextImpl.createActivityContext--> //创建上下文
+		-->ContextImpl{
+			- mPackageInfo //LoadedApk
+			- mClassLoader //ClassLoader
+			}
+	- java.lang.ClassLoader cl = appContext.getClassLoader-->mPackageInfo.getClassLoader@ContextImpl.java-->//loader
+	 -->getClassLoader-->createOrUpdateClassLoaderLocked@LoadedApk.java
+	- Activity activity = mInstrumentation.newActivity-->cl.loadClass(className).newInstance //加载activity
+	- Application app = r.packageInfo.makeApplication
+	- activity.attach(appContext,r.token)
+	- activity.setTheme(theme) //theme
+	- mInstrumentation.callActivityOnCreate(activity)
+	- return activity
 	}
-- 创建application，makeApplication
-- 关联activity{
-	- 上下文context,createBaseContextForActivity
-	- 配置configuration,new Configuration
-	- 关联activity.attach(appcontext,r.token)
-	- 设置主题，activity.setTheme
-	}
+  //activity启动成功
+- handleResumeActivity(r.token)
+- 启动不resume,performPauseActivityIfNeeded
 }@ActivityThread.java
 
 
-//加入view到窗口
+
+/*
+ resume
+ app.thread.scheduleResumeActivity--> handleResumeActivity--> ActivityManagerNative.getDefault().activityResumed
+*/
+resumeTopActivityInnerLocked-->next.app.thread.scheduleResumeActivity(next.appToken)@ActivityStack.java-->
+scheduleResumeActivity-->handleResumeActivity-->
 handleResumeActivity{
-- performResumeActivity-->r.activity.performResume@Activity.java
-- 获取窗口，getWindow
-- 获取窗口管理器，加入窗口，
-	wm.addView//activity加入窗口,mParentWindow为Phonewindow的父类Window
+- performResumeActivity(IBinder token){
+	- ActivityClientRecord r = mActivities.get(token)
+	- r.activity.performResume@Activity.java
+	- r.paused = false,r.stoped = false
+	}
+ //加入window,view
+- r.window = r.activity.getWindow()
+- View decor = r.window.getDecorView()
+- ViewManager wm = a.getWindowManager()
+- WindowManager.LayoutParams l = r.window.getAttributes()
+- wm.addView-->//activity窗口加入WindowManager
 	addView(View view)-->mGlobal.addView(view, params, mContext.getDisplay(), mParentWindow)@WindowManagerImpl
 	-->addView(View view,mContext.getDisplay(),mParentWindow){
 	- parentWindow.adjustLayoutParamsForSubWindow(wparams){//设置参数
@@ -118,30 +114,76 @@ handleResumeActivity{
 	- mViews.add(view),mRoots.add(root)
 	- root.setView(view)-->setView@ViewRootImpl.java
 	}@WindowManagerGlobal.java
-- 通知服务端更新状态，ActivityManagerNative.getDefault().activityResumed
+- Looper.myQueue().addIdleHandler(new Idler()) //idler
+- ActivityManagerNative.getDefault().activityResumed
 }
 
-
-//暂停pause
+/*
+ pause
+ app.thread.schedulePauseActivity-->handlePauseActivity-->ActivityManagerNative.getDefault().activityPaused
+*/
+startPausingLocked-->prev.app.thread.schedulePauseActivity(r.appToken)@ActivityStack.java-->
 schedulePauseActivity-->handlePauseActivity{
-- 执行暂停，performPauseActivity
-- 回调服务端，ActivityManagerNative.getDefault().activityPaused
+- performPauseActivity{
+	- 
+	}
+- ActivityManagerNative.getDefault().activityPaused
 }
 
+/*
+ stop
+ app.thread.scheduleStopActivity-->handleStopActivity-->ActivityManager.getService().activityStopped
+*/
 
-/创建服务
-handleCreateService{
-- packageInfo.getClassLoader()-->getClassLoader@LoadedApk.java
-- cl.loadClass(data.info.name).newInstance()
-}
+stopActivityLocked-->app.thread.scheduleStopActivity(r.appToken)@ActivityStack.java-->
+handleStopActivity(IBinder token, boolean show){
+- StopInfo info = new StopInfo()
+- performStopActivityInner(r, info, show){
+	- performPauseActivityIfNeeded
+	- r.activity.performStop
+	- r.stopped = true
+	}
+- updateVisibility(r, show){
+	- View v = r.activity.mDecor
+	- show,r.activity.makeVisible
+	- !show,v.setVisibility(View.INVISIBLE)
+	}
+- mH.post(info)-->ActivityManager.getService().activityStopped
+}@ActivityThread.java
 
 
 
-//idle状态
-activityIdleInternal-->activityIdleInternalLocked
+/*
+ destory
+ destroyActivityLocked-->app.thread.scheduleDestroyActivity-->ActivityManager.getService().activityDestroyed
+*/
+destroyActivityLocked-->r.app.thread.scheduleDestroyActivity(r.appToken@ActivityStack.java-->
+handleDestroyActivity(IBinder token, boolean finishing){
+- ActivityClientRecord r = performDestroyActivity(token, finishing){
+	- ActivityClientRecord r = mActivities.get(token)
+	- performPauseActivityIfNeeded(r)
+	- mInstrumentation.callActivityOnDestroy(r.activity)
+	- mActivities.remove(token)
+	}
+  //清除窗口
+- WindowManagerGlobal.getInstance().closeAll(token)
+- ActivityManager.getService().activityDestroyed(token)
+}@ActivityThread.java
 
 
-//更新configuration.资源配置
+/*
+ idle
+ looper循环中加入idler.空闲时通知ActivityMananger
+*/
+handleResumeActivity-->Looper.myQueue().addIdleHandler(new Idler())
+-->queueIdle{
+- IActivityManager am = ActivityManager.getService()
+- am.activityIdle(a.token)
+}@Ilder@@ActivityThread.java
+
+/*
+ configuration
+*/
 scheduleActivityConfigurationChanged(overrideConfig)-->sendMessage(H.ACTIVITY_CONFIGURATION_CHANGED)
 -->handleActivityConfigurationChanged-->performConfigurationChanged(activity,configuration){
 - activity.onConfigurationChanged(config){
@@ -155,6 +197,15 @@ updateConfigurationLocked-->app.thread.scheduleConfigurationChanged(configuratio
 scheduleConfigurationChanged-->sendMessage(H.CONFIGURATION_CHANGED-->handleConfigurationChanged
 -->applyConfigurationToResourcesLocked(更新mResConfiguration)@ActivityThread.java
 updateConfiguration-->updateConfiguration@Resources.java
+
+/*
+ service
+*/
+/创建服务
+handleCreateService{
+- packageInfo.getClassLoader()-->getClassLoader@LoadedApk.java
+- cl.loadClass(data.info.name).newInstance()
+}
 
 
 frameworks/base/core/java/android/app/ActivityThread.java

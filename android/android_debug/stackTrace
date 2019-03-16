@@ -22,7 +22,7 @@ stack.log("TAGNAME");
 try {
     throw new Exception("Call Stack Trace");
 } catch (Exception e) {
-    Log.i("TAGNAME", "xxx", e);
+    Log.i(TAG, "xxx", e);
 }
 
 

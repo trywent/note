@@ -1,11 +1,18 @@
-//
-surface: 代表一个被屏幕合成器操作的原始数据
-_________________________
-SurfaceHolder://SurfaceView.getHolder() 设置surface的属性。。设置回调函数可以监听surface的变化，
+/******************************
+ surface
+ SurfaceHolder
+ SurfaceTexture
+ SurfaceView
+*/
+//surface: 
+屏幕合成器操作的原始数据
+
+//SurfaceHolder: SurfaceView.getHolder() 设置surface的属性。。设置回调函数可以监听surface的变化，
 用来显示surface的抽象接口。允许控制surface的大小，格式，编辑surface中像素，监控surface的改变。
 该接口通常通过SurfaceView调用。
-_________________________
-SurfaceTexture:用来作为surface构造方法的参数
+
+
+//SurfaceTexture:用来作为surface构造方法的参数
 获取图像流中的帧(OpenGL ES 中texture)
 
 图像流可以来自相机预览或视频解码。SurfaceTexture可使用在一个SurfaceHolder中，来定义
@@ -23,8 +30,8 @@ texture对象使用由GL_OES_EGL_image_external OpenGL ES扩展定义的GL_TEXTU
 这限制了纹理如何被使用，每次绑定纹理时都要绑定到GL_TEXTURE_EXTERNAL_OES，而不是GL_TEXTURE_2D
 
 SurfaceTexture 对象可在任意的线程中创建。updateTexImage()只能在包含该texture线程中调用。
-__________________________
-SurfaceView:
+
+//SurfaceView:
 提供一个嵌入到view结构中的surface。可以控制surface的格式，大小。SurfaceView控制surface在屏幕上
 的位置。
 
@@ -51,8 +58,9 @@ SurfaceHolder.Callback.surfaceDestroyed()之间
 
 
 
-================================
+/******************************
 //通过SurfaceHolder来操作Surface
+*/
 
 SurfaceView{
 - getHolder()//获取 SurfaceHolder 
@@ -70,24 +78,20 @@ surfaceCreated(SurfaceHolder holder)
 surfaceDestroyed(SurfaceHolder holder)
 }
 
-加入到窗口管理器(创建surface)：
-updateWindow{
-- 
-- 加入到窗口服务，mSession.addToDisplayWithoutInputChannel
-- mSession.relayout(mNewSurface)-->relayoutWindow-->winAnimator.createSurfaceLocked
-	@WindowManagerService.java
-}@SurfaceView.java
+
 
 
 
 //visible
 setVisibility(设置mRequestedVisible)-->
 updateSurface{
+- creating = (mSurfaceControl == null || formatChanged || visibleChanged)&& mRequestedVisible //请求显示时才会创建
 - if(creating|visibleChanged...){ //创建surface,显示变化
 	- if(creating){
 		- mSurfaceSession = new SurfaceSession
 		- mSurfaceControl = new SurfaceControlWithBackground
 		}
+          //设置当前surfaceView状态,显示,大小,位置
 	- SurfaceControl.openTransaction()
 	- mSurfaceControl.setLayer
 	- mSurfaceControl.show/mSurfaceControl.hide //显示或隐藏
@@ -95,8 +99,24 @@ updateSurface{
 	- mSurfaceControl.setMatrix
 	- mSurfaceControl.setSize
 	- SurfaceControl.closeTransaction
+	- if (mSurfaceCreated && (surfaceChanged || (!visible)){
+		- mSurfaceCreated = false
+		- mSurface.forceScopedDisconnect()
+		}
+	- 若是创建,mSurface.copyFrom(mSurfaceControl)
+	- if(visible && mSurface.isValid()){ //surface可见,通知创建信息
+		- surfaceCreated
+		- surfaceChanged
+		  //大小发生变化,重建了.需要redraw
+		- SurfaceCallbackHelper(this::onDrawFinished).dispatchSurfaceRedrawNeededAsync
+		}
+	- if(mSurfaceControl != null && !mSurfaceCreated){ //销毁
+		- mSurface.release()
+		- mSurfaceControl.destroy()
+		}
+  }else{
+	- 
 	}
-- 
 }
 
 

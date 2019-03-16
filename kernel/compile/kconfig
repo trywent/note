@@ -1,3 +1,5 @@
+//
+
 make oldconfig 根据已经存在的.config文件配置内核(就是在原来的配置基础上)
 
 It reads the existing .config file and prompts the user for options in the current kernel source that are not found in the file. This is useful when taking an existing configuration and moving it to a new kernel.

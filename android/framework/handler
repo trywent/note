@@ -1,44 +1,30 @@
-概述：
-1，构造handler，初始化线程，looper开始循环等待消息
-2，通过handler发送消息，消息最终会被加入对类MessageQueue中。
-3，looper获取MessageQueue中的消息，并调用对应方法处理消息
-
-thread-local variable 线程本地变量，只在本线程可用。通过ThreadLocal来设置获取(set ,get)
-=========================
-创建Looper：
-Looper.prepare-->prepare(true){
-- 当前线程没有初始化looper，sThreadLocal.get()
-- 新建Looper，sThreadLocal.set(new Looper(quitAllowed))-->Looper(){
-	- 创建消息队列，mQueue = new MessageQueue(quitAllowed)
-	- 获取当前线程
+/**********************
+ Looper,hanlder,Message
+  
+ hanlder{//将消息加入MessageQueue
+	- MessageQueue
 	}
-}
 
-开始处理：
-loop{
-- 获取一个消息，queue.next()
-- 执行处理Message，msg.target.dispatchMessage(msg)
-- 回收，msg.recycle()
-}
+ looper{//从MessageQueue读取消息,处理消息
+	- MessageQueue
+	}
 
-退出循环:
-quite-->mQueue.quit()@Looper.java-->quit(mQuiting = true)@MessageQueue.java
 
-_________________________
-创建Handler:
-Handler(){
-- 获取使用的Looper,Looper.myLooper()
-- 获取MessageQueue，mLooper.mQueue
-- 设置Callback mCallback
+
+*/
+Handler(Looper looper)-->
+Handler(Looper looper, Callback callback, boolean async){
+- mLooper = Looper.myLooper()
+- mQueue = mLooper.mQueue
+- mCallback = callback //不为空,用来处理消息
+- mAsynchronous = async
 }@Handler.java
 
-dispatchMessage{
-- msg.callback不为空，handleCallback(msg)--> message.callback.run
-- mCallback不为空mCallback.handleMessage(msg)
-- handleMessage
-}
-_________________________
-获取message：
+
+/*获取message
+ Message一般都是按照时间顺序一次加入.
+ Message.setAsynchronous 设置消息不按顺序处理(MessageQueue被设置为顺序处理时)
+*/
 obtainMessage-->Message.obtain@Handler.java-->obtain(Handler h...){
 - 获取message实例，obtain(){
 	- 若sPool不为空，则从中获取一个Message
@@ -48,17 +34,61 @@ obtainMessage-->Message.obtain@Handler.java-->obtain(Handler h...){
 - 设置回调，Message.callback = callback
 }@Message.java
 
-发送message：
+//发送message：
 sendToTarget-->target.sendMessage(target是handler)@Message.java-->sendMessage-->
 sendMessageDelayed-->sendMessageAtTime(Message msg, long uptimeMillis){
-- 添加到消息队列中mQueue.enqueueMessage-->enqueueMessage{
+- MessageQueue queue = mQueue
+- mQueue.enqueueMessage-->enqueueMessage{
 
 	}@MessageQueue.java
 }@Handler.java
 
 
-__________________________
+//处理消息
+dispatchMessage(Message msg){
+  //先msg自己处理
+- msg.callback!=null，handleCallback(msg)--> message.callback.run
+  //再当前handler的callback处理
+- mCallback!=null.mCallback.handleMessage(msg)
+  //再
+- handleMessage
+}@Handler.java
 
+
+
+
+1/**********************
+  Looper
+
+*/
+//当前线程中创建looper
+Looper.prepare-->prepare(true){
+- sThreadLocal.set(new Looper(quitAllowed))-->
+	Looper{
+	- mQueue = new MessageQueue(quitAllowed)
+	- mThread = Thread.currentThread()	
+	}
+}
+
+//开始处理：
+loop{
+- Looper me = myLooper()-->sThreadLocal.get() //当前looper
+- MessageQueue queue = me.mQueue
+ //循环处理
+ {
+- Message msg = queue.next()
+- msg.target.dispatchMessage(msg)-->handler.dispatchMessage(msg)
+- msg.recycleUnchecked
+ }
+}
+
+//退出循环:
+quite-->mQueue.quit()@Looper.java-->quit(mQuiting = true)@MessageQueue.java
+
+
+2/**********************
+ MessageQueue
+*/
 MessageQueue(boolean quitAllowed) {
 - nativeInit()-->android_os_MessageQueue_nativeInit{
 	- new NativeMessageQueue(){
@@ -107,14 +137,8 @@ enqueueSyncBarrier{
 frameworks/base/core/java/android/os/MessageQueue.java
 frameworks/base/core/jni/android_os_MessageQueue.cpp
 frameworks/native/libs/utils/Looper.cpp
-__________________________
-通常的使用方法
-mThread = new HandlerThread(TAG);
-mThread.start();  //新建一个looper线程，在run中会调用Looper.loop()
-mHandler = new MyHandler(mThread.getLooper());
 
 
-可以通过Messager类进行进程间通信，(实际上跟binder相关，查看android reference----service)
 
 
 ____________________________
@@ -130,3 +154,16 @@ next-->(当消息队列执行完，或第一个消息要在将来进行执行，
 
 frameworks/base/core/java/android/os/MessageQueue.java
 frameworks/base/core/jni/android_os_MessageQueue.cpp
+
+
+/*
+ 通常的使用方法
+*/
+
+mThread = new HandlerThread(TAG);
+mThread.start();  //新建一个looper线程，在run中会调用Looper.loop()
+mHandler = new MyHandler(mThread.getLooper());
+
+
+可以通过Messager类进行进程间通信，(实际上跟binder相关，查看android reference----service)
+

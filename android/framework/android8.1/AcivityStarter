@@ -1,0 +1,95 @@
+/***********************
+ ActivityStarter启动Activity
+ //参数:源activity进程,源包名,option(比较少提供)
+ startActivity(IBinder whoThread, String callingPackage,bOptions)
+*/
+startActivity-->startActivityForResult@Activity.java-->mInstrumentation.execStartActivity
+-->execStartActivity@Instrumentation.java-->ActivityManager.getService().startActivity-->
+startActivity(IBinder whoThread, String callingPackage,Intent intent, String resolvedType, Bundle bOptions,callingUser/*userId*/)
+-->mActivityStarter.startActivityMayWait@ActivityManagerService.java-->
+startActivityMayWait(caller,intent, null/*inTask*/){
+- intent = new Intent(intent)
+- ResolveInfo rInfo = mSupervisor.resolveIntent(intent)
+- ActivityInfo aInfo = mSupervisor.resolveActivity(intent, rInfo
+- startActivityLocked(caller, intent, aInfo, rInfo)
+}@ActivityStarter.java
+
+startActivityLocked(IApplicationThread caller, Intent intent, ActivityInfo aInfo, ResolveInfo rInfo){
+- mLastStartActivityTimeMs = System.currentTimeMillis()
+- mLastStartActivityResult = startActivity(caller, intent,aInfo, rInfo) 
+}@ActivityStarter.java
+
+//创建ActivityRecord
+startActivity(IApplicationThread caller, Intent intent,ActivityInfo aInfo, ResolveInfo rInfo){
+- abort = !mSupervisor.checkStartAnyActivityPermission //检测是否有启动权限
+- ActivityRecord r = new ActivityRecord(mService, callerApp,callingPackage, intent) //创建ActivityRecord
+- startActivity(r, sourceRecord, true, options, null/*inTask*/)-->startActivityUnchecked
+}@ActivityStarter.java
+
+
+startActivityUnchecked{
+- setInitialState(r,options){
+	- mStartActivity = r
+	- mIntent = r.intent
+	- mOptions = options
+	- mLaunchBounds = getOverrideBounds(r, options, inTask) //options是否设置activity窗口范围
+	- mLaunchFlags = adjustLaunchFlagsToDocumentMode
+	}
+- computeLaunchingTaskFlags //计算启动task
+- computeSourceStack //获取源stack
+- ActivityRecord reusedActivity = getReusableIntentActivity(){//找到已存在的task,返回该task的Activity...activity被启动过
+	- 放到已有的task{
+		- mLaunchSingleInstance,mSupervisor.findActivityLocked(mIntent, mStartActivity.info)-->
+			findActivityLocked-->findActivityLocked@ActivityStack.java
+		- mSupervisor.findTaskLocked-->findTaskLocked(ActivityRecord target)@ActivityStack.java//查找满足intent的task中top activity
+		}
+	}
+  //已经启动过,使用已启动的Activity
+- reusedActivity!=null{
+	- reusedActivity = setTargetStackAndMoveToFrontIfNeeded
+	- setTaskFromIntentActivity //设置task的创建Activity
+	- resumeTargetStackIfNeeded
+	}
+- dontStart{ //已经启动
+	- deliverNewIntent
+	- mSupervisor.handleNonResizableTaskIfNeeded
+	}
+ //查找stack,创建task
+- FLAG_ACTIVITY_NEW_TASK,setTaskFromReuseOrCreateNewTask{ //新task
+	- mTargetStack = computeStackFocus(mStartActivity, mLaunchBounds)//获取stack
+	}
+- if(mSourceRecord != null)setTaskFromSourceRecord //从sourceRecord获取task
+- if (mInTask != null)setTaskFromInTask
+- setTaskToCurrentTopOrCreateNewTask//放到当前top task
+  //启动
+- mTargetStack.startActivityLocked(mStartActivity, topFocused, newTask,mOptions) 1-->
+- mDoResume{
+	- !isFocusable{
+		- mTargetStack.ensureActivitiesVisibleLocked
+		- mWindowManager.executeAppTransition
+		}
+	- mSupervisor.resumeFocusedStackTopActivityLocked 2-->
+	}
+- mSupervisor.updateUserStackLocked
+- mSupervisor.handleNonResizableTaskIfNeeded
+}@ActivityStarter.java
+
+-->1 startActivityLocked{
+- 
+- task.setFrontOfTask() //移动到栈顶
+- 需要启动,设置动画{
+	- mWindowManager.prepareAppTransition
+	- r.setVisibility //设置可见
+	}
+}@ActivityStack.java
+
+-->2 resumeFocusedStackTopActivityLocked-->
+resumeFocusedStackTopActivityLocked{
+- activity状态不是resumed,mFocusedStack.resumeTopActivityUncheckedLocked-->resumeTopActivityInnerLocked@ActivityStack.java
+- activity状态是resumed,mFocusedStack.executeAppTransition
+}@ActivityStackSupervisor.java
+
+
+
+//pinnedStack activity启动通知
+postStartActivityProcessing@ActivityStarter.java-->notifyPinnedActivityRestartAttempt@TaskChangeNotificationController.java

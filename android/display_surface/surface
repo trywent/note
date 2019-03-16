@@ -1,57 +1,67 @@
-//SurfaceSession 应用client端到surfaceflinger的一个连接(一个用于创建surface的接口)
-//创建mSurfaceSession-->SurfaceComposerClient  
-addWindow@WindowManagerService.java-->attach@WindowState.java-->windowAddedLocked
--->new SurfaceSession@Session.java-->nativeCreate@SurfaceSession.java-->
-new SurfaceComposerClient@android_view_SurfaceSession.cpp
+/******************************
+ SurfaceSession 应用client端到surfaceflinger的一个连接(一个用于创建surface的接口)
+ surfaceControl 操作surface
+*/
+//activity创建SurfaceSession,surfaceControl
+addWindow@WindowManagerService.java-->attach@WindowState.java-->
+windowAddedLocked{
+- mSurfaceSession = new SurfaceSession()
+- mService.mSessions.add(this)
+}@Session.java
 
-//获取surfaceflinger服务接口mClient
-SurfaceComposerClient(创建Composer)-->onFirstRef{
-- ComposerService::getComposerService-->ComposerService::connectLocked{
-	- getService("SurfaceFlinger")
-	}
-- 创建mClient(服务端接口)，sm->createConnection-->(服务端)new Client@SurfaceFlinger
-}
-
-
-/* 绘制数据用的surface
- * 应用端创建surfaceControl
- * 1，绘制数据 lockCanvas-->
- * 2，提交数据 unlockCanvasAndPost-->
- */
-relayoutWindow{
-- createSurfaceLocked@WindowStateAnimator.java-->new WindowSurfaceController(mSurfaceSession)
-	-->new SurfaceControl(mSurfaceSession)
-	-->nativeCreate@SurfaceControl.java-->client->createSurface
-	@android_view_SurfaceControl.cpp-->{
-	- (SurfaceComposerClient)mClient->createSurface(&IGraphicBufferProducer) //获取bufferQueue
-	- new SurfaceControl(bufferQueue)-->new Surface(IGraphicBufferProducer)//传入bufferQueue
-	- Surface.get
-	}@SurfaceComposerClient.cpp
-- outSurface.copyFrom(surfaceControl) //返回到ViewRootImpl，供绘制使用
+relayoutWindow(session){//surfaceControl
+- createSurfaceLocked@WindowStateAnimator.java--winAnimator.createSurfaceLocked{
+	- mSurfaceController = new WindowSurfaceController(mSession.mSurfaceSession)-->new SurfaceControlWithBackground
+	- return mSurfaceController
+	}@WindowStateAnimator.java
 }@WindowManagerService.java
 
-//surfaceFlinger创建对应的layer(包行producer，consumer)，用来获取bufferQueue
-Client::createSurface-->flinger->createLayer@client.cpp-->createLayer-->
-createNormalLayer(或者createDimLayer){
-- 创建outLayer，new Layer(设置当前状态mCurrentState)-->onFirstRef{
-	- createBufferQueue(&producer, &consumer,true/*to surfaceflinger*/)//
-	- mProducer = new MonitoredProducer(producer, mFlinger)
-	- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)
-	- mSurfaceFlingerConsumer.setFrameAvailableListener(this) //bufferqueu监听器回调
-	}@Layer.cpp
-- 设置handle,(*outLayer)->getHandle
-- 设置bufferQueue,(*outLayer)->getProducer  //producer 
-}@SurfaceFlinger.cpp
+//surfaceView创建SurfaceSession,surfaceControl
+updateSurface{
+-  mSurfaceSession = new SurfaceSession(viewRoot.mSurface)
+- new SurfaceControlWithBackground(mSurfaceSession)-->new SurfaceControl
+}@SurfaceView.java
 
-______________
-//Composer:用于记录本地设置值
+
+//surfaceSession
+SurfaceSession-->nativeCreate@SurfaceSession.java-->nativeCreate-->
+SurfaceComposerClient* client = new SurfaceComposerClient()@android_view_SurfaceSession.cpp-->
+SurfaceComposerClient(创建Composer)-->onFirstRef{
+- sp<ISurfaceComposer> sm(ComposerService::getComposerService())-->
+	ComposerService::getComposerService-->ComposerService::connectLocked{
+	- getService("SurfaceFlinger")
+	}
+- ISurfaceComposerClient mClient = sm->createConnection-->(/*SurfaceFlinger*/)new Client@SurfaceFlinger
+}@SurfaceComposerClient.cpp
+
+//surfaceControl
+SurfaceControl-->nativeCreate@SurfaceControl.java-->
+nativeCreate{
+- sp<SurfaceComposerClient> client(android_view_SurfaceSession_getClient) //session
+- sp<SurfaceControl> surface = client->createSurface()-->
+      createSurface{
+	- sp<IBinder> handle
+	- sp<IGraphicBufferProducer> gbp
+	- mClient->createSurface(name, w, h, format, &handle, &gbp)
+	- new SurfaceControl(this, handle, gbp)
+	}@SurfaceComposerClient.cpp
+}@android_view_SurfaceControl.cpp
+
+
+destory-->nativeDestroy@SurfaceControl.java-->
+destroy-->mClient->destroySurface(mHandle)@SurfaceControl.cpp
+
+
+/******************************
+ Composer:用于记录本地设置值
+
 //本地实现接口，设置layer（surface）的位置大小...
 setPosition
 setSize    
 status_t setLayer
 openGlobalTransaction
 closeGlobalTransaction
-
+*/
 //开始
 nativeOpenTransaction-->SurfaceComposerClient::openGlobalTransaction-->
 Composer::openGlobalTransaction-->Composer::getInstance().openGlobalTransactionImpl
@@ -74,9 +84,6 @@ closeGlobalTransactionImpl{
 - sm->setTransactionState-->setTransactionState@SrufaceFlinger.cpp
 }SurfaceComposerClient.cpp
 
-
-
-
 //surfaceFlinger设置
 setTransactionState{
 - 设置display，setDisplayStateLocked
@@ -90,14 +97,47 @@ setTransactionState{
 }@Surfaceflinger.cpp
 
 
-
-frameworks/native/services/surfaceflinger/Client.cpp
-frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-frameworks/native/services/surfaceflinger/Layer.cpp
+frameworks/base/core/java/android/view/SurfaceSession.java
+frameworks/base/core/java/android/view/SurfaceControl.java
+frameworks/base/core/jni/android_view_SurfaceControl.cpp
+frameworks/base/core/jni/android_view_SurfaceSession.cpp
 frameworks/native/libs/gui/SurfaceComposerClient.cpp
 frameworks/native/libs/gui/SurfaceControl.cpp
-frameworks/base/core/jni/android_view_SurfaceControl.cpp
-frameworks/base/core/java/android/view/SurfaceControl.java
+/******************************
+  surfaceFlinger 创建client,layer
+
+ */
+
+//创建
+SurfaceFlinger::createConnection() {
+- initClient(new Client(this))
+}
+
+//surfaceFlinger创建对应的layer(包行producer，consumer)，用来获取bufferQueue
+Client::createSurface()-->flinger->createLayer@client.cpp-->createLayer-->
+createNormalLayer(client){
+- 创建outLayer，new Layer(this, client, name, w, h)-->onFirstRef{
+	- createBufferQueue(&producer, &consumer,true/*to surfaceflinger*/)//
+	- mProducer = new MonitoredProducer(producer, mFlinger)
+	- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)
+	- mSurfaceFlingerConsumer.setFrameAvailableListener(this) //bufferqueu监听器回调
+	}@Layer.cpp
+- addClientLayer(client, *handle, *gbp, layer, *parent){
+	- client->attachLayer-->mLayers.add(handle, layer)
+	}
+}@SurfaceFlinger.cpp
+
+//销毁
+Client::destroySurface@Client.cpp-->onLayerRemoved-->
+removeLayer(const sp<Layer>& layer, true/*topLevelOnly*/){
+- auto& p = layer->getParent() //获取父layer,surfaceView父layer为Activity窗口
+- if(!topLevelOnly) p->removeChild(layer) //有父layer一般不删除
+  else mCurrentState.layersSortedByZ.remove(layer)
+- layer->onRemovedFromCurrentState()
+}@SurfaceFlinger.cpp
+
+
+
 =============
 //layer
 commitTransaction{
@@ -117,11 +157,15 @@ frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 //consumer
 Layer::onFirstRef()-->new SurfaceFlingerConsumer(IGraphicBufferConsumer)
 
-
+frameworks/native/services/surfaceflinger/Client.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/Layer.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlingerConsumer.cpp
-=============
-//应用端绘制和提交数据
-
+/******************************
+ 应用端绘制和提交数据
+ * 1，绘制数据 lockCanvas-->
+ * 2，提交数据 unlockCanvasAndPost-->
+*/
 //lockCanvas 返回一个canvas用于绘制，传入inOutDirty指定绘制大小(可能会被改变)
 lockCanvas@Surface.java-->nativeLockCanvas{
 - 计算脏区域大小，surface->lock(&outBuffer, dirtyRectPtr)

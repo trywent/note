@@ -1,59 +1,6 @@
-属性动画系统是个大的框架，能够以动画的方式驱动所有对象。可以用来执行，
-在一段时间内改变对象的属性值(改变的方式可以定义)，不管对象是否可以在屏幕上显示。
-
-Property Animation:能够定义动画以下特性
-
-Duration:动画操作的时长，默认是300ms。
-
-Time interpolation:动画的时间计算方法(渐变，跳跃...)
-
-Repeat count and behavior:定义动画执行时间结束后重复符动画的次数。定义动画是否顺序执行完后倒序执行。
-
-Animator sets:能够定义一组动画效果，一起执行或在一个延迟后顺序执行
-
-Frame refresh delay: 能够定义动画的帧刷新频率。默认是没10ms刷新一次，但是应用实际能够刷新
-		     的频率却是依赖系统的忙碌程度和系统的速度。
-
-工作原理：
-//定义所有与动画有关的时间,时长,当前属性的值,目的属性值...
-ValueAnimator{            
-//当动画执行一个小片段后(默认10ms执行一次)，
-TimeInterpolator	   //属性值改变的方式(线性改变，加速改变，降速改变)
-TypeEvaluator              //包含方法，用来计算属性值
-int duration		   //时长	
-int startPropertyValue	   //开始值
-int endPropertyValue 	   //结束值
-start()                    //调用后动画开始
-}
-
-1，设置属性初始值，结束值，动画时长。动画开始后ValueAnimator计算动画经过的片段值(0~1之间，百分比)。
-   
-2，ValueAnimator计算片段值后，会调用当前的TimeInterpolator用来计算插值片段
-(插值片段是TimeInterpolator中定义的动画变化片段)
-
-3，当插值片段计算好后，ValueAnimator调用TypeEvaluator计算属性这时应该对应的值。
-
-总结：对象的属性值随时间变化而改变，改变方式通过TimeInterpolator定义，改变的值通过TypeEvaluator计算。
-_______________________________
-动画过程：计算值，根据计算值设置对象的属性
-
-//事件接收
-ValueAnimator
-ObjectAnimator  //设置对象中的属性值
-AnimatorSet
+//
 
 
-//根据时间数据计算动画的属性值
-IntEvaluator
-FloatEvaluator
-
-//根据时间变化值变化
-AccelerateDecelerateInterpolator //中间快，两边慢
-AccelerateInterpolator //一直加速
-
-___________
-setEvaluator(TypeEvaluator value)
-setInterpolator(TimeInterpolator value)
 
 ===============================
 创建displayEvent接收器：

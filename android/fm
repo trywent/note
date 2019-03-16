@@ -1,0 +1,18 @@
+/***********************
+ android tuner
+*/
+
+frameworks/base/services/core/java/com/android/server/broadcastradio/Tuner.java
+frameworks/base/services/core/jni/BroadcastRadio/Tuner.cpp
+/***********************
+ sprdfm
+*/
+AudioSystem.setDeviceConnectionState(AudioManager.DEVICE_OUT_FM_HEADSET)@FmManagerSelect.java-->
+setDeviceConnectionState(AUDIO_DEVICE_OUT_FM_HEADSET)
+setParameters("handleFm=1")
+
+
+vendor/sprd/platform/packages/apps/DreamFMRadio/FmManagerSelect.java
+
+
+

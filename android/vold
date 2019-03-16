@@ -1,6 +1,9 @@
-//systemServer禁止访问sd卡
-======================================
-vold处理底层和上层命令：
+/******************************
+ vold
+ systemServer禁止访问sd卡
+
+*/
+//vold处理底层和上层命令：
 
 SocketListener(startListener-->threadStart-->runListener-->onDataAvailable)
 ↳FrameworkListener（dispatchCommand执行命令）

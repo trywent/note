@@ -6,6 +6,7 @@ WindowManagerService{
 - mRoot = new RootWindowContainer(this)
 - mPolicy = policy
 - mFxSession = new SurfaceSession()
+- WindowAnimator mAnimator = new WindowAnimator(this)
 }@WindowManagerService.java
 
 
@@ -30,7 +31,9 @@ getWindowSession@WindowManagerGlobal.java-->openSession-->new Session(IInputMeth
 addWindow(Session,IWindow client,WindowManager.LayoutParams attrs){
 - WindowToken token = displayContent.getWindowToken(attrs.token) //获取对应ActivityRecord的WindowToken(本质一个AppWindowToken)
 - AppWindowToken atoken = token.asAppWindowToken() //FIRST_APPLICATION_WINDOW -LAST_APPLICATION_WINDOW 应用窗口
-- WindowState win = new WindowState(token,attrs){
+- WindowState win = new WindowState(this, session, client, token,attrs){
+	- mSession = s
+	- mClient = c
 	- mToken = token
 	}
 - win.attach()
@@ -39,6 +42,15 @@ addWindow(Session,IWindow client,WindowManager.LayoutParams attrs){
 - mPolicy.getInsetHintLw(outOutsets) //获取初始窗口大小
 }@WindowManagerService.java
 
+relayoutWindow(Session session, IWindow client,WindowManager.LayoutParams attrs){
+- win.relayoutVisibleWindow
+- createSurfaceControl(Surface outSurface,WindowState win
+}
+//创建surface
+relayoutWindow-->createSurfaceControl(Surface outSurface,WindowState win,WindowStateAnimator winAnimator){
+- WindowSurfaceController surfaceController = winAnimator.createSurfaceLocked(win.mAttrs.type) //创建
+- surfaceController.getSurface(outSurface)
+}@WindowManagerService.java
 
 =====================
 /*应用设置方位*/

@@ -1,5 +1,7 @@
-//
-sp7731e-1h20-native.dts{
+/************************
+ 7731
+*/
+sp7731e-1h10-native.dts{
 - sc7731e.dtsi{
 	- "pike2.dtsi"
 	- "sc7731e-clocks.dtsi"
@@ -18,7 +20,7 @@ lunch sp7731e_1h20_native-userdebug
 echo 1 > /proc/sys/kernel/printk
 echo device > sys/devices/platform/soc/soc:ap-ahb/20200000.usb/host_dev
 
-dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/boot bs=1024 count=18000
+dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/boot bs=1024 count=18328
 dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/recovery bs=1024 count=22082
 dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/uboot bs=1024 count=488
 
@@ -32,3 +34,7 @@ bta_av_sink_data_cback
 
 //bluetooth
 WCN->CP0->DSP->2731
+
+
+//uart
+lookat -l 2 0x70100024

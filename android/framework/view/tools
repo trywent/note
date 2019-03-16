@@ -1,0 +1,10 @@
+/******************************
+ /android-sdk-linux/tools
+*/
+HierarchyViewer
+
+monitor(代替HierarchyViewer)
+
+
+//命令
+uiautomator dump /sdcard/window_dump.xml

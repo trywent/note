@@ -40,6 +40,7 @@ ViewRootImpl{
 
 setView{
 - 判断surfaceHolder是由应用自己提供，还是使用系统
+- attrs.setSurfaceInsets(view,false) //surfaceInset
 - 使用系统的surfaceHolder，打开硬件加速enableHardwareAcceleration{
 	- 判断应用是否开启硬件加速，FLAG_HARDWARE_ACCELERATED
 	- 创建HardwareRenderer.createGlRenderer

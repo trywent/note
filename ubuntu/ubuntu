@@ -46,3 +46,8 @@ sudo apt-get -f install
 
 //磁盘uuid
  ls -l /dev/disk/by-uuid
+
+
+//串口工具
+minicom 
+cutecom

@@ -1,4 +1,6 @@
-//窗口的surface
+/************************
+ 窗口的surface
+*/
 //更新AppWindowToken状态
 updateAllDrawnLocked
 

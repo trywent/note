@@ -11,7 +11,8 @@ startSystemServer-->Zygote.forkSystemServer-->/*pid=0*/handleSystemServerProcess
 - RuntimeInit.zygoteInit(cl)-->main
 }@ZygoteInit.java
 
-startService(serviceClass){
+
+-startService(serviceClass){
 - name = serviceClass.getName()
 - constructor = serviceClass.getConstructor(Context.class)
 - service = constructor.newInstance(mContext)

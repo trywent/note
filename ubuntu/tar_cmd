@@ -1,1 +1,0 @@
-tar -czvf px30722.tar.gz px3 --exclude="px3/out" --exclude="px3/kernel" --exclude="px3/uboot" --exclude="px3/rockdev"  --exclude="px3/.repo" 

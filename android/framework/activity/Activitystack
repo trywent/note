@@ -1,4 +1,6 @@
-//
+/***********************
+
+*/
 mWaitingVisibleActivities  //等待activity可见后才执行操作的activities
 mWaitingActivityVisible    //等待activity启动可见结果的进程集合
 mWaitingActivityLaunched   //等待activity启动完成结果的进程集合
@@ -8,70 +10,73 @@ mFinishingActivities     //将要结束的activity
 onCreate - onDestroy //完整生命周期
 onStart - onStop   //可见
 onResume - onPause //用户可交互
-===========
-onCreate:
-scheduleLaunchActivity-->handleLaunchActivity-->performLaunchActivity@ActivityThread.java
--->callActivityOnCreate@Instrumentation.java-->activity.performCreate-->onCreate@Activity.java
+/* launch
 
 
-onStart:
-performLaunchActivity@ActivityThread.java-->performStart-->
-mInstrumentation.callActivityOnStart-->activity.onStart@Activity.java
-
-
-onResume:
-scheduleResumeActivity-->handleResumeActivity-->performResumeActivity@ActivityThread.java
--->performResume-->mInstrumentation.callActivityOnResume@Activity.java
-
-onPause:
-schedulePauseActivity-->handlePauseActivity-->performPauseActivity{
-- 保存状态，callActivityOnSaveInstanceState
-- mInstrumentation.callActivityOnPause-->performPause-->onPause
-}@ActivityThread.java
-
-onStop:
-scheduleStopActivity-->handleStopActivity{
-- performStopActivityInner-->r.activity.performStop@-->
-	mInstrumentation.callActivityOnStop-->activity.onStop@Activity.java
-- updateVisibility
-}@ActivityThread.java
-
-
-scheduleWindowVisibility
-
-
-=================
-服务端接口：
-__________
-launch:
+*/
 resumeTopActivityLocked@ActivityStack.java-->(进程没有启动)realStartActivityLocked-->
 scheduleLaunchActivity@ActivityStackSupervisor.java
 
-__________
-resuem:
-resumeTopActivityLocked-->(应用进程已经存在)scheduleResumeActivity@ActivitStack.java
+/* resume
 
-__________
-暂停：
-startPausingLocked{
-- 应用端暂停，prev.app.thread.schedulePauseActivity-->
- (回调服务端)ActivityManagerNative.getDefault().activityPaused
-}
 
-//回调
-activityPaused-->stack.activityPausedLocked@ActivityManagerService.java-->
-activityPausedLocked-->completePauseLocked{
-- 正在执行结束activity，则直接结束finishCurrentActivityLocked
-- 配置变化执行销毁，destroyActivityLocked
-- {
-	- 其他情况加入mStoppingActivities，
-	- 空闲时执行清除,scheduleIdleLocked
-  }
-- mStackSupervisor.resumeTopActivitiesLocked
+*/
+resumeTopActivityInnerLocked-->scheduleResumeActivity@ActivitStack.java
 
+/* pause
+  调用schedulePauseActivity,当app执行pause完成后,resumeTop
+
+*/
+startPausingLocked(boolean userLeaving, boolean uiSleeping,ActivityRecord resuming, boolean pauseImmediately){
+- ActivityRecord prev = mResumedActivity //当前要执行pause的Activity
+- mPausingActivity = prev
+- prev.app.thread.schedulePauseActivity-->ActivityManagerNative.getDefault().activityPaused //app执行pause
+  //app执行pause完成返回
+- if pauseImmediately(boolean resumeNext){
+	- 
+	- ensureActivitiesVisibleLocked	
+  } else schedulePauseTimeout(prev)
 }@ActivityStack.java
 
-//finish:
+//Activity回调
+activityPaused(IBinder token)-->stack.activityPausedLocked(token)@ActivityManagerService.java-->
+activityPausedLocked(IBinder token){
+- ActivityRecord r = isInStackLocked(token)
+- mHandler.removeMessages(PAUSE_TIMEOUT_MSG, r)
+- if (mPausingActivity == r){
+	- completePauseLocked(true) //
+  }else{
+	- finishCurrentActivityLocked
+	}
+- mStackSupervisor.ensureActivitiesVisibleLocked(null)
+}@ActivityStack.java
+
+completePauseLocked(boolean resumeNext){
+- ActivityRecord prev = mPausingActivity
+- if(resumeNext){
+	- 
+	}
+}@ActivityStack.java
+
+/* stoping
+
+ 
+*/
+activityIdleInternalLocked@ActivityStackSupervisor.java-->
+stopActivityLocked{
+- scheduleStopActivity
+}@ActivityRecord.java
+
+
+activityStopped-->r.activityStoppedLocked@ActivityManangerService.java-->
+activityStoppedLocked{
+- 
+}@ActivityStack.java
+
+/* finish
+
+
+*/
 finish-->ActivityManagerNative.getDefault().finishActivity@Activity.java-->
 finishActivity@ActivityManagerService.java-->requestFinishActivityLocked-->
 finishActivityLocked{
@@ -90,10 +95,7 @@ finishCurrentActivityLocked{
 	}
 }@ActivityStack.java
 
-//stop:
-activityIdleInternalLocked@ActivityStackSupervisor.java-->stopActivityLocked-->
 
-=====================
 /* configuration
  每个ActivityStack拥有一个mOverrideConfig,分屏时每个stack中的窗口都不一样
  将stack中的mOverrideConfig应用到栈中的每个应用
@@ -109,4 +111,48 @@ ensureActivityConfigurationLocked-->scheduleActivityConfigurationChanged(mOverri
 
 //更新配置
 relaunchActivityLocked-->scheduleRelaunchActivity(mConfiguration,mOverrideConfig)@ActivityStack.java
+
+/*
+ resumeTop
+ 
+*/
+
+resumeTopActivityLocked{
+- 获取栈顶的ActivityRecord，topRunningActivityLocked
+- 若栈顶为空则启动launcher，mStackSupervisor.resumeHomeActivity
+- 若需resume的activity已经在栈顶{
+	- 执行窗口切换，mWindowManager.executeAppTransition
+	- mNoAnimActivities.clear
+	}
+- 前一个resumed activity不为空{
+	- 
+	}
+- 休眠状态，{
+	- 执行完要执行的动画，mWindowManager.executeAppTransition
+	- mNoAnimActivities.clear
+	}
+- 清除mStackSupervisor中activity的不对状态，mStoppingActivities,mGoingToSleepActivities
+- 要暂停的activity是否完成，mStackSupervisor.allPausedActivitiesComplete
+- 暂停当前已经resumed activity，startPausingLocked
+- 由于睡眠设置了NO_HISTORY的activity没有结束，结束它requestFinishActivityLocked
+- 上个activity不为空，且还是显示{
+	- 
+	- 当前activity已经显示，立即隐藏上个activity,mService.mWindowManager.setAppVisibility
+	}
+- 清除应用停止状态，AppGlobals.getPackageManager().setPackageStoppedState
+- windowManger准备动画，prev不为空{
+	- 状态为prev.finishing,设置动画mService.mWindowManager.prepareAppTransition(NONE/CLOSE)
+	- 不为finishing,设置动画mService.mWindowManager.prepareAppTransition(NONE/OPEN)
+	}else，栈不为空{
+	- 设置动画mService.mWindowManager.prepareAppTransition(NONE/OPEN)
+	}
+
+- next的app和进程已经存在，{
+	- 设置可见， mService.mWindowManager.setAppVisibility
+	- 启动计时，startLaunchTickingLocked
+	- 
+	- 若是mMainStack更新配置，mService.mWindowManager.updateOrientationFromAppTokens
+	}
+- next没有被启动过,startSpecificActivityLocked
+}@ActivityStack.java
 

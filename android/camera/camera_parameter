@@ -38,16 +38,12 @@ camera的参数通常有分辨率、清晰度、亮度、对比度、饱和度�
 //零延时:ZSL (zero shutter lag) 
 拍照&回显瞬间完成
 
-//感光度:ISO
+//感光度(感光灵敏度):ISO (因为由iso制定的颜色标准)
 胶片,sensor的感光
 
 //光学防抖（Optical image stabilization)
 
 --------------------- 
-作者：qccz123456 
-来源：CSDN 
-原文：https://blog.csdn.net/qccz123456/article/details/52371614 
-版权声明：本文为博主原创文章，转载请附上博文链接！
 
 //
 常见输出格式有：
@@ -74,15 +70,17 @@ camera的参数通常有分辨率、清晰度、亮度、对比度、饱和度�
 
 YVYU, UYVY格式跟YUY2類似，只是排列順序有所不同。
 
-常见排列格式如下：
+常见排列格式如下：(yuv的数据比例 422 420)
+YVYU: YVYUYVYUYVYU     =>YUV422
+//I420和YV12都是3-plane，YUV数据段分了三段Y-U-V
+I420: YYYYYYYY UU VV   =>YUV420P
+YV12: YYYYYYYY VV UU   =>YUV420P
+//NV12和NV21则是2-plane，YUV数据段只分两段Y-UV或是Y-VU
+NV12: YYYYYYYY UVUV    =>YUV420SP
+NV21: YYYYYYYY VUVU    =>YUV420SP
 
-    YVYU: YVYUYVYUYVYU  =>YUV422
-    I420: YYYYYYYY UU VV    =>YUV420P
-    YV12: YYYYYYYY VV UU    =>YUV420P
-    NV12: YYYYYYYY UVUV    =>YUV420SP
-    NV21: YYYYYYYY VUVU    =>YUV420SP
 
-I420和YV12都是3-plane，也就是YUV数据段分了三段Y-U-V，而NV12和NV21则是2-plane，也就是YUV数据段只分两段Y-UV或是Y-VU，处理时必须特别注意BUFFER的起始地址！！
 
-网上很多YUV转RGB，其实都是YUV444,而不是YUV420, 420处理时，还细分是NV12还是NV21或是YV12等格式，必须把UV映射弄清楚。不同的转换矩阵转出来效果也不同，不同的转换矩阵往往对应的输入源数据也不同。
+网上很多YUV转RGB，其实都是YUV444,而不是YUV420, 420处理时，还细分是NV12还是NV21或是YV12等格式，必须把UV映射弄清楚。
+不同的转换矩阵转出来效果也不同，不同的转换矩阵往往对应的输入源数据也不同。
 

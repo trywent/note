@@ -15,12 +15,11 @@ WindowState(WindowManagerService service, Session s, IWindow c, WindowToken toke
   }else{
 	- mBaseLayer = mPolicy.getWindowLayerLw(this) * TYPE_LAYER_MULTIPLIER + TYPE_LAYER_OFFSET
   }
-- mWinAnimator = new WindowStateAnimator(this)
+- mWinAnimator = new WindowStateAnimator(this) //窗口surface
 - mInputWindowHandle = new InputWindowHandle
 }
 
-
-
+//计算窗口大小
 computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
             Rect contentFrame, Rect visibleFrame, Rect decorFrame, Rect stableFrame,
             Rect outsetFrame){
@@ -38,5 +37,26 @@ computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
 		}
 	- mDisplayFrame.set(mContainingFrame)
   }
+- 
+}
+
+//加入mResizingWindows
+mApplySurfaceChangesTransaction@DisplayContent.java-->
+updateResizingWindowIfNeeded{
+- boolean configChanged = isConfigChanged()
+- boolean dragResizingChanged = isDragResizeChanged()
+  //inset,大小发生变化
+- mContentInsetsChanged..{
+	- updateLastInsetValues
+	- mService.mResizingWindows.add(this) //加入resizing中
+	}
+}@WindowState.java
+
+
+handleResizingWindows@RootWindowContainer.java-->
+reportResized-->dispatchResized-->mClient.resized(frame)@WindowState.java
+
+//销毁
+destroySurface(boolean cleanupOnResume, boolean appStopped){
 - 
 }

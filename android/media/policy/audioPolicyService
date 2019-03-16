@@ -120,7 +120,7 @@ AudioPolicyService::{
 
 
 //devices状态
-AudioPolicyManager::setDeviceConnectionStateInt{
+AudioPolicyManager::setDeviceConnectionState-->setDeviceConnectionStateInt{
 - mAvailableOutputDevices.add(devDesc)
 - mAvailableInputDevices.add(devDesc)
 }

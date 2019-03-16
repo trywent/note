@@ -1,0 +1,65 @@
+/**********************
+ windowAnimation
+*/
+
+WindowManagerService-->WindowAnimator mAnimator = new WindowAnimator(this)-->
+WindowAnimator(WindowManagerService service){
+- mService = service
+  //新建线程ServiceThread,执行run(阻塞等待直到返回).设置mChoreographer
+- AnimationThread.getHandler().runWithScissors(() -> mChoreographer = Choreographer.getSfInstance())
+- mAnimationFrameCallback = frameTimeNs -> {
+            animate(frameTimeNs);
+        }
+}@WindowAnimator.java
+
+
+//执行动画
+scheduleAnimation-->mChoreographer.postFrameCallback(mAnimationFrameCallback)-->
+animate(frameTimeNs){
+- 
+}@WindowAnimator.java
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/WindowAnimator.java
+frameworks/base/services/core/java/com/android/server/AnimationThread.java
+/**********************
+ stack animation
+*/
+BoundsAnimator.onAnimationEnd@BoundsAnimationController.java-->
+onAnimationEnd-->mService.mActivityManager.moveTasksToFullscreenStack@TaskStack.java
+-->moveTasksToFullscreenStack@ActivityManagerService.java
+
+animateResizePinnedStack-->getWindowContainerController().animateResizePinnedStack@PinnedActivityStack.java
+animateResizePinnedStack-->mService.mBoundsAnimationController.getHandler().post-->
+mService.mBoundsAnimationController.animateBounds@PinnedStackWindowController.java
+
+
+
+
+animateBounds-->animateBoundsImpl{
+- BoundsAnimator animator = new BoundsAnimator(target, from, to)
+- mRunningAnimations.put(target, animator)
+ //设置并开始
+- animator.setFloatValues(
+- animator.setDuration
+- animator.setInterpolator(mFastOutSlowInInterpolator)
+- animator.start()
+}@BoundsAnimationController.java
+
+
+animateBoundsImpl-->BoundsAnimator.onAnimationStart@BoundsAnimationController.java
+-->setPinnedStackSize@TaskStack.java
+
+
+frameworks/base/services/core/java/com/android/server/am/PinnedActivityStack.java
+frameworks/base/services/core/java/com/android/server/wm/PinnedStackWindowController.java
+frameworks/base/services/core/java/com/android/server/wm/BoundsAnimationController.java
+frameworks/base/services/core/java/com/android/server/wm/TaskStack.java
+
+
+updateDrawnWindowStates@AppWindowToken.java
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
