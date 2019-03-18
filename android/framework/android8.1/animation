@@ -1,6 +1,32 @@
 /**********************
- tweened animation:差变动画(属性动画)
- frame-by-frame animation:帧动画
+ animation
+
+*/
+
+//图像内容动画(animate bitmaps):图像内容变化.圆形按钮变成方形
+{
+
+}
+//图像显示,隐藏,位移动画(animate ui visisbility and motion): 图像移位,显示,隐藏
+{
+- 
+}
+//图像布局变化(animate layout changes): activity中fragment切换
+{
+- Scene
+- Transition
+- TransitionManager.go()
+}
+//activity切换:应用切换
+{
+- ActivityOptions.makeSceneTransitionAnimation()
+- startActivity()
+}
+
+
+/*
+ 属性动画: tweened animation(差变动画)
+ 
 
   AlphaAnimation, AnimationSet, RotateAnimation, ScaleAnimation, TranslateAnimation 
 */

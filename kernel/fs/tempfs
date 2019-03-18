@@ -1,0 +1,7 @@
+/***********************
+ temp文件系统
+ 字符设备,块设备
+*/
+
+
+而devtmpfs的设备节点名字应该是device_create()-->device_register()-->device_add()--->devtmpfs_create_node()--->device_get_devnode()这个函数所
