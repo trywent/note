@@ -19,7 +19,7 @@ setWindowManager(WindowManager wm, IBinder appToken, String appName){
 }@Window.java
 
 //设置contentView,LayoutParams
-onCreate@Activity-->setContentView{
+onCreate-->getWindow().setContentView(layoutResID)@Activity-->setContentView{
 - ViewGroup mContentParent==null
 	installDecor{
 		- DecorView mDecor= generateDecor-->new DecorView //包含content	

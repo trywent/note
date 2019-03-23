@@ -1,5 +1,5 @@
 /**********************
- windowAnimation
+ WindowAnimator
 */
 
 WindowManagerService-->WindowAnimator mAnimator = new WindowAnimator(this)-->
@@ -12,17 +12,52 @@ WindowAnimator(WindowManagerService service){
         }
 }@WindowAnimator.java
 
+//
+getScreenRotationAnimationLocked-->getDisplayContentsAnimatorLocked(int displayId){
+- DisplayContentsAnimator displayAnimator = mDisplayContentsAnimators.get(displayId)
+- displayAnimator == null{
+	- displayAnimator = new DisplayContentsAnimator()
+	- mDisplayContentsAnimators.put(displayId, displayAnimator)
+	}
+}@WindowAnimator.java
+
+setScreenRotationAnimationLocked(ScreenRotationAnimation animation){
+- DisplayContentsAnimator animator = getDisplayContentsAnimatorLocked(displayId)
+- animator.mScreenRotationAnimation = animation
+}
 
 //执行动画
+scheduleAnimationLocked@WindowManagerService.java-->
 scheduleAnimation-->mChoreographer.postFrameCallback(mAnimationFrameCallback)-->
 animate(frameTimeNs){
 - 
+- mService.openSurfaceTransaction()
+//遍历所有dispaly
+- dc.stepAppWindowsAnimation(mCurrentTime){//所有WindowContainer执行
+	- stepAppWindowsAnimation 
+	}
+  //旋转动画
+- ScreenRotationAnimation screenRotationAnimation = displayAnimator.mScreenRotationAnimation
+- screenRotationAnimation.stepAnimationLocked
+  //遍历所有窗口执行动画
+- dc.updateWindowsForAnimator-->forAllWindows(mUpdateWindowsForAnimator)-->
+	mUpdateWindowsForAnimator(WindowState w){//遍历所有窗口
+	- WindowStateAnimator winAnimator = w.mWinAnimator
+	- winAnimator.stepAnimationLocked //动画步进
+	- w.performShowLocked() //窗口显示
+	}@DisplayContent.java
+- dc.updateWallpaperForAnimator
+- dc.prepareWindowSurfaces
+//遍历所有dispaly
+- mService.closeSurfaceTransaction()
+
 }@WindowAnimator.java
 
 
 
 frameworks/base/services/core/java/com/android/server/wm/WindowAnimator.java
 frameworks/base/services/core/java/com/android/server/AnimationThread.java
+frameworks/base/services/core/java/com/android/server/wm/ScreenRotationAnimation.java
 /**********************
  stack animation
 */

@@ -1,4 +1,11 @@
-//
+/*
+
+创建adb_usb.ini文件，写入android设备的VID( 12d1:1079)
+echo 0x12d1 > ~/.android/adb_usb.ini
+
+vim /etc/udev/rules.d/70-android.rules
+service udev restart
+*/
 transport_socket_events@transport.c-->handle_packet@adb.c-->parse_banner@adb.c
 ====================
 adb协议：

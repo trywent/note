@@ -6,7 +6,13 @@ WindowManagerService{
 - mRoot = new RootWindowContainer(this)
 - mPolicy = policy
 - mFxSession = new SurfaceSession()
+
+- mAppTransition = new AppTransition(context, this)
+- AnimationHandler animationHandler = new AnimationHandler()
+- animationHandler.setProvider(new SfVsyncFrameCallbackProvider())
+- mBoundsAnimationController = new BoundsAnimationController(context, mAppTransition,animationHandler)
 - WindowAnimator mAnimator = new WindowAnimator(this)
+
 }@WindowManagerService.java
 
 
@@ -139,6 +145,36 @@ relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,
 - 
 }@WindowManagerService.java
 
+
+=====================
+/* 冻结画面
+  设置旋转动画到WindowAnimator
+*/
+startFreezingDisplayLocked(boolean inTransaction, int exitAnim, int enterAnim,int displayId){
+- mScreenFrozenLock.acquire() //wakeLock
+- mDisplayFrozen = true
+- mFrozenDisplayId = displayContent.getDisplayId()
+- mAppTransition.freeze(){
+
+	}
+- mExitAnimId = exitAnim,mEnterAnimId = enterAnim
+  //先停止WindowAnimator中已有动画
+- ScreenRotationAnimation screenRotationAnimation = mAnimator.getScreenRotationAnimationLocked(mFrozenDisplayId)
+- screenRotationAnimation.kill()
+- screenRotationAnimation = new ScreenRotationAnimation
+- mAnimator.setScreenRotationAnimationLocked(mFrozenDisplayId,screenRotationAnimation) //设置到WindowAnimator
+}@WindowManangerService.java
+
+
+stopFreezingDisplayLocked{
+- DisplayContent displayContent = mRoot.getDisplayContent(mFrozenDisplayId)
+- displayId = mFrozenDisplayId
+- mDisplayFrozen = false
+- mAnimator.setScreenRotationAnimationLocked(displayId, null)//设置旋转动画为空
+  //冻结结束,更新画面
+- boolean configChanged = updateOrientationFromAppTokensLocked
+- mH.obtainMessage(H.SEND_NEW_CONFIGURATION)
+}
 
 frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
 frameworks/base/services/core/java/com/android/server/am/ActivityRecord.java

@@ -20,6 +20,7 @@ am startservice -n com.syu.ms/app.ModuleService
 
 am start com.sprd.engineermode/.EngineerModeActivity
 
+am 
 //广播
 am broadcast -a com.android.test --es test_string "this is test string" --ei test_int 100 --ez test_boolean true
 

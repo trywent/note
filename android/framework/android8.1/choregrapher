@@ -1,7 +1,8 @@
 /**********************
- 应用并不知道绘制画面,更新画面的时间点.需要一个统一的刷新频率.脉冲事件需要主动请求
- 
+ 应用并不知道绘制画面,更新画面的时间点.需要一个统一的刷新频率.脉冲事件需要主动请求 
  Choreographer:用于接收固定时间间隔事件(屏幕刷新间隔16.66ms),处理动画,输入,绘制
+
+ WindowManagerService,ViewRootImpl,animator都使用Choreographer提供的脉冲
 
  事件获取和处理都在当前的线程中执行.出现处理不及时会是什么问题?
  
@@ -101,7 +102,7 @@ postCallbackDelayedInternal(int callbackType,Runnable action,long delayMillis){
 	}
 }
 
-//frame,动画类型
+//frame,CALLBACK_ANIMATION
 postFrameCallback(FrameCallback callback)-->postFrameCallbackDelayed-->
 postCallbackDelayedInternal(CALLBACK_ANIMATION,callback)-->
 
@@ -142,7 +143,10 @@ doCallbacks(int callbackType, long frameTimeNanos)
 - long now = System.nanoTime()
 - CallbackRecord callbacks= mCallbackQueues[callbackType].extractDueCallbacksLocked(now) //获取当前时间callback
 - for(CallbackRecord c = callbacks; c != null; c = c.next){
-	- c.run(frameTimeNanos)
+	- c.run(frameTimeNanos){
+		- FRAME_CALLBACK_TOKEN,action.doFrame
+		- else,action.run
+		}
 	}
 - recycleCallbackLocked
 }
@@ -153,7 +157,43 @@ frameworks/base/core/java/android/view/Choreographer.java
 frameworks/base/core/java/android/view/DisplayEventReceiver.java
 frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp
 
-/*
+/**********************
+ AnimationHandler:animator使用这个类中的方法,获取脉冲回调
+
+*/
+Choreographer.FrameCallback mFrameCallback = new Choreographer.FrameCallback() {
+- doFrame{
+	  //执行任务
+	- doAnimationFrame
+	  //回调不为空,获取下一次脉冲
+	- mAnimationCallbacks.size() > 0,getProvider().postFrameCallback(this)
+	}
+}@AnimationHandler.java
+
+//加入动画回调到mAnimationCallbacks..有callback时会一直获取脉冲
+addAnimationFrameCallback(AnimationFrameCallback callback){
+- getProvider().postFrameCallback(mFrameCallback)-->FrameCallback.doFrame--> //脉冲时执行CALLBACK_ANIMATION
+	doAnimationFrame{
+	 //遍历mAnimationCallbacks
+	- AnimationFrameCallback callback = mAnimationCallbacks.get(i)
+	- callback.doAnimationFrame(frameTime)
+	- getProvider().postCommitCallback()-->postCallback(Choreographer.CALLBACK_COMMIT, runnable)//脉冲时执行CALLBACK_COMMIT
+	- cleanUpList //清除要删除的回调
+	}
+- mAnimationCallbacks.add(callback)
+}@AnimationHandler.java
+
+//移除回调,停止获取脉冲
+removeCallback(AnimationFrameCallback callback){
+- mCommitCallbacks.remove(callback)
+- mAnimationCallbacks.set(id, null) //将回调设置为null,执行动画后被移除
+}@AnimationHandler.java
+
+//提交
+addOneShotCommitCallback
+
+frameworks/base/core/java/android/animation/AnimationHandler.java
+/**********************
  ViewRootImpl
  view中发起同步的绘制事件
 */
@@ -169,8 +209,17 @@ scheduleConsumeBatchedInput-->mChoreographer.postCallback(Choreographer.CALLBACK
 -->ConsumeBatchedInputRunnable.run-->doConsumeBatchedInput@ViewRootImpl.java
 
 //view处理.CALLBACK_ANIMATION
--->mChoreographer.postCallback(Choreographer.CALLBACK_ANIMATION,this)
--->InvalidateOnAnimationRunnable.run@ViewRootImpl.java
+dispatchInvalidateOnAnimation/dispatchInvalidateRectOnAnimation-->
+mInvalidateOnAnimationRunnable.addView(view){
+- mViews.add(view)
+- InvalidateOnAnimationRunnable.addView-->postIfNeededLocked-->
+  mChoreographer.postCallback(Choreographer.CALLBACK_ANIMATION,this)-->InvalidateOnAnimationRunnable.run{
+	- mTempViews = mViews.toArray //取出所有要处理的view
+	- mTempViews[i].invalidate() //遍历
+	- mTempViewRects = mViewRects.toArray		
+	- info.target.invalidate
+	}
+}@ViewRootImpl.java
 
 //布局.CALLBACK_TRAVERSAL
 scheduleTraversals-->mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL,mTraversalRunnable)

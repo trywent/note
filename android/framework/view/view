@@ -1,143 +1,75 @@
 /******************************
+ android draw views:
+ ViewGroup：子类 FrameLayout, GridLayout, LinearLayout, PagerTitleStrip, RelativeLayout等
 
-  android draw views:
-  绘画布局，从根节点开始，ViewGroup负责子项的绘画，View负责自己的绘画。不会绘画不显视的部分。
 */
-绘画布局有两个过程：测量，和布局。
--测量由函数measure(int,int)实现，从View树上部到底部操作，每个View将大小传递下去，
- 最后每个View都得到自己的测量结果。
--布局由layout(int,int,int,int)，也是从上到下。父项负责使用测量的结果放置子项在合适的位置。
 
-ViewGroup.LayoutParams用来告诉父项，View想要放置的位置，大小
-MeasureSpec 父项用来传递给子项，父项要求子项的大小等
-============================
-view一个矩形区域，处理绘制和事件
-viewGroup是layout的基本类。是不可见的容器，用于装载其他view（或viewGroup）.
-一个view的属性top,left,width,height。并有对应的方法获取这些属性。top,left是相对于父容器的坐标。
-view有两对维度值，测量宽高（在父容器中的大小），实际宽高（实际显示的大小，在绘制时段layout之后）
 
-一个window中的view被组织成一个树
-view通常的操作：
-Set properties:（属性）
- 	for example setting the text of a TextView. The available properties and the methods that set them will vary among the different subclasses of views. Note that properties that are known at build time can be set in the XML layout files.
+//layout两个过程：measure,layout
+measure:从上到下遍历ViewGroup中view.调用view.measure(int, int)，最后每个view保存自己的测量结果。
+layout:从上到下调用layout(int, int, int, int)，在这个过程中父View根据measure的结果，确定子View的位置
 
-Set focus:（焦点）
-	 The framework will handled moving focus in response to user input. To force focus to a specific view, call requestFocus().
 
-Set up listeners:（监听器）
-	 Views allow clients to set listeners that will be notified when something interesting happens to the view. For example, all views will let you set a listener to be notified when the view gains or loses focus. You can register such a listener using setOnFocusChangeListener(android.view.View.OnFocusChangeListener). Other view subclasses offer more specialized listeners. For example, a Button exposes a listener to notify clients when the button is clicked.
-
-Set visibility:（可见）
-	 You can hide or show views using setVisibility(int).
-
-实现自定义的View：
-重写那些被框架调用的标准函数。通常只要实现onDraw()函数。
-
-大小，填充，边缘空白：
-View有两种大小，一种是测量的大小，一种是实际显示的大小。
-测量的大小包括填充的象素，填充可以用来移位View中的显示内容的位置。
-View不支持边缘空白。ViewGroup支持。
-____________________
-layout处理：
-布局有两个过程：measure,layout
-measure:在view树中从上到下调用measure(int, int)，最后每个view保存自己的测量结果。
-layout:也是从上到下调用layout(int, int, int, int)，在这个过程中父View根据measure的结果，确定子View的位置
-
-当view的方法measure()返回后，view中getMeasuredWidth()和getMeasuredHeight()的值必须被设置。
-测得的值必须满足父View的要求(不能超出父View的大小),父View调用measure可能不止一次。
-
-measure过程使用两个类来传递View大小。View.MeasureSpec用来告诉父View，子View想被如果测量和放置。
-LayoutParams类用来描述View的长宽。
-
-这些大小值可以用来描述：
-    an exact number
-    MATCH_PARENT, which means the view wants to be as big as its parent (minus padding)
-    WRAP_CONTENT, which means that the view wants to be just big enough to enclose its content (plus padding). 
-
-MeasureSpecs 用来在测量过程中传递父View对子View的限定要求。有三种模式：
-
+//LayoutParams：view的大小
+    an exact number:确定值
+    MATCH_PARENT:父view一样大小
+    WRAP_CONTENT:view包含的内容大小 
+//MeasureSpecs: 父view如何测量view大小和位置
     UNSPECIFIED: 测量子View期望的大小，父View不限定.
     EXACTLY: 父View限定子View一个固定大小。
     AT_MOST: 父View限定子View一个最大的大小范围。所有的子View必须符合这个限定
 
 
 
+1/*
+ 布局,位置,大小
+ int measureSpec(0-29值,30-31模式)
+ MODE_MASK  = 0x3 << 30 //30-31为布局模式 UNSPECIFIED,EXACTLY,AT_MOST
+ 
+*/
+invalidate-->invalidateInternal(0, 0, mRight - mLeft, mBottom - mTop)-->p.invalidateChild@View.java-->
+invalidateChild(View child, Rect r){
+- ViewParent parent = this
+- while(parent@!=null){//循环获取父view,执行invalidateChildInParent
+	- parent = parent.invalidateChildInParent-->
+		invalidateChildInParent{
+		- invalidateRectOnScreen-->scheduleTraversals
+		}@ViewRootImpl.java
+	}
+}@ViewGroup.java
 
-测量过程：
-ViewGroup(相当View的容器，也是布局实现的地方)：
-子类 FrameLayout, GridLayout, LinearLayout, PagerTitleStrip, RelativeLayout等
-例：FrameLayout
+measureChildren(int widthMeasureSpec, int heightMeasureSpec)-->measureChild{
+- LayoutParams lp = child.getLayoutParams()
+- childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec,mPadding,lp.width)
+- childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec,mPadding,lp.height){
+	- 	
+	}
+- child.measure(childWidthMeasureSpec, childHeightMeasureSpec)
+}@ViewGroup.java
 
-测大小：onMeasure(传入参数，期望被测量View的尺寸)@FrameLayout.java-->measureChildWithMargins@ViewGroup.java-->
-child.measure-->measure-->onMeasuer(根据期望的尺寸和最小的尺寸，确定最终尺寸width,height)@View.java
-
-测位置：onLayout(根据LayoutParams，确定View在父容器中的相对位置)@FrameLayout.java-->child.layout-->layout
-(将测得的值保存在View中)@View
-
--------------------------
-Drawing绘制：
-父view在子view之前绘制。调用 invalidate()使View被绘制。
-
--------------------------
-事件的处理，线程：
-1事件发生并被分发到View,View处理事件调用监听器
-2在处理过程中，View的边界发生改变会调用requestLayout().
-3处理过程中，View的显示需要改变会调用invalidate()
-4如果requestLayout()或invalidate()被调用，框架负责测量，布局，绘制View树。
-
-
-//大小
-measure(widthMeasureSpec,heightMeasureSpec/*父view的范围*/)-->setMeasuredDimensionRaw{
-- mMeasuredWidth //设置宽高
-- mMeasuredHeight
+//设置mMeasuredWidth,mMeasuredHeight
+measure(widthMeasureSpec,heightMeasureSpec/*父view的范围*/){
+- 
+- onMeasure(widthMeasureSpec, heightMeasureSpec){
+	- getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec)
+	- setMeasuredDimensionRaw{
+		- mMeasuredWidth,mMeasuredHeight //设置宽高
+		}
+	}
 }@view.java
 
-performTraversals(第一次布局)@ViewRootImpl.java-->dispatchAttachedToWindow{
-- 设置mAttachInfo
-- ViewRootimpl获取View的属性，performCollectViewAttributes
+//设置位置mLeft,mTop,mRight,mBottom	
+layout(int l, int t, int r, int b){
+- if(isLayoutModeOptical(mParent)){
+	- setOpticalFrame(l, t, r, b)
+  }else{
+	- setFrame(l, t, r, b){
+		- 设置mLeft,mTop,mRight,mBottom	
+		}
+  }
+- onLayout(boolean changed, int left, int top, int right, int bottom)
 }@View.java
 
-collectViewAttributes@ViewRootImpl.java-->mView.dispatchCollectViewAttributes-->
-performCollectViewAttributes@View.java
-
-
-
-//
-invalidate{
-- p.invalidateChild-->parent.invalidateChildInParent@ViewGroup.java
-	-->invalidateChildInParent@ViewRootImpl.java
-}@View.java
-
-
-============================
-//绘制：
-scheduleTraversals-->mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable)
-@ViewRootImpl.java-->doFrame-->doCallback-->c.run@Choreographer.java-->
-TraversalRunnable.run-->doTraversal-->performTraversals-->mView.draw@ViewRootImpl.java
-
-
-draw(){
-- 
-- 
-}@View.java
-
-
-getDisplayList
-
-buildDrawingCache
-
-createSnapshot
-
-dispatchDraw-->drawChild-->child.draw@ViewGroup.java-->draw(Canvas canvas, ViewGroup parent, long drawingTime)@View.java
-
-onDrawShadow
-
-
-
-
-frameworks/base/core/java/android/view/WindowManagerImpl.java
-frameworks/base/core/java/android/view/ViewRootImpl.java
-_____________________
 //焦点
 onFocusChanged{
 - switchDefaultFocusHighlight{ //默认高亮
@@ -146,7 +78,7 @@ onFocusChanged{
 	- setDefaultFocusHighlight(null)
 	}
 }@View.java
-_____________________
+
 //View布局设置：
 SYSTEM_UI_FLAG_FULLSCREEN:
 能够隐藏状态条。与WindowManager.LayoutParams.FLAG_FULLSCREEN效果一样，除了在设置
@@ -169,3 +101,74 @@ SYSTEM_UI_FLAG_LOW_PROFILE:
 
 SYSTEM_UI_FLAG_VISIBLE:
 使状态条，导航条可见
+
+2/*
+ 绘制
+
+*/
+
+
+
+scheduleTraversals-->mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable)
+@ViewRootImpl.java-->doFrame-->doCallback-->c.run@Choreographer.java-->
+TraversalRunnable.run-->doTraversal-->performTraversals-->mView.draw@ViewRootImpl.java
+
+
+draw(Canvas canvas, ViewGroup parent){
+- boolean hardwareAcceleratedCanvas = canvas.isHardwareAccelerated() //硬件加速
+  //动画
+- Animation a = getAnimation()
+- more = applyLegacyAnimation(parent, drawingTime, a)
+- transformToApply = parent.getChildTransformation() //将要设置的动画改变值
+- 
+- if(transformToApply!=null){
+	- 
+	}
+}@View.java
+
+
+getDisplayList
+
+buildDrawingCache
+
+createSnapshot
+
+dispatchDraw-->drawChild-->child.draw@ViewGroup.java-->draw(Canvas canvas, ViewGroup parent, long drawingTime)@View.java
+
+onDrawShadow
+
+
+3/*
+ 动画
+ 
+*/
+startAnimation(Animation animation){
+- animation.setStartTime(Animation.START_ON_FIRST_FRAME)
+- setAnimation(animation){
+	- mCurrentAnimation = animation
+	- animation.reset()
+	}
+- invalidate(true)
+}@View.java
+
+
+applyLegacyAnimation(ViewGroup parent, long drawingTime,Animation a){
+ //确保初始化animation
+- boolean initialized = a.isInitialized()
+- a.initialize
+- onAnimationStart
+ //transformation
+- Transformation t = parent.getChildTransformation()
+- boolean more = a.getTransformation(drawingTime, t)
+- invalidationTransform = t
+ //计算变化区域,执行invalid
+- a.getInvalidateRegion(invalidationTransform)
+- parent.invalidate
+}@View.java
+
+frameworks/base/core/java/android/view/View.java
+frameworks/base/core/java/android/view/WindowManagerImpl.java
+frameworks/base/core/java/android/view/ViewRootImpl.java
+
+
+

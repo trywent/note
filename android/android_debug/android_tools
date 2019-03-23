@@ -1,4 +1,7 @@
-//
+/*
+dumpsys、Systrace、TraceView、Update Threads（更新线程）、Update Heap（更新堆）、Allocation Tracker（分配跟踪器）
+
+*/
 
  Systrace工具可以生成应用和系统的潜在的巨大数据，为了限制工具收集的数据量，使数据与分析相关，使用下面的选项：
     1.限制trace抓取的时间使用-t，--time选项，默认的trace时长是5s

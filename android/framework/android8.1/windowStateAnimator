@@ -57,5 +57,14 @@ destroySurfaceLocked{
 - mWin.setHasSurface(false)
 }@WindowStateAnimator.java
 
+ 
+
+//动画
+stepAnimationLocked(long currentTime){
+- 
+}
+
+
+
 frameworks/base/services/core/java/com/android/server/wm/WindowStateAnimator.java
 frameworks/base/services/core/java/com/android/server/wm/WindowSurfaceController.java

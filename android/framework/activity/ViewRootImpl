@@ -18,7 +18,7 @@ performLaunchActivity@ActivityThread.java-->attach{
 
 
 //创建rootView：并加入decor为DecorView@PhoneWindow.java
-handleResumeActivity-->(将activity的View加入到窗口)wm.addView(decor/*window.getDecorView*/)@ActivityThread.java-->
+handleResumeActivity-->(将activity的View加入到窗口)wm.addView(DecorView/*activity.window.getDecorView*/)@ActivityThread.java-->
 addView-->LocalWindowManager.addView(设置LayoutParams)-->super.addView@window.java-->
 CompatModeWrapper.addView-->mWindowManager.addView-->addView(View, ViewGroup.LayoutParams)
 -->addView(view, params, null, false)-->addView(view){

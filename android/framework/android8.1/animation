@@ -1,6 +1,5 @@
 /**********************
- animation
-
+ 动画效果
 */
 
 //图像内容动画(animate bitmaps):图像内容变化.圆形按钮变成方形
@@ -24,11 +23,15 @@
 }
 
 
-/*
- 属性动画: tweened animation(差变动画)
- 
+1/* 
+ 属性动画:在一个时间段内,产生对应时间点的属性值.
+ 动画的步进方式也使用choregrapher(AnimationHandler封装)
 
-  AlphaAnimation, AnimationSet, RotateAnimation, ScaleAnimation, TranslateAnimation 
+ 动画发生器ValueAnimator,ObjectAnimator,AnimatorSet
+ 估值器IntEvaluator,FloatEvaluator
+ 插值器AccelerateDecelerateInterpolator,AccelerateInterpolator //一直加速
+
+ 动画发生器android.animation
 */
 Property Animation{
 - Duration:动画操作的时长，默认是300ms
@@ -38,51 +41,67 @@ Property Animation{
 - Frame refresh delay: 能够定义动画的帧刷新频率。默认是没10ms刷新一次
 }
 
-
-
-工作原理：//定义所有与动画有关的时间,时长,当前属性的值,目的属性值...
+//定义所有与动画有关的时间,时长,当前属性的值,目的属性值...
 ValueAnimator{            
 - int duration		   //时长	
 - int startPropertyValue   //开始值
 - int endPropertyValue 	   //结束值
 - start()                    //调用后动画开始
-- TimeInterpolator	   //属性值改变的方式(线性改变，加速改变，降速改变)
-- TypeEvaluator              //包含方法，用来计算属性值
+- TimeInterpolator	   //插值器,属性值改变的方式(线性改变，加速改变，降速改变)
+- TypeEvaluator              //估值器,包含方法，用来计算属性值
 }
 
-1，设置属性初始值，结束值，动画时长。动画开始后ValueAnimator计算动画经过的片段值(0~1之间，百分比)。
-   
-2，ValueAnimator计算片段值后，会调用当前的TimeInterpolator用来计算插值片段
-(插值片段是TimeInterpolator中定义的动画变化片段)
+//开始
+start(boolean playBackwards){
+- addAnimationCallback-->getAnimationHandler().addAnimationFrameCallback(this)//加入脉冲回调
+- startAnimation
+}@ValueAnimator.java
 
-3，当插值片段计算好后，ValueAnimator调用TypeEvaluator计算属性这时应该对应的值。
-
-总结：对象的属性值随时间变化而改变，改变方式通过TimeInterpolator定义，改变的值通过TypeEvaluator计算。
-_______________________________
-动画过程：计算值，根据计算值设置对象的属性
-
-//事件接收
-ValueAnimator
-ObjectAnimator  //设置对象中的属性值
-AnimatorSet
+//结束animator
+endAnimation{
+- removeAnimationCallback-->getAnimationHandler().removeCallback(this) //从脉冲回调中移除
+- notifyStartListeners
+}@ValueAnimator.java
 
 
-//根据时间数据计算动画的属性值
-IntEvaluator
-FloatEvaluator
-
-//根据时间变化值变化
-AccelerateDecelerateInterpolator //中间快，两边慢
-AccelerateInterpolator //一直加速
-
-___________
-setEvaluator(TypeEvaluator value)
-setInterpolator(TimeInterpolator value)
-
-/*
+frameworks/base/core/java/android/animation/ValueAnimator.java
+frameworks/base/core/java/android/animation/AnimationHandler.java
+3/*
   frame-by-frame animation:帧动画
 */
 
 
+
+
+/*
+  view.animation
+
+  AlphaAnimation, AnimationSet, RotateAnimation, ScaleAnimation, TranslateAnimation
+
+*/
+Transformation{
+- mAlpha   //透明值
+- mMatrix  //位置,大小
+}@Transformation.java
+
+//获取当前时间点的变化
+getTransformation(long currentTime, Transformation outTransformation){
+- mStartTime = currentTime //记录开始时间
+- startOffset = getStartOffset()
+- duration = mDuration
+- normalizedTime = ((float) (currentTime - (mStartTime + startOffset))) /(float) duration//当前动画执行的进程比例
+  //当前插值器,计算当前的变化值
+- float interpolatedTime = mInterpolator.getInterpolation(normalizedTime)
+- applyTransformation(interpolatedTime, outTransformation){
+	- 
+	}
+  //判断动画是否结束,或者重复
+- fireAnimationEnd/fireAnimationRepeat 
+- return mMore //是否还要执行
+}@Animation.java
+
+
+
+frameworks/base/core/java/android/view/animation/Animation.java
 frameworks/base/graphics/java/android/graphics/drawable/AnimationDrawable.java
 

@@ -19,7 +19,11 @@ WindowState(WindowManagerService service, Session s, IWindow c, WindowToken toke
 - mInputWindowHandle = new InputWindowHandle
 }
 
-//计算窗口大小
+/*计算窗口大小
+ mContentInsets
+ mVisibleInsets
+ mStableInsets
+*/
 computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
             Rect contentFrame, Rect visibleFrame, Rect decorFrame, Rect stableFrame,
             Rect outsetFrame){
@@ -40,20 +44,30 @@ computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
 - 
 }
 
-//加入mResizingWindows
+//窗口发生变化,加入mResizingWindows
 mApplySurfaceChangesTransaction@DisplayContent.java-->
 updateResizingWindowIfNeeded{
+  //判断last和当前值是否变化
+- setReportResizeHints{
+	- mOverscanInsetsChanged
+	- mContentInsetsChanged
+	}
 - boolean configChanged = isConfigChanged()
 - boolean dragResizingChanged = isDragResizeChanged()
   //inset,大小发生变化
-- mContentInsetsChanged..{
-	- updateLastInsetValues
+- if(mContentInsetsChanged|| winAnimator.mSurfaceResized||mFrameSizeChanged){
+	  //保存当前值last
+	- updateLastInsetValues{
+		- mLastContentInsets.set(mContentInsets)
+		- mLastVisibleInsets.set(mVisibleInsets)
+		}
 	- mService.mResizingWindows.add(this) //加入resizing中
 	}
 }@WindowState.java
 
 
-handleResizingWindows@RootWindowContainer.java-->
+//通知应用窗口发生变化
+handleResizingWindows-->win.reportResized()@RootWindowContainer.java-->
 reportResized-->dispatchResized-->mClient.resized(frame)@WindowState.java
 
 //销毁

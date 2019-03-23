@@ -1,6 +1,7 @@
 /**********************
  viewRootImpl
 
+ DecorView extends FrameLayout implements RootViewSurfaceTaker, WindowCallbacks
 */
 ViewRootImpl(Context context, Display display) {
 - mWindowSession = WindowManagerGlobal.getWindowSession(){
@@ -9,15 +10,125 @@ ViewRootImpl(Context context, Display display) {
 	}WindowManangerGlobal.java
 - mThread = Thread.currentThread()
 - mWindow = new W(this)
-- mChoreographer = Choreographer.getInstance()
+- mChoreographer = Choreographer.getInstance() //界面刷新的脉冲驱动
 }
 
+//加入窗口,加入view DecorView extends 
 setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
-- mView = view
+- mView = view //DecorView
 - mWindowAttributes.copyFrom(attrs)
 - mInputChannel = new InputChannel()
 - mWindowSession.addToDisplay(mWindow, mWindowAttributes)
 }@ViewRootImpl.java
 
+//窗口状态
+performRestart/performStop-->WindowManagerGlobal.getInstance().setStoppedState(mToken, true)@Activity.java
+setStoppedState-->root.setWindowStopped@WindowManagerGlobal.java-->
+setWindowStopped(boolean stopped){
+- mStopped = stopped
+- ThreadedRenderer renderer = mAttachInfo.mThreadedRenderer
+- !stopped,scheduleTraversals
+- stoped,renderer.destroyHardwareResources(mView)
+}@ViewRootImpl.java
 
-w.resized(Rect frame)-->viewAncestor.dispatchResized
+
+//report draw
+reportResized-->dispatchResized-->mClient.resized(frame)@WindowState.java-->
+W.resized(Rect frame,boolean reportDraw)-->dispatchResized-->
+mHandler.obtainMessage(reportDraw ? MSG_RESIZED_REPORT : MSG_RESIZED).send-->
+ViewRootHandler.handleMessage(MSG_RESIZED_REPORT)-->
+reportNextDraw{
+- drawPending
+- mReportNextDraw = true
+}@ViewRootImpl.java
+
+
+//
+performTraversals{
+- View host = mView
+- WindowManager.LayoutParams lp = mWindowAttributes;
+- Rect frame = mWinFrame
+  //第一次
+- if (mFirst) {
+	- mFullRedrawNeeded = true
+	- mLayoutRequested = true //需要布局
+	- desiredWindowWidth,desiredWindowHeight //设置为屏幕大小
+  }else{
+	- desiredWindowWidth,desiredWindowHeight //设置为frame大小
+	- if(desiredWindowWidth != mWidth) {mLayoutRequested = true} //大小变化
+  }
+  //大小发生变化,重新测量大小
+- boolean layoutRequested = mLayoutRequested && (!mStopped || mReportNextDraw);
+- if (layoutRequested) {
+	- measureHierarchy(host, lp, desiredWindowWidth, desiredWindowHeight
+	}
+  //发生变化,重新计算frame,surface大小
+- if(mFirst || windowShouldResize|| params != null||mForceNextWindowRelayout){
+	- relayoutWindow(params, viewVisibility)
+	- mWidth = frame.width()
+        - mHeight = frame.height()
+	- if (!mStopped || mReportNextDraw) {
+		- childWidthMeasureSpec = getRootMeasureSpec(mWidth, lp.width){
+			- MeasureSpec.makeMeasureSpec(mWidth) //创建measureSpec	
+			}
+		- childHeightMeasureSpec = getRootMeasureSpec(mHeight, lp.height)
+		- performMeasure(childWidthMeasureSpec, childHeightMeasureSpec)
+		}
+	}
+ //,设置位置
+- boolean didLayout = layoutRequested && (!mStopped || mReportNextDraw)
+- if(didLayout){
+	- performLayout(lp, mWidth, mHeight)
+	}
+}
+
+/*测量
+ 设置View的mMeasuredWidth,mMeasuredHeight
+*/
+performMeasure-->mView.measure@ViewRootImpl.java-->
+measure(int widthMeasureSpec, int heightMeasureSpec){
+- 
+- super.onMeasure(widthMeasureSpec, heightMeasureSpec){
+	- 
+	}@FrameLayout.java
+  //调整width
+- int width = getMeasuredWidth()
+}@DecorView.java
+
+/*布局
+ 设置位置mLeft,mTop,mRight,mBottom
+*/
+performLayout(WindowManager.LayoutParams lp, int desiredWindowWidth,int desiredWindowHeight){
+- View host = mView
+- host.layout(0, 0, host.getMeasuredWidth(), host.getMeasuredHeight())
+- if(mLayoutRequesters.size()>0){
+	- measureHierarchy(host,desiredWindowWidth, desiredWindowHeight)
+	- host.layout(0, 0, host.getMeasuredWidth(), host.getMeasuredHeight())
+	}
+}@ViewRootImpl.java
+
+host.layout(0, 0, host.getMeasuredWidth(), host.getMeasuredHeight())-->
+onLayout(boolean changed, int left, int top, int right, int bottom){
+- super.onLayout(changed, left, top, right, bottom){
+	- 
+	}@FrameLayout.java
+- offsetLeftAndRight{
+	- mLeft,mRight //调整offset
+	}
+- offsetTopAndBottom{
+	- mTop,mBottom //调整offset
+	}
+- updateElevation
+}@DecorView.java
+
+//relayout,创建surface,获取frame大小
+relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,boolean insetsPending)-->
+mWindowSession.relayout(mWindow, mSeq, params,mMeasuredWidth,mMeasuredHeight,mSurface)@ViewRootImpl.java
+mService.relayoutWindow@Session.java-->relayoutWindow@WindowManangerService.java
+
+
+
+
+frameworks/base/core/java/android/view/ViewRootImpl.java
+frameworks/base/core/java/com/android/internal/policy/DecorView.java
+frameworks/base/core/java/android/widget/FrameLayout.java

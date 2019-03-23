@@ -89,7 +89,7 @@ AudioPolicyManager::getInputForAttr{
 - getInputForDevice(device)
 }
 
-
+AudioRecordClientProxy : public ClientProxy @AudioTrackShared.h
 
 //read数据,读取数据拷贝到 buffer中
 read@AudioRecord.java-->native_read_in_short_array(/*byte,short,float数据格式不同*/)-->
@@ -101,7 +101,7 @@ read(buffer,size){
 	- sp<AudioRecordClientProxy> proxy = mProxy
 	- sp<IMemory> iMem = mCblkMemory
 	- sp<IMemory> bufferMem = mBufferMemory
-	- proxy->obtainBuffer(&buffer, requested)-->obtainBuffer()@AudioTrackShared.cpp
+	- proxy->obtainBuffer(&buffer, requested)-->ClientProxy::obtainBuffer()@AudioTrackShared.cpp
 	}
 - memcpy(buffer, audioBuffer.i8)//拷贝到用户buffer中
 }@AudioRecord.cpp

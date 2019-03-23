@@ -38,7 +38,9 @@ ActivityRecord(ActivityManagerService _service, Intent _intent){
 */
 activity.attach(appContext, this, getInstrumentation(), r.token....)@ActivityThread.java-->
 attach(Context context, ActivityThread aThread,){
-- mWindow = new PhoneWindow(this, window, activityConfigCallback) //创建窗口
+- mWindow = new PhoneWindow(this, window, activityConfigCallback){ //创建窗口
+	-	
+	}
 - mWindow.setCallback(this)
 - mWindow.setWindowManager(ontext.getSystemService(Context.WINDOW_SERVICE),mToken,appName)//创建当前窗口的windowManagerImpl.....
 	-->setWindowManager{

@@ -30,11 +30,11 @@ AudioStreamInALSA::setParameters{
 
 adev_open_input_stream-->ladev->hwif->openInputStream@audio_hw_hal.cp-->
 openInputStream(uint32_t devices, int *format, uint32_t *channels, uint32_t *sampleRate){
-- android::sp <AudioStreamInALSA> in = new AudioStreamInALSA:
+- android::sp <AudioStreamInALSA> in = new AudioStreamInALSA{
 	- mSampleRate(AUDIO_HW_IN_SAMPLERATE) //48000
 	- mReqSampleRate(AUDIO_HW_IN_SAMPLERATE) //48000
 	- mInSampleRate(AUDIO_HW_IN_SAMPLERATE) //48000
-	{}
+	}
 - in->set(this, devices, format, channels, sampleRate, acoustic_flags)-->
 	AudioStreamInALSA::set{
 	- *pRate = sampleRate() //当前采样率
@@ -54,7 +54,7 @@ openInputStream(uint32_t devices, int *format, uint32_t *channels, uint32_t *sam
 //读数据
 AudioStreamInALSA::read{
 - 若standby状态，先open_l()-->AudioStreamInALSA::open_l{
-	- route_pcm_open(mHardware->getRouteFromDevice)
+	- route_pcm_open(mHardware->getRouteFromDevice) //获取通路
 	- route_set_controls
 	}
 - pcm_read

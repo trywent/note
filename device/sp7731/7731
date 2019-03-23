@@ -26,7 +26,7 @@ dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdi
 
 dd if=/sdcard/wmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/w_modem bs=1024 count=16384
 
-
+dd if=/sdcard/sml-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/sml bs=1024 count=22
 //声音
 i2s0---->8288
 
@@ -37,4 +37,13 @@ WCN->CP0->DSP->2731
 
 
 //uart
+busybox stty -F /dev/ttyS1 ispeed 460800 ospeed 460800 cs8
+
 lookat -l 2 0x70100024
+
+
+
+fdt_fixup_cp_boot@sprd_fdt_support.c
+
+
+u-boot15/common/loader/sprd_fdt_support.c

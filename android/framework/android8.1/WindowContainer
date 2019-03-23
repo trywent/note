@@ -33,7 +33,9 @@ WindowContainer{
 	}
 }@WindowContainer.java
 
-//root
+/*
+ RootWindowContainer
+*/
 RootWindowContainer(WindowManagerService service) {
 - mService = service;
 - mLayersController = new WindowLayersController(mService);
@@ -47,40 +49,8 @@ createDisplayContent{
 - DisplayInfo displayInfo = dc.getDisplayInfo()
 }
 
-performSurfacePlacement(boolean force)-->
-performSurfacePlacementLoop{
-- if (!mService.mForceRemoves.isEmpty()){//移除窗口
-	- boolean recoveringMemory = true
-	- WindowState ws = mService.mForceRemoves.remove(0)
-	- ws.removeImmediately()	
-	}
-- mService.mRoot.performSurfacePlacement(recoveringMemory)
-- if (mService.mRoot.isLayoutNeeded()) {
-	- requestTraversal-->mService.mAnimationHandler.post(mPerformSurfacePlacement)-->performSurfacePlacement
-	- mService.mH.sendEmptyMessage(REPORT_WINDOWS_CHANGE)
-	}
-}@WindowSurfacePlacer.java
 
 
-performSurfacePlacement(boolean recoveringMemory){
- //布局
-- mService.openSurfaceTransaction()
-- applySurfaceChangesTransaction{
-	- mService.mWatermark.positionSurface//设置水印,安全模式...显示位置
-	- 遍历DisplayContent,dc.applySurfaceChangesTransaction
-	- mService.mDisplayManagerInternal.performTraversalInTransactionFromWindowManager
-	}
-- mService.closeSurfaceTransaction
-- handleResizingWindows()
-
- //销毁不可见窗口
-- 遍历,mService.mDestroySurface
-- WindowState win = mService.mDestroySurface.get(i)
-- win.destroyOrSaveSurfaceUnchecked
-}@RootWindowContainer.java
-
-
-frameworks/base/services/core/java/com/android/server/wm/WindowSurfacePlacer.java
 frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
 ====== 1
 /**********************
@@ -292,6 +262,12 @@ AppWindowContainerController(token/*ActivityRecord.appToken*/){
 		- token = _token
 		- onDisplayChanged(dc)-->dc.reParentWindowToken(this) //加入到DisplayContent
 		}@WindowToken.java
+	- this{
+		- mInputApplicationHandle = new InputApplicationHandle(this)
+		- mAppAnimator = new AppWindowAnimator(this, service)
+		- onOverrideConfigurationChanged
+		- mBounds.set(bounds)
+		}
 	- setController(controller)//设置controler ,container
 	}@AppWindowToken.java
 - task.addChild(atoken) //加入到task
@@ -313,7 +289,18 @@ addWindow(Session session,IWindow Client,WindowManager.LayoutParams attrs){
 setBounds-->updateAdjustedBounds
 onOverrideConfigurationChanged-->onConfigurationChanged@WindowContainer.java
 
+/* AppWindow动画
 
+
+*/
+
+//设置动画
+setAnimation
+
+stepAnimationLocked(long currentTime) {
+- 
+
+}
 
 frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
 frameworks/base/services/core/java/com/android/server/wm/WindowContainer.java
@@ -321,3 +308,5 @@ frameworks/base/services/core/java/com/android/server/wm/WindowContainerControll
 frameworks/base/services/core/java/com/android/server/wm/Task.java
 frameworks/base/services/core/java/com/android/server/am/ConfigurationContainer.java
 frameworks/base/services/core/java/com/android/server/wm/WindowState.java
+frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
+frameworks/base/services/core/java/com/android/server/wm/AppWindowAnimator.java

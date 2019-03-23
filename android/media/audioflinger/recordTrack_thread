@@ -9,15 +9,26 @@ RecordThread(AudioStreamIn *input, audio_devices_t outDevice,audio_devices_t inD
 RecordThread::onFirstRef-->run-->threadLoop{
 - inputStandBy
 - mInput->stream->read(mInput->stream,mRsmpInBuffer)
-}
+}@Threads.cpp
 
-AudioFlinger::openRecord-->
-AudioFlinger::RecordThread::createRecordTrack_l(const sp<AudioFlinger::Client>& client,){
+
+//打开创建track
+AudioFlinger::openRecord(audio_io_handle_t input,uint32_t sampleRate,sp<IMemory>& cblk,sp<IMemory>& buffers){
+- RecordThread *thread = checkRecordThread_l(input)
+- sp<Client> client = registerPid(pid)
+- sp<RecordThread::RecordTrack> recordTrack = thread->createRecordTrack_l(client, sampleRate)
+  //设置回调,buffer
+- cblk = recordTrack->getCblk()
+- buffers = recordTrack->getBuffers()
+- recordHandle = new RecordHandle(recordTrack)
+}@AudioFlinger.cpp
+
+AudioFlinger::RecordThread::createRecordTrack_l(const sp<AudioFlinger::Client>& client,uint32_t sampleRate,){
 - sp<RecordTrack> track = new RecordTrack(this, client, sampleRate,TrackBase::TYPE_DEFAULT){
 	- TrackBase(ThreadBase *thread,const sp<Client>& client,ALLOC_CBLK){
 		- mThread(thread)
 		- mClient(client)
-		- mCblkMemory = client->heap()->allocate(size) //设置mCblkMemory
+		- mCblkMemory = client->heap()->allocate(size) //分配内存,设置mCblkMemory
 		- mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->pointer()))
 		- new(mCblk) audio_track_cblk_t() //将回调函数结构放到mCblk内存中
 		  //
@@ -38,7 +49,11 @@ client->heap()->allocate(size){
 - 
 }@MemoryDealer.cpp
 
-AudioFlinger::RecordThread::start
+AudioFlinger::RecordThread::start{
+- recordTrack->mSyncStartEvent = mAudioFlinger->createSyncEvent
+- mActiveTracks.add(recordTrack)
+- AudioSystem::startInput(mId, recordTrack->sessionId())
+}@Threads.cpp
 
 frameworks/av/services/audioflinger/Threads.cpp
 frameworks/av/services/audioflinger/Tracks.cpp
