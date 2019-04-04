@@ -1,3 +1,4 @@
+//mediascan
 创建扫描类：{
 - new MediaScanner{
 	- native_setup-->android_media_MediaScanner_native_setup{

@@ -1,5 +1,0 @@
-
-//创建devcie并注册到sysfs
-device_create-->device_create_vargs@core.c
-
-kernel/drivers/base/core.c

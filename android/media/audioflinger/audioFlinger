@@ -130,19 +130,23 @@ AudioFlinger::setMasterMute-->dev->hwDevice()->set_master_mute@AudioFlinger.cpp
 
 ===============
 /*input
-* 保存input数据的buffer在audioflinger侧分配，client(AudioRecord端)获取这个buffer读取数据
-* IMemory 进程间拷贝数据。
+ 保存input数据的buffer在audioflinger侧分配，client(AudioRecord端)获取这个buffer读取数据
+ IMemory 进程间拷贝数据。
 */
-AudioFlinger::openInput-->openInput_l{
-- inHwHal->open_input_stream{//打开input流，设置input的配置
-
-	}
-- new AudioStreamIn //创建流
-- new RecordThread(this,inputStream,devices)  //创建线程
+AudioFlinger::openInput-->openInput_l(audio_module_handle_t module,audio_io_handle_t *input,
+      audio_config_t *config, audio_devices_t devices,audio_source_t source){
+- *input = nextUniqueId(AUDIO_UNIQUE_ID_USE_INPUT) //input为一个handle
+  //打开HAL input，设置input的配置
+- inHwHal->open_input_stream(*input, devices, &halconfig,source, &inStream){
+	- inStream
+	}@audio_hw.c
+- AudioStreamIn *inputStream = new AudioStreamIn(inHwDev, inStream)//创建流
+- new RecordThread(this,inputStream,*input,devices)  //创建录音线程
 - mRecordThreads.add(*input, thread) //加入容器
 }
 
 
+//创建RecordTrack
 AudioFlinger::openRecord(audio_io_handle_t input, uint32_t sampleRate,audio_channel_mask_t channelMask,
 	sp<IMemory>& cblk,sp<IMemory>& buffers,){
 - checkRecordThread_l //获取input对应的线程

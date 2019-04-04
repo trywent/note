@@ -24,7 +24,9 @@ initializeNative{
 }@com_android_bluetooth_hfpclient.cpp
 
 
-//connect
+/* 
+ connect
+*/
 connect(BluetoothDevice)-->service.connect@BluetoothHeadsetClient.java-->
 connect-->sm.sendMessage(CONNECT)@HeadsetClientService.java-->Disconnected.processMessage(CONNECT)
 @HeadsetClientStateMachine.java-->NativeInterface.connectNative@NativeInterface.java-->
@@ -35,7 +37,9 @@ sBluetoothHfpClientCallbacks.connection_state_cb-->connection_state_cb@com_andro
 -->onConnectionStateChanged-->service.messageFromNative(event)@NativeInterface.java-->
 messageFromNative-->sm.sendMessage(StackEvent.STACK_EVENT,event)@HeadsetClientService.java
 
-//connectAudio/disconnectAudio
+/*
+ connectAudio/disconnectAudio
+ */
 connectAudio-->sm.sendMessage(HeadsetClientStateMachine.CONNECT_AUDIO)@HeadsetClientService.java
 -->NativeInterface.connectAudioNative@HeadsetClientStateMachine.java-->connectAudioNative
 @NativeInterface.java-->connectAudioNative-->sBluetoothHfpClientInterface->connect_audio
@@ -74,9 +78,12 @@ Connected.processMessage{
 }
 
 
-
-
-
+/* 
+ 查询call 
+*/
+queryCallsDone-->sendMessageDelayed(QUERY_CURRENT_CALLS)-->Connected.processMessage(QUERY_CURRENT_CALLS)-->
+queryCallsStart@HeadsetClientStateMachine.java-->queryCurrentCallsNative-->sBluetoothHfpClientInterface->query_current_calls
+@com_android_bluetooth_hfpclient.cpp-->
 
 
 packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientService.java

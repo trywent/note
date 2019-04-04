@@ -1,8 +1,0 @@
-main{
-- ProcessState::self()->startThreadPool
-- BootAnimation
-- IPCThreadState::self()->joinThreadPool
-}
-
-
-frameworks/base/cmds/bootanimation/bootanimation_main.cpp

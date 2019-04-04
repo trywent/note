@@ -1,10 +1,50 @@
-//hardwaredevice
+/***********************
+  audioFlinger
+
+*/
+
+AudioRecord::set-->openRecord_l{
+- input = AudioSystem::getInput(mInputSource, mSampleRate)-->AudioFlinger::openInput
+- record = audioFlinger->openRecord(input,mSampleRate)
+}
+
+//创建recordThread
+AudioFlinger::openInput(audio_module_handle_t module,audio_devices_t *pDevices, uint32_t *pSamplingRate){
+- inHwHal->open_input_stream(inHwHal, id, *pDevices, &config, &inStream)
+- AudioStreamIn *input = new AudioStreamIn(inHwDev, inStream)
+- thread = new RecordThread(this,input,reqSamplingRate, reqChannels)
+}
+
+
+
+
+
+/***********************
+  hardwaredevice
+
+*/
 HAL_MODULE_INFO_SYM-->legacy_audio_module_methods-->legacy_adev_open{
 - ladev->device.open_output_stream = adev_open_output_stream
 - ladev->device.open_input_stream = adev_open_input_stream
 - ladev->hwif = createAudioHardware()-->new AudioHardware()
 - 返回ladev->device //audioflinger通过device接口操作
 }@audio_hw_hal.cp
+
+struct alsa_sound_card_config sound_card_config_list[] = {
+    {
+        .sound_card_name = "RKRK616",
+        .route_table = &rk616_config_table,
+    }
+}
+
+AudioHardware{
+- loadRILD
+- route_init{
+	- fp = fopen("/proc/asound/card0/id", "rt")//读取声卡id
+	- fread(soundCardID, fp)
+	- route_table = sound_card_config_list[i].route_table //设置通路表
+	}@alsa_route.c
+}@AudioHardware.cpp
 
 
 hardware/rk29/audio/audio_hw_hal.cp
@@ -22,7 +62,17 @@ AudioStreamOutALSA::write{
 
 
 ===============
-//input
+/*input
+ mInSampleRate 为kernel的采样率(rk的只支持播放录制同一个采样率,所以要固定为播放一样)
+ mSampleRate 上层请求的采样率
+*/
+AudioStreamInALSA::AudioStreamInALSA(){
+- mChannels(CHANNEL_IN_STEREO)
+- mSampleRate(48 k)
+- mInSampleRate(48 k)
+}
+
+
 AudioStreamInALSA::setParameters{
 - mInSampleRate //设置需要的采样率
 - set(mHardware, mDevices, &pFormat, &pChannels) //重新配置
@@ -43,19 +93,29 @@ openInputStream(uint32_t devices, int *format, uint32_t *channels, uint32_t *sam
 	- mSampleRate //当前采样率
 	- mBufferSize = getBufferSize(mSampleRate)
 	- mSampleRate < mInSampleRate{//采样率不匹配
-		- mDownSampler = new AudioHardware::DownSampler(mSampleRate,mInSampleRate)
+		- mDownSampler = new AudioHardware::DownSampler(mSampleRate,mInSampleRate,this)
 		}
 	}
 }@AudioHardware.cpp
 
 
-
+//重采样
+AudioHardware::DownSampler::DownSampler(uint32_t outSampleRate, uint32_t inSampleRate,
+    uint32_t channelCount,uint32_t frameCount, AudioHardware::BufferProvider* provider){
+- mProvider(provider)
+  //输出采样率
+- mSampleRate(outSampleRate)
+- mInResampler =  speex_resampler_init(mChannelCount, inSampleRate/*输入*/, mSampleRate/*输出*/)
+}
 
 //读数据
 AudioStreamInALSA::read{
 - 若standby状态，先open_l()-->AudioStreamInALSA::open_l{
 	- route_pcm_open(mHardware->getRouteFromDevice) //获取通路
 	- route_set_controls
+	}
+- if (mDownSampler != NULL){
+	- mDownSampler->resample((int16_t *)buffer)
 	}
 - pcm_read
 }

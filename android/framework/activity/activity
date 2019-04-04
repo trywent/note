@@ -41,6 +41,7 @@ attach(Context context, ActivityThread aThread,){
 - mWindow = new PhoneWindow(this, window, activityConfigCallback){ //创建窗口
 	-	
 	}
+  //设置按键事件处理回调函数
 - mWindow.setCallback(this)
 - mWindow.setWindowManager(ontext.getSystemService(Context.WINDOW_SERVICE),mToken,appName)//创建当前窗口的windowManagerImpl.....
 	-->setWindowManager{
@@ -70,9 +71,12 @@ finishActivityLocked{
 	}
 }@ActivityStack.java
 
-===================
-事件：
-处理后退按键：
+
+/* 事件
+ 处理后退按键
+*/
+
+dispatchKeyEvent-->cb.dispatchKeyEvent(event)@DecorView.java-->dispatchKeyEvent-->
 onBackPressed-->finish-->(没有父activity)ActivityManagerNative.getDefault().finishActivity
 @Activity.java-->finishActivity-->mMainStack.requestFinishActivityLocked@ActivityManagerService.java
 -->finishActivityLocked-->finishActivityLocked-->finishActivityLocked-->resumeTopActivityLocked

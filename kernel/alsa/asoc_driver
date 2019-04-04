@@ -2,9 +2,9 @@
  asoc数据结构
  dai_link(接口信息)将codec_dai,cpu_dai关联起来。
 
- developer设置:
+ dirver developer设置:
 	struct snd_soc_dai_link     cpu,codec连接关系
-	struct snd_soc_codec_driver 驱动
+	struct snd_soc_codec_driver codec驱动
 	struct snd_soc_dai_driver   dai驱动
 */
 struct snd_soc_dai_link{   //dai_link定义了一些dai的对应关系
@@ -173,7 +173,7 @@ struct snd_soc_dapm_context {
 /***********************
   注册驱动codec_drv.创建struct snd_soc_codec *codec,
   创建component(对应一个物理设备codec),初始化component操作函数
-  创建dai加入到dai_list
+  创建struct snd_soc_dai dai加入到dai_list
 
   struct snd_soc_codec{
 	.component
@@ -263,7 +263,7 @@ snd_soc_register_platform(struct device *dev,
  struct snd_device     //control,pcm
  struct snd_soc_pcm_runtime *rtd
 */
-static LIST_HEAD(dai_list)       //注册dai,加入该链表..codec,component都是dai
+static LIST_HEAD(dai_list)       //注册dai,加入该链表..codec,component都是struct snd_soc_dai dai
 static LIST_HEAD(platform_list)  //
 static LIST_HEAD(codec_list)     //注册codec,加入该链表
 static LIST_HEAD(component_list) //注册component,加入该链表
@@ -377,7 +377,7 @@ soc_probe(struct platform_device *pdev){
 
 
 /***********************
- soc ctl设备
+ soc ctl设备对应snd_card
 
  snd_device保存在链表card->device中
 
@@ -395,7 +395,7 @@ snd_soc_add_component_controls-->snd_soc_add_controls-->snd_ctl_add(card, snd_so
 
 
 /***********************
- soc pcm设备
+ soc pcm设备 对应dai_link
 
 */
 
@@ -423,8 +423,10 @@ sound/core/pcm_lib.c
 sound/core/sound.c
 /***********************
  节点操作函数
+  open 
+  ioctl
 */
-open:
+
 snd_pcm_f_ops.open(capture)-->snd_pcm_capture_open(snd_lookup_minor_data/*获取snd_pcm pcm*/)-->snd_pcm_open-->
 snd_pcm_open_file(file,pcm,stream/*录制，或播放*/){
 - 创建snd_pcm_substream，snd_pcm_open_substream{
@@ -474,8 +476,10 @@ snd_pcm_period_elapsed(dma中断中调用)/snd_pcm_update_hw_ptr(读写数据时
 - runtime->status->audio_tstamp//时间
 - snd_pcm_update_state //唤醒等待的进程
 }@pcm_lib.c
-//读取数据
-/*
+
+/* 读取数据
+
+
 - 目标地址：用户空间传入的buffer
 - 源地址：dma的位置+偏移值
 源：
@@ -487,7 +491,6 @@ dma总大小：frame个数，
 偏移位置：
  runtime->control->appl_ptr % runtime->buffer_size 
 */
-ioctl:
 snd_pcm_f_ops.unlocked_ioctl-->snd_pcm_capture_ioctl{
 - 获取snd_pcm_file *pcm_file = file->private_data //是一个snd_pcm_file pcm
 - snd_pcm_capture_ioctl1(pcm_file->substream)
@@ -507,7 +510,7 @@ snd_pcm_capture_ioctl1(SNDRV_PCM_IOCTL_READI_FRAMES)@pcm_native.c-->snd_pcm_lib_
 - tarnsfer(stream,appl_ofs, data, offset,frames)-->
   snd_pcm_lib_read_transfer(stream,hwoff/*dma的偏移*/,buffer,offset/*已经读取的frames*/，frames/*本次需读取的frame*/){
 	- 根据buffer和offset，计算目标保存地址位置
-	- 若stream又copy函数，substream->ops->copy
+	- substream->ops->copy
 	- 没有copy函数{
 		- 计算源地址的位置，runtime->dma_area + frames_to_bytes(runtime, hwoff)
 		- unalign_copy_to_user

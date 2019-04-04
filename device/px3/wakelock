@@ -1,3 +1,8 @@
+/*
+ wakelock
+
+*/
+
 example:
 PowerManager pm = (PowerManager)mContext.getSystemService(Context.POWER_SERVICE);
  PowerManager.WakeLock wl = pm.newWakeLock(

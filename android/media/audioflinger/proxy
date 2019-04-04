@@ -1,0 +1,31 @@
+/*
+ proxy
+
+*/
+
+ServerProxy::ServerProxy(audio_track_cblk_t* cblk, void *buffers, size_t frameCount,bool isOut, bool clientInServer){
+- Proxy(cblk, buffers, frameCount, frameSize, isOut, clientInServer){
+	- mCblk(cblk), mBuffers(buffers), mFrameCount(frameCount)
+	}
+- cblk->mBufferSizeInFrames = frameCount
+}@AudioTrackShared.cpp
+
+ServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush){
+- audio_track_cblk_t* cblk = mCblk
+- buffer->mRaw = &((char *) mBuffers)[(mIsOut ? front : rear) * mFrameSize] //从mBuffer中分配
+}
+
+//play
+AudioTrackServerProxy
+
+
+
+
+//record
+AudioRecordServerProxy
+
+
+
+
+frameworks/av/include/private/media/AudioTrackShared.h
+frameworks/av/media/libaudioclient/AudioTrackShared.cpp

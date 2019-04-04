@@ -1,5 +1,11 @@
-//=================
-//jni接口
+/*
+ AG(audio gate):通常是手机
+ hf(hands free):控制设备
+
+ 提供上层调用接口:BTA_ID_HS - bta_hf_client_reg
+
+*/
+ //jni接口
 bthfClientInterface = {
     sizeof(bthf_client_interface_t),
     .init = init,
@@ -7,28 +13,35 @@ bthfClientInterface = {
     .disconnect = disconnect,
     .connect_audio = connect_audio,
     .disconnect_audio = disconnect_audio,
-}
-//初始化jni接口
+    .query_current_calls = query_current_calls,
+}@btif_hf_client.c
+ //java获取stack jni接口
+btif_hf_client_get_interface-->return &bthfClientInterface@btif_hf_client.c
+
+ //初始化jni接口
 init-->bt_hf_client_callbacks = callbacks@btif_hf_client.c
 
-//开始服务,设置bta api回调函数
+ //开始服务,设置bta api
 btif_in_execute_service_request@btif_dm.cc
-btif_hf_client_execute_service@btif_hf_client.c-->BTA_HfClientEnable(bta_hf_client_evt)@bta_hf_client_api.c-->
+btif_hf_client_execute_service-->BTA_HfClientEnable(bta_hf_client_evt,BTIF_HF_CLIENT_SECURITY)@btif_hf_client.c
+--> BTA_HfClientEnable(tBTA_HF_CLIENT_CBACK* p_cback, tBTA_SEC sec_mask)@bta_hf_client_api.c-->
 bta_hf_client_api_enable{
 - bta_sys_register(BTA_ID_HS, &bta_hf_client_reg)
 - bta_hf_client_cb_arr_init   //初始化control block...回调接口,函数接口
-- bta_hf_client_cb_arr.p_cback = bta_hf_client_evt  //设置回调接口bta--->btif
+  //设置接口回调到java
+- bta_hf_client_cb_arr.p_cback = bta_hf_client_evt  
 - bta_sys_collision_register(BTA_ID_HS, bta_hf_client_collision_cback)
 }@bta_hf_client_main.c
 
 
 
-===================
-//发送操作命令,接受回复
-/*状态机处理回调btif-->bta. bta-->btif
-* 状态表有4中状态,st_init,st_opening,st_open,st_closing
-* 每种状态中包含15种event.每种event有2个action,一个next state
-*
+
+/*
+ java上层调用stack
+
+ 状态机处理回调btif-->bta. bta-->btif
+ 状态表有4中状态,st_init,st_opening,st_open,st_closing
+ 每种状态中包含15种event.每种event有2个action,一个next state
 */
 bta_sys_sendmsg(BTA_HF_CLIENT_API_AUDIO_OPEN_EVT)-->bta_message_loop->task_runner()->PostTask(bta_sys_event)
 -->bta_sys_event@bta_sys_main.cc-->bta_hf_client_reg.evt_hdlr-->bta_hf_client_hdl_event-->
@@ -37,13 +50,16 @@ bta_hf_client_sm_execute{
 - state_table = bta_hf_client_st_tbl[client_cb->state] //获取状态表
 - client_cb->state = state_table[event][BTA_HF_CLIENT_NEXT_STATE] //设置下一个状态
 - action = state_table[event][i] 
-- bta_hf_client_action[action](p_data){//获取该事件下状态的action,并执行
+  //获取该事件下状态的action,并执行
+- bta_hf_client_action[action](p_data){
 - client_cb->state = state_table[event][BTA_HF_CLIENT_NEXT_STATE] //设备下一个状态
+ //是否通知上层状态
+- bta_hf_client_app_callback
 }@bta_hf_client_main.cc
 
 
 
-//connect_audio
+ //connect_audio
 connect_audio{
 - cb = btif_hf_client_get_cb_by_bda(*bd_addr)//获取连接的设备
 - 若设备支持codec协商,BTA_HfClientSendAT(BTA_HF_CLIENT_AT_CMD_BCC)
@@ -64,14 +80,27 @@ bta_hf_client_send_at_cmd{
 BTA_HfClientAudioOpen-->bta_sys_sendmsg(BTA_HF_CLIENT_API_AUDIO_OPEN_EVT)@btif_hf_client.c-->
 bta_hf_client_sco_open-->bta_hf_client_sco_event(BTA_HF_CLIENT_SCO_OPEN_E)@bta_hf_client_sco.cc-->
 
-//disconnect_audio
+ //disconnect_audio
+
+
+ //查询电话状态
+query_current_calls-->BTA_HfClientSendAT(cb->handle, BTA_HF_CLIENT_AT_CMD_CLCC)@btif_hf_client.cc-->
+BTA_HfClientSendAT-->bta_sys_sendmsg@bta_hf_client_api.cc
+
+ //命令超时
+bta_hf_client_at_resp_timer_cback(void* data){
+- tBTA_HF_CLIENT_CB* client_cb = (tBTA_HF_CLIENT_CB*)data
+- msg.hdr.layer_specific = client_cb->handle
+- bta_hf_client_sm_execute(BTA_HF_CLIENT_API_CLOSE_EVT, &msg)
+}@bta_hf_client_at.cc
 
 
 
+/*
+ 底层回调到java
 
-
-____________________
-//回调到bta_hf_client_cb.p_cback
+ bta_hf_client_cb.p_cback
+*/
 bta_hf_client_app_callback-->bta_hf_client_cb.p_cback@bta_hf_client_main.c
 bta_hf_client_evt(event)-->btif_transfer_context(btif_hf_client_upstreams_evt,event)
 btif_hf_client_upstreams_evt{
@@ -90,6 +119,10 @@ btif_hf_client_upstreams_evt{
 	- HAL_CBACK(bt_hf_client_callbacks, audio_state_cb, BTHF_CLIENT_AUDIO_STATE_DISCONNECTED)
 
 }@btif_hf_client.c
+
+
+
+
 
 ===================
 //sco

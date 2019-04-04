@@ -1,18 +1,86 @@
 /****************
- record
+ record:
+ 创建RecordThread,创建recordTrack
 */
-RecordThread(AudioStreamIn *input, audio_devices_t outDevice,audio_devices_t inDevice){
+
+RecordThread({
+- AudioStreamIn                       *mInput
+- SortedVector < sp<RecordTrack> >    mTracks
+- ActiveTracks<RecordTrack>           mActiveTracks
+- void                               *mRsmpInBuffer;  // size = mRsmpInFramesOA
+  //non-blocking
+- sp<NBAIO_Source>                    mInputSource
+- sp<NBAIO_Source>                    mNormalSource
+- sp<NBAIO_Sink>                      mPipeSink
+}
+
+//RecordThread
+openRecord_l-->AudioSystem::getInputForAttr@AudioRecord.cpp-->AudioFlinger::openInput-->
+openInput_l-->new RecordThread@AudioFlinger.cpp-->
+RecordThread(const sp<AudioFlinger>& audioFlinger,AudioStreamIn *input,audio_io_handle_t id,
+         audio_devices_t outDevice, audio_devices_t inDevice)){
+- ThreadBase(audioFlinger, id, outDevice, inDevice)
+- AudioStreamIn mInput(input) //AudioStreamIn
+  //根据参数,分配mRsmpInBuffer保存录音数据
+- readInputParameters_l{
+	- mInput->stream->getAudioProperties(&mSampleRate, &mChannelMask, &mHALFormat)
+	- mInput->stream->getBufferSize(&mBufferSize)
+	- mFrameCount = mBufferSize / mFrameSize
+	- mRsmpInFrames = mFrameCount * 7
+	- posix_memalign(&mRsmpInBuffer, 32, mRsmpInFramesOA * mFrameSize)
+	}
 - mInputSource = new AudioStreamInSource(input->stream)
 
+//initFastCapture
+- Pipe *pipe = new Pipe(pipeFramesP2, format, pipeBuffer)
+- mPipeSink = pipe
+- PipeReader *pipeReader = new PipeReader(*pipe)
+  // create fast capture
+- mFastCapture = new FastCapture()
 }
 
 RecordThread::onFirstRef-->run-->threadLoop{
-- inputStandBy
-- mInput->stream->read(mInput->stream,mRsmpInBuffer)
+- inputStandBy  
+- 遍历mActiveTracks{
+	- activeTrack = mActiveTracks[i]
+	- TrackBase::track_state activeTrackState = activeTrack->mState //状态
+	- switch (activeTrackState){
+		- case TrackBase::PAUSING:mActiveTracks.remove(activeTrack)
+		}
+	- mStartStopCond.broadcast() //通知处理了PAUSING,STARTING_2
+	}
+  //读取数据保存到RecordThread中mRsmpInBuffer
+- if(mPipeSource){
+	- framesRead = mPipeSource->read(mRsmpInBuffer)
+  }else{ 
+	- mInput->stream->read(mRsmpInBuffer + rear * mFrameSize, mBufferSize)-->
+		StreamInHalLocal::read(void *buffer, size_t bytes, size_t *read/*读取结果*/)
+		-->mStream->read(mStream, buffer)
+	- framesRead = bytesRead / mFrameSize//读取帧数
+	}
+  //遍历activeTracks,填充RecordThread数据到RecordTrack
+ {
+- activeTrack = activeTracks[i]
+- activeTrack->mRecordBufferConverter->convert(activeTrack->mSink.raw, activeTrack->mResamplerBufferProvider)
+ }
 }@Threads.cpp
 
 
-//打开创建track
+
+/****************
+ 创建RecordTrack 返回IAudioRecord RecordHandle
+
+ track请求共享内存,填充数据后client直接从共享内存获取数据
+ client --- audioFlinger --- track
+
+*/
+RecordTracks{
+- AudioBufferProvider::Buffer mSink
+- ResamplerBufferProvider  *mResamplerBufferProvider
+}
+
+
+AudioRecord::openRecord_l@AudioRecord.cpp-->
 AudioFlinger::openRecord(audio_io_handle_t input,uint32_t sampleRate,sp<IMemory>& cblk,sp<IMemory>& buffers){
 - RecordThread *thread = checkRecordThread_l(input)
 - sp<Client> client = registerPid(pid)
@@ -20,10 +88,11 @@ AudioFlinger::openRecord(audio_io_handle_t input,uint32_t sampleRate,sp<IMemory>
   //设置回调,buffer
 - cblk = recordTrack->getCblk()
 - buffers = recordTrack->getBuffers()
-- recordHandle = new RecordHandle(recordTrack)
+- IAudioRecord recordHandle = new RecordHandle(recordTrack)
+- return recordHandle
 }@AudioFlinger.cpp
 
-AudioFlinger::RecordThread::createRecordTrack_l(const sp<AudioFlinger::Client>& client,uint32_t sampleRate,){
+AudioFlinger::RecordThread::createRecordTrack_l(const sp<AudioFlinger::Client>& client,uint32_t sampleRate,){                         
 - sp<RecordTrack> track = new RecordTrack(this, client, sampleRate,TrackBase::TYPE_DEFAULT){
 	- TrackBase(ThreadBase *thread,const sp<Client>& client,ALLOC_CBLK){
 		- mThread(thread)
@@ -31,10 +100,12 @@ AudioFlinger::RecordThread::createRecordTrack_l(const sp<AudioFlinger::Client>& 
 		- mCblkMemory = client->heap()->allocate(size) //分配内存,设置mCblkMemory
 		- mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->pointer()))
 		- new(mCblk) audio_track_cblk_t() //将回调函数结构放到mCblk内存中
-		  //
-		- ALLOC_CBLK:mBuffer = (char*)mCblk + sizeof(audio_track_cblk_t)
+		- ALLOC_CBLK:mBuffer = (char*)mCblk + sizeof(audio_track_cblk_t) //mBuffer
 		}
-	- mServerProxy = new AudioRecordServerProxy(mCblk, mBuffer, frameCount
+	- mRecordBufferConverter = new RecordBufferConverter
+	  //创建buffer分配管理
+	- mServerProxy = new AudioRecordServerProxy(mCblk, mBuffer, frameCount)
+	  //用于从thread中获取数据到track
 	- mResamplerBufferProvider = new ResamplerBufferProvider(this)
 	}@Tracks.cpp
 - mTracks.add(track)
@@ -49,11 +120,62 @@ client->heap()->allocate(size){
 - 
 }@MemoryDealer.cpp
 
-AudioFlinger::RecordThread::start{
-- recordTrack->mSyncStartEvent = mAudioFlinger->createSyncEvent
-- mActiveTracks.add(recordTrack)
-- AudioSystem::startInput(mId, recordTrack->sessionId())
-}@Threads.cpp
+
+/*start 
+
+*/
+start-->mAudioRecord->start@AudioRecord.cpp-->RecordHandle::start@Track.cpp-->
+AudioFlinger::RecordThread::RecordTrack::start{
+- RecordThread *recordThread = mThread.promote().get()
+  //thread开始
+- recordThread->start-->RecordThread::start{
+		- recordTrack->mSyncStartEvent = mAudioFlinger->createSyncEvent
+		- mActiveTracks.add(recordTrack)
+		- AudioSystem::startInput(mId, recordTrack->sessionId())
+	}@Threads.cpp
+}@Tracks.cpp
+
+
+/*read
+
+*/
+//获取track中保存数据的buffer空间
+RecordTrack::getNextBuffer(AudioBufferProvider::Buffer* buffer){
+- ServerProxy::Buffer buf
+- mServerProxy->obtainBuffer(&buf)
+- buffer->raw = buf.mRaw
+}@Tracks.cpp
+
+//将RecordThread中数据保存到Track
+RecordBufferConverter::convert(void *dst,AudioBufferProvider *provider, size_t frames){
+- if (mResampler == NULL){
+	- AudioBufferProvider::Buffer buffer
+	- provider->getNextBuffer(&buffer)-->ResamplerBufferProvider::getNextBuffer //从RecordThread中获取数据
+	- convertNoResampler(dst, buffer.raw, buffer.frameCount){//将数据保存到Track中buffer
+		- 
+		}
+	- dst = (int8_t*)dst + buffer.frameCount * mDstFrameSize
+ }else{
+	- mResampler->resample((int32_t*)mBuf, frames, provider)
+ }
+}@RecordBufferConverter.cpp
+
+/*stop 
+
+*/
+stop-->mAudioRecord->stop@AudioRecord.cpp-->RecordHandle::stop-->stop_nonvirtual@Track.cpp-->
+AudioFlinger::RecordThread::RecordTrack::stop{
+- RecordThread *recordThread = (RecordThread *)mThread.promote().get()
+- recordThread->stop(this)-->RecordThread::stop{
+	- recordTrack->mState = TrackBase::PAUSING
+	- mWaitWorkCV.broadcast() //通知ThreadLoop
+	- mStartStopCond.wait(mLock) //等待停止状态
+	}
+- AudioSystem::stopInput
+}@Tracks.cpp
+
+
 
 frameworks/av/services/audioflinger/Threads.cpp
 frameworks/av/services/audioflinger/Tracks.cpp
+frameworks/av/media/libaudioprocessing/RecordBufferConverter.cpp

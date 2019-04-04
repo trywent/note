@@ -56,16 +56,26 @@ hal_module_methods.open-->adev_open{
 //解析配置tiny_hw.xml 支持的设备在结构体dev_names_digitalfm  
 adev_open-->adev_config_parse{
 - 文件tiny_hw.xml
-- adev_config_start{//解析配置，并保存到adev.dev_cfgs中
-	- 解析默认path //不带device的path。一些默认音量值
+- adev_config_start(void *data, const XML_Char *elem, const XML_Char **attr){//解析配置，并保存到adev.dev_cfgs中
+	- struct config_parse_state *s = data
+	- static dev_names_para_t *dev_names = dev_names_digitalfm
+	- "device"{//output，input设备
+		- struct tiny_dev_cfg *dev_cfg = realloc(s->adev->dev_cfgs)//分配设备空间
+		- s->adev->dev_cfgs = dev_cfg
+		}
+	- "path"{
+		s->on = true/s->on = false
+		}
+	- "ctl"{
+		- struct route_setting *r = realloc(s->path, sizeof(*r) * (s->path_len + 1))
+		- r[s->path_len].ctl_name = strdup(name) //名字
+		- r[s->path_len].strval //值
+		- s->path = r
+		}
 	- adev_config_parse_private{//sprd私有控制接口vbc，eq
 		- vbc_switch
 		- vbc_eq_switch....
-		}
-	- 解析device{//output，input设备
-		- realloc(s->adev->dev_cfgs)//分配设备空间
-		- 解析path，ctl
-		}
+		}	
 	}
 - adev_config_end{
 	- set_route_by_array //设置adev_config_start解析的默认path
@@ -98,7 +108,9 @@ stream_routing_thread_entry(等待设置)-->do_select_devices{
 }
 
 set_route_by_array(struct mixer,struct route_setting *route){
-
+ //遍历route
+- struct mixer_ctl *ctl = mixer_get_ctl_by_name(mixer, route[i].ctl_name)
+- mixer_ctl_set_enum_by_string/mixer_ctl_set_value //设置值
 }
 
 adev_set_parameters-->do_select_devices_static
@@ -156,13 +168,17 @@ RECORD_NR  //定义
 
 //record
 hw_device.open_input_stream@AudioFlinger.cpp-->
-adev_open_input_stream(audio_config){
+adev_open_input_stream(struct audio_hw_device *dev,audio_io_handle_t handle, audio_devices_t devices,
+        struct audio_config *config, struct audio_stream_in **stream_in){
+- struct tiny_stream_in *in = calloc(1, sizeof(struct tiny_stream_in))
 - in->stream初始化{
-	- 设置stream的接口
-	- in_read
+	- in->stream.common
+	- in->stream.read = in_read
 	}
 - in->config初始化,设置采样率，period_size，
-- in->requested_channels = channel_count //请求的通道
+- in->requested_channels = channel_count 
+- in->device = devices
+- *stream_in = &in->stream
 }
 
 in_read(buffer,size){

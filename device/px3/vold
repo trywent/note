@@ -1,3 +1,6 @@
+/*
+ vold
+*/
 main{
 - VolumeManager->setBroadcaster(CommandListener) //设置命令监听器
 - NetlinkManager->setBroadcaster(CommandListener)

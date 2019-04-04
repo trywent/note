@@ -2,6 +2,9 @@
   一个声卡对应一个control
   struct snd_card
   struct snd_device:pcm,mixer,MIDI
+
+ 信息节点:/proc/asound/card0/pcm0p/sub0
+
 */
 struct snd_device_ops {
 	int (*dev_free)(struct snd_device *dev);
@@ -261,6 +264,14 @@ kernel/sound/core/pcm_lib.c
 
 /***********************
  ASoC Machine Driver:(平台驱动和codec的粘合剂)
+
+ dai_link(接口信息)将codec_dai,cpu_dai关联起来。
+
+ dirver developer设置:
+	struct snd_soc_dai_link     cpu,codec连接关系
+	struct snd_soc_codec_driver codec驱动
+	struct snd_soc_dai_driver   dai驱动
+
 */
 
 
@@ -269,9 +280,19 @@ struct snd_soc_card {
 }
 
 
-
 int snd_soc_register_card(struct snd_soc_card *card)
 int snd_soc_unregister_card(struct snd_soc_card *card)
+
+//注册codec_driver
+snd_soc_register_codec(struct device *dev,const struct snd_soc_codec_driver *codec_drv,
+		  struct snd_soc_dai_driver *dai_drv,int num_dai)
+
+//注册component
+snd_soc_register_component(struct device *dev,const struct snd_soc_component_driver *cmpnt_drv,
+		struct snd_soc_dai_driver *dai_drv,int num_dai)
+
+//platform
+snd_soc_register_platform(struct device *dev,const struct snd_soc_platform_driver *platform_drv)
 
 ____________________
 Machine DAI Configuration:将cpu的ADI接口与codec粘合
@@ -460,15 +481,10 @@ static int wm8974_mute(struct snd_soc_dai *dai, int mute)
 /***********************
 ASoC Platform Driver:
 可分为：音频数据访问(audio DMA)，数字音频配置(SoC DAI(digit audio interface) configuration),控制(control)
-
+ pcm处理函数,读取写入
 */
 
 
-
-
-
-____________________
-audio DMA:
 /* 音频处理函数SoC audio ops */
 struct snd_soc_ops {
 	int (*startup)(struct snd_pcm_substream *);

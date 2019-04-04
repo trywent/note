@@ -1,0 +1,26 @@
+/*
+ log
+*/
+//config
+stack_config_module.init--init{
+- const char* path = "/etc/bluetooth/bt_stack.conf"
+- static config_t* config = config_new(path)
+  //sprd
+- static config_t *config_debug = config_new("/etc/bluetooth/bt_stack_beta.conf")
+}@stack_config.cc
+
+const stack_config_t interface = {get_trace_config_enabled,
+                                  get_all,
+                                  get_debug_config};}
+
+//loglevel
+bte_logmsg_module.init-->init{
+- const stack_config_t* stack_config = stack_config_get_interface()-->interface@stack_config.cc
+- load_levels_from_config(stack_config->get_all())
+}@bte_logmsg.cc
+
+//appl
+load_levels_from_config-->BTAPP_SetTraceLevel
+
+system/bt/main/stack_config.cc
+system/bt/main/bte_logmsg.cc

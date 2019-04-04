@@ -1,8 +1,10 @@
-//blutooth application
 /*
-* 各个profile的接口调用bta_sys_register,将回调注册到bta_sys_cb.
-* 当上层btif调用接口后,会切换线程执行到bta上下文.bta将回调各个profile注册的回调函数
-*
+  profile的调用接口:
+  每个profile的通过调用bta_sys_register,将接口注册到bta_sys_cb
+  当上层btif调用接口后,会切换线程执行到bta上下文.bta将调用对应profile函数
+
+  btif_xxx -->bta_sys_sendmsg-->profile提供的接口
+
 */
 {
 #define BTA_ID_SYS          0            /* system manager */
@@ -12,7 +14,9 @@
 #define BTA_ID_DM_SEC       3            /* device manager security */
 #define BTA_ID_DG           4            /* data gateway */
 #define BTA_ID_AG           5            /* audio gateway */
-#define BTA_ID_OPC          6     
+...
+#define BTA_ID_HS 27            /* Headset */   
+...
 }@bta_sys.h
 
 //接口中的子接口BTA_ID_DM_SEARCH
@@ -23,45 +27,61 @@ BTA_DM_API_DISCOVER_EVT,
 BTA_DM_INQUIRY_CMPL_EVT,
 }@bta_dm_int.h
 
-//BTA_ID_SYS
-bta_sys_register(ID,tBTA_SYS_REG)-->//将id和回调保存到bta_sys_cb
-bta_sys_cb{//接口函数
+//注册提供给上层的接口
+bta_sys_register(ID,tBTA_SYS_REG)-->
+bta_sys_cb{//将id和回调保存到bta_sys_cb
 - reg[BTA_ID_SYS]= bta_sys_hw_reg //bta_sys_main.c
-
 - reg[BTA_ID_DM] = bta_dm_search_reg//bta_dm_api.c
 - reg[BTA_ID_DM_SEARCH] = bta_dm_search_reg//bta_dm_api.c
 }
 
-//BTA_ID_SYS接口
+//在btu线程中,执行接口
+bta_sys_sendmsg(pmsg){
+- get_message_loop-->message_loop_@btu_task.cc //获取message_loop_thread_@btu_task  在线程message_loop_thread_
+- bta_message_loop->task_runner()->PostTask(bta_sys_event,pmsg)-->bta_sys_event(p_msg)
+	-->(*bta_sys_cb.reg[id]->evt_hdlr)(p_msg) //执行profile注册的接口
+}@bta_sys_main.c
+
+/*
+ BTA_ID_SYS
+ 栈的关闭打开
+*/
 btu_task_start_up@btu_task.c-->
 bta_sys_init{
 - bta_sys_register(BTA_ID_SYS, &bta_sys_hw_reg)
 - BTM_RegisterForDeviceStatusNotif(bta_sys_hw_btm_cback)
 }@bta_sys_main.c
 
-//bta任务处理
-bta_sys_sendmsg(pmsg){
-- get_message_loop //获取message_loop_@btu_task  在线程message_loop_thread_
-- bta_message_loop->task_runner()->PostTask(bta_sys_event,pmsg)-->bta_sys_event(p_msg)
-	-->(*bta_sys_cb.reg[id]->evt_hdlr)(p_msg) //执行到BTA_ID_SYS,BTA_ID_DM_SEARCH
-}@bta_sys_main.c
-
+//执行
+bta_sys_sm_execute-->
 bta_sys_action{
 - BTA_DM_API_ENABLE_EVT
 - BTA_DM_API_SEARCH_EVT
 }
 
-======================
-//hw层接口
-bta_dm_enable-->bta_sys_hw_register(bta_dm_sys_hw_cback)@bta_dm_act.c
+system/bt/bta/sys/bta_sys_main.cc
+
+/*
+ BTA_ID_DM/BTA_ID_DM_SEARCH
+ 设备管理,设备扫描
+*/
+BTA_EnableBluetooth{
+- bta_sys_register(BTA_ID_DM, &bta_dm_reg)
+- bta_sys_register(BTA_ID_DM_SEARCH, &bta_dm_search_reg)
+}@bta_dm_api.cc
 
 
-//bta任务处理函数注册
-btif_is_radio_enabled@btif_core.c-->BTA_EnableBluetooth{
-- bta_sys_register(BTA_ID_DM,&bta_dm_reg)
-- bta_sys_register(BTA_ID_DM_SEARCH,&bta_dm_search_reg)
-- bta_sys_sendmsg(BTA_DM_API_ENABLE_EVT)
-}@bta_dm_api.c
+
+system/bt/bta/dm/bta_dm_api.cc
+
+/*
+
+*/
+
+
+
+
+
 
 
 bta/sys/bta_sys_main.c

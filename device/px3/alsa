@@ -1,0 +1,91 @@
+/*
+
+ /sys/kernel/debug/asoc/RK_RK616_TINY/rk616-codec.0/codec_reg
+
+*/
+
+/*
+ asoc
+*/
+static struct snd_soc_dai_link rk_dai[] = {
+	{
+		.name = "RK616 I2S1",
+		.stream_name = "RK616 PCM",
+		.codec_name = "rk616-codec.4-0050",
+		.platform_name = "rockchip-audio",
+		.cpu_dai_name = "rk29_i2s.1",
+		.codec_dai_name = "rk616-hifi",
+		.init = rk616_init,
+		.ops = &rk616_hifi_ops,
+	},
+	{
+		.name = "RK616 I2S2",
+		.stream_name = "RK616 PCM",
+		.codec_name = "rk616-codec.4-0050",
+		.platform_name = "rockchip-audio",
+		.cpu_dai_name = "rk29_i2s.1",
+		.codec_dai_name = "rk616-voice",
+		.ops = &rk616_voice_ops,
+	},
+}
+
+audio_card_init{
+- snd_soc_card_rk.name = "RK_RK616_TINY"
+- static struct platform_device *rk_snd_device = platform_device_alloc("soc-audio")
+- platform_set_drvdata(rk_snd_device, &snd_soc_card_rk)
+- platform_device_add(rk_snd_device)
+}@rk_rk616.c
+
+/*
+ i2s
+*/
+
+rockchip_i2s_init-->platform_driver_register(&rockchip_i2s_driver)-->
+rockchip_i2s_driver.probe-->rockchip_i2s_probe{
+- struct snd_soc_dai_driver *dai = &rk29_i2s_dai[pdev->id]
+- dai->ops = &rockchip_i2s_dai_ops
+- snd_soc_register_dai(&pdev->dev, dai)
+}@rk30_i2s.c
+
+
+/*
+ codec
+*/
+static struct snd_soc_dai_driver rk616_dai[] = {
+	{
+		.name = "rk616-hifi",
+		.playback = {
+			.stream_name = "HiFi Playback",
+		},
+		.capture = {
+			.stream_name = "HiFi Capture",
+			.channels_min = 2,
+		},
+		.ops = &rk616_dai_ops,
+	},
+	{
+		.name = "rk616-voice",
+		.playback = {
+		},
+		.capture = {
+		},
+		.ops = &rk616_dai_ops,
+	},
+
+}
+
+//初始
+rk616_modinit-->platform_driver_register(&rk616_codec_driver)-->rk616_codec_driver.probe-->
+rk616_platform_probe-->snd_soc_register_codec(&pdev->dev,&soc_codec_dev_rk616, rk616_dai)@rk616_codec.c
+
+/*
+ platform
+*/
+snd_rockchip_pcm_init-->platform_driver_register(&rockchip_pcm_driver)-->rockchip_pcm_driver.probe-->
+rockchip_pcm_platform_probe-->snd_soc_register_platform(&pdev->dev, &rockchip_pcm_platform)
+
+
+kernel/sound/soc/rk29/rk_rk616.c
+kernel/sound/soc/codecs/rk616_codec.c
+kernel/sound/soc/rk29/rk30_i2s.c
+kernel/sound/soc/rk29/rk29_pcm.c

@@ -1,4 +1,7 @@
-//
+/*
+ 创建AudioRecord
+
+*/
 MediaRecorder{ //数据源
 - DEFAULT 
 - MIC                //microphone
@@ -36,30 +39,19 @@ int getMinBufferSize (int sampleRateInHz, int channelConfig, int audioFormat)
 - return frameCount * channelCount * audio_bytes_per_sample(format)// 帧转换bytes
 }
 
-
-//start
-startRecording-->native_start-->android_media_AudioRecord_start-->lpRecorder->start
-@android_media_AudioRecord.cpp-->start@AudioRecord.cpp
-
-
-
-//read
-read(short[] audioData)-->native_read_in_short_array-->android_media_AudioRecord_readInArray
--->lpRecorder->read(recordBuff)@@android_media_AudioRecord.cpp-->read(buffer)@AudioRecord.cpp
-
-native_read_in_direct_buffer-->android_media_AudioRecord_readInDirectBuffer-->lpRecorder->read
-
-/**********************************
- audioRecord native
-*/
+//开始当前线程AudioRecordThread,获取flinger端接口mAudioRecord
 AudioRecord::AudioRecord-->set(audio_source_t inputSource, uint32_t sampleRate, audio_format_t format,
         audio_channel_mask_t channelMask,callback_t cbf){
 - mReqFrameCount //根据参数计算帧数
 - mCbf = cbf不为空{
-	- mAudioRecordThread = new AudioRecordThread
+	- mAudioRecordThread = new AudioRecordThread(*this,threadCanCallJava){
+		- mReceiver(receiver)
+		}
 	- mAudioRecordThread->run
 	}
+  //AudioFlinger端打开录音线程
 - openRecord_l{
+	  //创建RecordThread
 	- AudioSystem::getInputForAttr(根据采样率等参数，创建属性)-->aps->getInputForAttr
 		AudioPolicyManager::getInputForAttr{//获取流
 		- getDeviceAndMixForInputSource-->getDeviceForInputSource//获取input设备
@@ -70,41 +62,78 @@ AudioRecord::AudioRecord-->set(audio_source_t inputSource, uint32_t sampleRate, 
 		-
 		}
 	- size_t frameCount = mReqFrameCount
-	- audioFlinger->openRecord(input,mSampleRate,mChannelMask,frameCount,iMem,bufferMem){
+	  //创建RecordTrack
+	- sp<IAudioRecord> mAudioRecord = audioFlinger->openRecord(input,mSampleRate,mChannelMask,frameCount,iMem,bufferMem){
 		- iMem  //cblk
 		- bufferMem //flinger端mBuffer地址
 		}@AudioFlinger.cpp //
-	  //设置地址
 	- void *iMemPointer = iMem->pointer() //IMemory->pointer获取IMemoryHeap,获取地址
 	- audio_track_cblk_t* cblk = static_cast<audio_track_cblk_t*>(iMemPointer) //第一部分为回调
 	- buffers = cblk + 1 //buffer位置随后
 	- mCblkMemory = iMem 
 	- mBufferMemory = bufferMem
-	- mProxy = new AudioRecordClientProxy(cblk, buffers, mFrameCount, mFrameSize) //创建proxy，用来读取数据	
+	  //创建proxy，用来读取数据
+	- mProxy = new AudioRecordClientProxy(cblk, buffers, mFrameCount, mFrameSize){
+		- ClientProxy(audio_track_cblk_t* cblk, void *buffers)
+		}@AudioTrackShared.h 	
 	}
 }@AudioRecord.cpp
 
-AudioPolicyManager::getInputForAttr{
-- device = getDeviceAndMixForInputSource
-- getInputForDevice(device)
-}
 
-AudioRecordClientProxy : public ClientProxy @AudioTrackShared.h
+//处理数据
+AudioRecord::AudioRecordThread::threadLoop(){
+- mMyCond.wait(mMyLock)
+- mReceiver.processAudioBuffer()-->processAudioBuffer{
 
-//read数据,读取数据拷贝到 buffer中
+} 
+}@AudioRecord.cpp
+
+
+/*start */
+startRecording@AudioRecord.java-->native_start-->android_media_AudioRecord_start-->lpRecorder->start
+@android_media_AudioRecord.cpp-->
+start{
+- AudioSystem::setParameters(audio_io_handle_t(0) , "record_bypass=1") //googlequicksearchbox 设置bypass
+- mProxy->flush()
+- status = mAudioRecord->start(event, triggerSession)
+- 启动失败,恢复录音,restoreRecord_l("start")
+-  if (status != NO_ERROR){AudioSystem::setParameters(audio_io_handle_t(0) , "record_bypass=0")}
+   else{
+	- mAudioRecordThread.resume
+	}	
+}@AudioRecord.cpp
+
+
+
+/*read
+ read数据,读取数据拷贝到 buffer中
+*/
+
 read@AudioRecord.java-->native_read_in_short_array(/*byte,short,float数据格式不同*/)-->
 android_media_AudioRecord_readInArray-->lpRecorder->read@android_media_AudioRecord.cpp-->
 read(buffer,size){
-- Buffer audioBuffer
-- obtainBuffer(Buffer* audioBuffer,const struct timespec )
+  //通过AudioRecordClientProxy获取数据,装入audioBuffer
+- Buffer audioBuffer  
+- obtainBuffer(&audioBuffer,const struct timespec )
 	-->obtainBuffer{
 	- sp<AudioRecordClientProxy> proxy = mProxy
 	- sp<IMemory> iMem = mCblkMemory
 	- sp<IMemory> bufferMem = mBufferMemory
 	- proxy->obtainBuffer(&buffer, requested)-->ClientProxy::obtainBuffer()@AudioTrackShared.cpp
 	}
-- memcpy(buffer, audioBuffer.i8)//拷贝到用户buffer中
+  //拷贝到用户buffer中
+- memcpy(buffer, audioBuffer.i8)
 }@AudioRecord.cpp
+
+
+/*stop */
+AudioRecord::stop{
+- mProxy->interrupt()
+- mAudioRecord->stop()
+- mAudioRecordThread->pause
+- AudioSystem::setParameters(audio_io_handle_t(0) , "record_bypass=0") //googlequicksearchbox
+}@AudioRecord.cpp
+
 
 frameworks/base/media/java/android/media/AudioRecord.java
 frameworks/base/core/jni/android_media_AudioRecord.cpp

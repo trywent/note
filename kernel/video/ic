@@ -57,3 +57,10 @@ sp9853:
 - Support up to 16MP RAWRGB data from MIPI CSI;
 - Support 8, 10 and 12 bits RAW RGB via MIPI CSI;
 - Support JPEG and YUV data via MIPI CSI (YUV input format 422, output format 2-plane 420)
+
+sp7731:
+- Support up to 4-lane MIPI CSI-2 interface;
+- Support up to 8M RAWRGB data from MIPI CSI;
+- Support 8, 10 and 12 bits Raw RGB via MIPI CSI;
+- Support 8, 10 bits YUV via MIPI CSI
+- Support YUV422(2-plane), YUV420(2-plane) and YUV420(3-plane) input format in review burst in mode

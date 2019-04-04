@@ -166,9 +166,30 @@ applyLegacyAnimation(ViewGroup parent, long drawingTime,Animation a){
 - parent.invalidate
 }@View.java
 
+/* 事件处理
+
+*/
+
+
 frameworks/base/core/java/android/view/View.java
 frameworks/base/core/java/android/view/WindowManagerImpl.java
 frameworks/base/core/java/android/view/ViewRootImpl.java
 
+/*
+ 应用的View.DecorView
 
+*/
+
+dispatchKeyEvent(KeyEvent event){
+- Window.Callback cb = mWindow.getCallback()
+- cb.dispatchKeyEvent(event)-->dispatchKeyEvent@Activity.java
+ //没有view处理,则窗口处理
+- mWindow.onKeyDown/mWindow.onKeyUp
+}@DecorView.java
+
+
+
+
+
+frameworks/base/core/java/com/android/internal/policy/DecorView.java
 

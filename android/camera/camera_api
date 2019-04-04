@@ -2,7 +2,7 @@
  android.hardware.camera2
 
  1-cameraManager获取CameraDevice.
- 2-CameraDevice创建session //对应native的stream
+ 2-CameraDevice.createCaptureSession创建session //对应native的stream
  3-创建请求,一些键值对,CaptureRequest {
 	- sensor配置
 	- lens镜头peiz

@@ -1,4 +1,7 @@
-//
+/*
+
+
+*/
 HCI Command Packet：host发给controller，主要是HCI 命令， 注意是命令，不是数据。
 HCI Event Packet：controller发给host。对应于command packet。
 HCI ACL Data Packet： host发给controller或者相反。主要是L2CAP发送和接收的数据，我们上层的所有数据，
@@ -13,13 +16,16 @@ hci_module.start_up-->hci_module_start_up{
 - command_response_timer = alarm_new("hci.command_response_timer")
 - thread = thread_new("hci_thread")
 - packet_fragmenter->init(&packet_fragmenter_callbacks)-->callbacks=packet_fragmenter_callbacks@packet_fragmenter.cc
-- thread_post(thread, message_loop_run)-->message_loop_run{//开始消息队列
+  //开始消息队列,监听hci消息
+- thread_post(thread, message_loop_run)-->message_loop_run{
 	- 创建message_loop_
-	- hci_initialize //加载本地库文件,本地接口
-	}
-- vendor_open-->dlopen("libbt-vendor.so")@vendor.c//加载本地库
+	- message_loop_->task_runner()->PostTask(FROM_HERE,base::Bind(&hci_initialize))
+	}  
+- vendor_open-->dlopen("libbt-vendor.so")@vendor.c//Deprecated 加载本地库
 }@hci_layer.c
 
+
+//Deprecated 老做法
 hci_initialize{
 - bt_vendor_fd = fd = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI) //打开socket
 - addr.hci_family = AF_BLUETOOTH
@@ -28,8 +34,6 @@ hci_initialize{
 - reader_thread = new Thread("hci_sock_reader") //创建读线程
 - monitor_socket //开始监听消息
 }@hci_layer_linux.cc
-
-
 
 //发送命令，并设置回复后的回调函数
 btu_hcif_send_cmd-->hci_layer_get_interface()->
@@ -105,13 +109,35 @@ btu_hci_msg_queue-->btu_hci_msg_ready-->btu_hci_msg_process{
 
 }@btu_task.c
 
+/*
+ android 8.1
+*/
+//
+hci_initialize{
+- android::sp<IBluetoothHci> btHci = IBluetoothHci::getService()
+- android::sp<IBluetoothHciCallbacks> callbacks = new BluetoothHciCallbacks()
+- btHci->initialize(callbacks)
+}@hci_layer_android.cc
 
+//发送到HCI
+hci_transmit(BT_HDR* packet){
+- MSG_STACK_TO_HC_HCI_CMD:btHci->sendHciCommand(data)
+- MSG_STACK_TO_HC_HCI_ACL:btHci->sendAclData(data)
+- MSG_STACK_TO_HC_HCI_SCO:btHci->sendScoData(data)
+}@hci_layer_android.cc
 
-
+//从HCI接收
+class BluetoothHciCallbacks : public IBluetoothHciCallbacks {
+- initializationComplete
+- hciEventReceived
+- aclDataReceived
+- scoDataReceived
+}@hci_layer_android.cc
 
 
 system/bt/main/bte_main.c
 system/bt/hci/src/hci_layer.c
 system/bt/hci/src/packet_fragmenter.cc
 system/bt/hci/src/hci_layer_linux.cc
+system/bt/hci/src/hci_layer_android.cc
 system/bt/stack/btu/btu_hcif.cc

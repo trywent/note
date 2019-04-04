@@ -1,4 +1,8 @@
-//解析apk
+/*解析apk
+
+//应用默认比例1.86
+DEFAULT_PRE_O_MAX_ASPECT_RATIO@PackageParser.java
+*/
 parsePackage(File packageFile){
 - parseClusterPackage{//目录文件
 	- PackageLite lite = parseClusterPackageLite(packageDir)

@@ -1,4 +1,0 @@
-内核启动命令中定义console使用的串口设备：console=device,options
-
-kernel/Documentation/serial-console.txt
-kernel/Documentation/x86/earlyprintk.txt
