@@ -7,7 +7,7 @@ xxxusb_probe{
 - usb_add_hcd //加入hcd
 }@xxxusb_otg/host_driver.c
 
-添加HCD：
+//添加HCD：
 usb_add_hcd{
 - hcd_buffer_create
 - usb_register_bus //

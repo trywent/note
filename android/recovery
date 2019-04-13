@@ -64,25 +64,69 @@ fs_mgr_add_entry@roots.cpp
 
 
 
-=====================
-UI:
-设置背景：
+/*
+ android4.4 UI
+*/
+
+main{
+- Device* device = make_device()-->ui(new DefaultUI)-->ScreenRecoveryUI
+- ui = device->GetUI()
+- ui->init()
+- ui->SetLocale(locale)
+}@recovery.cpp
+
+ScreenRecoveryUI{
+- currentIcon(NONE)
+- installingFrame(0)
+ //初始化进度条
+- progress(0)
+ //初始化text,初始化菜单
+- text_cols(0)
+- show_text(false)
+- show_menu(false)
+ //资源?
+- animation_fps(20)
+}@screen_ui.cpp
+
+init{
+- gr_init()
+  //初始化字体大小
+- gr_font_size(&char_width, &char_height)
+- text_cols = gr_fb_width() / char_width
+  //加载资源图片
+- LoadBitmap("icon_installing", &backgroundIcon[INSTALLING_UPDATE])
+  ...
+- pthread_create(&progress_t, NULL, progress_thread)
+  //处理输入事件
+- RecoveryUI::Init(){
+	- ev_init(input_callback)
+	- pthread_create(&input_t, NULL, input_thread)
+	}
+}@screen_ui.cpp
+
+//设置背景：是否显示字符：输出字符：
 ScreenRecoveryUI::SetBackground
-
-是否显示字符：
 ScreenRecoveryUI::ShowText
-
-输出字符：
 ScreenRecoveryUI::Print
 
-加载图片：
-ScreenRecoveryUI::Init(){
-- LoadBitmap("icon_installing", &backgroundIcon[INSTALLING_UPDATE])-->
-	res_create_surface{
-		- 根据图片名加载图片资源
-	}
-}
+//graphic
+gr_init{
+- gglInit(&gr_context)
+- GGLContext *gl = gr_context
+  //字体
+- gr_init_font
+  //获取fb信息,buffer
+- get_framebuffer(gr_framebuffer)
+}@graphics.c
 
+
+bootable/recovery/ui.h
+bootable/recovery/ui.cpp
+bootable/recovery/screen_ui.cpp
+bootable/recovery/default_device.cpp
+bootable/recovery/minui/graphics.c
+include/pixelflinger/pixelflinger.h
+system/core/libpixelflinger
 =====================
 RKUPDATE:
 sdtool_main-->install_rkimage

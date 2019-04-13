@@ -1,0 +1,90 @@
+/*
+
+ mount -t configfs none /config
+ 
+ 通过sysfs管理内核object或config_items
+*/
+
+/*
+ config_item代表一个目录节点,节点中包含子节点提供属性信息
+*/
+struct config_item {
+	char                    *ci_name;
+	char                    ci_namebuf[UOBJ_NAME_LEN];
+	struct kref             ci_kref;
+	struct list_head        ci_entry;
+	struct config_item      *ci_parent;
+	struct config_group     *ci_group;
+	struct config_item_type *ci_type;//属性
+	struct dentry           *ci_dentry;
+}
+
+void config_item_init(struct config_item *);
+void config_item_init_type_name(struct config_item *,const char *name,struct config_item_type *type);
+struct config_item *config_item_get(struct config_item *);
+void config_item_put(struct config_item *);
+
+/*
+ config_item_type代表一个属性
+*/
+struct configfs_item_operations {
+	void (*release)(struct config_item *);
+	int (*allow_link)(struct config_item *src,struct config_item *target);
+	int (*drop_link)(struct config_item *src,struct config_item *target);
+};
+
+struct config_item_type {
+	struct module                           *ct_owner;
+	struct configfs_item_operations         *ct_item_ops;
+	struct configfs_group_operations        *ct_group_ops;
+	struct configfs_attribute               **ct_attrs;
+};
+struct configfs_attribute {
+	char                    *ca_name;
+	struct module           *ca_owner;
+	umode_t                  ca_mode;
+	ssize_t (*show)(struct config_item *, char *);
+	ssize_t (*store)(struct config_item *, const char *, size_t);
+};
+
+
+/*
+ config_group包含config_item目录节点
+
+ 用户空间在group目录执行mkdir,可以创建item(若有函数make_item),或group(若有函数make_group)
+*/
+struct config_group {
+	struct config_item		cg_item;
+	struct list_head		cg_children;
+	struct configfs_subsystem 	*cg_subsys;
+	struct config_group		**default_groups;
+};
+
+void config_group_init(struct config_group *group);
+void config_group_init_type_name(struct config_group *group,const char *name, struct config_item_type *type);
+
+struct configfs_group_operations {
+	struct config_item *(*make_item)(struct config_group *group, const char *name);
+	struct config_group *(*make_group)(struct config_group *group,const char *name);
+	int (*commit_item)(struct config_item *item);
+	void (*disconnect_notify)(struct config_group *group, struct config_item *item);
+	void (*drop_item)(struct config_group *group,struct config_item *item);
+};
+
+/*
+ configfs初始,configfs_register_subsystem
+*/
+struct configfs_subsystem {
+	struct config_group	su_group;
+	struct mutex		su_mutex;
+};
+int configfs_register_subsystem(struct configfs_subsystem *subsys);
+void configfs_unregister_subsystem(struct configfs_subsystem *subsys);
+
+
+
+
+
+
+kernel/drivers/usb/gadget/configfs.c
+kernel/include/linux/configfs.h

@@ -1,4 +1,6 @@
-//
+/*
+ usb
+*/
 subsys_initcall(usb_init)-->usb_init{
 - bus_register(&usb_bus_type)
 - usb_devio_init{//io接口
@@ -21,3 +23,4 @@ struct bus_type usb_bus_type = {
 
 
 kernel/drivers/usb/core/usb.c
+kernel/drivers/usb/core/generic.c

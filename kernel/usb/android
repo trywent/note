@@ -1,0 +1,49 @@
+/*
+
+ /sys/class/android_usb/android0
+
+ 创建/config/usb_gadget/g1
+ mkdir /config/usb_gadget/g1@init.usb.rc
+*/
+static struct configfs_group_operations gadgets_ops = {
+	.make_group     = &gadgets_make,
+	.drop_item      = &gadgets_drop,
+};
+
+static struct config_item_type gadgets_type = {
+	.ct_group_ops   = &gadgets_ops,
+	.ct_owner       = THIS_MODULE,
+};
+
+static struct configfs_subsystem gadget_subsys = {
+	.su_group = {
+		.cg_item = {
+			.ci_namebuf = "usb_gadget",
+			.ci_type = &gadgets_type,
+		},
+	},
+	.su_mutex = __MUTEX_INITIALIZER(gadget_subsys.su_mutex),
+}
+
+module_init(gadget_cfs_init)-->gadget_cfs_init{
+  //创建configfs
+- config_group_init(&gadget_subsys.su_group)
+- configfs_register_subsystem(&gadget_subsys)
+  //sysfs
+- class_create(THIS_MODULE, "android_usb")
+}
+
+//创建/config/usb_gadeget,创建sys/class/android0
+mkdir "/config/usb_gadget/g1"@init.usb.rc-->gadgets_ops-->make_group-->
+gadgets_make{
+- struct gadget_info *gi = kzalloc(sizeof(*gi), GFP_KERNEL)
+- gi->group.default_groups = gi->default_groups
+- config_group_init_type_name(&gi->functions_group, "functions",&functions_type)
+  ...
+- android_device_create{
+	- device_create(android_class,MKDEV(0, 0), "android0")
+	- device_create_file //属性文件DISCONNECTED,CONNECTED,CONFIGURED
+	}
+}@configfs.c
+
+kernel/drivers/usb/gadget/configfs.c

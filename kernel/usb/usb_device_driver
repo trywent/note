@@ -1,3 +1,8 @@
+/*
+ usbDevice
+*/
+
+
 //usb设备创建
 usb_hub_init-->hub_thread-->hub_events-->hub_port_connect_change{
  //处理各种事件

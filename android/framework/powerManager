@@ -1,4 +1,6 @@
+/*
 
+*/
 systemReady{
 - 创建mDisplayPowerController(灯光服务mLightsService)
 - 注册广播接收器，

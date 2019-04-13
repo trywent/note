@@ -1,0 +1,85 @@
+/*
+ USBService
+*/
+startOtherServices-->mSystemServiceManager.startService(USB_SERVICE_CLASS)@SystemServer.java
+-->startService("com.android.server.usb.UsbService$Lifecycle")@SystemServiceManager.java-->
+onStart{
+- mUsbService = new UsbService(getContext())
+- publishBinderService(Context.USB_SERVICE, mUsbService)
+}@UsbService.java
+
+
+UsbService(Context context) {
+- UsbSettingsManager mSettingsManager = new UsbSettingsManager(context)
+- UsbAlsaManager mAlsaManager = new UsbAlsaManager(context)
+  //host
+- mHostManager mHostManager = new UsbHostManager(context, mAlsaManager, mSettingsManager)
+  //device 存在"/sys/class/android_usb"
+- UsbDeviceManager mDeviceManager = new UsbDeviceManager(context, mAlsaManager, mSettingsManager)
+- UsbPortManager mPortManager = new UsbPortManager(context)
+}@UsbService.java
+
+
+/*
+ host
+*/
+
+
+/*
+ device (Accessory附件)
+*/
+UsbDeviceManager(Context context, UsbAlsaManager alsaManager){
+- 
+}@UsbDeviceManager.java
+
+UsbHandler(Looper looper) {
+  //监听adb设置
+- mContentResolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ADB_ENABLED))
+  //监听uevent
+- mUEventObserver.startObserving(USB_STATE_MATCH)
+- mUEventObserver.startObserving(ACCESSORY_START_MATCH)
+}@UsbDeviceManager.java
+
+
+//进入accessory
+mUEventObserver.onUEvent{
+- mHandler.updateState(state)
+- startAccessoryMode{
+	- mAccessoryStrings = nativeGetAccessoryStrings()
+	- String functions //设置accessory
+	- mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_ACCESSORY_MODE_ENTER_TIMEOUT)) //设置超时处理
+	- setCurrentFunctions(functions)//设置功能
+	}
+}@UsbDeviceManager.java
+
+//设置function
+setCurrentFunctions-->mHandler.sendMessage(MSG_SET_CURRENT_FUNCTIONS)-->UsbHandler.handleMessage-->
+setEnabledFunctions-->trySetEnabledFunctions{
+- functions = applyAdbFunction(functions)
+- setUsbConfig-->SystemProperties.set(USB_CONFIG_PROPERTY, config)
+}
+
+
+
+//处理消息
+UsbHandler.handleMessage{
+  //连接变化
+- MSG_UPDATE_STATE:{
+	- 
+	 //有accessory功能
+	- updateCurrentAccessory
+	}
+  //
+- MSG_ACCESSORY_MODE_ENTER_TIMEOUT{
+	- notifyAccessoryModeExit
+	}
+}
+
+
+updateCurrentAccessory{
+- 
+}
+
+frameworks/base/services/usb/java/com/android/server/usb/UsbService.java
+frameworks/base/services/usb/java/com/android/server/usb/UsbDeviceManager.java
+frameworks/base/services/core/jni/com_android_server_UsbDeviceManager.cpp
