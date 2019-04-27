@@ -62,7 +62,7 @@ player->setDataSource@mediaplayer.cpp-->Client::setDataSource(const sp<IMediaHTT
 //获取播放器类型
 MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client, const char* url)-->GET_PLAYER_TYPE_IMPL{
 - player_type ret = STAGEFRIGHT_PLAYER
-   //遍历sFactoryMap
+   //遍历sFactoryMap,查找分数最高player
 - for (size_t i = 0; i < sFactoryMap.size()){
 	- IFactory* v = sFactoryMap.valueAt(i)
 	- thisScore = v->scoreFactory(a, bestScore)
