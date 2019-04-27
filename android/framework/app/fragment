@@ -1,3 +1,7 @@
+/*
+ fragment
+*/
+
 通常加入到一个activity中。但有自己的生命周期，能够存放到activity的back stack通过返回键能够恢复。
 
 _______________________
@@ -7,8 +11,7 @@ fragment通常作为activity的一部分使用，并提供自己的布局。frag
 
 可以从xml中获取布局。
 
-_______________________
-将fragment加入一个activity
+//将fragment加入一个activity
 
 有两种方法：
 *在activity的layout文件中声明fragment
@@ -19,23 +22,38 @@ _______________________
  在activity运行的任何时候，都可将fragment加入activity。只需实现一个ViewGroup将fragment加入。
  进行fragment的操作(增加，移除，替换)，必须通过fragmenTransaction提供的接口。
 
-_______________________
-管理fragment
-
+/*fragmentManager
+ 管理fragment
+*/
 通过getFragmentManager()获取FragmentManager来进行fragment的管理。
 可以用来
 -获取activity中的fragment。通过findFragmentById()(有UI)或 findFragmentByTag()（无UI）
 -通过popBackStack()将fragment从back stack中出栈。
 -addOnBackStackChangedListener()，注册back stack改变的监听器。
 
-还可以通过FragmentTransaction,进行fragment的增加移除等操作。
+addFragment-->makeActive-->mActive.add@FragmentManager.java
 
-_______________________
-fragment的交互操作
+
+
+/*FragmentTransaction
+ 还可以通过FragmentTransaction,进行fragment的增加移除等操作。
+*/
 执行FragmentTransaction提供的操作add(),remove(),和replace()，最后要调用commit()
 
-_______________________
-fragment与activity交互
+
+ //加入view
+  at android.view.ViewGroup.addViewInner(ViewGroup.java:4994)
+  at android.view.ViewGroup.addView(ViewGroup.java:4785)
+  at android.view.ViewGroup.addView(ViewGroup.java:4725)
+  at android.view.ViewGroup.addView(ViewGroup.java:4698)
+  at android.app.FragmentManagerImpl.moveToState(FragmentManager.java:1284)
+  at android.app.FragmentManagerImpl.addAddedFragments(FragmentManager.java:2422)
+  at android.app.FragmentManagerImpl.executeOpsTogether(FragmentManager.java:2190)
+  at android.app.FragmentManagerImpl.removeRedundantOperationsAndExecute(FragmentManager.java:2146)
+  at android.app.FragmentManagerImpl.execPendingActions(FragmentManager.java:2047)
+  at android.app.FragmentManagerImpl$1.run(FragmentManager.java:719)
+
+//fragment与activity交互
 虽然fragment是一个独立于activity的对象。但fragment的实例是与包含它的activity绑定的。
 
 fragment可以通过getActivity()函数获取activity。
@@ -44,6 +62,6 @@ fragment可以通过getActivity()函数获取activity。
 
 
 ==================================
-fragmentManager:
-addFragment-->makeActive-->mActive.add@FragmentManager.java
+:
+
 

@@ -1,0 +1,43 @@
+/*
+
+*/
+SoundPool.Builder.build-->new SoundPool(mMaxStreams, mAudioAttributes)
+SoundPool{
+- native_setup(new WeakReference<SoundPool>(this), maxStreams, attributes){
+	- SoundPool *ap = new SoundPool(maxChannels, paa)
+	}@android_media_SoundPool.cpp
+- baseRegisterPlayer
+}@SoundPool.java
+
+
+SoundPool(maxChannels, paa){
+- mChannelPool = new SoundChannel[mMaxChannels]
+- startThreads{
+	- createThreadEtc
+	- mDecodeThread = new SoundPoolThread(this)
+	}
+}@SoundPool.cpp
+
+load-->_load@SoundPool.java-->android_media_SoundPool_load_FD{
+- SoundPool *ap = MusterSoundPool(env, thiz)
+- ap->load(jniGetFDFromFileDescriptor(env, fileDescriptor)){
+	- sp<Sample> sample = new Sample(sampleID, fd, offset, length)
+	- sample->startLoad()
+	- mDecodeThread->loadSample(sampleID)-->write(SoundPoolMsg(SoundPoolMsg::LOAD_SAMPLE, sampleID))@SoundPoolThread.cpp
+	}@SoundPool.cpp
+}@android_media_SoundPool.cpp
+
+
+doLoadSample-->sample->doLoad()@SoundPoolThread.cpp-->
+decode(int fd, int64_t offset, int64_t length, uint32_t *rate, int *numChannels){
+- AMediaExtractor *ex = AMediaExtractor_new()
+- AMediaExtractor_setDataSourceFd(ex, fd, offset, length)
+- AMediaExtractor_getTrackCount(ex)
+- 
+}@SoundPool.cpp
+
+
+frameworks/base/media/java/android/media/SoundPool.java
+frameworks/base/media/jni/soundpool/android_media_SoundPool.cpp
+frameworks/base/media/jni/soundpool/SoundPoolThread.cpp
+frameworks/base/media/jni/soundpool/SoundPool.cpp

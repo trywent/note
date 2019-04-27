@@ -1,0 +1,64 @@
+/*
+
+interface
+*/
+
+class BpMediaPlayer: public BpInterface<IMediaPlayer>
+{
+    // disconnect from media player service
+    void disconnect()
+
+    status_t setDataSource(
+            const sp<IMediaHTTPService> &httpService,
+            const char* url,
+            const KeyedVector<String8, String8>* headers)    
+    status_t setDataSource(int fd, int64_t offset, int64_t length)
+    status_t setDataSource(const sp<IStreamSource> &source) 
+    status_t setDataSource(const sp<IDataSource> &source) 
+    // pass the buffered IGraphicBufferProducer to the media player service
+    status_t setVideoSurfaceTexture(const sp<IGraphicBufferProducer>& bufferProducer)
+    status_t setBufferingSettings(const BufferingSettings& buffering)
+    status_t getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */)
+    status_t prepareAsync()
+    status_t start()
+    status_t stop()
+    status_t isPlaying(bool* state)
+    status_t setPlaybackSettings(const AudioPlaybackRate& rate)
+    status_t getPlaybackSettings(AudioPlaybackRate* rate /* nonnull */)
+    status_t setSyncSettings(const AVSyncSettings& sync, float videoFpsHint)
+    status_t getSyncSettings(AVSyncSettings* sync /* nonnull */, float* videoFps /* nonnull */)
+    status_t pause()
+    status_t seekTo(int msec, MediaPlayerSeekMode mode)
+    status_t getCurrentPosition(int* msec)
+    status_t getDuration(int* msec)
+    status_t reset()
+
+    status_t setAudioStreamType(audio_stream_type_t stream)
+    status_t setLooping(int loop)
+    status_t setVolume(float leftVolume, float rightVolume)
+    status_t invoke(const Parcel& request, Parcel *reply)
+    status_t setMetadataFilter(const Parcel& request)
+    status_t getMetadata(bool update_only, bool apply_filter, Parcel *reply)
+    status_t setAuxEffectSendLevel(float level)
+    status_t attachAuxEffect(int effectId)
+    status_t setParameter(int key, const Parcel& request)
+    status_t getParameter(int key, Parcel *reply)
+    status_t setRetransmitEndpoint(const struct sockaddr_in* endpoint)
+    status_t setNextPlayer(const sp<IMediaPlayer>& player)
+    status_t getRetransmitEndpoint(struct sockaddr_in* endpoint)
+    virtual VolumeShaper::Status applyVolumeShaper(
+            const sp<VolumeShaper::Configuration>& configuration,
+            const sp<VolumeShaper::Operation>& operation)
+    virtual sp<VolumeShaper::State> getVolumeShaperState(int id)
+    // Modular DRM
+    status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId)
+    status_t releaseDrm()
+
+}@IMediaPlayer.cpp
+
+
+class Client : public BnMediaPlayer@MediaPlayerService.h
+
+
+frameworks/av/media/libmedia/IMediaPlayer.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.h

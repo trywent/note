@@ -1,0 +1,75 @@
+/*
+ 系统设置值
+*/
+/*android6.0之前
+
+ /data/data/com.android.providers.settings/database/
+*/
+onCreate{
+- mBackupManager = new BackupManager(getContext())
+- establishDbTracking{
+	-  DatabaseHelper dbhelper = new DatabaseHelper(getContext(), userHandle){
+			- onCreate //加载数据库数据
+			}@DatabaseHelper.java
+	}
+- onProfilesChanged
+}@SettingsProvider.java
+
+
+
+//================================
+SettingProvider:系统设置中的值
+onCreate-->new DatabaseHelper@SettingsProvider.java-->第一次getWritableDatabase-->onCreate-->loadSettings-->loadSystemSettings@DatabaseHelper.java-->execute@SQLiteStatement.java
+
+
+update secure set value='210.72.145.44' where _id=31
+select * from secure
+INSERT INTO system VALUES (71,'user_rotation', 1);
+
+update system set value=-1 where _id=642
+update global set value=2 where _id=59
+update secure set value="gps,network" where _id=1
+update secure set value="138664b737fc3ded" where _id=28;
+
+
+frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/DatabaseHelper.java
+frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/SettingsProvider.java
+frameworks/base/core/java/android/database/sqlite/SQLiteStatement.java
+
+
+/*android8.0
+
+ system/users/0/
+
+ SETTINGS_FILE_GLOBAL = "settings_global.xml";
+ SETTINGS_FILE_SYSTEM = "settings_system.xml";
+ SETTINGS_FILE_SECURE = "settings_secure.xml";
+ SETTINGS_FILE_SSAID = "settings_ssaid.xml";
+*/
+onCreate{
+- mHandlerThread = new HandlerThread
+- mHandlerThread.start()
+- mHandler = new Handler(mHandlerThread.getLooper())
+- mSettingsRegistry = new SettingsRegistry(){
+	- mGenerationRegistry = new GenerationRegistry(mLock)
+	- migrateAllLegacySettingsIfNeeded
+	}
+- registerBroadcastReceivers
+}@SettingsProvider.java
+
+//创建settingState
+ensureSettingsStateLocked{
+- final int maxBytesPerPackage = getMaxBytesPerPackageForType
+- SettingsState settingsState = new SettingsState(getContext(), mLock,getSettingsFile(key), key, maxBytesPerPackage){
+	- mStatePersistFile //"system/users/0/**.xml"
+	- readStateSyncLocked
+	}@SettingsState
+}
+
+migrateAllLegacySettingsIfNeeded{
+
+}
+
+
+
+frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/SettingsProvider.java

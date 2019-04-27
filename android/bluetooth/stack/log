@@ -16,7 +16,9 @@ const stack_config_t interface = {get_trace_config_enabled,
 //loglevel
 bte_logmsg_module.init-->init{
 - const stack_config_t* stack_config = stack_config_get_interface()-->interface@stack_config.cc
-- load_levels_from_config(stack_config->get_all())
+- load_levels_from_config(stack_config->get_all()){
+	- 遍历bttrc_set_level_map
+	}
 }@bte_logmsg.cc
 
 //appl

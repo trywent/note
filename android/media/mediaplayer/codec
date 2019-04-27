@@ -2,8 +2,11 @@
 
 
 
-//extrator============================
-/*可解析媒体框架支持的各种文件格式的组件*/
+
+/*extrator
+
+可解析媒体框架支持的各种文件格式的组件
+*/
 service mediaextractor /system/bin/mediaextractor
 
 
@@ -11,9 +14,12 @@ service mediaextractor /system/bin/mediaextractor
 
 
 
-//codec============================
-/*非安全解码器和软件编码器位于编解码器进程中。
-  安全解码器和硬件编码器位于 mediaserver（未变更）中。*/
+
+/*codec
+
+非安全解码器和软件编码器位于编解码器进程中。
+  安全解码器和硬件编码器位于 mediaserver（未变更）中
+*/
 
 //media.codec Service
 service mediacodec /vendor/bin/hw/android.hardware.media.omx@1.0-service@android.hardware.media.omx@1.0-service.rc-->

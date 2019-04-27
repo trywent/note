@@ -1,6 +1,14 @@
 /******************************
  senor
+ 
+ /dev/sprd_sensor
+ /dev/sprd_image
+ /dev/sprd_jpg
+ /dev/sprd_cpp
 */
+
+
+
 camera_local_int-->camera_init_internal-->camera_sensor_init-->
 cmr_sensor_init-->cmr_sns_create_thread
 

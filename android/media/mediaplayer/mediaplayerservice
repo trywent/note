@@ -1,162 +1,11 @@
-//api
-{//播放流程
--new MediaPlayer();
--setAudioStreamType(AudioManager.STREAM_MUSIC)
--setDataSource(getApplicationContext(), myUri)
--prepare()//获取源，解码。导致耗时长，mediaPlayer使用另一线程执行
--start()，pause，stop
--setSurface(Surface surface)/setDisplay(SurfaceHolder)//视频播放时需要设置
--release
-}MediaPlayer.java
+/* mediaPlayerService
 
-{
-- new MediaPlayer
-- setAudioStreamType-->mStreamType
-- setDataSource{
-	- service(getMediaPlayerService())
-	- player(service->create)
-	- player->setDataSource
-	- attachNewPlayer(player)-->mPlayer //初始化mPlayer
-	}
-- setVideoSurfaceTexture //视频surface bufferProducer
-- 
-}mediaplayer.cpp
-
-
-1. //初始：new MediaPlayer
-new MediaPlayer-->native_setup@MediaPlayer.java-->android_media_MediaPlayer_native_setup(设置player)
-@android_media_MediaPlayer.cpp-->new MediaPlayer(创建本地mediaPlayer)@mediaplayer.cpp
-
-//监听错误：
-setOnErrorListener(OnErrorListener)@MediaPlayer.java
-
-native_setup-->android_media_MediaPlayer_native_setup-->mp->setListener@android_media_MediaPlayer.cpp
-
-收到并处理错误：
-MediaPlayer::notify-->listener->notify@mediaPlayer.cpp-->JNIMediaPlayerListener::notify
--->env->CallStaticVoidMethod(mClass, fields.post_event)@android_media_MediaPlayer.cpp
--->postEventFromNative-->mp.mEventHandler.sendMessage(发送消息)-->
-EventHandler.handleMessage(MEDIA_ERROR)-->mOnErrorListener.onError@MediaPlayer.java
-
-mediaPlayer销毁：
-IMediaDeathNotifier::DeathNotifier::binderDied-->notifier->died@IMediaDeathNotifier.cpp
--->MediaPlayer::died--> notify(MEDIA_ERROR_SERVER_DIED)@mediaplayer.cpp
-
-frameworks/av/media/libmedia/IMediaDeathNotifier.cpp
-2. //设置流类型：setAudioStreamType
-setAudioStreamType@MediaPlayer.java-->android_media_MediaPlayer_setAudioStreamType
--->mp->setAudioStreamType@android_media_MediaPlayer.cpp-->MediaPlayer::setAudioStreamType
-(设置mStreamType值)@mediaplayer.cpp
-
-服务端在prepare时设置：
-MediaPlayer::prepareAsync_l-->mPlayer->setAudioStreamType(mStreamType)@mediaplayer.cpp
--->MediaPlayerService::Client::setAudioStreamType-->mAudioOutput->setAudioStreamType
-@MediaPlayerService.cpp
-
-3. //设置源/创建player：setDataSource
-setDataSource@MediaPlayer.java-->android_media_MediaPlayer_setDataSourceFD
-@android_media_MediaPlayer.cpp-->setDataSource{
-- 获取服务 service(getMediaPlayerService()){
-	- 获取服务管理器，defaultServiceManager()
-	- 获取播放器服务，sm->getService(String16("media.player"))
-	- 设置服务，sMediaPlayerService = interface_cast<IMediaPlayerService>(binder)
-	}
-- 通过服务创建palyer，service->create(this, mAudioSessionId)
-- doSetRetransmitEndpoint(player)
-- 设置源，player->setDataSource(url, headers)
-- 设置mPlayer，attachNewPlayer(player)
-}@mediaplayer.cpp
-
-_____________________
-创建服务端player代理:
-
-service->create@mediaplayer.cpp-->create{
-- remote()->transact(CREATE, data, &reply)-->(服务端)create{
-	- 创建服务端client,new Client()
-	- 将client加入容器，mClients.add
-	}@MediaPlayerService.cpp
-- 返回服务，interface_cast<IMediaPlayer>-->BpMediaPlayer@IMediaPlayer.cpp
-}@IMediaPlayerService.cpp
-
-
-服务端播放器设置源：
-player->setDataSource@mediaplayer.cpp-->(跨进程)Client::setDataSource(source){
-- 资源路径是"content://"{
-	- 打开资源文件，android::openContentProviderFile
-	- setDataSource(fd...)
-	}
-- 其他资源{
-	- 获取播放器类型，getPlayerType(url)-->getDefaultPlayerType(默认播放器类型)
-	- 创建播放器，setDataSource_pre{
-		- 根据类型创建播放器，Client::createPlayer
-		- 设置声音输出类，new AudioOutput
-		- 设置AudioSink，setAudioSink
-		}
-	- 设置源，p->setDataSource(url, headers)-->(假设stageFright)mPlayer->setDataSource-->
-		@StagefrightPlayer.cpp-->AwesomePlayer::setDataSource-->setDataSource_l
-		- 
-		}
-	- setDataSource_post(player){
-		- p->setRetransmitEndpoint
-		- 设置mPlayer
-		}
-	}
-}@MediaPlayerService.cpp
-
-
-根据媒体类型创建播放器：
-createPlayer-->MediaPlayerService::Client::createPlayer{
-- 是否存在mPlayer且类型与要创建的player类型一致，不一致则清除mPlayer
-- 创建player,MediaPlayerFactory::createPlayer{
-	- 从sFactoryMap获取对应类型factory，sFactoryMap.valueFor(playerType
-	- 创建播放器，factory->createPlayer-->(如创建stagefright)new StagefrightPlayer(创建AwesomePlayer)
-	- 初始化，p->initCheck()
-	}@MediaPlayerFactory.cpp
-- 设置UID，setUID
-}@MediaPlayerService.cpp
-
-//真正的工作将会在finishSetDataSource_l中执行，
-AwesomePlayer::setDataSource-->setDataSource_l{
-- 设置mStats.mURI = mUri，
-}@AwesomePlayer.cpp
-
-4. //准备:prepare
-prepare@MediaPlayer.java-->android_media_MediaPlayer_prepare-->
-process_media_player_call@android_media_MediaPlayer.cpp-->
-MediaPlayer::prepare-->MediaPlayer::prepareAsync_l{
-- mPlayer->setAudioStreamType-->(服务端)MediaPlayerService::Client::setAudioStreamType
-	-->mAudioOutput->setAudioStreamType{
-	- mStreamType = streamType
-	}@MediaPlayerService.cpp
-- mPlayer->prepareAsync-->(服务端)MediaPlayerService::Client::prepareAsync-->
-	mPlayer->prepareAsync-->
-}@mediaplayer.cpp
-
-
-
-5. //开始播放:start
-start-->_start@MediaPlayer.java-->android_media_MediaPlayer_start-->getMediaPlayer.start
-@android_media_MediaPlayer.cpp-->MediaPlayer::start-->mPlayer->start@mediaplayer.cpp-->
-MediaPlayerService::Client::start-->getPlayer()->start@MediaPlayerService.cpp
-
-
-6.//视频设置surface
-setSurface/setDisplay@MediaPlayer.java-->android_media_MediaPlayer_setVideoSurface-->
-setVideoSurface-->getMediaPlayer().setVideoSurfaceTexture@android_media_MediaPlayer.cpp
--->setVideoSurfaceTexture(bufferProducer)-->mPlayer->setVideoSurfaceTexture@mediaplayer.cpp
-
-
-//mediaPlayerService:====================
-/*
  player :public MediaPlayerInterface : public MediaPlayerBase
 
 */
-
-//服务初始化：
-
 main--> MediaPlayerService::instantiate@main_mediaserver.cpp
-MediaPlayerService::instantiate-->addService(String16("media.player"), new MediaPlayerService())@
-MediaPlayerService.cpp
+MediaPlayerService::instantiate-->addService(String16("media.player"), new MediaPlayerService())
+@MediaPlayerService.cpp
 
 
 //注册播放器内置factory：
@@ -169,23 +18,57 @@ registerBuiltinFactories{
 }@MediaPlayerFactory.cpp
 
 
-
-mediaPlayerService::client{
-- create(IMediaPlayerClient)-->new Client(pid,IMediaPlayerClient)
-- setDataSource{
-	- MediaPlayerFactory::getPlayerType //获取播放器类型
-	- setDataSource_pre
-	- setDataSource_post
-	- p->setDataSource(fd)
+/*
+ 服务端client
+*/
+service->create@mediaplayer.cpp-->create(const sp<IMediaPlayerClient>& client,audio_session_t audioSessionId){
+- sp<Client> c = new Client(this, pid, connId, client){
+	- mService = service
+	- mClient = client
 	}
-- start
-}
+- mClients.add(w)
+}@MediaPlayerService.cpp
+
+
+/*
+ setDataSource{
+	- setDataSource_pre 创建player
+	- MediaPlayerBase->setDataSource
+	- setDataSource_post
+ }
+*/
+player->setDataSource@mediaplayer.cpp-->Client::setDataSource(const sp<IMediaHTTPService> &httpService,const char *url){
+- "content://"{
+	- String16 url16(url)
+	- int fd = android::openContentProviderFile(url16)
+	- setDataSource(fd, 0, 0x7fffffffffLL){
+		//获取文件状态
+		- struct stat sb
+		- fstat(fd, &sb)
+		//设置player
+		- playerType = MediaPlayerFactory::getPlayerType(this,fd)
+		- sp<MediaPlayerBase> p = setDataSource_pre(playerType)
+		- setDataSource_post(p, p->setDataSource(fd, offset, length))
+		}
+	}
+- 其它url{
+	- player_type playerType = MediaPlayerFactory::getPlayerType(this, url)  //默认播放器类型	 
+	- sp<MediaPlayerBase> p = setDataSource_pre(playerType)//创建播放器	  
+	- setDataSource_post(p, p->setDataSource(httpService, url, headers))
+	}
+}@MediaPlayerService.cpp
+
 
 //获取播放器类型
-getPlayerType(a)-->GET_PLAYER_TYPE_IMPL{
-- IFactory = sFactoryMap.valueAt(i) //遍历sFactoryMap
-- IFactory->scoreFactory(a) //获取分数最高的播放器
-- getDefaultPlayerType //分数为0,返回默认播放器NU_PLAYER
+MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client, const char* url)-->GET_PLAYER_TYPE_IMPL{
+- player_type ret = STAGEFRIGHT_PLAYER
+   //遍历sFactoryMap
+- for (size_t i = 0; i < sFactoryMap.size()){
+	- IFactory* v = sFactoryMap.valueAt(i)
+	- thisScore = v->scoreFactory(a, bestScore)
+	- if (thisScore > bestScore) ret = sFactoryMap.keyAt(i)
+	}
+- bestScore==0.0 getDefaultPlayerType //分数为0,返回默认播放器NU_PLAYER
 @MediaPlayerFactory.cpp
 
 //创建player
@@ -212,9 +95,7 @@ setDataSource-->p->setDataSource(fd)@MediaPlayerService.cpp
 
 
 
-frameworks/base/media/java/android/media/MediaPlayer.java
-frameworks/base/media/jni/android_media_MediaPlayer.cpp
-frameworks/av/media/libmedia/mediaplayer.cpp
+
 frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
 frameworks/av/media/mediaserver/main_mediaserver.cpp
 frameworks/av/media/libmedia/IMediaPlayerService.cpp

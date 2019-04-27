@@ -1,5 +1,27 @@
+/*数据结构*/
+
+struct CaptureRequest {
+    uint32_t frameNumber;
+    uint64_t fmqSettingsSize;
+    CameraMetadata settings;
+    StreamBuffer inputBuffer;
+    vec<StreamBuffer> outputBuffers;
+};
+
+struct CaptureResult {
+    uint32_t frameNumber;
+    uint64_t fmqResultSize;
+    CameraMetadata result;
+    vec<StreamBuffer> outputBuffers;
+    StreamBuffer inputBuffer;
+    uint32_t partialResult;
+
+};
+
+hardware/interfaces/camera/device/3.2/type.hal
 /**********************
  HAL Service
+
 */
 interface ICameraProvider {//provider接口
 - setCallback(ICameraProviderCallback callback)
@@ -75,10 +97,10 @@ CameraDevice::open(sp<ICameraDeviceCallback>& callback){
  ICameraDeviceSession
  device接口 session
 */
-ICameraDeviceSession{
-- constructDefaultRequestSettings
-- configureStreams
-- processCaptureRequest
+interface ICameraDeviceSession{
+- constructDefaultRequestSettings(RequestTemplate type)
+- configureStreams(StreamConfiguration requestedConfiguration)
+- processCaptureRequest(vec<CaptureRequest> requests,vec<BufferCache> cachesToRemove)
 - getCaptureRequestMetadataQueue
 - getCaptureResultMetadataQueue
 }@3.3::ICameraDeviceSession.hal

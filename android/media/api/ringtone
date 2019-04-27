@@ -1,5 +1,7 @@
-===================
-ringTone:
+/*
+ ringTone:
+*/
+
 {
 - 获取，RingtoneManager.getRingtone-->setUri(设置播放源)
 - 设置参数，setStreamType-->setAudioAttributes-->setUri

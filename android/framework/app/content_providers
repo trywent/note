@@ -65,24 +65,7 @@ SQLiteOpenHelper(传入数据库名称)-->getWritableDatabase(返回创建的数
 
 query()://返回Cursor
 
-//================================
-SettingProvider:系统设置中的值
-onCreate-->new DatabaseHelper@SettingsProvider.java-->第一次getWritableDatabase-->onCreate-->loadSettings-->loadSystemSettings@DatabaseHelper.java-->execute@SQLiteStatement.java
 
-
-update secure set value='210.72.145.44' where _id=31
-select * from secure
-INSERT INTO system VALUES (71,'user_rotation', 1);
-
-update system set value=-1 where _id=642
-update global set value=2 where _id=59
-update secure set value="gps,network" where _id=1
-update secure set value="138664b737fc3ded" where _id=28;
-
-
-frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/DatabaseHelper.java
-frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/SettingsProvider.java
-frameworks/base/core/java/android/database/sqlite/SQLiteStatement.java
 
 ================================
 从应用中访问数据，一般不再主线程中访问，而是使用异步访问。

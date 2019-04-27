@@ -1,5 +1,10 @@
 /***********************
  host
+
+ /dev/sprd_sensor
+ /dev/sprd_image
+ /dev/sprd_jpg
+ /dev/sprd_cpp
 */
 
 module_platform_driver-->

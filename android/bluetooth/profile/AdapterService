@@ -53,7 +53,9 @@ onStartCommand-->doStart-->notifyProfileServiceStateChanged@ProfileService.java
 }@AdapterService.java
 
 
-//AdapterState=====================
+/*
+ AdapterState
+*/
 mOffState.processMessage{
 - BLE_TURN_ON{
 	- notifyAdapterStateChange(STATE_BLE_TURNING_ON)	
@@ -89,7 +91,8 @@ OnState.processMessage{
 
 BleOnState.processMessage{//ble
 - USER_TURN_ON{
-	- startCoreServices-->setProfileServiceState(STATE_ON)@AdapterService.java //已经打开
+ 	//启动profile
+	- startCoreServices-->setProfileServiceState(STATE_ON)@AdapterService.java 
 	}
 }@AdapterState.java
 
@@ -101,9 +104,25 @@ notifyAdapterStateChange-->adapterService.updateAdapterState(oldState, newState)
 }@AdapterService.java
 
 
+/*
+ profile启动
+*/
+startCoreServices{
+  //获取支持的profile
+- Class[] supportedProfileServices = Config.getSupportedProfiles()
+- setProfileServiceState(supportedProfileServices,BluetoothAdapter.STATE_ON){
+	- 遍历supportedProfileServices
+	- Intent intent = new Intent(this,services[i])
+	- startService(intent)
+	}
+}@AdapterService.java
+
+
+
 apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
 apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterState.java
 apps/Bluetooth/src/com/android/bluetooth/btservice/ProfileService.java
+apps/Bluetooth/src/com/android/bluetooth/btservice/Config.java
 apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
 system/bt/btif/src/bluetooth.cc
 

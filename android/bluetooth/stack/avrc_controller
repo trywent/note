@@ -115,6 +115,7 @@ handle_notification_response{
 handle_rc_ctrl_features{
 -
 - btif_av_is_sink_enabled,getcapabilities_cmd(AVRC_CAP_COMPANY_ID)//获取支持的功能
+- HAL_CBACK(bt_rc_ctrl_callbacks, getrcfeatures_cb)//回调
 }
 //支持功能回复
 handle_get_capability_response{

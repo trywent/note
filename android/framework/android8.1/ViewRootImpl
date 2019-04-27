@@ -118,7 +118,11 @@ onLayout(boolean changed, int left, int top, int right, int bottom){
 - offsetTopAndBottom{
 	- mTop,mBottom //调整offset
 	}
-- updateElevation
+  //设置elevation,窗口立体高度
+- updateElevation{
+	- FREEFORM_WORKSPACE_STACK_ID设置20
+	- PINNED_STACK_ID设置5
+	}
 }@DecorView.java
 
 //relayout,创建surface,获取frame大小

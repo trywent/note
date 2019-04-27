@@ -1,4 +1,6 @@
-
+/*
+ 波形
+*/
 
 Visualizer-->native_setup@Visualizer.java-->android_media_visualizer_native_setup
 @android_media_Visualizer.cpp-->Visualizer-->initCaptureSize@Visualizer.cpp

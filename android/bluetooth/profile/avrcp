@@ -46,7 +46,26 @@ typedef struct {
     btrc_ctrl_set_browsed_player_callback                       set_browsed_player_cb;
     btrc_ctrl_set_addressed_player_callback                     set_addressed_player_cb;
 } btrc_ctrl_callbacks_t;
-
+static btrc_ctrl_callbacks_t sBluetoothAvrcpCallbacks = {
+    sizeof(sBluetoothAvrcpCallbacks),
+    btavrcp_passthrough_response_callback,
+    btavrcp_groupnavigation_response_callback,
+    btavrcp_connection_state_callback,
+    btavrcp_get_rcfeatures_callback,
+    btavrcp_setplayerapplicationsetting_rsp_callback,
+    btavrcp_playerapplicationsetting_callback,
+    btavrcp_playerapplicationsetting_changed_callback,
+    btavrcp_set_abs_vol_cmd_callback,
+    btavrcp_register_notification_absvol_callback,
+    btavrcp_track_changed_callback,
+    btavrcp_play_position_changed_callback,
+    btavrcp_play_status_changed_callback,
+    btavrcp_get_folder_items_callback,
+    btavrcp_change_path_callback,
+    btavrcp_set_browsed_player_callback,
+    btavrcp_set_addressed_player_callback,
+    btrc_get_element_attr_rsp_callback
+}
 
 
 

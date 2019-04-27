@@ -121,56 +121,10 @@ struct snd_soc_pcm_runtime {
 }
 
 
+(1)
 /***********************
- ALSA SoC Dynamic Audio Power Management(dapm)
+  初始数据准备
 
-*/
-struct snd_soc_dapm_route {
-	const char *sink;
-	const char *control;
-	const char *source;
-	int (*connected)(struct snd_soc_dapm_widget *source,
-			 struct snd_soc_dapm_widget *sink);
-}
-
-struct snd_soc_dapm_path {
-	const char *name;
-	union {
-		struct {
-			struct snd_soc_dapm_widget *source;
-			struct snd_soc_dapm_widget *sink;
-		};
-		struct snd_soc_dapm_widget *node[2];
-	};
-
-	int (*connected)(struct snd_soc_dapm_widget *source,
-			 struct snd_soc_dapm_widget *sink);
-}
-
-struct snd_soc_dapm_widget {
-	enum snd_soc_dapm_type id; //类型
-	const char *name;		/* widget name */
-	struct snd_soc_dapm_context *dapm;
-	struct regulator *regulator;		/* attached regulator */
-	const struct snd_soc_pcm_stream *params; /* params for dai links */
-	int reg; //寄存器
-	int (*event)(struct snd_soc_dapm_widget*, struct snd_kcontrol *, int);//
-	const struct snd_kcontrol_new *kcontrol_news
-	struct snd_kcontrol **kcontrols
-}
-struct snd_soc_dapm_context {
-	enum snd_soc_bias_level bias_level;
-	void (*seq_notifier)(struct snd_soc_dapm_context *,
-			     enum snd_soc_dapm_type, int);
-	struct snd_soc_component *component; /* parent component */
-	struct snd_soc_card *card; /* parent card */
-}
-
-
-
-
-
-/***********************
   注册驱动codec_drv.创建struct snd_soc_codec *codec,
   创建component(对应一个物理设备codec),初始化component操作函数
   创建struct snd_soc_dai dai加入到dai_list
@@ -178,8 +132,8 @@ struct snd_soc_dapm_context {
   struct snd_soc_codec{
 	.component
 	}
-
 */
+
 snd_soc_register_codec(struct device *dev,
 			   const struct snd_soc_codec_driver *codec_drv,
 			   struct snd_soc_dai_driver *dai_drv,int num_dai){
@@ -256,6 +210,7 @@ snd_soc_register_platform(struct device *dev,
 	}
 }
 
+(2)
 /***********************
  注册soc驱动.注册声卡,并注册所有子设备
  struct snd_soc_card
@@ -375,7 +330,7 @@ soc_probe(struct platform_device *pdev){
 }@soc-core.c
 
 
-
+(3)
 /***********************
  soc ctl设备对应snd_card
 
@@ -393,7 +348,7 @@ struct snd_kcontrol *snd_soc_cnew(const struct snd_kcontrol_new *_template,
 //加入control
 snd_soc_add_component_controls-->snd_soc_add_controls-->snd_ctl_add(card, snd_soc_cnew)
 
-
+(4)
 /***********************
  soc pcm设备 对应dai_link
 
@@ -421,6 +376,8 @@ sound/core/device.c
 sound/core/pcm.c
 sound/core/pcm_lib.c
 sound/core/sound.c
+
+(5)
 /***********************
  节点操作函数
   open 
@@ -571,8 +528,51 @@ snd_pcm_f_ops.mmap(file,vm_area_struct)-->snd_pcm_mmap{
 - snd_pcm_mmap_data-->substream->ops->mmap()-->platform->driver->mmap
 }@pcm_native.c
 
-/***********************
- dapm ALSA SoC Dynamic Audio Power Management
-*/
 
+/***********************
+ ALSA SoC Dynamic Audio Power Management(dapm)
+
+*/
+struct snd_soc_dapm_route {
+	const char *sink;
+	const char *control;
+	const char *source;
+	int (*connected)(struct snd_soc_dapm_widget *source,
+			 struct snd_soc_dapm_widget *sink);
+}
+
+struct snd_soc_dapm_path {
+	const char *name;
+	union {
+		struct {
+			struct snd_soc_dapm_widget *source;
+			struct snd_soc_dapm_widget *sink;
+		};
+		struct snd_soc_dapm_widget *node[2];
+	};
+
+	int (*connected)(struct snd_soc_dapm_widget *source,
+			 struct snd_soc_dapm_widget *sink);
+}
+
+struct snd_soc_dapm_widget {
+	enum snd_soc_dapm_type id; //类型
+	const char *name;		/* widget name */
+	struct snd_soc_dapm_context *dapm;
+	struct regulator *regulator;		/* attached regulator */
+	const struct snd_soc_pcm_stream *params; /* params for dai links */
+	int reg; //寄存器
+	int (*event)(struct snd_soc_dapm_widget*, struct snd_kcontrol *, int);//
+	const struct snd_kcontrol_new *kcontrol_news
+	struct snd_kcontrol **kcontrols
+}
+struct snd_soc_dapm_context {
+	enum snd_soc_bias_level bias_level;
+	void (*seq_notifier)(struct snd_soc_dapm_context *,
+			     enum snd_soc_dapm_type, int);
+	struct snd_soc_component *component; /* parent component */
+	struct snd_soc_card *card; /* parent card */
+}
+
+snd_soc_dapm_ignore_suspend
 

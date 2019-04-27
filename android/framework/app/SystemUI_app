@@ -37,11 +37,14 @@ startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
 - Dependency.get(PluginManager.class).addPluginListener
 }@SystemUIApplication.java
 =======================
-//Dependency
+/*Dependency
+  大量工具类的实例加入到这里方便获取?
+*/
 Dependency.start{
 - mProviders.put(TIME_TICK_HANDLER)
-- mProviders.put(FragmentService.class), new FragmentService)
-mProviders.put(RotationLockController.class,new RotationLockControllerImpl(mContext) //旋转设置
+- mProviders.put(RotationLockController.class,new RotationLockControllerImpl(mContext) //旋转设置
+- mProviders.put(ConfigurationController.class, () ->new ConfigurationControllerImpl(mContext))
+- mProviders.put(FragmentService.class, () ->new FragmentService(mContext))
 }@Dependency.java
 
 //commandQueue
@@ -90,7 +93,7 @@ createAndAddWindows-->addStatusBarWindow{//创建view
 		- mListeners.put(tag, listeners)
 		- listeners.add(listener)
 		}@FragmentHostManager.java
-	- getFragmentManager().replace(R.id.status_bar_container,CollapsedStatusBarFragment)-->
+	- getFragmentManager().beginTransaction().replace(R.id.status_bar_container,CollapsedStatusBarFragment)-->
 		FragmentListener.onFragmentViewCreated(TAG,fragment){
 		- statusBarFragment = fragment
 		- mStatusBarView = (PhoneStatusBarView) fragment.getView()
@@ -106,19 +109,36 @@ createAndAddWindows-->addStatusBarWindow{//创建view
 }@StatusBar.java
 
 
-//替换view中status_bar_container为CollapsedStatusBarFragment
+/*替换view中status_bar_container为CollapsedStatusBarFragment
+  systemUI中使用FragmentHostManager@FragmentService管理fragment
+*/
 FragmentHostManager.get(mStatusBarWindow)-->Dependency.get(FragmentService.class).getFragmentHostManager
 @FragmentHostManager.java-->getFragmentHostManager(view){
-- new FragmentHostState()-->new FragmentHostManager-->createFragmentHost{
-	- mFragments = FragmentController.createController(HostCallbacks)
-	}
+- state = new FragmentHostState(root)-->mFragmentHostManager = new FragmentHostManager-->createFragmentHost{
+	- FragmentController mFragments = FragmentController.createController(HostCallbacks)
+	- mLifecycleCallbacks = new FragmentLifecycleCallbacks
+	}@FragmentHostManager.java
 - mHosts.put(root, state)
-- getFragmentHostManager //返回FragmentHostManager
+- state.getFragmentHostManager-->mFragmentHostManager //返回FragmentHostManager
 }@FragmentService.java
 
 mFragments.getFragmentManager()@FragmentController.java-->HostCallbacks.getFragmentManagerImpl
 @FragmentHostCallback.java-->FragmentManagerImpl@FragmentManager.java
 
+//替换
+getFragmentManager().beginTransaction().replace@StatusBar.java-->FragmentManagerImpl.beginTransaction().replace
+@FragmentManager.java-->BackStackRecord.replace-->replace(containerViewId, fragment)-->
+doAddOp-->addOp(new Op(opcmd, fragment))-->mOps.add(op)@BackStackRecord.java
+
+commit-->commitInternal-->mManager.enqueueAction(this, allowStateLoss)@BackStackRecord.java-->
+enqueueAction{
+- mPendingActions.add(action)
+- scheduleCommit-->mHost.getHandler().post(mExecCommit)-->mExecCommit.run-->
+	execPendingActions@FragmentHostManager.java//systemui进程中执行
+}@FragmentManager.java
+
+frameworks/base/core/java/android/app/FragmentManager.java
+frameworks/base/core/java/android/app/BackStackRecord.java
 //折叠statusBar
 onViewCreated{
 - mStatusBar

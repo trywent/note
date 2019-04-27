@@ -1,0 +1,65 @@
+/*
+
+ dumpsys media_session
+*/
+MediaSession{
+- MediaSessionManager manager = (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE)
+  //MediaSessionService中的回调
+- CallbackStub mCbStub = new CallbackStub(this)
+- ISession mBinder = manager.createSession(mCbStub, tag, userId)
+- MediaSession.Token mSessionToken = new Token(mBinder.getController())
+- MediaController mController = new MediaController(context, mSessionToken)
+}@MediaSession.java
+
+
+//设置回调
+setCallback(@Nullable Callback callback, @Nullable Handler handler) {
+- callback.mSession = this
+- CallbackMessageHandler msgHandler = new CallbackMessageHandler(handler.getLooper(),callback)
+- mCallback = msgHandler
+}@MediaSession.java
+
+@MediaSessionService.java-->CallbackStub.onXXX-->dispatchxxxx-->postToCallback-->mCallback.post-->
+CallbackMessageHandler.post(int what, Object obj, Bundle bundle)-->obtainMessage(what, obj).sendToTarget
+-->handleMessage-->mCallback.xxx@MediaSession.java
+
+
+setActive(boolean active)-->mBinder.setActive(active)@MediaSession.java-->
+SessionStub.setActive-->mService.updateSession(MediaSessionRecord.this)@MediaSessionRecord.java
+-->updateSession@MediaSessionService.java
+
+/*MediaSessionService
+
+*/
+SessionManagerImpl.createSession(String packageName, ISessionCallback cb)-->
+createSessionInternal(resolvedUserId/*user 0*/,packageName, cb)-->createSessionLocked{
+- FullUserRecord user = getFullUserRecordLocked(userId)
+- MediaSessionRecord session = new MediaSessionRecord(userId, callerPackageName, cb){
+	- mSession = new SessionStub()
+	- mSessionCb = new SessionCb(cb)
+	- mService = service
+	- mAudioManager = (AudioManager) service.getContext().getSystemService(Context.AUDIO_SERVICE)
+	}@MediaSessionRecord.java
+- user.mPriorityStack.addSession(session)
+}@MediaSessionService.java
+
+
+//mediabutton
+dispatchMediaKeyEventLocked@MediaSessionService.java-->
+sendMediaButton-->SessionCb.sendMediaButton
+
+//按键事件
+interceptKeyBeforeQueueing{
+- if(MediaSessionLegacyHelper.getHelper(mContext).isGlobalPriorityActive())//不发送到user
+	result &= ~ACTION_PASS_TO_USER
+- Message msg = mHandler.obtainMessage(MSG_DISPATCH_MEDIA_KEY_WITH_WAKE_LOCK,new KeyEvent(event))
+- msg.sendToTarget()
+}@PhoneWindowManager.java
+
+PolicyHandler.handleMessage(MSG_DISPATCH_MEDIA_KEY_WITH_WAKE_LOCK)-->dispatchMediaKeyWithWakeLockToAudioService-->
+MediaSessionLegacyHelper.getHelper(mContext).sendMediaButtonEvent@PhoneWindowManager.java
+
+frameworks/base/media/java/android/media/session/MediaSession.java
+frameworks/base/media/java/android/media/session/MediaSessionManager.java
+frameworks/base/services/core/java/com/android/server/media/MediaSessionService.java
+frameworks/base/services/core/java/com/android/server/media/MediaSessionRecord.java

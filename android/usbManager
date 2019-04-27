@@ -29,7 +29,13 @@ UsbService(Context context) {
  device (Accessory附件)
 */
 UsbDeviceManager(Context context, UsbAlsaManager alsaManager){
-- 
+- initRndisAddress
+  //加载oem usb配置
+- readOemUsbOverrideConfig{
+	- 读取配置com.android.internal.R.array.config_oemUsbModeOverride
+	- mOemModeMap.put
+	}
+- mHandler = new UsbHandler
 }@UsbDeviceManager.java
 
 UsbHandler(Looper looper) {
@@ -56,6 +62,7 @@ mUEventObserver.onUEvent{
 setCurrentFunctions-->mHandler.sendMessage(MSG_SET_CURRENT_FUNCTIONS)-->UsbHandler.handleMessage-->
 setEnabledFunctions-->trySetEnabledFunctions{
 - functions = applyAdbFunction(functions)
+  //设置属性,init.rc监听属性设置后设置usb功能
 - setUsbConfig-->SystemProperties.set(USB_CONFIG_PROPERTY, config)
 }
 

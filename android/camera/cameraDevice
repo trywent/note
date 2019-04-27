@@ -108,7 +108,7 @@ createDefaultRequest(int templateId,/*out*/CameraMetadataNative* request){
 }@CameraDeviceClient.cpp
 
 //请求数据
-submitRequestList(vector<hardware::camera2::CaptureRequest>& requests,bool streaming){
+submitRequestList(vector<hardware::camera2::CaptureRequest>& requests,bool streaming/*repeat*/){
 - CameraMetadata metadata(request.mMetadata)
 - 遍历requests,for (auto&& request: requests){
 		for (sp<Surface> surface : request.mSurfaceList){ //普通流程中request中没有surface

@@ -35,15 +35,35 @@ prepareSurfaceLocked{
 - setSurfaceBoundariesLocked
 }@WindowStateAnimator.java
 
+/*
+ surfaceInsets 会影响实际窗口大小
+*/
+
 setSurfaceBoundariesLocked{
-- 
+ //设置mTmpSize原点,再设置大小
+- mTmpSize.set(w.mShownPosition.x, w.mShownPosition.y, 0, 0)
+- calculateSurfaceBounds(attr){
+	- mTmpSize.right,mTmpSize.bottom
+	- 根据surfaceInsets调整mTmpSize
+	}
 - mSurfaceController.setSizeInTransaction //设置大小
+  //是否裁剪
+- calculateCrop(mTmpClipRect){
+	- w.inPinnedWorkspace(),pinstack中返回
+	  //根据surfaceinset调整大小
+	- adjustCropToStackBounds{
+		- Rect surfaceInsets = w.getAttrs().surfaceInsets
+		}
+	}
+- calculateFinalCrop(mTmpFinalClipRect){
+	- 
+	}
 - isForceScaled(){
 	- mSurfaceController.setPositionInTransaction //设置位置
 	}
 }@WindowStateAnimator.java
 
-
+calculateSurfaceBounds
 //销毁
 destroySurfaces-->win.destroySurface@AppWindowToken.java-->destroySurface@WindowState.java-->
 destroyPreservedSurfaceLocked-->destroyDeferredSurfaceLocked

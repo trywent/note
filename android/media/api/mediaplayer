@@ -1,0 +1,101 @@
+/*
+ api
+*/
+{//播放流程
+-new MediaPlayer();
+-setAudioStreamType(AudioManager.STREAM_MUSIC)
+-setDataSource(getApplicationContext(), myUri)
+-prepare()//获取源，解码。导致耗时长，mediaPlayer使用另一线程执行
+-start()，pause，stop
+-setSurface(Surface surface)/setDisplay(SurfaceHolder)//视频播放时需要设置
+-release
+}MediaPlayer.java
+
+{
+- new MediaPlayer
+- setAudioStreamType-->mStreamType
+- setDataSource{
+	- service(getMediaPlayerService())
+	- player(service->create)
+	- player->setDataSource
+	- attachNewPlayer(player)-->mPlayer //初始化mPlayer
+	}
+- setVideoSurfaceTexture //视频surface bufferProducer
+- 
+}mediaplayer.cpp
+
+
+1. //初始：new MediaPlayer
+new MediaPlayer-->native_setup@MediaPlayer.java-->android_media_MediaPlayer_native_setup(设置player)
+@android_media_MediaPlayer.cpp-->new MediaPlayer(创建本地mediaPlayer)@mediaplayer.cpp
+
+//监听错误：
+setOnErrorListener(OnErrorListener)@MediaPlayer.java
+
+native_setup-->android_media_MediaPlayer_native_setup-->mp->setListener@android_media_MediaPlayer.cpp
+
+收到并处理错误：
+MediaPlayer::notify-->listener->notify@mediaPlayer.cpp-->JNIMediaPlayerListener::notify
+-->env->CallStaticVoidMethod(mClass, fields.post_event)@android_media_MediaPlayer.cpp
+-->postEventFromNative-->mp.mEventHandler.sendMessage(发送消息)-->
+EventHandler.handleMessage(MEDIA_ERROR)-->mOnErrorListener.onError@MediaPlayer.java
+
+mediaPlayer销毁：
+IMediaDeathNotifier::DeathNotifier::binderDied-->notifier->died@IMediaDeathNotifier.cpp
+-->MediaPlayer::died--> notify(MEDIA_ERROR_SERVER_DIED)@mediaplayer.cpp
+
+frameworks/av/media/libmedia/IMediaDeathNotifier.cpp
+2. //设置流类型：setAudioStreamType
+setAudioStreamType@MediaPlayer.java-->android_media_MediaPlayer_setAudioStreamType
+-->mp->setAudioStreamType@android_media_MediaPlayer.cpp-->MediaPlayer::setAudioStreamType
+(设置mStreamType值)@mediaplayer.cpp
+
+服务端在prepare时设置：
+MediaPlayer::prepareAsync_l-->mPlayer->setAudioStreamType(mStreamType)@mediaplayer.cpp
+-->MediaPlayerService::Client::setAudioStreamType-->mAudioOutput->setAudioStreamType
+@MediaPlayerService.cpp
+
+3. //设置源：setDataSource   创建服务端player
+setDataSource@MediaPlayer.java-->android_media_MediaPlayer_setDataSourceFD
+@android_media_MediaPlayer.cpp-->setDataSource{
+- 获取服务 service(getMediaPlayerService()){
+	- 获取服务管理器，defaultServiceManager()
+	- 获取播放器服务，sm->getService(String16("media.player"))
+	- 设置服务，sMediaPlayerService = interface_cast<IMediaPlayerService>(binder)
+	}
+  //服务端player
+- 通过服务创建palyer，service->create(this, mAudioSessionId)
+- doSetRetransmitEndpoint(player)
+- 设置源，player->setDataSource(url, headers)
+- 设置mPlayer，attachNewPlayer(player)
+}@mediaplayer.cpp
+
+
+4. //准备:prepare
+prepare@MediaPlayer.java-->android_media_MediaPlayer_prepare-->
+process_media_player_call@android_media_MediaPlayer.cpp-->
+MediaPlayer::prepare-->MediaPlayer::prepareAsync_l{
+- mPlayer->setAudioStreamType-->(服务端)MediaPlayerService::Client::setAudioStreamType
+	-->mAudioOutput->setAudioStreamType{
+	- mStreamType = streamType
+	}@MediaPlayerService.cpp
+- mPlayer->prepareAsync-->(服务端)MediaPlayerService::Client::prepareAsync-->
+	mPlayer->prepareAsync-->
+}@mediaplayer.cpp
+
+
+
+5. //开始播放:start
+start-->_start@MediaPlayer.java-->android_media_MediaPlayer_start-->getMediaPlayer.start
+@android_media_MediaPlayer.cpp-->MediaPlayer::start-->mPlayer->start@mediaplayer.cpp-->
+MediaPlayerService::Client::start-->getPlayer()->start@MediaPlayerService.cpp
+
+
+6.//视频设置surface
+setSurface/setDisplay@MediaPlayer.java-->android_media_MediaPlayer_setVideoSurface-->
+setVideoSurface-->getMediaPlayer().setVideoSurfaceTexture@android_media_MediaPlayer.cpp
+-->setVideoSurfaceTexture(bufferProducer)-->mPlayer->setVideoSurfaceTexture@mediaplayer.cpp
+
+frameworks/base/media/java/android/media/MediaPlayer.java
+frameworks/base/media/jni/android_media_MediaPlayer.cpp
+frameworks/av/media/libmedia/mediaplayer.cpp

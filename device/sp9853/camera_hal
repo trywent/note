@@ -95,14 +95,16 @@ SprdCamera3OEMIf::SprdCamera3OEMIf(){
 - mSetting->getDefaultParameters(mParameters)
 }@SprdCamera3OEMIf.cpp
 
- //OMI 结构
-struct oem_module OEM_MODULE_INFO_SYM = {
-    .tag = 0, .ops = &oem_module_ops, .dso = NULL
-}@SprdOEMCamera.c
 
 //
 static oem_ops_t oem_module_ops = {
     camera_init, camera_deinit, camera_release_frame, camera_set_param,}
+//OMI 结构
+struct oem_module OEM_MODULE_INFO_SYM = {
+    .tag = 0, .ops = &oem_module_ops, .dso = NULL
+}@SprdOEMCamera.c
+
+
 
 SprdCamera3OEMIf::openCamera() {
 - mSetting->getLargestPictureSize(mCameraId, &picW, &picH)
@@ -121,7 +123,24 @@ camera_local_int(cmr_u32 camera_id, camera_cb_of_type callback,cmr_handle *oem_h
 - cxt->camera_id = camera_id
 - camera_init_internal((cmr_handle)cxt
 - *oem_handle = (cmr_handle)cxt
-}
+}@cmr_oem.c
+
+/******************************
+ senor
+*/
+camera_local_int-->camera_init_internal-->camera_sensor_init-->
+cmr_sensor_init-->cmr_sns_create_thread
+
+
+cmr_sns_open@cmr_sensor.c-->
+sensor_get_entry_by_idx-->sensor_get_regist_table@sensor_cfg.c
+
+
+vendor/sprd/modules/libcamera/sensor/sensor_cfg.c
+vendor/sprd/modules/libcamera/sensor/sensor_drv_u.c
+vendor/sprd/modules/libcamera/oem2v1/src/cmr_sensor.c
+vendor/sprd/modules/libcamera/oem2v1/src/cmr_oem.c
+
 
 
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Hal.cpp
@@ -131,3 +150,6 @@ vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3OEMIf.cpp
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Channel.cpp
 vendor/sprd/modules/libcamera/oem2v1/src/SprdOEMCamera.c
 vendor/sprd/modules/libcamera/oem2v1/src/cmr_oem.c
+vendor/sprd/modules/libcamera/sensor/sensor_cfg.c
+vendor/sprd/modules/libcamera/sensor/sensor_drv_u.c
+vendor/sprd/modules/libcamera/oem2v1/src/cmr_sensor.c

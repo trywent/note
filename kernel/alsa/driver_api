@@ -107,7 +107,9 @@ kernel/include/sound/core.h
 kernel/sound/core/init.c
 kernel/sound/core/device.c
 /***********************
- control接口.每个snd_card对应一个control
+ control接口:"/dev/snd/controlC%u"
+
+ 每个snd_card对应一个control 
 */
 struct snd_kcontrol {
 	struct list_head list;		/* list of controls */
@@ -181,7 +183,7 @@ SOC_SINGLE_EXT(xname, FUN_REG(xreg), 0, 1, 0, mixer_get, mixer_set)
 kernel/include/sound/control.h
 kernel/sound/core/control.c
 /***********************
- PCM接口：
+ PCM接口："/dev/snd/pcmC%uD%u%c"
 */
 struct snd_pcm_substream {
 	struct snd_pcm *pcm;
@@ -263,9 +265,7 @@ kernel/sound/core/pcm_lib.c
 
 
 /***********************
- ASoC Machine Driver:(平台驱动和codec的粘合剂)
-
- dai_link(接口信息)将codec_dai,cpu_dai关联起来。
+ ASoC Machine Driver: dai_link(接口信息)将codec_dai,cpu_dai关联起来。
 
  dirver developer设置:
 	struct snd_soc_dai_link     cpu,codec连接关系

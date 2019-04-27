@@ -27,6 +27,8 @@ dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdi
 dd if=/sdcard/wmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/w_modem bs=1024 count=16384
 
 dd if=/sdcard/sml-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/sml bs=1024 count=22
+
+dd if=/sdcard/wnvitem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/w_modem bs=1024 count=412
 //声音
 i2s0---->8288
 

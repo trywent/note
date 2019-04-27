@@ -12,10 +12,46 @@ YUV 4:2:0采样，每四个Y共用一组UV分量。
 3. YUV422P（属于YUV422）
 4. YV12，YU12格式（属于YUV420）
 5. NV12、NV21（属于YUV420)
-I420: YYYYYYYY UU VV    =>YUV420P
-YV12: YYYYYYYY VV UU    =>YUV420P
-NV12: YYYYYYYY UVUV     =>YUV420SP
-NV21: YYYYYYYY VUVU     =>YUV420SP
+
+packed:
+YVYU: YVYUYVYUYVYU     =>YUV422
+
+planar:
+//I420和YV12都是3-plane，YUV数据段分了三段Y-U-V
+I420: YYYYYYYY UU VV   =>YUV420P
+YV12: YYYYYYYY VV UU   =>YUV420P
+//NV12和NV21则是2-plane，YUV数据段只分两段Y-UV或是Y-VU
+NV12: YYYYYYYY UVUV    =>YUV420SP
+NV21: YYYYYYYY VUVU    =>YUV420SP
+
+
+//
+常见输出格式有：
+    RGB4 —— 16色，每个像素用4位表示，需要调色板
+    RGB8 —— 256色，每个像素用8位表示，需要调色板
+    RGB565 —— 每个像素用16位表示，RGB分量分别使用5位、6位、5位
+    RGB555 —— 每个像素用16位表示，RGB分量都使用5位（剩下的1位不用）
+    RGB24 —— 每个像素用24位表示，RGB分量各使用8位
+    RGB32 —— 每个像素用32位表示，RGB分量各使用8位（剩下的8位不用）
+    ARGB32 —— 每个像素用32位表示，RGB分量各使用8位（剩下的8位用于表示Alpha通道值）
+    YUY2 —— YUY2格式，以4:2:2方式打包
+    YUYV —— YUYV格式（实际格式与YUY2相同）
+    YVYU —— YVYU格式，以4:2:2方式打包
+    UYVY —— UYVY格式，以4:2:2方式打包
+    AYUV —— 带Alpha通道的4:4:4 YUV格式
+    Y41P —— Y41P格式，以4:1:1方式打包
+    Y411 —— Y411格式（实际格式与Y41P相同）
+    Y211 —— Y211格式
+    IF09 —— IF09格式
+    IYUV —— IYUV格式
+    YV12 —— YV12格式
+    YVU9 —— YVU9格式
+
+YVYU, UYVY格式跟YUY2類似，只是排列順序有所不同。
+
+
+网上很多YUV转RGB，其实都是YUV444,而不是YUV420, 420处理时，还细分是NV12还是NV21或是YV12等格式，必须把UV映射弄清楚。
+不同的转换矩阵转出来效果也不同，不同的转换矩阵往往对应的输入源数据也不同。
 
 {
 DEPTH16 //每个像素16bits(索引表颜色),最高3bits为数据有效性.1--0代表0/7--7/7
