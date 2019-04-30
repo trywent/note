@@ -1,4 +1,6 @@
-//audioTrack通过audioFlinger进行操作
+/*audioTrack通过audioFlinger进行操作
+
+*/
 
 
 //new AudioTrack

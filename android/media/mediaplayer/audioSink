@@ -1,0 +1,42 @@
+/*AudioSink
+ mediaplayer用于播放声音
+ 
+ offload指音频解码使用dsp,不使用上层解码器.(更加快速省电?)
+*/
+class AudioSink : public RefBase@MediaPlayerInterface.h
+class AudioOutput : public MediaPlayerBase::AudioSink@MediaPlayerService.cpp
+
+MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
+        const audio_attributes_t* attr)
+    : mCallback(NULL),
+      mCallbackCookie(NULL),
+      mCallbackData(NULL),
+      mStreamType(AUDIO_STREAM_MUSIC),
+      mLeftVolume(1.0),
+      mRightVolume(1.0),
+      mPlaybackRate(AUDIO_PLAYBACK_RATE_DEFAULT),
+      mSampleRateHz(0),
+      mMsecsPerFrame(0),
+      mFrameSize(0),{}
+
+
+MediaPlayerService::AudioOutput::open(uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,
+        audio_format_t format, int bufferCount,AudioCallback cb)
+{ 
+  //检查可复用的audioTrack
+- mRecycledTrack
+- sp<AudioTrack> t =  new AudioTrack(mStreamType,sampleRate,format, channelMask)
+- t->setVolume(mLeftVolume, mRightVolume)
+- mTrack = t
+- updateTrack{
+	- mTrack->setPlaybackRate(mPlaybackRate)
+	- mTrack->attachAuxEffect(mAuxEffectId)
+	}
+}@MediaPlayerService.cpp
+
+switchToNextOutput
+
+
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.h
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/libmediaplayerservice/include/MediaPlayerInterface.h

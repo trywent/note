@@ -1,5 +1,5 @@
-/*
- api
+/* api
+
 */
 {//播放流程
 -new MediaPlayer();
@@ -56,8 +56,20 @@ MediaPlayer::prepareAsync_l-->mPlayer->setAudioStreamType(mStreamType)@mediaplay
 @MediaPlayerService.cpp
 
 3. //设置源：setDataSource   创建服务端player
-setDataSource@MediaPlayer.java-->android_media_MediaPlayer_setDataSourceFD
-@android_media_MediaPlayer.cpp-->setDataSource{
+
+//设置文件源
+setDataSource(String path)-->setDataSource(String path, String[] keys, String[] values,List<HttpCookie> cookies){
+ //非文件路径
+- nativeSetDataSource(MediaHTTPService.createHttpServiceBinderIfNecessary(path, cookies),path)
+ //文件
+- File file = new File(path)
+- FileInputStream is = new FileInputStream(file)
+- FileDescriptor fd = is.getFD()
+- setDataSource(fd)-->setDataSource(fd, 0, 0x7ffffffffffffffL)-->_setDataSource(fd, offset, length)
+}@MediaPlayer.java-->
+
+_setDataSource-->android_media_MediaPlayer_setDataSourceFD@android_media_MediaPlayer.cpp-->
+setDataSource(int fd, int64_t offset, int64_t length){
 - 获取服务 service(getMediaPlayerService()){
 	- 获取服务管理器，defaultServiceManager()
 	- 获取播放器服务，sm->getService(String16("media.player"))
@@ -66,10 +78,18 @@ setDataSource@MediaPlayer.java-->android_media_MediaPlayer_setDataSourceFD
   //服务端player
 - 通过服务创建palyer，service->create(this, mAudioSessionId)
 - doSetRetransmitEndpoint(player)
-- 设置源，player->setDataSource(url, headers)
+- 设置源，player->setDataSource(fd, offset, length)
 - 设置mPlayer，attachNewPlayer(player)
 }@mediaplayer.cpp
 
+
+//设置http源
+nativeSetDataSource-->android_media_MediaPlayer_setDataSourceAndHeaders@android_media_MediaPlayer.cpp
+setDataSource(httpService, pathStr,&headersVector){
+- const sp<IMediaPlayerService> service(getMediaPlayerService())
+- sp<IMediaPlayer> player(service->create(this, mAudioSessionId))
+- player->setDataSource(httpService, url, headers)) 
+}@mediaplayer.cpp
 
 4. //准备:prepare
 prepare@MediaPlayer.java-->android_media_MediaPlayer_prepare-->

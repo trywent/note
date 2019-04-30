@@ -1,0 +1,9 @@
+/*extrator
+
+可解析媒体框架支持的各种文件格式的组件
+*/
+service mediaextractor /system/bin/mediaextractor
+
+
+makeIDataSource
+

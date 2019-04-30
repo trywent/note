@@ -37,25 +37,30 @@ service->create@mediaplayer.cpp-->create(const sp<IMediaPlayerClient>& client,au
 	- setDataSource_post
  }
 */
+
+//http
 player->setDataSource@mediaplayer.cpp-->Client::setDataSource(const sp<IMediaHTTPService> &httpService,const char *url){
 - "content://"{
 	- String16 url16(url)
 	- int fd = android::openContentProviderFile(url16)
-	- setDataSource(fd, 0, 0x7fffffffffLL){
-		//获取文件状态
-		- struct stat sb
-		- fstat(fd, &sb)
-		//设置player
-		- playerType = MediaPlayerFactory::getPlayerType(this,fd)
-		- sp<MediaPlayerBase> p = setDataSource_pre(playerType)
-		- setDataSource_post(p, p->setDataSource(fd, offset, length))
-		}
+	- setDataSource(fd, 0, 0x7fffffffffLL) //设置文件
 	}
 - 其它url{
 	- player_type playerType = MediaPlayerFactory::getPlayerType(this, url)  //默认播放器类型	 
 	- sp<MediaPlayerBase> p = setDataSource_pre(playerType)//创建播放器	  
 	- setDataSource_post(p, p->setDataSource(httpService, url, headers))
 	}
+}@MediaPlayerService.cpp
+
+//文件
+MediaPlayerService::Client::setDataSource(int fd, int64_t offset, int64_t length){
+ //获取文件状态
+- struct stat sb
+- fstat(fd, &sb)
+ //设置player
+- playerType = MediaPlayerFactory::getPlayerType(this,fd)
+- sp<MediaPlayerBase> p = setDataSource_pre(playerType)
+- setDataSource_post(p, p->setDataSource(fd, offset, length))
 }@MediaPlayerService.cpp
 
 
@@ -71,29 +76,37 @@ MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client, const char* ur
 - bestScore==0.0 getDefaultPlayerType //分数为0,返回默认播放器NU_PLAYER
 @MediaPlayerFactory.cpp
 
-//创建player
+/* 创建player
+ 
+ IOmx::getService()  解码
+ AudioOutput 声音播放
+*/
 setDataSource_pre(player_type){
+  //player
 - createPlayer(playerType)-->MediaPlayerFactory::createPlayer{
 	- factory = sFactoryMap.valueFor(playerType)
 	- p = factory->createPlayer(pid)-->NuPlayerFactory::createPlayer-->new NuPlayerDriver
 	- p->initCheck
 	- p->setNotifyCallback
 	}@MediaPlayerFactory.cpp
+  //文件extractor
 - binder = defaultServiceManager()->getService(String16("media.extractor")
 - mExtractorDeathListener=new ServiceDeathNotifier(binder)
 - binder->linkToDeath(mExtractorDeathListener)
-- binder = IOmx::getService()//默认执行
+  //codec
+- sp<IOmx> omx = IOmx::getService()//默认执行
 - mCodecDeathListener = new ServiceDeathNotifier(omx)
-- binder->linkToDeath(mCodecDeathListener)
+- omx->linkToDeath(mCodecDeathListener)
+  //设置audio
 - mAudioOutput =new AudioOutput
-- p->setAudioSink(mAudioOutput) //设置audio
+- p->setAudioSink(mAudioOutput)
 }@MediaPlayerService.cpp
 
 //设置源
 setDataSource-->p->setDataSource(fd)@MediaPlayerService.cpp
 
-
-
+//start
+MediaPlayerService::Client::start-->p->start@MediaPlayerService.cpp
 
 
 frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp

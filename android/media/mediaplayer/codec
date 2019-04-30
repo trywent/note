@@ -1,23 +1,92 @@
-//open MAX兼容解码器
+/************************* client
+ decoder 解码数据
 
-
-
-
-/*extrator
-
-可解析媒体框架支持的各种文件格式的组件
 */
-service mediaextractor /system/bin/mediaextractor
+NuPlayer::Decoder::Decoder(const sp<AMessage> &notify,
+        const sp<Source> &source,
+        pid_t pid,
+        uid_t uid,
+        const sp<Renderer> &renderer,
+        const sp<Surface> &surface,
+        const sp<CCDecoder> &ccDecoder):
+  mSurface(surface)
+  mSource(source)
+  mRenderer(renderer)
+  mCCDecoder(ccDecoder)
+  mComponentName("decoder"){
+- mCodecLooper = new ALooper
+- mCodecLooper->setName("NPDecoder-CL")
+- mCodecLooper->start(false, false, ANDROID_PRIORITY_AUDIO)
+}
+
+//初始化codec. player.start时
+instantiateDecoder-->(*decoder)->configure(format)@NuPlayer-->configure@NuPlayerDecoderBase.cpp
+-->onConfigure{
+ //获取mime类型,判断时audio还是video
+- format->findString("mime", &mime)
+- mIsAudio = !strncasecmp("audio/", mime.c_str(), 6)
+- mIsVideoAVC = !strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime.c_str())
+ //codec
+- mCodec = MediaCodec::CreateByType(mCodecLooper, mime.c_str(), false /* encoder */)
+- mCodec->configure(format,mSurface) //surface
+- sp<AMessage> reply = new AMessage(kWhatCodecNotify, this)
+- mCodec->setCallback(reply)
+- mCodec->start()
+}@NuPlayerDecoder.cpp
 
 
 
+onInputBufferFetched-->queueInputBuffer
 
 
+onInputBufferAvailable-->msg->post()@MediaCodec.cpp-->
+onMessageReceived(kWhatCodecNotify){
+- msg->findInt32("callbackID", &cbID)
+  switch(cbID)
+- MediaCodec::CB_INPUT_AVAILABLE:{
+	- msg->findInt32("index", &index)
+	- handleAnInputBuffer(index)
+	}@MediaCodec.cpp
+}@NuPlayerDecoder.cpp
+
+NuPlayer::Decoder::handleAnInputBuffer(size_t index){
+- 
+- onRequestInputBuffers@NuPlayerDecoderBase.cpp-->doRequestBuffers-->fetchInputData@NuPlayerDecoder.cpp
+	-->mSource->dequeueAccessUnit@GenericSource.cpp
+}@NuPlayerDecoder.cpp
 
 
-/*codec
+/*mediaCodec
 
-非安全解码器和软件编码器位于编解码器进程中。
+*/
+struct MediaCodec : public AHandler
+
+MediaCodec::CreateByType(const sp<ALooper> &looper, const AString &mime, bool encoder){
+- sp<MediaCodec> codec = new MediaCodec(looper){
+	- mLooper(looper)
+	}
+- codec->init(mime, true /* nameIsType */, encoder)
+}@MediaCodec.cpp
+
+MediaCodec::init(const AString &name, bool nameIsType, bool encoder){
+- mResourceManagerService->init()
+- mCodec = GetCodecBase(name, nameIsType){
+	- nameIsType,return new ACodec
+	- "android.filter.",return new MediaFilter
+	}
+  //设置消息处理函数
+- mLooper->registerHandler(this)
+}@MediaCodec.cpp
+
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDecoder.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDecoderBase.cpp
+frameworks/av/media/libstagefright/MediaCodec.cpp
+
+
+/**************************codecService
+  open MAX兼容解码器
+
+  非安全解码器和软件编码器位于编解码器进程中。
   安全解码器和硬件编码器位于 mediaserver（未变更）中
 */
 
@@ -84,7 +153,11 @@ OMXClient::connect{
 }@OMXClient.cpp
 
 
+/*CCDecode
 
+Closed Caption(CC)，意思就是隐藏的带有解释意味的字幕（CAPTION）(描述当前画面的字母,供听力障碍者)
+
+*/
 
 
 

@@ -90,5 +90,12 @@ reclaimSomeSurfaceMemoryLocked{
 }@WindowManagerService.java
 
 
+//单手模式
+
+mLastDsdx,mLastDtdx,mLastDsdy,mLastDtdy@WindowSurfaceController.java
+
+
+
 frameworks/base/services/java/com/android/server/wm/WindowAnimator.java
 frameworks/base/services/java/com/android/server/wm/WindowStateAnimator.java
+frameworks/base/services/core/java/com/android/server/wm/WindowSurfaceController.java
