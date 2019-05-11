@@ -1,0 +1,17 @@
+/*
+ "audio.a2dp.default"
+*/
+struct hw_module_methods_t hal_module_methods = {
+    .open = adev_open
+}
+
+static int adev_open(const hw_module_t* module, const char* name,
+                     hw_device_t** device)
+
+adev_open_input_stream
+
+out_write-->start_audio_datapath
+
+
+
+system/bt/audio_a2dp_hw/src/audio_a2dp_hw.cc

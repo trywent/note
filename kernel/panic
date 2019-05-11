@@ -1,4 +1,14 @@
-//
+/*panic
+
+ BUG为panic宏封装
+ 注意loglevel是否允许dump_stack
+*/
+#define BUG() do { \
+	printk("BUG: failure at %s:%d/%s()!\n", __FILE__, __LINE__, __func__); \
+	panic("BUG!"); \
+} while (0)
+
+
 panic{
 - atomic_notifier_call_chain-->(通知panic)__atomic_notifier_call_chain-->
 	notifier_call_chain-->notifier_call@notifier.c
@@ -7,8 +17,10 @@ panic{
 
 
 kernel/kernel/panic.c
-==============
-//android panic
+kernel/include/asm-generic/bug.h
+/*android panic
+
+*/
 apanic_init-->register_mtd_user-->mtd_panic_notifier.add-->mtd_panic_notify_add{
 - 若mtd名字和CONFIG_APANIC_PLABEL不匹配则return
 - 

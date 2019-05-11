@@ -17,3 +17,14 @@ dumpsys、Systrace、TraceView、Update Threads（更新线程）、Update Heap�
            $ cd android-sdk/platform-tools/systrace
            $ python systrace.py --time=10 -o mynewtrace.html sched gfx view wm
      3.在设备上，执行任何你想要被包含进trace信息的操作
+
+
+
+/**********************
+
+*/
+
+
+
+//vmstat:  CPU 使用率，内存使用，虚拟内存交换情况,IO读写情况
+vmstat 2 1 //第一个参数是采样的时间间隔数，单位是秒，第二个参数是采样的次数

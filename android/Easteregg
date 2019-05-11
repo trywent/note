@@ -1,0 +1,15 @@
+/* 彩蛋
+
+ android版本连续点击进入PlatLogo
+ PlatLogo连续点击5次再长按进入彩蛋
+
+*/
+
+//platLogo
+
+
+./base/core/java/com/android/internal/app/PlatLogoActivity.java
+
+//EasterEgg
+
+/frameworks/base/packages/EasterEgg/

@@ -1,4 +1,6 @@
-//多媒体服务启动：
+/*多媒体服务启动：
+
+*/
 service media /system/bin/mediaserver@init.rc-->
 main{
 - fork子进程，开始log服务MediaLogService::instantiate()
@@ -23,22 +25,11 @@ BinderService::instantiate-->publish{
 frameworks/av/media/mediaserver/main_mediaserver.cpp
 frameworks/native/include/binder/BinderService.h
 
-=====================
+//android8.1
+int main(int argc __unused, char **argv)
+{
+- AudioFlinger::instantiate()
+- AudioPolicyService::instantiate()
 
-audio_policy:
-AudioPolicyService::AudioPolicyService{
-- 获取模块，hw_get_module(AUDIO_POLICY_HARDWARE_MODULE_ID)@AudioPolicyService.cpp-->hw_get_module_by_class{
-	- 设置合适的查找路径"/system/lib/hw",或"/vendor/lib/hw"
-	- 加载库load(audio_policy.default.so){
-		- 打开库，dlopen
-		- 查找符号"HMI",dlsym
-		- 关闭dlclose
-		}
-	}@hardware.c
-- 获取audio_policy_device设备mpAudioPolicyDev，audio_policy_dev_open-->module->methods->open
-- 创建策略，mpAudioPolicyDev->create_audio_policy
 }
-
-
-frameworks/av/services/audioflinger/AudioPolicyService.cpp
-
+frameworks/av/media/audioserver/main_audioserver.cpp

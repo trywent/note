@@ -1,5 +1,7 @@
-//
-=========================
+/*
+
+
+*/
 存储信息：
 
 onCreate(取得当前的每个volume,创建preference)@Memory.java-->StorageVolumePreferenceCategory(要显示的信息)
@@ -32,8 +34,19 @@ jb/packages/apps/Settings/src/com/android/settings/SettingsPreferenceFragment.ja
 jb/packages/apps/Settings/src/com/android/settings/deviceinfo/StorageVolumePreferenceCategory.java
 
 
-=======================
-背光：
+/*时间日期
+
+*/
+
+
+date_time_prefs
+
+
+packages/apps/Settings/src/com/android/settings/DateTimeSettings.java
+/*背光
+
+*/
+
 onClick-->getContext().sendBroadcastAsUser(new Intent(ACTION_SHOW_BRIGHTNESS_DIALOG))//启动设置界面
 new QSPanel-->new BrightnessController(ToggleSlider)@QSPanel.java-->
 

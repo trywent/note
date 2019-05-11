@@ -31,7 +31,11 @@ new ActivityManagerService(context){
 - mRecentTasks = new RecentTasks
 }
 
-startOtherServices-->mActivityManagerService.systemReady
+startOtherServices-->mActivityManagerService.systemReady{
+ //启动常驻应用
+- startPersistentApps
+
+}
 
 /***********************
  设置WindowManager

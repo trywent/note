@@ -1,4 +1,21 @@
-//audio hw
+/*audio hw
+
+
+
+*/
+struct tiny_audio_device {
+ struct audio_hw_device hw_device;
+//当前设备
+ int out_devices;
+ int in_devices;
+//当前设备状态
+ struct tiny_stream_in *active_input;
+ struct tiny_stream_out *active_output;
+ struct tiny_stream_out *active_deepbuffer_output;
+ struct tiny_stream_out *active_offload_output;
+}
+
+
 //hal提供接口
 {
 - getSupportedDevices
@@ -53,7 +70,18 @@ standby@AudioHardware.cpp
 
 
 =============
-//input
+/*input
+
+
+
+
+*/
+
+struct tiny_stream_in {
+struct audio_stream_in stream;
+int device; //当前input打开的设备
+}
+
 open_input_stream -->adev_open_input_stream{
 - 
 }@audio_hw.c

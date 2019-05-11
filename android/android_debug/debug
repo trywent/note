@@ -4,7 +4,7 @@ radio:
 logcat -b radio
 
 event:
-logcat -b event
+logcat -b events
 
 
 Systrace tool:

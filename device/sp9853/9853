@@ -16,6 +16,8 @@ echo device  > /sys/devices/platform/soc/soc:ap-ahb/e2500000.usb2/host_dev
 echo host > /sys/devices/platform/soc/soc:ap-ahb/e2500000.usb2/host_dev
 
 
+setprop sys.fyt.setparama lsecadbdebug9 
+
 dd if=/mnt/usbdisk/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/boot bs=1024 count=16000
 
 dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/boot bs=1024 count=16000

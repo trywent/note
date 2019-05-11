@@ -311,6 +311,12 @@ vbc_ctl_modem_monitor_routine{
 		}
 	}
 }
+
+
+SetParas_DeviceCtrl_Incall
+
+
+
 vendor/sprd/modules/audio/normal/vb_control_parameters.c
 
 

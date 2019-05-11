@@ -120,7 +120,9 @@ find <start directory> -iname "<all my files type>" -exec cp {} <target_dir> \;
 赋值文件并创建目录：
 test -d "$d" || mkdir -p "$d" && cp file "$d"
 
-
+//文件夹大小 -d 深度
+du  -h  -d 1
+ 
 ==========================
 改变UUID：
 sudo blkid  //查看

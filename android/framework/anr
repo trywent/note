@@ -2,6 +2,8 @@
 //A BroadcastReceiver hasn't finished executing within 10 seconds.
 kill  -s 3 <pid>  
 
+
+kill -s 6 pid  //dump core logcat -s DEBUG
 //按键5s
 handleTargetsNotReadyLocked-->onANRLocked-->doNotifyANRLockedInterruptible
 @InputDispatcher.cpp-->notifyANR@InputManagerService.java-->notifyANRf{

@@ -1,3 +1,11 @@
+/*
+
+ audio_policy_configuration.xml中声明所有的支持模块,根据这些配置加载对应的库文件
+
+
+*/
+
+
 //通过HAL层进行操作  9853：vendor/sprd/modules/audio/normal/newapm/O.x/AudioPolicyManagerSPRD.cpp
 module{
 //mixport
@@ -61,8 +69,9 @@ AudioPolicyManager(AudioPolicyClientInterface *clientInterface){
 	- ManagerInterfaceImpl mManagerInterface(this)
 	}
 - mEngine->initializeVolumeCurves //初始化音量
+  //根据mHwModules的名字,加载prmary,usb,a2dp库
 - 遍历,mHwModules{
-	- mHwModules[i]->mHandle = mpClientInterface->loadHwModule(name)--> //获取audiohw接口,以前的加载hw库
+	- mHwModules[i]->mHandle = mpClientInterface->loadHwModule(name)--> 
 	  AudioPolicyService::AudioPolicyClient::loadHwModule-->af->loadHwModule(name)
 	  //将当前可用的设备关联到audiohw
 	- 遍历,mOutputProfiles{
