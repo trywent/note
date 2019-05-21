@@ -146,7 +146,7 @@ I/USB3G ( 829): event { 'add', '/devices/platform/Mstar-ehci-3.2/usb2', 'usb', '
 
 //wifi
 打开wifi调试:
-persist.adb.tcp.port
+persist.adb.tcp.port=5555
 service.adb.tcp.port 
 
 

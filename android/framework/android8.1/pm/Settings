@@ -1,0 +1,33 @@
+/*
+ 保存应用信息
+*/
+
+PackageManagerService{
+- mSettings = new Settings(mPackages){
+	- mSystemDir = new File(dataDir, "system")
+	- mSettingsFilename = new File(mSystemDir, "packages.xml");
+        - mBackupSettingsFilename = new File(mSystemDir, "packages-backup.xml");
+        - mPackageListFilename = new File(mSystemDir, "packages.list");
+	}
+- mSettings.readLPw(USER)
+}@PakcageManagerService.java
+
+readLPw(USER){
+- 
+- 
+}@Settings.java
+
+
+
+isEnabledAndMatchLPr(ComponentInfo componentInfo, int flags, int userId){
+- PackageSetting ps = mPackages.get(componentInfo.packageName)
+- PackageUserState userState = ps.readUserState(userId)
+- userState.isMatch(componentInfo, flags)
+}@Settings.java
+
+
+
+frameworks/base/services/core/java/com/android/server/pm/Settings.java
+frameworks/base/services/core/java/com/android/server/pm/PackageSetting.java
+frameworks/base/services/core/java/com/android/server/pm/PackageSettingBase.java
+frameworks/base/core/java/android/content/pm/PackageUserState.java

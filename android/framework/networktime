@@ -1,4 +1,6 @@
-//
+/*
+
+*/
 
 Reference Timestamp：系统时钟最后一次被设定或更新的时间。
 Originate Timestamp：NTP请求报文离开客户端时客户端的本地时间。客户端

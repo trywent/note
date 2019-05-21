@@ -25,6 +25,8 @@ new ActivityManagerService(context){
 - mFgBroadcastQueue = new BroadcastQueue
 - mBgBroadcastQueue = new BroadcastQueue
 - mBatteryStatsService = new BatteryStatsService
+  //usercontrol
+- mUserController = new UserController(this)
   //activity
 - mStackSupervisor = createStackSupervisor()
 - mActivityStarter = new ActivityStarter(this, mStackSupervisor)

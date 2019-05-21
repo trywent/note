@@ -2,39 +2,13 @@
 
 
 */
-存储信息：
-
-onCreate(取得当前的每个volume,创建preference)@Memory.java-->StorageVolumePreferenceCategory(要显示的信息)
-@StorageVolumePreferenceCategory-->StorageMeasurement.getInstance(获取对象实例。然后设置receiver)-->
-measure(探测已使用存储的大小)-->
-
-对话框：
-onPreferenceTreeClick-->unmount-->showDialogInner@Memory.java-->showDialog-->
-new SettingsDialogFragment-->SettingsDialogFragment.SettingsDialogFragment-->
-SettingsDialogFragment.onCreateDialog-->((DialogCreatable) mParentFragment)
-.onCreateDialog(mDialogId)-->onCreateDialog@SettingsPreferenceFragment.java-->
-onCreatDialog@Memory.java
-
-更新存储信息(大小，已使用)
-onStorageStateChanged@Memory.java-->onStorageStateChanged-->measure--> 
-mMeasurement.measure()@StorageVolumePreferenceCategory.java-->measure-->
-handleMessage(MSG_MEASURE)-->handleMessage(MSG_CONNECTED)-->
-measureApproximateStorage-->sendInternalApproximateUpdate-->
-receiver.updateApproximate(bundle)@StorageMeasurement.java-->
-updateApproximate-->handleMessage(MSG_UI_UPDATE_APPROXIMATE)-->
-updateApproximate-->updatePreferencesFromState@StorageVolumePreferenceCategory.java
-
-收到磁盘状态改变
-onStorageStateChanged-->onStorageStateChanged-->svpc.onStorageStateChanged@Memory.java
--->measure@StorageVolumePreferenceCategory.java
 
 
-jb/packages/apps/Settings/src/com/android/settings/deviceinfo/Memory.java
-jb/packages/apps/Settings/src/com/android/settings/SettingsPreferenceFragment.java
-jb/packages/apps/Settings/src/com/android/settings/deviceinfo/StorageVolumePreferenceCategory.java
 
+packages/apps/Settings/src/com/android/settings/SettingsActivity.java
 
-/*时间日期
+/*
+ 时间日期
 
 */
 
@@ -43,7 +17,8 @@ date_time_prefs
 
 
 packages/apps/Settings/src/com/android/settings/DateTimeSettings.java
-/*背光
+/*
+ 背光
 
 */
 
@@ -66,8 +41,10 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/Batt
 frameworks/base/services/core/java/com/android/server/display/DisplayPowerState.java
 frameworks/base/services/core/java/com/android/server/lights/LightsService.java
 frameworks/base/services/core/jni/com_android_server_lights_LightsService.cpp
-=======================
-字体：
+
+/*
+ 字体：
+*/
 entries_font_size//字体字符
 
 onCreate{
@@ -89,8 +66,11 @@ packages/apps/Settings/src/com/android/settings/DisplaySettings.java
 frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
 frameworks/base/core/java/android/provider/Settings.java
 
-=======================
+
+/*
 语言：
+
+*/
 getLocales()@AssetManager.java
 
 //6.0
@@ -119,9 +99,10 @@ onCreate{
 
 packages/apps/Settings/src/com/android/settings/localepicker/LocaleListEditor.java
 frameworks/base/core/java/com/android/internal/app/LocalePickerWithRegion.java
-=======================
-恢复出厂设置:reset
 
+/*
+恢复出厂设置:reset
+*/
 
 mFinalClickListener{
 - 清除sd卡，startService(ExternalStorageFormatter)-->updateProgressState{
@@ -140,21 +121,12 @@ frameworks/base/core/java/com/android/internal/os/storage/ExternalStorageFormatt
 frameworks/base/services/java/com/android/server/MasterClearReceiver.java
 frameworks/base/core/java/android/os/RecoverySystem.java
 
-=======================
-背光：
-onClick-->sendBroadcastAsUser(ACTION_SHOW_BRIGHTNESS_DIALOG)@BrightnessPreference.java-->
-onChanged(修改数据库中亮度)-->BrightnessObserver.onChange-->setBrightness-->
-mPower.setTemporaryScreenBrightnessSettingOverride@BrightnessController.java-->
 
-窗口设置背光：
-lp.screenBrightness
 
-packages/apps/Settings/src/com/android/settings/BrightnessPreference.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/settings/BrightnessDialog.java
-frameworks/base/packages/SystemUI/src/com/android/systemui/settings/BrightnessController.java
-
-=======================
+/*
 wifi:
+
+*/
 打开wifi：
 onCheckedChanged-->mWifiManager.setWifiEnabled@WifiEnabler.java-->setWifiEnabled-->
 mWifiStateMachine.setWifiEnabled@WifiService.java-->setWifiEnabled-->
@@ -179,9 +151,49 @@ new WifiConfigController@WifiDialog.java-->WifiConfigController(设置提交密�
 提交密码：
 onClick-->submit-->mWifiManager.connect@WifiSetting.java-->connect@WifiManager.java
 
+/*
+ 密码保存检查 pin
+ 
+*/
 
-==================
+//密码设置
+
+//密码检查
+launchConfirmationActivity{
+- 
+- switch (mLockPatternUtils.getKeyguardStoredPasswordQuality(effectiveUserId)) {
+	- DevicePolicyManager.PASSWORD_QUALITY_SOMETHING{
+		- launchConfirmationActivity(request, title, header, description,
+                        returnCredentials || hasChallenge
+                                ? ConfirmLockPattern.InternalActivity.class
+                                : ConfirmLockPattern.class)
+		}
+	- DevicePolicyManager.PASSWORD_QUALITY_NUMERIC{
+		- launchConfirmationActivity(request, title, header, description,
+                        returnCredentials || hasChallenge
+                                ? ConfirmLockPassword.InternalActivity.class
+                                : ConfirmLockPassword.class)
+		}
+	}
+}
+
+
+startCheckPassword-->LockPatternChecker.checkPassword(mLockPatternUtils,pin)@ConfirmLockPassword.java
+utils.checkPassword(password)@LockPatternChecker.java-->mLockPatternUtils.checkPassword-->checkPassword
+-->checkCredential-->getLockSettings().checkCredential(credential)@LockPatternUtils.java-->
+checkCredential@LockSettingsService.java
+
+
+Settings/src/com/android/settings/password/ChooseLockSettingsHelper.java
+Settings/src/com/android/settings/password/ConfirmDeviceCredentialBaseActivity.java
+Settings/src/com/android/settings/password/ConfirmDeviceCredentialBaseFragment.java
+Settings/src/com/android/settings/password/ConfirmLockPassword.java
+frameworks/base/core/java/com/android/internal/widget/LockPatternChecker.java
+frameworks/base/core/java/com/android/internal/widget/LockPatternUtils.java
+
+/*
 加密sd卡：
+*/
 
 
 //加密
@@ -195,7 +207,7 @@ CryptfsCmd::runCommand@CommandListener.cpp-->cryptfs_enable@cryptfs.c
 //检测是否加密
 onStart-->setupUi-->ValidationTask.doInBackground@CryptKeeper.java
 
-____________
+
 mount_all@init.rc-->do_mount_all{
 - fork子进程进行挂载{
 	- fs_mgr_mount_all{
@@ -231,8 +243,9 @@ system/vold/vdc.c
 system/core/init/builtins.c
 
 
-==================
-//位置location
+/*
+ 位置location
+*/
 onRadioButtonClicked@LocationMode.java-->setLocationMode(mode){
 - getActivity().sendBroadcast(MODE_CHANGING_ACTION)
 - refreshLocationMode

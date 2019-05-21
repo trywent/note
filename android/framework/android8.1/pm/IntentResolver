@@ -1,0 +1,35 @@
+/*
+ 解析intent
+
+ ActivityIntentResolver，ActivityIntentResolver，ServiceIntentResolver，ProviderIntentResolver
+
+*/
+
+queryIntent(Intent intent, String resolvedType, boolean defaultOnly,int userId){
+- ArrayList<R> finalList = new ArrayList<R>
+- if (resolvedType != null){
+	- 
+	}
+- buildResolveList(intent, categories, debug, defaultOnly, resolvedType,scheme, firstTypeCut, finalList, userId){
+
+	}
+- buildResolveList(intent, categories, debug, defaultOnly, resolvedType,scheme, secondTypeCut, finalList, userId)
+- buildResolveList(intent, categories, debug, defaultOnly, resolvedType,scheme, thirdTypeCut, finalList, userId)
+- buildResolveList(intent, categories, debug, defaultOnly, resolvedType,scheme, schemeCut, finalList, userId)
+}@IntentResolver.java
+
+
+/*
+ ActivityIntentResolver
+*/
+
+//类名和Activity
+ArrayMap<ComponentName, PackageParser.Activity> mActivities = new ArrayMap<ComponentName, PackageParser.Activity>()
+
+
+
+
+
+frameworks/base/core/java/android/content/Intent.java
+frameworks/base/core/java/android/content/IntentFilter.java
+frameworks/base/services/core/java/com/android/server/IntentResolver.java

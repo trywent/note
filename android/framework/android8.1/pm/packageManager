@@ -1,0 +1,111 @@
+/*
+ SystemConfig 配置，功能，权限
+ mSetting 保存应用信息
+
+ MATCH_DIRECT_BOOT_UNAWARE
+ MATCH_DIRECT_BOOT_AWARE
+*/
+final ArrayMap<String, PackageParser.Package> mPackages = new ArrayMap<String, PackageParser.Package>
+
+PackageManagerService(Context context, Installer installer,
+            boolean factoryTest, boolean onlyCore){
+- mSettings = new Settings(mPackages)
+- mInstaller = installer
+- mPackageDexOptimizer = new PackageDexOptimizer(installer)
+- mDexManager = new DexManager(this, mPackageDexOptimizer, installer)
+  //读取system,vendor,odm,oem配置，权限
+- SystemConfig systemConfig = SystemConfig.getInstance()-->new SystemConfig{
+	- readPermissions(Environment.buildPath(Environment.getRootDirectory(), "etc", "sysconfig"), ALLOW_ALL)
+	- readPermissions(Environment.buildPath(Environment.getVendorDirectory(), "etc", "sysconfig"), vendorPermissionFlag)
+	}
+- mGlobalGids = systemConfig.getGlobalGids()
+- mSystemPermissions = systemConfig.getSystemPermissions()
+- mAvailableFeatures = systemConfig.getAvailableFeatures()
+ //处理应用
+- mHandlerThread = new ServiceThread(TAG,Process.THREAD_PRIORITY_BACKGROUND)
+- mHandlerThread.start()
+- sUserManager = new UserManagerService(context, this,new UserDataPreparer(mInstaller, mInstallLock, mContext, mOnlyCore))
+ //读取用户设置 
+- mFirstBoot = !mSettings.readLPw(sUserManager.getUsers(false))
+- requestCopyPreoptedFiles //copy files
+  //扫描应用
+- scanDirTracedLI
+}
+
+
+
+
+
+resolveIntent(Intent intent, String resolvedType,int flags, int userId)-->
+resolveIntentInternal{
+  //更新flag
+- flags = updateFlagsForResolve(flags, userId, intent, callingUid, resolveForStart)-->
+	updateFlagsForResolve(int flags, int userId, Intent intent, int callingUid,
+            boolean wantInstantApps, boolean onlyExposedExplicitly)
+- List<ResolveInfo> query = queryIntentActivitiesInternal(intent, resolvedType, flags)
+- esolveInfo bestChoice = chooseBestActivity(intent, resolvedType, flags, query)
+- return bestChoice
+}@PackageManagerService.java
+
+updateFlagsForResolve(int flags, int userId, Intent intent, int callingUid,
+            boolean wantInstantApps, boolean onlyExposedExplicitly){
+- if (getInstantAppPackageName(callingUid) != null) {
+  	- flags |= PackageManager.MATCH_VISIBLE_TO_INSTANT_APP_ONLY
+	- flags |= PackageManager.MATCH_INSTANT
+  else{
+	- flags &= ~(PackageManager.MATCH_VISIBLE_TO_INSTANT_APP_ONLY
+                    | PackageManager.MATCH_EXPLICITLY_VISIBLE_ONLY)
+  } 
+- updateFlagsForComponent{
+	- updateFlags{
+		- 已经设置MATCH_DIRECT_BOOT_UNAWARE|MATCH_DIRECT_BOOT_AWARE
+		- 没有设置aware,unaware则，getUserManagerInternal().isUserUnlockingOrUnlocked(userId){
+			- flags |= PackageManager.MATCH_DIRECT_BOOT_AWARE | MATCH_DIRECT_BOOT_UNAWARE		
+			}else
+			- flags |= PackageManager.MATCH_DIRECT_BOOT_AWARE
+		}
+	}
+}@PackageManagerService.java
+
+//Activity 查询
+queryIntentActivitiesInternal(Intent intent,
+            String resolvedType, int flags, int filterCallingUid, int userId,
+            boolean resolveForStart, boolean allowDynamicSplits, boolean bool) {
+  //intent是否包含包名，component
+- String pkgName = intent.getPackage()
+- ComponentName comp = intent.getComponent()
+  //component不为空
+- if (comp != null) {
+	- List<ResolveInfo> list = new ArrayList<ResolveInfo>(1)
+	- ActivityInfo ai = getActivityInfo(comp, flags, userId)-->getActivityInfoInternal
+	- return applyPostResolutionFilter
+	}
+- List<ResolveInfo> result
+
+- synchronized (mPackages){
+  //packageName为空
+  {//crossprofile,先查找过滤当前用户的匹配
+- List<CrossProfileIntentFilter> matchingFilters = getMatchingCrossProfileIntentFilters(intent)
+- ResolveInfo xpResolveInfo  = querySkipCurrentProfileIntents(matchingFilters, intent)  
+- result = filterIfNotSystemUser(mActivities.queryIntent(intent, resolvedType, flags, userId), userId)//查找
+  }
+  //packageName不为空
+- filterIfNotSystemUser(mActivities.queryIntentForPackage(intent, resolvedType, flags))
+- 
+  }//synchronized (mPackages)
+}@PackageManagerService.java
+
+/*activities 中查询
+
+*/
+ActivityIntentResolver.queryIntent(Intent intent, String resolvedType, int flags,int userId){
+- mFlags = flags
+- super.queryIntent(intent, resolvedType)
+}
+
+
+frameworks/base/services/core/java/com/android/server/pm/PackageManagerService.java
+frameworks/base/services/core/java/com/android/server/IntentResolver.java
+
+
+//mSettings.isEnabledAndMatchLPr

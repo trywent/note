@@ -1,0 +1,154 @@
+/*
+ userManagerService
+*/
+PER_USER_RANGE = 100000 //每个user可分配的uid(每个进程都有一个uid)
+userId{ //用户id
+- USER_ALL = -1 
+- USER_CURRENT = -2 
+- USER_SYSTEM=0 
+}
+
+uid{ //进程的 uid
+- AID_ROOT = android.os.Process.ROOT_UID //0
+- AID_APP_START = android.os.Process.FIRST_APPLICATION_UID //10000
+- AID_APP_END = android.os.Process.LAST_APPLICATION_UID  //19999
+}
+
+
+//服务启动
+PackageManagerService@PackageManagerService.java-->UserManagerService-->
+UserManagerService(Context context, PackageManagerService pm,UserDataPreparer userDataPreparer, Object packagesLock, File dataDir){
+- mPackagesLock = packagesLock
+- mHandler = new MainHandler()
+- mUsersDir = new File(dataDir, USER_INFO_DIR)// "/data/system/users"
+- userZeroDir = new File(mUsersDir, String.valueOf(UserHandle.USER_SYSTEM) // 0
+- mUserListFile = new File(mUsersDir, USER_LIST_FILENAME) //"userlist.xml"
+  //读取
+- readUserListLP{
+	- if(!mUserListFile.exists()){//第一次启动，userlist不存在
+		- fallbackToSingleUserLP //创建user
+		}
+	}
+- sInstance = this
+  //设置状态为STATE_BOOTING
+- mUserStates.put(UserHandle.USER_SYSTEM, UserState.STATE_BOOTING)
+}@UserManagerService.java
+
+//创建system USER
+fallbackToSingleUserLP{
+- UserInfo system = new UserInfo(UserHandle.USER_SYSTEM)
+- UserData userData = putUserInfo(system){
+	- UserData userData = new UserData()
+	- userData.info = userInfo
+	- mUsers.put(userInfo.id, userData)
+	}
+}@UserManagerService.java
+
+isUserUnlocked@UserManager.java-->isUserUnlocked-->LocalService.isUserUnlockingOrUnlocked{
+- state == UserState.STATE_RUNNING_UNLOCKING
+- state == UserState.STATE_RUNNING_UNLOCKED
+}@UserManagerService.java
+
+/*
+ UserContoler
+
+*/
+//STATE_BOOTING
+ActivityManagerService@ActivityManagerService.java-->
+UserController(Injector injector) {
+- mInjector = injector
+- UserState uss = new UserState(UserHandle.SYSTEM){
+	- state = STATE_BOOTING //初始状态为STATE_BOOTING
+	- lastState = STATE_BOOTING
+	}
+- mStartedUsers.put(UserHandle.USER_SYSTEM, uss)
+- updateStartedUserArrayLocked
+}UserController.java
+
+//STATE_BOOTING-->STATE_RUNNING_LOCKED 启动完成
+performEnableScreen@WindowManagerService.java-->bootAnimationComplete-->finishBooting@ActivityManagerService.java
+-->sendBootCompletedLocked(查找所有的mStartedUsers，执行finishUserboot)-->
+finishUserBoot(UserState uss, IIntentReceiver resultTo){
+  //状态从BOOTING转换STATE_RUNNING_LOCKED成功
+- uss.setState(STATE_BOOTING, STATE_RUNNING_LOCKED){
+	- mInjector.getUserManagerInternal().setUserState(userId, uss.state) //设置userManagerService端userState
+	- mHandler.sendMessage(mHandler.obtainMessage(REPORT_LOCKED_BOOT_COMPLETE_MSG)-->
+		mUserController.dispatchLockedBootComplete@ActivityManagerService.java-->dispatchLockedBootComplete	  
+	  //发送锁屏开机完成广播
+	- Intent intent = new Intent(Intent.ACTION_LOCKED_BOOT_COMPLETED)
+	- mInjector.broadcastIntentLocked(intent)
+	}
+- mInjector.getUserManager().isManagedProfile(userId){
+	- UserInfo parent = mInjector.getUserManager().getProfileParent(userId)
+	- parent
+  }else{
+	- maybeUnlockUser{
+		- storageManager.unlockUserKey(userId, userInfo.serialNumber)
+		- unlockUserCleared-->finishUserUnlocking
+		  //解锁子user
+		- int size = childProfilesToUnlock.size()
+		- maybeUnlockUser(childProfilesToUnlock.valueAt(i))
+	 }
+	}
+}@UserController.java
+
+//STATE_RUNNING_LOCKED-->STATE_RUNNING_UNLOCKING
+finishUserUnlocking(UserState uss){
+  //从RUNNING_LOCKED到RUNNING_UNLOCKING
+- if (uss.setState(STATE_RUNNING_LOCKED, STATE_RUNNING_UNLOCKING)) {
+	- mInjector.getUserManagerInternal().setUserState(userId, uss.state)
+	- proceedWithUnlock = true	
+	}
+- if(proceedWithUnlock){
+	- mHandler.obtainMessage(SYSTEM_USER_UNLOCK_MSG, userId, 0, uss).sendToTarget()-->finishUserUnlocked
+	}
+}@UserController.java
+
+
+//STATE_RUNNING_UNLOCKING-->STATE_RUNNING_UNLOCKED
+finishUserUnlocked{
+- if (uss.setState(STATE_RUNNING_UNLOCKING, STATE_RUNNING_UNLOCKED)) {
+	- mInjector.getUserManagerInternal().setUserState(userId, uss.state)
+	- Intent unlockedIntent = new Intent(Intent.ACTION_USER_UNLOCKED)
+	- mInjector.broadcastIntentLocked(unlockedIntent)
+	  //
+	- if (!Objects.equals(info.lastLoggedInFingerprint, Build.FINGERPRINT)) {
+		- mInjector.sendPreBootBroadcast(userId, quiet,() -> finishUserUnlockedCompleted(uss))
+	 }else
+	   	- finishUserUnlockedCompleted
+	}
+}@UserController.java
+
+finishUserUnlockedCompleted(UserState uss) {
+- UserInfo userInfo = getUserInfo(userId)
+  //发送启动完成广播
+- Intent bootIntent = new Intent(Intent.ACTION_BOOT_COMPLETED)
+- mInjector.broadcastIntentLocked(bootIntent,new IIntentReceiver.Stub())
+}@UserController.java
+
+//ActivityManagerService处理USER状态
+MainHandler.handleMessage{
+- SYSTEM_USER_START_MSG{
+	- 
+	}
+- SYSTEM_USER_UNLOCK_MSG{
+	- mSystemServiceManager.unlockUser(userId)
+	  //启动常驻应用
+	- startPersistentApps(PackageManager.MATCH_DIRECT_BOOT_UNAWARE)
+	- installEncryptionUnawareProviders
+	- mUserController.finishUserUnlocked((UserState) msg.obj)
+	}
+- SYSTEM_USER_CURRENT_MSG{
+	- 
+	}
+}@ActivityManangerService.java
+
+
+
+
+frameworks/base/core/java/android/os/UserHandle.java
+frameworks/base/services/core/java/com/android/server/am/UserState.java
+frameworks/base/core/java/android/os/UserManager.java
+frameworks/base/core/java/android/os/UserManagerInternal.java
+frameworks/base/services/core/java/com/android/server/am/UserController.java
+frameworks/base/services/core/java/com/android/server/LockSettingsService.java

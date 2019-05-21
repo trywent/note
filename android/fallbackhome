@@ -1,10 +1,6 @@
-//启动完成
-enableScreenIfNeeded-->enableScreenIfNeededLocked
+/*
 
-
-
-frameworks/base/services/core/java/com/android/server/wm/WindowManagerService.java
-//================
+*/
 //锁屏状态控制
 mSystemServiceManager.startService(LOCK_SETTINGS_SERVICE_CLASS)-->Lifecycle
 @LockSettingsService.java
@@ -48,7 +44,9 @@ isUserUnlocked@UserManager.java-->isUserUnlocked-->LocalService.isUserUnlockingO
 - state == UserState.STATE_RUNNING_UNLOCKED
 }@UserManagerService.java
 
-//=============android.intent.category.HOME android:priority="-1000"
+/*
+ android.intent.category.HOME android:priority="-1000"
+*/
 //Android is starting  
 onCreate{
 - registerReceiver(mReceiver, new IntentFilter(Intent.ACTION_USER_UNLOCKED))//监听ACTION_USER_UNLOCKED

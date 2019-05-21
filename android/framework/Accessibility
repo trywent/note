@@ -1,7 +1,46 @@
-//
+/*
+ dumpsys accessibility
+*/
+AccessibilityManagerService{
+- mMainHandler = new MainHandler(mContext.getMainLooper()
+- registerBroadcastReceivers{
+	  //监听应用状态
+	- PackageMonitor monitor = new PackageMonitor() {
+		- onSomePackagesChanged() {
+			- readConfigurationForUserStateLocked			
+			}
+		- onPackageUpdateFinished(String packageName, int uid)
+		- onPackageRemoved(String packageName, int uid)
+		- onHandleForceStop(Intent intent, String[] packages)
+		}
+	  //监听user状态
+	- IntentFilter intentFilter = new IntentFilter();
+        - intentFilter.addAction(Intent.ACTION_USER_SWITCHED);
+        - intentFilter.addAction(Intent.ACTION_USER_UNLOCKED);
+        - intentFilter.addAction(Intent.ACTION_USER_REMOVED);
+        - intentFilter.addAction(Intent.ACTION_USER_PRESENT)
+	- mContext.registerReceiverAsUser(new BroadcastReceiver() {
+		- onReceive{
+			- ACTION_USER_PRESENT:readConfigurationForUserStateLocked
+			}
+		},IntentFilter)
+	}
+- new AccessibilityContentObserver(mMainHandler).register() 
+}@AccessibilityManagerService.java
+
+//systemui发送USER_PRESENT
+onBootCompleted-->sendUserPresentBroadcast-->mContext.sendBroadcastAsUser(USER_PRESENT_INTENT)@KeyguardViewMediator.java
+
 binderDied-->onUserStateChangedLocked-->updateServicesLocked-->manageServicesLocked
 
 
-
+readConfigurationForUserStateLocked(UserState userState){
+  //读取已安装的accessibility服务
+- readInstalledAccessibilityServiceLocked(UserState userState){
+	- 
+	}
+- readEnabledAccessibilityServicesLocked(UserState userState)
+}@AccessibilityManagerService.java
 
 frameworks/base/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/keyguard/KeyguardViewMediator.java

@@ -1,3 +1,10 @@
+/*
+
+*/
+
+dd if=/sdcard/kernel.img of=/dev/block/platform/emmc/by-name/kernel bs=1024 count=8210
+dd if=/sdcard/boot.img of=/dev/block/platform/emmc/by-name/boot bs=1024 count=1546
+
 kernel:
 make rkpx3_fyt_defconfig
 make rkpx3_sdk_android-4.4_defconfig

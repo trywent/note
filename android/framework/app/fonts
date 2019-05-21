@@ -163,3 +163,13 @@ external/skia/src/ports/SkFontConfigParser_android.cpp
             <file lang="zh-Hans">youyuan.TTF</file>
         </fileset>
     </family>
+
+
+
+//字体大小
+        <item>0.85</item>
+        <item>1.0</item>
+        <item>1.15</item>
+        <item>1.30</item>
+
+@packages/apps/Settings、res/values/arrays.xml

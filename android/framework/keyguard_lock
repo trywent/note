@@ -1,0 +1,97 @@
+/* keyguard service
+
+   keyguardDelegate的操作都会执行到keyguardService
+*/
+
+//keyguarddelegate 锁屏服务的代理
+init-->new KeyguardServiceDelegate(context,new StateCallback())@PhoneWindowManager.java-->
+KeyguardServiceDelegate{
+- mHandler = UiThread.getHandler()
+- mCallback = callback
+}KeyguardServiceDelegate.java
+
+//绑定服务
+onSystemUiStarted-->bindKeyguard-->mKeyguardDelegate.bindService@PhoneWindowManager.java-->
+bindService{
+- Intent intent = new Intent()
+  //com.android.systemui/com.android.systemui.keyguard.KeyguardService 绑定服务
+- ComponentName keyguardComponent = ComponentName.unflattenFromString(com.android.internal.R.string.config_keyguardComponent)
+- intent.setComponent(keyguardComponent)
+- context.bindServiceAsUser(intent, mKeyguardConnection)
+}@KeyguardServiceDelegate.java
+
+ServiceConnection mKeyguardConnection = new ServiceConnection() {
+- onServiceConnected(ComponentName name, IBinder service) {
+	- mKeyguardService = new KeyguardServiceWrapper(mContext,IKeyguardService.Stub.asInterface(service), mCallback)
+	}
+}
+
+
+//keyguardService 
+onCreate{
+- ((SystemUIApplication) getApplication()).startServicesIfNeeded()
+- mKeyguardViewMediator = ((SystemUIApplication) getApplication()).getComponent(KeyguardViewMediator.class)
+- mKeyguardLifecyclesDispatcher = new KeyguardLifecyclesDispatcher
+}@keyguradService.java
+
+IKeyguardService.Stub mBinder = new IKeyguardService.Stub()//所有对keyguradServie的操作都会执行到mKeyguardViewMediator
+
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+frameworks/base/services/core/java/com/android/server/policy/keyguard/KeyguardServiceDelegate.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/keyguard/KeyguardService.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/keyguard/KeyguardViewMediator.java
+frameworks/base/services/core/java/com/android/server/am/KeyguardController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarKeyguardViewManager.java
+
+
+/*keyguarService android4.2
+
+*/
+init-->mKeyguardMediator= new KeyguardViewMediator@PhoneWindowManager.java
+
+显示：
+mNotificationTask.run-->policy.screenTurningOn(mScreenOnListener)@PowerManagerService.java-->
+screenTurningOn-->@PhoneWindowManager.java
+
+
+onScreenTurnedOn-->notifyScreenOnLocked-->mHandler.sendMessage-->
+mHandler.handleMessage(NOTIFY_SCREEN_ON)-->
+handleNotifyScreenOn-->mKeyguardViewManager.onScreenTurnedOn@KeyguardViewMediator.java-->
+onScreenTurnedOn-->mKeyguardView.onScreenTurnedOn@KeyguardViewManager.java
+
+隐藏：
+mKeyguardMediator.setHidden
+
+
+
+frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
+frameworks/base/policy/src/com/android/internal/policy/impl/KeyguardViewMediator.java
+frameworks/base/policy/src/com/android/internal/policy/impl/KeyguardViewManager.java
+frameworks/base/packages/Keyguard/src/com/android/keyguard/KeyguardViewMediator.java
+/*
+ 锁屏密码
+
+ PIN(Personal Identification Number)
+ PUK是英文PIN Unblocking Key的缩写，即PIN解锁码
+
+ locksettings set-pattern [--old OLD_CREDENTIAL] NEW_PATTERN //图形
+ locksettings set-pin [--old OLD_CREDENTIAL] NEW_PIN
+ locksettings set-password: sets a password
+ locksettings clear: clears the unlock credential
+*/
+
+mSystemServiceManager.startService(LOCK_SETTINGS_SERVICE_CLASS)@SystemServer.java-->
+Lifecycle.onStart{
+- mLockSettingsService = new LockSettingsService(getContext())
+- publishBinderService("lock_settings", mLockSettingsService)
+}@LockSettingsService.java
+
+//设置
+
+//验证
+checkCredential-->doVerifyCredential@LockSettingsService.java
+
+
+
+frameworks/base/services/core/java/com/android/server/locksettings/LockSettingsService.java
+

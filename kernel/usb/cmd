@@ -1,5 +1,21 @@
-//lsusb
+/*
 
+*/
+
+//usb设备的信息
+/sys/device/platform/usb**
+
+1-0:1.0   //otg device interface
+2-0:1.0   //host device interface
+2-1       //hub device
+2-1:1.0   //hub interface
+2-1.1     //device1 @ hub
+2-1.1:1.0 //interface
+2-1.2     //device2 @ hub
+2-1.2:1.0 //interface
+
+
+//lsusb
 遍历"/sys/bus/usb/devices/"目录下所有文件夹,读取文件夹下的uevent若有以下三项则是usb设备
 {
 - "BUSNUM=%u\n", &busnum
@@ -11,7 +27,5 @@
 
 
 external/toybox/toys/other/lsusb
-
-
 
 //adb

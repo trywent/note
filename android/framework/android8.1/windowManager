@@ -59,7 +59,9 @@ relayoutWindow-->createSurfaceControl(Surface outSurface,WindowState win,WindowS
 }@WindowManagerService.java
 
 =====================
-/*应用设置方位*/
+/*
+应用设置方位
+*/
 setRequestedOrientation@ActivityManagerService.java-->setRequestedOrientation{
 - displayConfig = mStackSupervisor.getDisplayOverrideConfiguration
 - mWindowContainerController.setOrientation(requestedOrientation){ //设置方位
@@ -175,6 +177,33 @@ stopFreezingDisplayLocked{
 - boolean configChanged = updateOrientationFromAppTokensLocked
 - mH.obtainMessage(H.SEND_NEW_CONFIGURATION)
 }
+
+/*
+ 启动结束
+*/
+//动画结束
+
+
+//打开屏幕
+performSurfacePlacement@RootWindowContainer.java-->enableScreenIfNeeded-->enableScreenIfNeededLocked-->
+performEnableScreen{
+  //是否可以结束动画，keyguard是否绘制
+- mPolicy.canDismissBootAnimation(){
+	- mKeyguardDrawComplete	
+	}@PhoneWindowMananger.java
+  //是否有显示窗口
+- getDefaultDisplayContentLocked().checkWaitingForWindows(){
+	- 
+	}@DisplayContent.java
+  //结束动画
+- SystemProperties.set("service.bootanim.exit", "1")
+  //检查动画是否结束，没有则继续等待
+- checkBootAnimationCompleteLocked
+
+  //启动完成
+- mActivityManager.bootAnimationComplete()
+}@WindowManagerService.java
+
 
 frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
 frameworks/base/services/core/java/com/android/server/am/ActivityRecord.java

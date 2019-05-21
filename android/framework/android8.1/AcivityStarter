@@ -3,14 +3,33 @@
  //参数:源activity进程,源包名,option(比较少提供)
  startActivity(IBinder whoThread, String callingPackage,bOptions)
 */
+//启动home
+startHomeActivityLocked(int userId, String reason) {
+- Intent intent = getHomeIntent(){
+	- Intent intent = new Intent(mTopAction)//Intent.MAIN
+	- intent.addCategory(Intent.CATEGORY_HOME)
+	}
+- ActivityInfo aInfo = resolveActivityInfo(intent, STOCK_PM_FLAGS, userId){
+	- AppGlobals.getPackageManager().resolveIntent(intent)
+	}
+- aInfo = new ActivityInfo(aInfo)
+- mActivityStarter.startHomeActivityLocked(intent, aInfo, myReason)
+}@ActivityManagerService.java
+
+
+
+
+
+//启动应用
 startActivity-->startActivityForResult@Activity.java-->mInstrumentation.execStartActivity
 -->execStartActivity@Instrumentation.java-->ActivityManager.getService().startActivity-->
 startActivity(IBinder whoThread, String callingPackage,Intent intent, String resolvedType, Bundle bOptions,callingUser/*userId*/)
 -->mActivityStarter.startActivityMayWait@ActivityManagerService.java-->
 startActivityMayWait(caller,intent, null/*inTask*/){
 - intent = new Intent(intent)
+  //解析intent对应的应用
 - ResolveInfo rInfo = mSupervisor.resolveIntent(intent)
-- ActivityInfo aInfo = mSupervisor.resolveActivity(intent, rInfo
+- ActivityInfo aInfo = mSupervisor.resolveActivity(intent, rInfo)
 - startActivityLocked(caller, intent, aInfo, rInfo)
 }@ActivityStarter.java
 

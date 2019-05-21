@@ -1,4 +1,7 @@
-//获取并解析vcard数据
+/*获取并解析vcard数据
+
+ OBEX(Object Exchange,对象交换协议)
+*/
 
 pullPhoneBook-->mSession.makeRequest@BluetoothPbapClient.java-->makeRequest
 @BluetoothPbapSession.java--->mObexSession.schedule-->schedule(request)-->
@@ -19,14 +22,58 @@ bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapRequestPullPhoneBook.ja
 bluetooth/src/android/bluetooth/client/pbap/BluetoothPbapSession.java
 
 ======================
-//8.1
+/*8.1
+ logcat -s BluetoothPbapRequest BluetoothPbapRequestPullPhoneBook
+
+*/
 connect-->service.connect@BluetoothPbapClient.java-->connect@PbapClientService.java-->
-pbapClientStateMachine.start-->Connecting.enter{
-- mSdpReceiver = new SDPBroadcastReceiver
-- mCurrentDevice.sdpSearch(BluetoothUuid.PBAP_PSE)//搜索sdp
-- new HandlerThread().start
-- PbapClientConnectionHandler.Builder
+pbapClientStateMachine.start-->Connecting.enter@PbapClientStateMachine.java
+
+connecting{
+- enter{
+	- mSdpReceiver = new SDPBroadcastReceiver()
+	- mSdpReceiver.register()
+	  //查询设备支持的服务（Service discovery）
+	- mCurrentDevice.sdpSearch(BluetoothUuid.PBAP_PSE)
+	- mHandlerThread = new HandlerThread("PBAP PCE handler").start()
+	- mConnectionHandler = new PbapClientConnectionHandler.Builder()
+                                         .setLooper(mHandlerThread.getLooper()).build()
+	}
+- processMessage{
+	- MSG_DISCONNECT{
+		- transitionTo(mDisconnecting)
+		}
+	- MSG_CONNECTION_COMPLETE{
+		- transitionTo(mConnected)
+		}
+	- MSG_CONNECTION_FAILED,MSG_CONNECT_TIMEOUT:{
+		- transitionTo(mDisconnecting)
+		}
+	- MSG_SDP_COMPLETE:{//查询到远程设备支持pbap
+		- mConnectionHandler.obtainMessage(PbapClientConnectionHandler.MSG_CONNECT).sendToTarget()
+		}
+	}
+- exit{
+	- mSdpReceiver.unregister()
+	}
 }@PbapClientStateMachine.java
+
+//sdp查询
+SDPBroadcastReceiver extends BroadcastReceiver {
+- onReceive(intent){
+	 //收到ACTION_SDP_RECORD，uuid为BluetoothUuid.PBAP_PSE
+	- intent.getAction().equals(BluetoothDevice.ACTION_SDP_RECORD)
+	- sendMessage(MSG_SDP_COMPLETE)
+	}
+  //注册广播接收
+- register{
+	- IntentFilter filter = new IntentFilter().addAction(BluetoothDevice.ACTION_SDP_RECORD)
+	- mService.registerReceiver(this, filter)
+	}
+}
+
+
+//handler
 
 SDPBroadcastReceiver.onReceive-->sendMessage(MSG_SDP_COMPLETE)-->Connecting.processMessage(MSG_SDP_COMPLETE)
 -->mConnectionHandler.obtainMessage(MSG_CONNECT).sendToTarget()@PbapClientStateMachine.java-->
@@ -38,17 +85,107 @@ handleMessage{
 }@PbapClientConnectionHandler.java
 
 
-//下载电话本
-Connected.enter-->obtainMessage(MSG_DOWNLOAD).sendToTarget@PbapClientStateMachine.java-->
-handleMessage(MSG_DOWNLOAD){
-- request = new BluetoothPbapRequestPullPhoneBook().execute()//获取电话本
-- processor = new PhonebookPullRequest //处理接收数据
+/*sdp查询设备支持pbap后，开始下载电话本
+
+
+*/
+PB_PATH = "telecom/pb.vcf";
+MCH_PATH = "telecom/mch.vcf";
+ICH_PATH = "telecom/ich.vcf";
+OCH_PATH = "telecom/och.vcf";
+
+
+handleMessage(){
+- MSG_CONNECT{//sdp查询支持pbap
+	- mPseRec = (SdpPseRecord) msg.obj
+	- connectSocket{
+		- if(mPseRec == null)
+			mSocket = mDevice.createRfcommSocketToServiceRecord
+		  else if(mPseRec.getL2capPsm() != L2CAP_INVALID_PSM)
+			mSocket = mDevice.createL2capSocket(mPseRec.getL2capPsm())
+		  else
+			mSocket = mDevice.createRfcommSocket(mPseRec.getRfcommChannelNumber())
+		- mSocket.connect()
+		}
+	- connectObexSession{
+		- BluetoothObexTransport transport = new BluetoothObexTransport(mSocket)
+		- mObexSession = new ClientSession(transport)
+		- HeaderSet connectionResponse = mObexSession.connect(connectionRequest)
+		}
+	- mPbapClientStateMachine.obtainMessage(PbapClientStateMachine.MSG_CONNECTION_COMPLETE).sendToTarget()
+	}
+- MSG_DISCONNECT
+- MSG_DOWNLOAD{
+	 //清除数据库联系人
+	- mContext.getContentResolver().delete(CallLog.Calls.CONTENT_URI
+	 //下载联系人pb.vcf，默认获取最大数65535
+	- request = new BluetoothPbapRequestPullPhoneBook(PB_PATH, mAccount, PBAP_REQUESTED_FIELDS, VCARD_TYPE_30)
+	- request.execute()
+	 //处理接收数据
+	- processor = new PhonebookPullRequest 
+	- processor.setResults(request.getList())
+	 //通话记录
+	- downloadCallLog(MCH_PATH) //未接电话
+        - downloadCallLog(ICH_PATH)//接听电话
+        - downloadCallLog(OCH_PATH)//拨出电话
+	}
+
 - 
 }@PbapClientConnectionHandler.java
 
 
+//下载电话本
+BluetoothPbapRequestPullPhoneBook(
+            String pbName, Account account, long filter, byte format,
+            int maxListCount, int listStartOffset){
+- mHeaderSet.setHeader(HeaderSet.NAME, pbName)
+- mHeaderSet.setHeader(HeaderSet.TYPE, TYPE)
+  //获取电话本操作参数
+- ObexAppParameters oap = new ObexAppParameters()
+- oap.add(OAP_TAGID_FORMAT, format) //格式
+- oap.add(OAP_TAGID_MAX_LIST_COUNT，maxListCount/*为0时则获取最大数65535*/)//获取电话本条数
+- oap.addToHeaderSet(mHeaderSet)
+}@BluetoothPbapRequestPullPhoneBook.java
+
+execute(ClientSession session){
+- mOp = (ClientOperation) session.get(mHeaderSet)
+- mOp.continueOperation(true, false)
+- readResponseHeaders(mOp.getReceivedHeader())
+- InputStream is = mOp.openInputStream()
+  //读取数据
+- readResponse{
+	- mResponse = new BluetoothPbapVcardList(mAccount, stream, mFormat)
+	}@BluetoothPbapRequestPullPhoneBook.java
+- is.close()
+}@BluetoothPbapRequest.java
+
+//从流中解析电话本
+BluetoothPbapVcardList(Account account, InputStream in, byte format){
+- mAccount = account
+- parse(in, format){
+	- if (format == PbapClientConnectionHandler.VCARD_TYPE_30)
+		VCardParser parser = new VCardParser_V30()
+	  else
+		VCardParser parser = new VCardParser_V21()
+	- VCardEntryConstructor constructor = new VCardEntryConstructor
+	- VCardEntryCounter counter = new VCardEntryCounter()
+	- CardEntryHandler handler = new CardEntryHandler()
+	- constructor.addEntryHandler(handler)
+	- parser.addInterpreter(constructor)
+	- parser.addInterpreter(counter)
+	 //解析
+	- parser.parse(in)
+	}
+}@BluetoothPbapVcardList.java
 
 frameworks/base/core/java/android/bluetooth/BluetoothPbapClient.java
 packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/PbapClientService.java
 packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/PbapClientStateMachine.java
 packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/PbapClientConnectionHandler.java
+packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/BluetoothPbapRequest.java
+packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/BluetoothPbapRequestPullPhoneBook.java
+packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/PhonebookPullRequest.java
+packages/apps/Bluetooth/src/com/android/bluetooth/pbapclient/BluetoothPbapVcardList.java
+
+
+frameworks/opt/vcard/java/com/android/vcard/VCardParser_V30.java

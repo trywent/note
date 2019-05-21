@@ -17,7 +17,7 @@ setInitialDisplaySize{
         }else{
 
 }
-========================
+
 //检查窗口权限
 checkAddPermission(attrs, appOp){
 - !isSystemAlertWindowType,{//非TYPE_PHONE,TYPE_SYSTEM_ALERT,TYPE_APPLICATION_OVERLAY
@@ -28,8 +28,11 @@ checkAddPermission(attrs, appOp){
 - 其它类型检查警告窗口,outAppOp[0] = OP_SYSTEM_ALERT_WINDOW
 }@PhoneWindowManager.java
 
-========================
-//布局
+
+/*布局
+
+
+*/
     // The current size of the screen; really; extends into the overscan area of
     // the screen and doesn't account for any system elements like the status bar.
     int mOverscanScreenLeft, mOverscanScreenTop;
@@ -230,8 +233,11 @@ mDisplaySettings.getOverscanLocked@WindowManagerService.java
 configureDisplayPolicyLocked
 @WindowManagerService.java-->setDisplayOverscan@PhoneWindowManager.java
 
-=================
-systemUI:
+/*
+ systemUI
+
+*/
+
 getSystemUiVisibility
 
 updateSystemUiVisibilityLw{
@@ -252,6 +258,17 @@ updateSystemBarsLw{
 - applyTranslucentFlagLw
 - 
 }@PhoneWindowManager.java
+
+/*
+ keyguard
+
+*/
+screenTurningOn-->finishKeyguardDrawn-->mKeyguardDrawComplete = true@PhoneWindowMananger.java
+
+//是否可以结束动画
+canDismissBootAnimation-->return mKeyguardDrawComplete@PhoneWindowMananger.java
+
+
 
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
 

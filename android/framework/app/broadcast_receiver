@@ -1,5 +1,11 @@
+/*
+
+
+*/
+
 //广播注册：
-registerReceiver-->registerReceiverInternal{
+registerReceiver(BroadcastReceiver receiver, IntentFilter filter)-->
+registerReceiverInternal(BroadcastReceiver receiver, int userId,IntentFilter filter){
 - mPackageInfo.getReceiverDispatcher-->getReceiverDispatcher{
 	- 先从map中查找
 	- 若没有则新建，ReceiverDispatcher
@@ -13,10 +19,10 @@ registerReceiver-->registerReceiverInternal{
 	- 创建ReceiverList，加入到容器mRegisteredReceivers。并将filter加入到容器
 	- 处理所有的sticky广播。queue.enqueueParallelBroadcastLocked
 	}
-}@ContextImpl
+}@ContextImpl.java
 
 
-________________________
+
 //发送：
 sendBroadcast-->ActivityManagerNative.getDefault().broadcastIntent@ContextImpl.java-->
 broadcastIntentLocked{(默认广播不会发送到stoped状态的应用,判断函数Intent.isExcludingStopped)
@@ -41,7 +47,7 @@ broadcastIntentLocked{(默认广播不会发送到stoped状态的应用,判断�
 
 }@ActivityManagerService.java
 
-_________________________
+//
 ActivityManagerService中创建两个广播队列：
         mFgBroadcastQueue = new BroadcastQueue(this, "foreground", BROADCAST_FG_TIMEOUT);
         mBgBroadcastQueue = new BroadcastQueue(this, "background", BROADCAST_BG_TIMEOUT);
