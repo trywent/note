@@ -26,13 +26,15 @@ start{
 - mReaderThread->run("InputReader")
 }@InputManager.cpp
 
-
-
-
-addClient-->mClients.put@InputMethodManagerService.java
-
-windowGainedFocus-->mIWindowManager.inputMethodClientHasFocus@InputMethodManagerService.java
--->
+//设置input的窗口，方位
+setDisplayViewports@LocalService.java-->setDisplayViewportsInternal-->setDisplayViewport-->
+nativeSetDisplayViewport@InputManagerService.java-->setDisplayViewport(type,viewport){
+- type == ViewportType::VIEWPORT_EXTERNAL: mLocked.externalViewport = viewport
+- type == ViewportType::VIEWPORT_INTERNAL: mLocked.internalViewport = viewport
+- ontroller = mLocked.pointerController.promote
+- controller->setDisplayViewport
+- mInputManager->getReader()->requestRefreshConfiguration
+}@com_android_server_input_InputManagerService.cpp
 
 
 /***********************

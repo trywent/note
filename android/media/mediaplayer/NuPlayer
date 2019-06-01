@@ -1,0 +1,225 @@
+/*************************
+  服务端player接口：  NULPlayerDriver
+
+*/
+enum player_type {
+    STAGEFRIGHT_PLAYER = 3,
+    NU_PLAYER = 4, //默认播放器
+    TEST_PLAYER = 5,
+};
+
+enum State {
+        STATE_IDLE,
+        STATE_SET_DATASOURCE_PENDING,
+        STATE_UNPREPARED,
+        STATE_PREPARING,
+        STATE_PREPARED,
+        STATE_RUNNING,
+        STATE_PAUSED,
+        STATE_RESET_IN_PROGRESS,
+        STATE_STOPPED,                  // equivalent to PAUSED
+        STATE_STOPPED_AND_PREPARING,    // equivalent to PAUSED, but seeking
+        STATE_STOPPED_AND_PREPARED,     // equivalent to PAUSED, but seek complete
+}
+
+//开始线程 "NuPlayerDriver Looper"
+createPlayer(NU_PLAYER)-->factory->createPlayer@MediaPlayerService.cpp-->
+createPlayer-->new NuPlayerDriver@MediaPlayerFactory.cpp-->
+NuPlayerDriver{
+- mLooper(new ALooper)
+- mPlayer(new NuPlayer(pid))
+- mLooper->start
+- mLooper->registerHandler(mPlayer)
+- mPlayer->setDriver(this)
+}@NuPlayerDriver.cpp
+
+//设置文件源
+NuPlayerDriver::setDataSource(int fd, int64_t offset, int64_t length) {
+- mState = STATE_SET_DATASOURCE_PENDING
+- mPlayer->setDataSourceAsync(fd, offset, length)
+  //等待player设置完成
+- mCondition.wait(mLock)
+}@NuPlayerDriver.cpp
+//设置http源
+NuPlayerDriver::setDataSource(const sp<IMediaHTTPService> &httpService, const char *url){
+- mState = STATE_SET_DATASOURCE_PENDING
+- mPlayer->setDataSourceAsync(httpService, url, headers)
+  //等待player设置完成
+- mCondition.wait(mLock)
+}@NuPlayerDriver.cpp
+
+notifySetDataSourceCompleted{
+- CHECK_EQ(mState, STATE_SET_DATASOURCE_PENDING) //检查状态是否是STATE_SET_DATASOURCE_PENDING
+- mState = (err == OK) ? STATE_UNPREPARED : STATE_IDLE
+- mCondition.broadcast()
+}
+
+//perpare
+NuPlayerDriver::prepare()-->prepare_l
+
+/*NULPlayer:  mDriver为NuPlayerDriver
+
+*/
+struct NuPlayer: public AHandler{
+  //文件数据
+- Source mSource
+  //图像
+- Surface mSurface
+  //声音
+- AudioSink mAudioSink
+  //解码
+- DecoderBase mVideoDecoder
+- DecoderBase mAudioDecoder
+- CCDecoder mCCDecoder
+  //渲染
+- Renderer mRenderer
+}@NuPlayer.cpp
+
+NuPlayer::setDriver(const wp<NuPlayerDriver> &driver)-->mDriver = driver@NuPlayer.cpp
+
+
+1
+/*设置mSource
+  
+*/
+setDataSourceAsync(int fd, int64_t offset, int64_t length){
+- msg = new AMessage(kWhatSetDataSource)
+- notify = new AMessage(kWhatSourceNotify)
+- source = new GenericSource(notify, mUIDValid, mUID)
+- source->setDataSource(fd, offset, length)
+  //通知设置mSource
+- msg->post(source)-->onMessageReceived(kWhatSetDataSource)-->mSource
+}@NuPlayer.cpp
+
+//设置mAudioSink
+MediaPlayerService::Client::setDataSource_pre-->setAudioSink-->
+onMessageReceived(kWhatSetAudioSink)-->mAudioSink@@NuPlayer.cpp
+
+//设置mSurface
+MediaPlayerService::Client::setVideoSurfaceTexture-->NuPlayerDriver::setVideoSurfaceTexture
+mPlayer->setVideoSurfaceTextureAsync-->NuPlayer::setVideoSurfaceTextureAsync-->
+
+}
+
+2
+/* prepare
+
+*/
+prepareAsync@NuPlayerDriver.cpp-->prepareAsync-->(new AMessage(kWhatPrepare, this))->post()
+-->mSource->prepareAsync()@NuPlayer.cpp
+
+3 
+/*start:
+  mSource读取数据
+  创建解码器
+*/
+sp<DecoderBase> mVideoDecoder;
+sp<DecoderBase> mAudioDecoder;
+
+start-->new AMessage(kWhatStart)->post-->onMessageReceived(kWhatStart)-->
+onStart(int64_t startPositionUs, MediaPlayerSeekMode mode){
+- mSource->start()
+- sp<AMessage> notify = new AMessage(kWhatRendererNotify, this)
+- mRenderer = new Renderer(mAudioSink,notify)
+- mRendererLooper = new ALooper
+- mRendererLooper->start(false, false, ANDROID_PRIORITY_AUDIO)
+- mRendererLooper->registerHandler(mRenderer)
+- mRenderer->setVideoFrameRate(rate)
+  //初始化解码器decoder
+- postScanSources-->new AMessage(kWhatScanSources).post()-->onMessageReceived{
+	- instantiateDecoder(false, &mVideoDecoder)
+	- instantiateDecoder(true,&mAudioDecoder)
+	}
+}@NuPlayer.cpp
+
+/*初始化mVideoDecoder,mAudioDecoder
+  获取数据格式创建解码器
+*/
+instantiateDecoder(bool audio,&decoder){
+- sp<AMessage> format = mSource->getFormat(audio) //获取格式
+  //创建字符解码
+- !audio{
+	- ccNotify = new AMessage(kWhatClosedCaptionNotify)
+	- 获取mime
+	- mCCDecoder = new CCDecoder(ccNotify)
+	- format->setInt32 //设置secure,protected,operatiion-rate
+	}
+  //音频解码器
+- audio{
+	- notify = new AMessage(kWhatAudioNotify)
+	- *decoder = new Decoder(notify, mSource, mPID, mUID, mRenderer)
+	}
+  //视频解码器
+- !audio{
+	- notify = new AMessage(kWhatVideoNotify)
+	- *decoder =new Decoder(notify, mSource, mPID, mUID, mRenderer, mSurface, mCCDecoder)
+	}
+- (*decoder)->init()
+- (*decoder)->configure(format)  //初始化
+}@NuPlayer.cpp
+
+
+performDecoderFlush-->flushDecoder
+
+//消息处理,通知
+onMessageReceived(const sp<AMessage> &msg){
+  switch (msg->what())
+  //设置mSource
+- kWhatSetDataSource:{	 
+	- msg->findObject("source", &obj)
+	- mSource = static_cast<Source *>(obj.get()
+	 //通知driver设置完成
+	- mDriver.promote()->notifySetDataSourceCompleted(err)
+	}
+- kWhatSetVideoSurface:{
+	- mVideoDecoder->setVideoSurface(surface) //NuPlayerDecorder设置surface
+	- !mStarted状态,performSetSurface(surface){
+		- mSurface
+		- setVideoScalingMode
+		}
+	- 否则延迟操作{
+		- mDeferredActions.push_back(FlushDecoderAction)
+		- mDeferredActions.push_back(SetSurfaceAction(surface))
+		- mDeferredActions.push_back(SimpleAction(&performScanSources))
+		- mDeferredActions.push_back(ResumeDecoderAction)
+		- processDeferredActions
+	}
+  //从source过来的通知
+- kWhatSourceNotify:{
+   	- onSourceNotify(msg)
+	}
+- kWhatScanSources:{
+	- instantiateDecoder(false,&mVideoDecoder)
+	- instantiateDecoder(true,&mAudioDecoder)
+	}
+
+  //视频音频解码通知
+- kWhatVideoNotify
+  kWhatAudioNotify{
+	- 
+	}
+  
+}
+
+onSourceNotify(const sp<AMessage> &msg){
+- msg->findInt32("what", &what)
+  switch (what)
+  //创建安全解码器
+- Source::kWhatInstantiateSecureDecoders:
+	- onInstantiateSecureDecoders{
+		- (mSourceFlags & Source::FLAG_SECURE)
+		- instantiateDecoder(false,&mVideoDecoder)
+		- instantiateDecoder(true,&mAudioDecoder)
+	}
+- Source::kWhatPrepared 
+- Source::kWhatBufferingUpdate:{
+	- notifyListener(MEDIA_BUFFERING_UPDATE, percentage
+	}
+}
+
+
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDriver.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayer.cpp
+

@@ -1,0 +1,14 @@
+//c手册
+sudo apt install manpages-dev glibc-doc
+
+//c++手册
+sudo apt install manpages-dev libstdc++-6-5.4.0-doc
+
+//在线手册
+https://en.cppreference.com/w/cpp/string/basic_string/stoul
+
+https://gcc.gnu.org/onlinedocs/libstdc++/
+https://en.cppreference.com/w/Cppreference:Archives
+
+//源码
+https://gcc.gnu.org/onlinedocs/libstdc++/latest-doxygen/

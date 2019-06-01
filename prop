@@ -1,0 +1,40 @@
+############系统配置
+#默认字体大小 1.0  1.15  1.30
+ro.build.fytfontsize=1.0
+
+#默认launcher
+ro.fyt.launcher=com.android.launcher3
+
+#默认动画
+ro.fyt.anim_scale_setting=1.0
+
+#默认时区
+persist.sys.timezone=Asia/Shanghai
+
+#默认语言
+persist.sys.locale=zh-CN
+
+#默认输入法
+ro.build.fytinputmethod=
+
+#蓝牙配置
+#type 0 default
+#type 1 blink
+#type 2 brlinkd
+sys.fyt.bluetooth_type=1
+
+#px3蓝牙配置(gocsdk5)
+ro.fyt.bluetooth_type=1
+
+############竖屏相关
+#android8.0之前旋转角度设置
+ro.sf.hwrotation=90                                        
+#android8.0旋转角度
+ro.sf.swrotation=90 
+
+#显示导航条
+qemu.hw.mainkeys=0
+
+#statusBar NaviBar高度
+sys.lsec.status_bar_height=140
+sys.lsec.navi_bar_height=140

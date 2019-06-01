@@ -1,0 +1,78 @@
+/*
+ looper  message  handler
+*/
+/*
+ ALooper 消息处理线程。消息传到handler处理
+
+*/
+
+//looper线程开始
+struct ALooper::LooperThread : public Thread(ALooper *looper, bool canCallJava) {
+- Thread(canCallJava)
+- mLooper(looper)
+}@ALooper.cpp
+
+//加入消息队列
+ALooper::post(const sp<AMessage> &msg, int64_t delayUs){
+- Event event;
+- event.mWhenUs = whenUs;
+- event.mMessage = msg;
+- mEventQueue.insert(it, event);
+}@ALooper.cpp
+
+//开始处理消息
+ALooper::start(bool runOnCallingThread, bool canCallJava, int32_t priority){
+- mThread = new LooperThread(this, canCallJava)
+- mThread->run("ALooper")-->threadLoop()-->mLooper->loop()
+}@ALooper.cpp
+
+Looper::loop() {//处理消息
+- Event event = *mEventQueue.begin()
+- mEventQueue.erase(mEventQueue.begin())
+- event.mMessage->deliver()-->AMessage::deliver()@AMessage.cpp-->handler->deliverMessage(this)-->
+	deliverMessage@AHandler.cpp
+}@ALooper.cpp
+
+
+/*
+ AMessage 用来发送消息
+
+*/
+AMessage::AMessage(uint32_t what, const sp<const AHandler> &handler){
+- mWhat(what) 
+  //设置handler
+- setTarget(handler) 
+}
+
+AMessage::setTarget(const sp<const AHandler> &handler) {
+- mTarget = handler->id()
+- mHandler = handler->getHandler()
+- mLooper = handler->getLooper()
+}@AMessage.cpp
+
+//发送消息
+AMessage::post(int64_t delayUs)-->looper->post(this, delayUs)
+
+status_t AMessage::postAndAwaitResponse(sp<AMessage> *response) {
+- looper->post(this, 0 /* delayUs */)
+- looper->awaitResponse(token, response)
+}
+/*
+ Handler 用来处理消息
+
+*/
+//处理消息
+Looper::loop@ALooper.cpp-->AMessage::deliver()@AMessage.cpp-->
+AHandler::deliverMessage(const sp<AMessage> &msg) {
+- onMessageReceived(msg)
+- mMessageCounter++
+}@AHandler.cpp
+
+
+
+frameworks/av/media/libstagefright/foundation/ALooper.cpp
+frameworks/av/media/libstagefright/include/media/stagefright/foundation/ALooper.h
+frameworks/av/media/libstagefright/foundation/AMessage.cpp
+frameworks/av/media/libstagefright/foundation/include/media/stagefright/foundation/AMessage.h
+frameworks/av/media/libstagefright/foundation/AHandler.cpp
+frameworks/av/media/libstagefright/foundation/include/media/stagefright/foundation/AHandler.h

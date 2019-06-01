@@ -35,7 +35,10 @@ WindowContainer{
 
 /*
  RootWindowContainer
+ 
+ 创建DisplayContent并加入RootWindowContainer
 */
+new RootWindowContainer(this)@WindowManagerService.java-->
 RootWindowContainer(WindowManagerService service) {
 - mService = service;
 - mLayersController = new WindowLayersController(mService);
@@ -43,10 +46,13 @@ RootWindowContainer(WindowManagerService service) {
 }
 
 getDisplayContentOrCreate-->
-createDisplayContent{
+createDisplayContent(){
 - DisplayContent dc = new DisplayContent(display, mService, mLayersController,mWallpaperController)
-  //设置displayInfo
+  //设置displayInfo..读取保存的屏幕信息。将当前屏幕信息设置到LogicDisplay
 - DisplayInfo displayInfo = dc.getDisplayInfo()
+- mService.mDisplaySettings.getOverscanLocked(displayInfo.name, displayInfo.uniqueId, rect)
+- isplayInfo.overscanLeft = rect.left
+- mService.mDisplayManagerInternal.setDisplayInfoOverrideFromWindowManager(displayId, displayInfo)
 }
 
 
@@ -54,7 +60,7 @@ createDisplayContent{
 frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
 ====== 1
 /**********************
-  displayContent初始化.加入到root中
+  displayContent初始化.加入到RootWindowContainer中
   displayContent包含4种Container
 	mAboveAppWindowsContainers
 	mTaskStackContainers //所有应用窗口容器
@@ -62,7 +68,10 @@ frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.jav
 	mImeWindowsContainers
 */
 
-DisplayContent(WindowManagerService service){
+DisplayContent(Display display, WindowManagerService service,WindowLayersController layersController){
+- mDisplay = display
+- display.getDisplayInfo(mDisplayInfo)
+  //
 - mLayersController = layersController //窗口layer设置
 - mDividerControllerLocked = new DockedStackDividerController
 - mPinnedStackControllerLocked = new PinnedStackController
@@ -73,6 +82,17 @@ DisplayContent(WindowManagerService service){
 - super.addChild(mImeWindowsContainers)
 - mService.mRoot.addChild(this, null) //加入到mRoot
 }@DisplayContent.java
+
+//初始化屏幕信息
+initializeDisplayBaseInfo() {
+- updateBaseDisplayMetrics(mDisplayInfo.logicalWidth, mDisplayInfo.logicalHeight,mDisplayInfo.logicalDensityDpi);
+- mInitialDisplayWidth = mDisplayInfo.logicalWidth;
+- mInitialDisplayHeight = mDisplayInfo.logicalHeight;
+}
+
+updateDisplayAndOrientation(int uiMode){
+
+}
 
 //保存windowToken(对应ActivityRecord)
 onDisplayChanged(dc)-->dc.reParentWindowToken@WindowToken.java-->reParentWindowToken-->

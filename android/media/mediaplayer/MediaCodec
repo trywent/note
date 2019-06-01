@@ -1,0 +1,192 @@
+/************************* client
+ 解码器接口函数。提供给java层，NuPlayer使用
+ MediaCodec中使用ACodec 
+
+ MediaCodec ---> Acodec ---> (server)omxCodec
+
+*/
+
+
+
+/*mediaCodec
+
+ 视频codec有自己的消息处理线程
+ Acodec可以通过回调将消息发送到MediaCodec
+*/
+struct MediaCodec : public AHandler
+
+MediaCodec::CreateByType(const sp<ALooper> &looper, const AString &mime, bool encoder){
+- sp<MediaCodec> codec = new MediaCodec(looper){
+	- mLooper(looper)
+	}
+- codec->init(mime, true /* nameIsType */, encoder)
+}@MediaCodec.cpp
+
+MediaCodec::init(const AString &name, bool nameIsType, bool encoder){
+- mResourceManagerService->init()
+  //创建Acodec
+- sp<CodecBase> mCodec = GetCodecBase(name, nameIsType){
+	- nameIsType,return new ACodec
+	- "android.filter.",return new MediaFilter
+	}
+  //将消息处理函数，关联到线程
+- mIsVideo，{
+	- mCodecLooper = new ALooper	
+	- mCodecLooper->registerHandler(mCodec)
+	}else{
+  	- mLooper->registerHandler(mCodec)
+	}
+- mLooper->registerHandler(this)
+  //ACodec消息
+- mCodec->setCallback(
+            std::unique_ptr<CodecBase::CodecCallback>(
+                    new CodecCallback(new AMessage(kWhatCodecNotify, this))))
+  //Buffer消息
+- mBufferChannel = mCodec->getBufferChannel();
+- mBufferChannel->setCallback(
+            std::unique_ptr<CodecBase::BufferCallback>(
+                    new BufferCallback(new AMessage(kWhatCodecNotify, this))))
+  //发送初始化消息
+- sp<AMessage> msg = new AMessage(kWhatInit, this);
+  msg->setString("name", name);
+  msg->setInt32("nameIsType", nameIsType);
+  PostAndAwaitResponse(msg, &response)
+   
+}@MediaCodec.cpp
+
+//配置
+configure()-->configure(format, nativeWindow, crypto, NULL, flags){
+- sp<AMessage> msg = new AMessage(kWhatConfigure, this)
+- msg->setObject("surface", surface)
+- PostAndAwaitResponse(msg, &response)-->mCodec->initiateConfigureComponent(format)
+}@MediaCodec.cpp
+
+//设置Surface
+MediaCodec::setSurface(const sp<Surface> &surface)-->connectToSurface(surface)@MediaCodec.cpp
+
+//请求数据进行解码
+fillThisBuffer-->mCallback->onInputBufferAvailable@ACodecBufferChannel.cpp-->
+onInputBufferAvailable{
+- dequeuePortBuffer(kPortIndexInput)
+- sp<AMessage> msg = mCallback->dup()
+- msg->setInt32("callbackID", CB_INPUT_AVAILABLE)
+- msg->post()
+}@MediaCodec.cpp
+
+
+//数据解码完成
+drainThisBuffer-->mCallback->onOutputBufferAvailable@ACodecBufferChannel.cpp-->
+onOutputBufferAvailable{
+- dequeuePortBuffer(kPortIndexOutput)
+- sp<AMessage> msg = mCallback->dup()
+- msg->setInt32("callbackID", CB_OUTPUT_AVAILABLE)
+- msg->post()
+}@MediaCodec.cpp
+
+
+//AHandler处理消息
+MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
+ //Acodec回调消息
+- kWhatCodecNotify{
+ - kWhatError{
+	}
+ - kWhatComponentAllocated{
+	
+	}
+ - kWhatComponentConfigured{
+
+	}
+ - kWhatInputSurfaceCreated{}
+ }
+ //mediaCodec消息
+- kWhatInit{
+	  //名字是否是类型
+	- if(nameIsType/*true*/){
+		- msg->findInt32("nameIsType", &nameIsType)
+		- msg->findInt32("encoder", &encoder)
+	  }else{
+		- format->setString("componentName", name.c_str())
+		}
+	- sp<AMessage> format = new AMessage	
+	- mCodec->initiateAllocateComponent(format)
+	}
+- kWhatSetNotification
+- kWhatSetCallback
+- kWhatConfigure{
+	- msg->findObject("surface", &obj)
+	- if(obj!=NULL){//有surface
+		- format->setObject("native-window", obj)
+		- handleSetSurface(static_cast<Surface *>(obj.get()))-->connectToSurface(surface)
+		}
+	- mCodec->initiateConfigureComponent(format)
+	}
+- kWhatSetSurface
+}
+
+
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDecoder.cpp
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDecoderBase.cpp
+frameworks/av/media/libstagefright/MediaCodec.cpp
+
+/*
+ MediaCodecList
+*/
+
+MediaCodecList::findMatchingCodecs(const char *mime,Vector<AString> *matches) {
+- const sp<IMediaCodecList> list = getInstance(){
+	- sp<IBinder> binder = defaultServiceManager()->getService(String16("media.player"))
+	- sp<IMediaPlayerService> service = nterface_cast<IMediaPlayerService>(binder)
+	  //从mediaplayer服务获取解码器列表...实际还是本地
+	- sRemoteList = service->getCodecList()-->MediaPlayerService::getCodecList()-->MediaCodecList::getLocalInstance()
+	  //若获取空，则从本地获取解码器列表
+	- MediaCodecList::getLocalInstance()
+	}
+ //查找匹配的解码器
+- ssize_t matchIndex = list->findCodecByType(mime, encoder, index)
+- const sp<MediaCodecInfo> info = list->getCodecInfo(matchIndex)
+- matches->push(componentName)
+}@MediaCodecList.cpp
+
+
+//创建解码器列表
+MediaCodecList::getLocalInstance()-->MediaCodecList(&sOmxInfoBuilder){
+- mGlobalSettings = new AMessage()
+- MediaCodecListWriter writer(this)
+- mInitCheck = builder->buildMediaCodecList(&writer)-->
+  buildMediaCodecList(MediaCodecListWriter* writer){
+	- if(terble){
+		- sp<IOmxStore> omxStore = IOmxStore::getService()
+		- omxStore->listServiceAttributes
+		- omxStore->listRoles
+	  }else{
+		- sp<IBinder> codecBinder = sm->getService(String16("media.codec"))
+		- sp<IMediaCodecService> codecService = interface_cast<IMediaCodecService>(codecBinder)
+		- sp<IOMXStore> omxStore = codecService->getOMXStore()
+		- omxStore->listServiceAttributes(&serviceAttributes)
+		- omxStore->listRoles(&roles)
+	  }
+	- writer->addMediaCodecInfo()
+	}@OmxInfoBuilder.cpp
+}@MediaCodecList.cpp
+
+//获取匹配的解码器
+MediaCodecList::findCodecByType(const char *type, bool encoder, size_t startIndex){
+- size_t numCodecInfos = mCodecInfos.size()
+  //遍历codecInfo
+- for (; startIndex < numCodecInfos; ++startIndex) {
+	- MediaCodecInfo &info = *mCodecInfos[startIndex]
+	- sp<MediaCodecInfo::Capabilities> capabilities = info.getCapabilitiesFor(type)-->
+		getCapabilitiesFor(const char *mime){
+		- ssize_t ix = getCapabilityIndex(mime) //查找
+		- mCaps.valueAt(ix)
+		}@MediaCodecInfo.cpp
+	- startIndex
+	}
+}@MediaCodecList.cpp
+
+frameworks/av/media/libstagefright/MediaCodecList.cpp
+frameworks/av/media/libstagefright/OmxInfoBuilder.cpp
+frameworks/av/media/libmedia/MediaCodecInfo.cpp
+
+
+

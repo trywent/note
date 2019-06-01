@@ -19,13 +19,16 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
       mMsecsPerFrame(0),
       mFrameSize(0),{}
 
-
+mAudioSink->open(sampleRate,&NuPlayer::Renderer::AudioSinkCallback)@NuPlayerRenderer.cpp-->
 MediaPlayerService::AudioOutput::open(uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,
         audio_format_t format, int bufferCount,AudioCallback cb)
 { 
+- mCallback = cb
   //检查可复用的audioTrack
 - mRecycledTrack
-- sp<AudioTrack> t =  new AudioTrack(mStreamType,sampleRate,format, channelMask)
+  //传入CallbackWrapper
+- CallbackData *newcbd = new CallbackData(this) //传入回调的数据
+- sp<AudioTrack> t = new AudioTrack(mStreamType,sampleRate,format,channelMask,frameCount,flags, CallbackWrapper,newcbd)
 - t->setVolume(mLeftVolume, mRightVolume)
 - mTrack = t
 - updateTrack{
@@ -34,9 +37,29 @@ MediaPlayerService::AudioOutput::open(uint32_t sampleRate, int channelCount, aud
 	}
 }@MediaPlayerService.cpp
 
-switchToNextOutput
+//向audioTrack写入数据
+MediaPlayerService::AudioOutput::CallbackWrapper(int event, void *cookie, void *info)){
+  //获取回调数据
+- CallbackData *data = (CallbackData*)cookie
+- AudioOutput *me = data->getOutput()-->mData//AudioOutput
+- AudioTrack::Buffer *buffer = (AudioTrack::Buffer *)info
+- switch(event)
+  EVENT_MORE_DATA:{
+	- actualSize = (*me->mCallback)(me, buffer->raw, buffer->size)-->mCallback
+	}
+  EVENT_STREAM_END:{
+	- (*me->mCallback)(me, NULL )
+	}
+}@MediaPlayerService.cpp
+
+//填充数据到AudioTrack....没有使用这种方式
+mCallback-->NuPlayer::Renderer::AudioSinkCallback
+
+//写数据到AudioTrack
+write(const void* buffer, size_t size, bool blocking = true)
 
 
 frameworks/av/media/libmediaplayerservice/MediaPlayerService.h
 frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
 frameworks/av/media/libmediaplayerservice/include/MediaPlayerInterface.h
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerRenderer.cpp

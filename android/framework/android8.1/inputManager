@@ -1,9 +1,13 @@
-//
-NativeInputManager{
+/*
+ InputManagerService
+ 
+*/
+nativeInit-->new NativeInputManager
+NativeInputManager(jobject contextObj,jobject serviceObj, const sp<Looper>& looper){
 - mLocked //初始化部分值
 - eventHub = new EventHub()
 - mInputManager = new InputManager(eventHub)
-}
+}@com_android_server_input_InputManagerService.cpp
 
 setDisplayViewports@LocalService.java-->setDisplayViewportsInternal-->setDisplayViewport-->
 nativeSetDisplayViewport@InputManagerService.java-->setDisplayViewport(type,viewport){

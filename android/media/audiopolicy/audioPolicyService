@@ -2,11 +2,11 @@
 
  audio_policy_configuration.xml中声明所有的支持模块,根据这些配置加载对应的库文件
 
-
+ 9853：vendor/sprd/modules/audio/normal/newapm/O.x/AudioPolicyManagerSPRD.cpp
 */
 
 
-//通过HAL层进行操作  9853：vendor/sprd/modules/audio/normal/newapm/O.x/AudioPolicyManagerSPRD.cpp
+//结构
 module{
 //mixport
 - IOProfile{
@@ -29,6 +29,7 @@ module{
    }
 }
 
+//实例结构
 HwModule{
 //mixport
 - mOutputProfiles
@@ -92,7 +93,7 @@ AudioPolicyManager(AudioPolicyClientInterface *clientInterface){
 - 
 }@AudioPolicyManager.cpp
 
-//解析xml
+//解析xml。初始化profile
 deserializeAudioPolicyXmlConfig(config)-->serializer.deserialize{
 - deserializeCollection<ModuleTraits>(modules,&config)-->ModuleTraits::deserialize{
 	//IOProfile mixport 
@@ -134,6 +135,10 @@ AudioPolicyManager::setDeviceConnectionState-->setDeviceConnectionStateInt{
 - mAvailableInputDevices.add(devDesc)
 }
 =================
+/* output
+
+*/
+
 openOutput-->af->openOutput@AudioPolicyClientImpl.cpp-->AudioFlinger::openOutput
 
 //android8.0
@@ -150,12 +155,96 @@ AudioPolicyManager::getOutputForAttr(&output,selectedDeviceId){
 }
 
 
+=================
+/* input
+  
+   1,获取设备，打开input
+
+*/
+AudioRecord-->set-->openRecord_l-->AudioSystem::getInputForAttr(&mAttributes, &input)@AudioRecore.cpp-->
+getInputForAttr(const audio_attributes_t *attr,audio_io_handle_t *input)-->aps->getInputForAttr@AudioSystem.cpp-->
+getInputForAttr(const audio_attributes_t *attr,audio_io_handle_t *input,audio_session_t session,uid_t uid,const audio_config_base_t *config,
+	audio_input_flags_t flags,audio_port_handle_t *selectedDeviceId,input_type_t *inputType){
+- audio_source_t inputSource = attr->source
+  //特殊情况mmap
+- if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) == AUDIO_INPUT_FLAG_MMAP_NOIRQ &&
+            *input != AUDIO_IO_HANDLE_NONE){}
+- halInputSource = inputSource
+  //获取设备
+- if (inputSource == AUDIO_SOURCE_REMOTE_SUBMIX){
+	- *inputType = API_INPUT_MIX_EXT_POLICY_REROUTE
+	- device = AUDIO_DEVICE_IN_REMOTE_SUBMIX
+  }else{
+	- device = getDeviceAndMixForInputSource(inputSource, &policyMix){
+		- 若存在则返回，audio_devices_t selectedDeviceFromMix = mPolicyMixes.getDeviceAndMixForInputSource(inputSource)
+		- getDeviceForInputSource(inputSource)
+		}
+	- *inputType = API_INPUT_LEGACY
+  }
+  //根据inputsource获取input
+- *input = getInputForDevice(device, address, session, uid, inputSource)
+- inputDevices = mAvailableInputDevices.getDevicesFromType(device)
+}@AudioPolicyManager.cpp
 
 
+//获取input
+AudioPolicyManager::getInputForDevice(audio_devices_t device,String8 address,audio_session_t session,uid_t uid,
+        audio_source_t inputSource,uint32_t samplingRate,audio_format_t format,audio_channel_mask_t channelMask,
+        audio_input_flags_t flags,AudioMix *policyMix){
+- audio_source_t halInputSource = inputSource
+- isSoundTrigger = false
+  //唤醒词
+- if (inputSource == AUDIO_SOURCE_HOTWORD) {
+	 //session已经存在
+	- input = mSoundTriggerSessions.valueFor(session)
+	- isSoundTrigger = true
+	 //session不存在
+	- halInputSource = AUDIO_SOURCE_VOICE_RECOGNITION
+	}
+  //查找对应的profile
+- uint32_t profileSamplingRate = samplingRate
+- audio_format_t profileFormat = format
+- sp<IOProfile> profile = getInputProfile(device, address,profileSamplingRate){
+	 //遍历mHwModules，遍历mInputProfiles
+	-  if (profile->isCompatibleProfile(device, address, samplingRate,&samplingRate, format)
+		return profile
+	}
+  //创建session
+- sp<AudioSession> audioSession = new AudioSession(session,inputSource,format,samplingRate)
+  //初始化config
+- audio_config_t config = AUDIO_CONFIG_INITIALIZER
+- config.sample_rate = profileSamplingRate
+  //打开hal层input
+- status = mpClientInterface->openInput(profile->getModuleHandle(),&input,&config,&device)
+  //创建AudioInputDescriptor,保存到mInputs中
+- sp<AudioInputDescriptor> inputDesc = new AudioInputDescriptor(profile)
+- inputDesc->addAudioSession(session, audioSession)
+- addInput(input, inputDesc)-->mInputs.add(input, inputDesc)
+}@AudioPolicyManager.cpp
+
+
+//根据inputSource获取对应的设备
+getDeviceForInputSource(audio_source_t inputSource){
+- 从mInputRoutes中查找相同，return route->mDeviceDescriptor->type()
+- mEngine->getDeviceForInputSource(inputSource){
+	- return device
+	}@Engine.cpp
+}@AudioPolicyManager.cpp
+
+
+
+//开始录音
+start@AudioRecord.cpp-->RecordThread::start@Threads.cpp-->startInput@AudioSystem.cpp-->
+startInput{
+- 
+}@AudioPolicyMananger.cpp
+
+
+frameworks/av/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
 frameworks/av/services/audioflinger/AudioPolicyService.cpp
 frameworks/av/services/audiopolicy/service/AudioPolicyClientImpl.cpp
 frameworks/av/services/audiopolicy/common/managerdefinitions/src/Serializer.cpp
-
+frameworks/av/services/audiopolicy/enginedefault/src/Engine.cpp
 
 
 

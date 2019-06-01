@@ -1,0 +1,292 @@
+/*
+ client
+
+ MediaCode ---> Acodec ---> (server)omxCodec
+*/
+
+struct CodecBase : public AHandler
+struct ACodec : public AHierarchicalStateMachine, public CodecBase 
+
+//提供给MediaCodec的接口
+ACodec::initiateAllocateComponent-->msg->setWhat(kWhatAllocateComponent)->post()
+
+ACodec::initiateConfigureComponent-->msg->setWhat(kWhatConfigureComponent)->post()
+
+ACodec::initiateStart()-->(new AMessage(kWhatStart, this))->post()
+
+ACodec::signalFlush()-->(new AMessage(kWhatFlush, this))->post()
+
+//Acodec
+MediaCodec::init@MediaCodec.cpp-->
+ACodec::ACodec() {
+  //状态机  所有state继承BaseState。消息处理
+- mUninitializedState = new UninitializedState(this){
+	- mCodec(this)
+	}
+- mLoadedState = new LoadedState(this);
+- mLoadedToIdleState = new LoadedToIdleState(this);
+- mIdleToExecutingState = new IdleToExecutingState(this);
+- mExecutingState = new ExecutingState(this);
+- mOutputPortSettingsChangedState = new OutputPortSettingsChangedState(this)
+- mExecutingToIdleState = new ExecutingToIdleState(this);
+- mIdleToLoadedState = new IdleToLoadedState(this);
+- mFlushingState = new FlushingState(this);
+
+- mPortMode[kPortIndexInput] = IOMX::kPortModePresetByteBuffer
+- mPortMode[kPortIndexOutput] = IOMX::kPortModePresetByteBuffer
+  //初始状态mUninitializedState
+- changeState(mUninitializedState)
+}@ACodec.cpp
+
+
+
+
+
+
+
+//状态机消息处理
+//handler::onMessageReceived-->AHierarchicalStateMachine::handleMessage
+AHandler::deliverMessage-->onMessageReceived@AHandler.cpp-->
+onMessageReceived@Acodec.h-->handleMessage{
+  //当前状态处理消息
+- sp<AState> cur = mState
+- cur->onMessageReceived(msg)-->ACodec::BaseState::onMessageReceived
+}@AHierarchicalStateMachine.cpp
+
+ACodec::BaseState::onMessageReceived{
+- kWhatInputBufferFilled{
+	- onInputBufferFilled(msg)
+	}
+- kWhatOutputBufferDrained:{
+	- onOutputBufferDrained(msg)
+	}
+- kWhatOMXMessageList:onOMXMessage(msg)
+- kWhatOMXMessageItem:onOMXMessage(msg)
+- kWhatOMXMessage:onOMXMessage(msg)
+}
+
+/*
+ 接收OMX服务端消息
+ 
+*/
+CodecObserver->onMessages(const std::list<omx_message> &messages){
+- sp<AMessage> msg = new AMessage
+- omx_message::EVENT{
+	- msg->setInt32
+	}
+- omx_message::EMPTY_BUFFER_DONE{
+	- msg->setInt32
+	}
+- omx_message::FRAME_RENDERED{
+	- msg->setInt64
+	}
+- mNotify->post() //new AMessage(kWhatOMXMessageList) 发送消息到ACodec
+}
+//处理OMX消息
+ACodec::BaseState::onOMXMessage(const sp<AMessage> &msg) {
+- EVENT:onOMXEvent(static_cast<OMX_EVENTTYPE>(event))
+- EMPTY_BUFFER_DONE:{//
+	- onOMXEmptyBufferDone(bufferID, fenceFd)
+	}
+- FILL_BUFFER_DONE:{//
+	- onOMXFillBufferDone( bufferID,(size_t)rangeOffset)
+	}
+- FRAME_RENDERED:onOMXFrameRendered(mediaTimeUs, systemNano)
+}
+
+ACodec::BaseState::onOMXEmptyBufferDone(IOMX::buffer_id bufferID, int fenceFd) {
+- 
+- RESUBMIT_BUFFERS{
+	- mCodec->mBufferChannel->drainThisBuffer(info->mBufferID, flags)
+	}
+- FREE_BUFFERS:mCodec->freeBuffer(kPortIndexOutput, index)
+}@ACodec.cpp
+
+
+ACodec::BaseState::onOMXFillBufferDone(IOMX::buffer_id bufferID,size_t rangeOffset, size_t rangeLength){
+- RESUBMIT_BUFFERS{
+	- mCodec->mBufferChannel->drainThisBuffer(info->mBufferID, flags)
+	}
+- FREE_BUFFERS:mCodec->freeBuffer(kPortIndexOutput, index)
+}@ACodec.cpp
+
+
+
+
+
+1/* 
+ UninitializedState
+
+ 
+*/
+initiateSetup-->msg->setWhat(kWhatSetup)-->onSetup
+
+
+//切换状态到LoadedState
+MediaCodec::init@MediaCodec.cpp-->initiateAllocateComponent-->msg->setWhat(kWhatAllocateComponent)-->
+UninitializedState::onAllocateComponent{
+- Vector<AString> matchingCodecs
+  //查找匹配的解码器名字
+- if (msg->findString("componentName", &componentName)) {
+	- sp<IMediaCodecList> list = MediaCodecList::getInstance()
+	- ssize_t index = list->findCodecByName(componentName.c_str())
+	- sp<MediaCodecInfo> info = list->getCodecInfo(index)
+	- matchingCodecs.add(info->getCodecName())
+  }else{
+	- MediaCodecList::findMatchingCodecs(mime.c_str(),encoder,&matchingCodecs)
+  }
+- sp<CodecObserver> observer = new CodecObserver
+  //根据名字创建服务端解码器
+- for (size_t matchIndex = 0; matchIndex < matchingCodecs.size();++matchIndex){
+	- sp<CodecObserver> observer = new CodecObserver //OMX服务回调接口
+	- OMXClient client
+	- client.connect(owners[matchIndex].c_str(), &trebleFlag)
+	- sp<IOMX> omx = client.interface()-->return mOMX@OMXClient.h
+	- omx->allocateNode(componentName.c_str(), observer, &omxNode)
+  }
+- mCodec->mComponentName = componentName
+  //设置observer发送到Acodec的消息
+- notify = new AMessage(kWhatOMXMessageList, mCodec);
+- notify->setInt32("generation", ++mCodec->mNodeGeneration);
+- observer->setNotificationMessage(notify)
+  //服务端解码
+- mCodec->mOMX = omx
+- mCodec->mOMXNode = omxNode
+- mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str())
+- mCodec->changeState(mCodec->mLoadedState)
+}@ACodec.cpp
+
+
+//消息处理
+ACodec::UninitializedState::onMessageReceived{
+- ACodec::kWhatSetup{
+	- onSetup
+	}
+- ACodec::kWhatAllocateComponent{
+	- onAllocateComponent
+	}
+}
+
+
+2/* 
+ LoadedState
+ 
+ 设置解码器
+
+*/
+MediaCodec::configure@MediaCodec.cpp-->mCodec->initiateConfigureComponent(format)-->
+ACodec::LoadedState::onConfigureComponent(const sp<AMessage> &msg){
+- mCodec->configureCodec(mime.c_str(), msg)
+- mCodec->mCallback->onComponentConfigured(mCodec->mInputFormat, mCodec->mOutputFormat)
+}@Acodec.cpp
+
+//配置,创建解码器
+ACodec::configureCodec(const char *mime, const sp<AMessage> &msg){
+ //是否时录制
+- msg->findInt32("encoder", &encoder)
+- sp<AMessage> inputFormat = new AMessage;
+  sp<AMessage> outputFormat = new AMessage;
+  mConfigFormat = msg
+ //是否是视频
+- int32_t video = !strncasecmp(mime, "video/", 6)
+ //是否有NativeWindow。只有播放才有
+- bool haveNativeWindow = msg->findObject("native-window", &obj)&& obj != NULL && video && !encoder
+- if (haveNativeWindow) {
+	- sp<ANativeWindow> nativeWindow = static_cast<ANativeWindow *>(static_cast<Surface *>(obj.get()))
+	- native_window_set_sideband_stream(nativeWindow.get(), NULL)
+	}
+  //设置解码器
+- if (video) {
+	- if (haveNativeWindow && mComponentName.startsWith("OMX.google.")) {
+	 	- setPortMode(kPortIndexOutput, IOMX::kPortModePresetByteBuffer)
+	  }else{
+		- setPortMode(kPortIndexOutput, IOMX::kPortModePresetANWBuffer)
+	  }	
+	- if (encoder) {
+          	- err = setupVideoEncoder(mime, msg, outputFormat, inputFormat)
+        	} else {
+        	- err = setupVideoDecoder(mime, msg, haveNativeWindow, usingSwRenderer, outputFormat)
+          }
+  }else(MEDIA_MIMETYPE_AUDIO_MPEG){
+	- setupmp3Codec
+  }else(MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II){
+	- setupRawAudioFormat
+  }else(MEDIA_MIMETYPE_AUDIO_AMR_NB) {
+        - setupAMRCodec(encoder, false /* isWAMR */, bitRate))
+  }
+}@ACodec.cpp
+
+
+ACodec::setupVideoDecoder(const char *mime, const sp<AMessage> &msg, bool haveNativeWindow,
+bool usingSwRenderer, sp<AMessage> &outputFormat) {
+ //获取宽高
+- msg->findInt32("width", &width) 
+  msg->findInt32("height", &height)
+- 
+}@ACodec.cpp
+
+
+//设置surface
+initiateCreateInputSurface-->onCreateInputSurface(msg){
+- 
+}
+
+
+initiateSetInputSurface-->onSetInputSurface
+
+ACodec::LoadedState::onMessageReceived{
+- kWhatConfigureComponent{
+	- onConfigureComponent(msg)
+	}
+- kWhatCreateInputSurface{
+	- onCreateInputSurface(msg)
+	}
+- kWhatSetInputSurface{
+	- onSetInputSurface(msg)
+	}
+}
+
+3/* 
+ mLoadedToIdleState
+*/
+
+
+4/* 
+ mIdleToExecutingState
+*/
+
+
+5/* 
+ mExecutingState
+*/
+
+6/* 
+ mOutputPortSettingsChangedState
+*/
+
+7/* 
+ mExecutingToIdleState
+*/
+
+
+8/* 
+ mIdleToLoadedState
+*/
+
+
+9/* 
+ mFlushingState
+*/
+
+ACodec::ExecutingState::onOMXEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2){
+- OMX_EventCmdComplete
+- OMX_EventPortSettingsChanged{
+	- sp<AMessage> msg = new AMessage(kWhatOMXMessage, mCodec)
+	- mCodec->deferMessage(msg)
+	}
+}
+
+frameworks/av/media/libstagefright/ACodec.cpp
+frameworks/av/media/libmedia/omx/1.0/WOmx.cpp
+frameworks/av/media/libstagefright/OMXClient.cpp
+frameworks/av/media/libstagefright/foundation/AHierarchicalStateMachine.cpp

@@ -21,3 +21,5 @@ enum AVSampleFormat {
 }
 
 ffprobe file //查看文件编码信息
+
+ffplay file //播放

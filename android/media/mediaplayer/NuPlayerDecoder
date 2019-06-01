@@ -1,0 +1,100 @@
+/*
+ NuPlayerDecoder,Nuplayer使用的帮助函数
+ 使用MediaCodec
+
+*/
+
+onStart-->instantiateDecoder(bool audio,&decoder){
+- *decoder = new Decoder(notify, mSource, mPID, mUID, mRenderer)
+- (*decoder)->init()
+- (*decoder)->configure(format)  //初始化
+}@NuPlayer.cpp
+
+onStart-->instantiateDecoder(bool audio,&decoder)-->
+NuPlayer::Decoder::Decoder(const sp<AMessage> &notify,
+        const sp<Source> &source,
+        pid_t pid,
+        uid_t uid,
+        const sp<Renderer> &renderer,
+        const sp<Surface> &surface,
+        const sp<CCDecoder> &ccDecoder):
+  mSurface(surface)
+  mSource(source)
+  mRenderer(renderer)
+  mCCDecoder(ccDecoder)
+  mComponentName("decoder"){
+- mCodecLooper = new ALooper
+- mCodecLooper->setName("NPDecoder-CL")
+- mCodecLooper->start(false, false, ANDROID_PRIORITY_AUDIO)
+}@NuPlayer.cpp
+
+//创建并初始化codec. player.start时
+instantiateDecoder-->(*decoder)->configure(format)@NuPlayer.cpp-->configure@NuPlayerDecoderBase.cpp
+-->onConfigure(const sp<AMessage> &format){
+ //获取mime类型,判断时audio还是video
+- format->findString("mime", &mime)
+- mIsAudio = !strncasecmp("audio/", mime.c_str(), 6)
+- mIsVideoAVC = !strcasecmp(MEDIA_MIMETYPE_VIDEO_AVC, mime.c_str())
+ //codec
+- sp<MediaCodec> mCodec = MediaCodec::CreateByType(mCodecLooper, mime.c_str(), false /* encoder */)
+- mCodec->configure(format,mSurface) //surface
+  //设置回调，MediaCodec通知NuPlayerCodec
+- sp<AMessage> reply = new AMessage(kWhatCodecNotify, this)
+- mCodec->setCallback(reply)
+- mCodec->start()
+}@NuPlayerDecoder.cpp
+
+
+//设置surface
+setVideoSurface(surface)@NuPlayer.cpp-->setVideoSurface(const sp<Surface> &surface)-->
+mCodec->setSurface(surface)@NuPlayer.cpp-->setSurface@MediaCodec.cpp
+
+
+onInputBufferFetched-->queueInputBuffer
+
+//MediaCodec通知需要数据进行解码
+onInputBufferAvailable-->msg->post()@MediaCodec.cpp-->
+onMessageReceived(kWhatCodecNotify){
+- msg->findInt32("callbackID", &cbID)
+  switch(cbID)
+- MediaCodec::CB_INPUT_AVAILABLE:{
+	- msg->findInt32("index", &index)
+	- handleAnInputBuffer(index)
+	}@MediaCodec.cpp
+}@NuPlayerDecoder.cpp
+
+
+NuPlayer::Decoder::handleAnInputBuffer(size_t index){
+- 
+- onRequestInputBuffers@NuPlayerDecoderBase.cpp-->doRequestBuffers-->fetchInputData@NuPlayerDecoder.cpp
+	-->mSource->dequeueAccessUnit@GenericSource.cpp
+}@NuPlayerDecoder.cpp
+
+fetchInputData(sp<AMessage> &reply){
+- mSource->dequeueAccessUnit(mIsAudio, &accessUnit)
+- if (mCCDecoder != NULL) mCCDecoder->decode(accessUnit)
+- reply->setBuffer("buffer", accessUnit)
+}@NuPlayerDecoder.cpp
+
+
+//MediaCodec通知数据解码完成
+NuPlayer::Decoder::handleAnOutputBuffer{
+
+}
+
+
+
+NuPlayer::Decoder::onMessageReceived(const sp<AMessage> &msg){
+  //收到MediaCodec通知
+- kWhatCodecNotify{
+	- CB_INPUT_AVAILABLE: handleAnInputBuffer(index)
+	- CB_OUTPUT_AVAILABLE: handleAnOutputBuffer(index, offset, size, timeUs, flags)
+	}
+- kWhatSetVideoSurface{
+	- mCodec->setSurface(surface)
+	- nativeWindowConnect(mSurface.get(), "kWhatSetVideoSurface(mSurface)")
+	}
+}
+
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerDecoder.cpp
+

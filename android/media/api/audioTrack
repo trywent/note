@@ -13,7 +13,24 @@ AudioTrack@AudioTrack.java-->native_setup-->android_media_AudioTrack_native_setu
 }@android_media_AudioTrack.cpp
 
 
-AudioTrack::AudioTrack-->set(sharedBuffer){
+AudioTrack::AudioTrack(
+        audio_stream_type_t streamType,
+        uint32_t sampleRate,
+        audio_format_t format,
+        audio_channel_mask_t channelMask,
+        size_t frameCount,
+        audio_output_flags_t flags,
+        callback_t cbf,
+        void* user,
+        int32_t notificationFrames,
+        audio_session_t sessionId,
+        transfer_type transferType,
+        const audio_offload_info_t *offloadInfo,
+        uid_t uid,
+        pid_t pid,
+        const audio_attributes_t* pAttributes,
+        bool doNotReconnect,
+        float maxRequiredSpeed)-->set(sharedBuffer){
 - 检查参数，获取参数
 - 获取output，AudioSystem::getOutput-->aps->getOutput
 - 设置采样率，格式，channel
@@ -30,40 +47,50 @@ AudioTrack::AudioTrack-->set(sharedBuffer){
 }@AudioTrack.cpp
 
 //android8.0
-AudioTrack::set{
-- 
-- AudioTrackThread
+AudioTrack::set(
+        audio_stream_type_t streamType,
+        uint32_t sampleRate,
+        audio_format_t format,
+        audio_channel_mask_t channelMask,
+        size_t frameCount,
+        audio_output_flags_t flags,
+        callback_t cbf,
+        void* user,
+        int32_t notificationFrames,
+        const sp<IMemory>& sharedBuffer/*为空*/){
+- mCbf = cbf
+- mUserData = user //传入回调
+- if(cbf!=NULL){
+	  //用于处理播放数据
+	- mAudioTrackThread = new AudioTrackThread(*this, threadCanCallJava){
+		- mReceiver(receiver/*AudioTrack*/)
+		- mPaused(true)
+		- mPausedInt(false)
+		}
+	- mAudioTrackThread->run("AudioTrack", ANDROID_PRIORITY_AUDIO)
+	}
 - createTrack_l{
-	- AudioSystem::getOutputForAttr(&output)-->aps->getOutputForAttr{//获取output
-		- strategy = getStrategyForAttr(&attributes)//获取策略
-		- device = getDeviceForStrategy(strategy)
-		- getOutputForDevice(device)
-		}@AudioPolicyManager.cpp
-	- audioFlinger->createTrack
+	- audio_config_t config = AUDIO_CONFIG_INITIALIZER
+	- AudioSystem::getOutputForAttr(attr, &output, mSessionId, &streamType, mClientUid,&config)
+	- sp<IAudioTrack> track = audioFlinger->createTrack(streamType,mSampleRate,mFormat,mChannelMask)
+	  //audioFlinger端track信息
+	- sp<IMemory> iMem = track->getCblk()
+	- void *iMemPointer = iMem->pointer()
+	- mAudioTrack = track
+	- audio_track_cblk_t* mCblk = cblk = static_cast<audio_track_cblk_t*>(iMemPointer)
+	  //应用没有提供共享内存
+	- if (mSharedBuffer == 0){
+		-mProxy = new AudioTrackClientProxy(cblk, buffers, frameCount, mFrameSize)	
+		}
 	}
 }
 
+//音量
+setStereoVolume-->native_setVolume@AudioTrack.java-->android_media_AudioTrack_set_volume
+@android_media_AudioTrack.cpp-->setVolume-->mProxy->setVolumeLR@AudioTrack.cpp
+mCblk->mVolumeLR@AudioTrackShared.h
 //设置outputdevice
 AudioTrack::setOutputDevice
-
-//write
-write@AudioTrack.java-->native_write_byte-->android_media_AudioTrack_native_write_byte
--->writeToTrack{
-- sharedBuffer为0，直接写入write
-- sharedBuffer不为0，拷贝数据到sharedBuffer
-}@android_media_AudioTrack.cpp
-
-
-AudioTrack::write{
-- 获取buffer，obtainBuffer-->obtainBuffer(Buffer*,timespec)-->obtainBuffer{
-	- 若服务对象dead，重建AudioTrack，restoreTrack_l
-	- 通过代理从获取buffer，proxy->obtainBuffer-->ClientProxy::obtainBuffer
-	}
-- 拷贝数据，memcpy(audioBuffer.i8, buffer)
-- releaseBuffer-->mProxy->releaseBuffer
-}@AudioTrack.cpp
-
-
 
 //play
 play@AudioTrack.java-->native_start-->android_media_AudioTrack_start-->
@@ -71,8 +98,6 @@ lpTrack->start@android_media_AudioTrack.cpp-->start-->mAudioTrack->start@AudioTr
 -->AudioFlinger::TrackHandle::start@AudioFlinger.cpp-->mTrack->start@Tracks.cpp-->
 start-->playbackThread->addTrack_l@Track.cpp-->AudioSystem::startOutput@Threads.cpp
 
-
-//
 start{
 - 设置状态，mState
 - 设置播放位置，mNewPosition
@@ -90,13 +115,37 @@ stop{
 	-->设置状态mState = STOPPED@Track.cpp
 }@AudioTrack.cpp
 
-//回调通知AudioTrack.java
-AudioTrack::AudioTrackThread::threadLoop-->AudioTrack::processAudioBuffer
+//write
+write(byte[] audioData, int offsetInBytes, int sizeInBytes)@AudioTrack.java-->
+native_write_byte-->android_media_AudioTrack_writeArray
+-->writeToTrack{
+- if (track->sharedBuffer() == 0) {//mSharedBuffer为空走这里
+	- track->write(data)
+  }else{
+	- memcpy(track->sharedBuffer()->pointer(), data)
+  }	
+}@android_media_AudioTrack.cpp
 
-//音量
-setStereoVolume-->native_setVolume@AudioTrack.java-->android_media_AudioTrack_set_volume
-@android_media_AudioTrack.cpp-->setVolume-->mProxy->setVolumeLR@AudioTrack.cpp
-mCblk->mVolumeLR@AudioTrackShared.h
+
+AudioTrack::write(const void* buffer, size_t userSize, bool blocking){
+- 获取buffer，obtainBuffer-->obtainBuffer(Buffer*,timespec)-->obtainBuffer{
+	- 若服务对象dead，重建AudioTrack，restoreTrack_l
+	- 通过代理从获取buffer，proxy->obtainBuffer-->ClientProxy::obtainBuffer
+	}
+- 拷贝数据，memcpy(audioBuffer.i8, buffer)
+- releaseBuffer-->mProxy->releaseBuffer
+}@AudioTrack.cpp
+
+//回调通知AudioTrack.java
+set->mAudioTrackThread->runAudioTrackThread::threadLoop-->
+processAudioBuffer{
+  //获取锁后，获取mCblk->mFlags
+- mLock.lock()
+- int32_t flags = android_atomic_and(~(CBLK_UNDERRUN | CBLK_LOOP_CYCLE | CBLK_LOOP_FINAL | CBLK_BUFFER_END), &mCblk->mFlags)
+- 
+}@AudioTrack.cpp
+
+
 =============
 //mixer
 

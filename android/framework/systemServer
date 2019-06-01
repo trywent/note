@@ -7,25 +7,11 @@ startSystemServer-->Zygote.forkSystemServer-->/*pid=0*/handleSystemServerProcess
   //类/system/framework/services.jar:/system/framework/ethernet-service.jar:/system/framework/wifi-service.jar
 - systemServerClasspath = Os.getenv("SYSTEMSERVERCLASSPATH") 
 - performSystemServerDexOpt(systemServerClasspath)
-- cl = new PathClassLoader(systemServerClasspath
-- RuntimeInit.zygoteInit(cl)-->main
+- cl = new PathClassLoader(systemServerClasspath)
+- RuntimeInit.zygoteInit(cl)-->main-->SystemServer.run
 }@ZygoteInit.java
 
-
--startService(serviceClass){
-- name = serviceClass.getName()
-- constructor = serviceClass.getConstructor(Context.class)
-- service = constructor.newInstance(mContext)
-- startService(service){
-	- mServices.add(service)
-	- service.onStart{ //在这里发布远程服务，本地服务
-		- publishBinderService
-		- publishLocalService
-		}
-	}
-}SystemServiceManager.java
-
-//启动服务
+//SystemServer启动
 main-->SystemServer().run{
 - mSystemServiceManager = new SystemServiceManager(mSystemContext)
 - createSystemContext(){//创建系统上下文
@@ -38,6 +24,20 @@ main-->SystemServer().run{
 }@SystemServer.java
 
 
+startService(serviceClass){
+- name = serviceClass.getName()
+- constructor = serviceClass.getConstructor(Context.class)
+- service = constructor.newInstance(mContext)
+- startService(service){
+	- mServices.add(service)
+	- service.onStart{ //在这里发布远程服务，本地服务
+		- publishBinderService
+		- publishLocalService
+		}
+	}
+}SystemServiceManager.java
+
+//
 startBootstrapServices{
 - SystemServerInitThreadPool.get().submit(SystemConfig::getInstance)//加载系统配置/system/etc/permissions
 - mSystemServiceManager.startService(Installer.class)
@@ -65,8 +65,10 @@ frameworks/base/services/core/java/com/android/server/SystemServiceManager.java
 frameworks/base/services/core/java/com/android/server/SystemService.java
 frameworks/base/services/core/jni/com_android_server_SystemServer.cpp
 
-====================
-//本地服务LocalServices
+/*
+ 本地服务LocalServices
+
+*/
 addService-->sLocalServiceObjects.put(type, service)@LocalServices.java
 
 getService-->sLocalServiceObjects.get(type)@LocalServices.java

@@ -1,6 +1,6 @@
 //二极管
 
-//三极管
+
 /*
 电子三极管 Triode （俗称电子管的一种）
 */
@@ -19,3 +19,12 @@ J型场效应管 Junction gate FET（Field Effect Transistor）
 V型槽场效应管 VMOS （Vertical Metal Oxide Semiconductor ）
 
 */
+
+
+
+/*
+
+*/
+dB是一个无量纲的的单位，是因为数字太大，而用取对数后再乘10来表示。
+dBV是电压单位，表示以V计数的电压取对数乘20。比如说0.1V的电压，就是20*lg0.1 = -20dBV。
+dBm是功率单位，表示以mW计数的功率取对数乘10，0.1mW就是10*lg0.1 =-10dBm

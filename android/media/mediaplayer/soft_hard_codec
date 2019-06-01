@@ -1,0 +1,77 @@
+/*
+ 软解
+*/
+
+static const struct {
+    const char *mName;
+    const char *mLibNameSuffix;
+    const char *mRole;
+
+} kComponents[] = {
+    { "OMX.google.ffmpeg.decoder", "ffmpegdec", "audio_decoder.ffmpeg" },
+    { "OMX.google.aac.decoder", "aacdec", "audio_decoder.aac" },
+    { "OMX.google.aac.encoder", "aacenc", "audio_encoder.aac" },
+    { "OMX.google.amrnb.decoder", "amrdec", "audio_decoder.amrnb" },
+    { "OMX.google.amrnb.encoder", "amrnbenc", "audio_encoder.amrnb" },
+    { "OMX.google.amrwb.decoder", "amrdec", "audio_decoder.amrwb" },
+    { "OMX.google.amrwb.encoder", "amrwbenc", "audio_encoder.amrwb" },
+    { "OMX.google.h264.decoder", "avcdec", "video_decoder.avc" },
+    { "OMX.google.h264.encoder", "avcenc", "video_encoder.avc" },
+    { "OMX.google.hevc.decoder", "hevcdec", "video_decoder.hevc" },
+    { "OMX.google.g711.alaw.decoder", "g711dec", "audio_decoder.g711alaw" },
+    { "OMX.google.g711.mlaw.decoder", "g711dec", "audio_decoder.g711mlaw" },
+    { "OMX.google.mpeg2.decoder", "mpeg2dec", "video_decoder.mpeg2" },
+    { "OMX.google.h263.decoder", "mpeg4dec", "video_decoder.h263" },
+    { "OMX.google.h263.encoder", "mpeg4enc", "video_encoder.h263" },
+    { "OMX.google.mpeg4.decoder", "mpeg4dec", "video_decoder.mpeg4" },
+    { "OMX.google.mpeg4.encoder", "mpeg4enc", "video_encoder.mpeg4" },
+    { "OMX.google.mp3.decoder", "mp3dec", "audio_decoder.mp3" },
+    { "OMX.google.vorbis.decoder", "vorbisdec", "audio_decoder.vorbis" },
+    { "OMX.google.opus.decoder", "opusdec", "audio_decoder.opus" },
+    { "OMX.google.vp8.decoder", "vpxdec", "video_decoder.vp8" },
+    { "OMX.google.vp9.decoder", "vpxdec", "video_decoder.vp9" },
+    { "OMX.google.vp8.encoder", "vpxenc", "video_encoder.vp8" },
+    { "OMX.google.vp9.encoder", "vpxenc", "video_encoder.vp9" },
+    { "OMX.google.raw.decoder", "rawdec", "audio_decoder.raw" },
+    { "OMX.google.flac.decoder", "flacdec", "audio_decoder.flac" },
+    { "OMX.google.flac.encoder", "flacenc", "audio_encoder.flac" },
+    { "OMX.google.gsm.decoder", "gsmdec", "audio_decoder.gsm" },
+}
+
+frameworks/av/media/libstagefright/omx/SoftOMXPlugin.cpp
+/*
+ sprd 硬解
+*/
+
+static const struct {
+    const char *mName;
+    const char *mLibNameSuffix;
+    const char *mRole;
+
+} kComponents[] = {
+    { "OMX.google.ffmpeg.decoder","soft_ffmpegdec","audio_decoder.ffmpeg"},
+    { "OMX.sprd.h263.decoder", "sprd_mpeg4dec", "video_decoder.h263" },
+    { "OMX.sprd.mpeg4.decoder", "sprd_mpeg4dec", "video_decoder.mpeg4" },
+    { "OMX.sprd.h264.decoder", "sprd_h264dec", "video_decoder.avc" },
+    { "OMX.sprd.mp3.decoder", "sprd_mp3dec", "audio_decoder.mp3" },
+    { "OMX.sprd.mp3l1.decoder", "sprd_mp3dec", "audio_decoder.mp1" },
+    { "OMX.sprd.mp3l2.decoder", "sprd_mp3dec", "audio_decoder.mp2" },
+    { "OMX.sprd.mp3.encoder", "sprd_mp3enc", "audio_encoder.mp3" },
+    { "OMX.sprd.h264.encoder", "sprd_h264enc", "video_encoder.avc" },
+    { "OMX.google.mjpg.decoder", "soft_mjpgdec", "video_decoder.mjpg" },
+    { "OMX.google.imaadpcm.decoder", "soft_imaadpcmdec", "audio_decoder.imaadpcm" },
+#ifndef PLATFORM_SHARKLE
+    { "OMX.sprd.mpeg4.encoder", "sprd_mpeg4enc", "video_encoder.mpeg4" },
+    { "OMX.sprd.h263.encoder", "sprd_mpeg4enc", "video_encoder.h263" },
+#if (defined PLATFORM_SHARKL3 || defined PLATFORM_SHARKL2 || defined PLATFORM_ISHARKL2)
+    { "OMX.sprd.vpx.decoder", "sprd_vpxdec", "video_decoder.vp8" },
+#endif
+#ifdef PLATFORM_SHARKL3
+    { "OMX.sprd.hevc.decoder", "sprd_h265dec", "video_decoder.hevc" },
+    { "OMX.sprd.vp9.decoder", "sprd_vp9dec", "video_decoder.vp9" },
+    { "OMX.sprd.h265.encoder", "sprd_h265enc", "video_encoder.hevc" },
+#endif
+#endif
+}
+
+vendor/sprd/modules/media/omx_core/sprd_omx_core.cpp

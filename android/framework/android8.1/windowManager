@@ -15,9 +15,9 @@ WindowManagerService{
 
 }@WindowManagerService.java
 
-
+getActivityDisplayOrCreateLocked(int displayId)@ActivityStackSupervisor.java-->
 onDisplayAdded(displayId){
-- display = mDisplayManager.getDisplay(displayId)
+- Display display = mDisplayManager.getDisplay(displayId)
 - createDisplayContentLocked-->mRoot.getDisplayContentOrCreate-->
 	createDisplayContent{
 	- dc = new DisplayContent
@@ -60,8 +60,23 @@ relayoutWindow-->createSurfaceControl(Surface outSurface,WindowState win,WindowS
 
 =====================
 /*
-应用设置方位
+ 屏幕显示方位
+ 方位定义：@ActivityInfo
+ 	SCREEN_ORIENTATION_UNSET = -2;
+	SCREEN_ORIENTATION_UNSPECIFIED = -1;
+	SCREEN_ORIENTATION_LANDSCAPE = 0;
+	SCREEN_ORIENTATION_PORTRAIT = 1;
+	SCREEN_ORIENTATION_USER = 2;
+	SCREEN_ORIENTATION_BEHIND = 3;
+	SCREEN_ORIENTATION_SENSOR = 4;
+	SCREEN_ORIENTATION_NOSENSOR = 5;
+
+ 旋转角度：
+ 
+
 */
+
+//应用设置方位
 setRequestedOrientation@ActivityManagerService.java-->setRequestedOrientation{
 - displayConfig = mStackSupervisor.getDisplayOverrideConfiguration
 - mWindowContainerController.setOrientation(requestedOrientation){ //设置方位
@@ -80,7 +95,7 @@ updateOrientationFromAppTokens-->updateOrientationFromAppTokensLocked(currentCon
 	}
 }
 
-//更新窗口方位.先根据非应用窗口计算,然后再计算应用窗口
+//应用触发窗口方位更新.先根据非应用窗口计算,然后再计算应用窗口
 updateOrientationFromAppTokensLocked{
 - DisplayContent dc = mRoot.getDisplayContent(displayId)
 - req = dc.getOrientation{
@@ -89,7 +104,7 @@ updateOrientationFromAppTokensLocked{
 	- 返回 mTaskStackContainers.getOrientation //应用窗口
 	}
 - req!=dc.getLastOrientation(){//方位发生变化
-	- dc.setLastOrientation(req) //更新最后一次方位
+	- dc.setLastOrientation(req) //记录最后一次方位
 	- mPolicy.setCurrentOrientationLw(req){
 		- mCurrentAppOrientation =req //设置app方位	
 		- updateOrientationListenerLp
@@ -100,7 +115,7 @@ updateOrientationFromAppTokensLocked{
 
 
 
-//传感器更新方位
+//传感器触发方位更新
 updateRotation(false)@PhoneWindowManager-->updateRotation-->
 updateRotationUnchecked{
 - displayContent = getDefaultDisplayContentLocked
@@ -117,11 +132,11 @@ updateOrientationListenerLp{
 - mOrientationListener.disable
 }@PhoneWindowManager.java
 
-
-rotationForOrientationLw{//从传感器获取方位
+//根据当前方位，当前旋转角度。计算新的旋转角度0,90,180,270
+rotationForOrientationLw(int orientation, int lastRotation) {
 - mOrientationListener.getProposedRotation() //获取传感器方位
 - preferredRotation
-}
+}@PhoneWindowManagerPolicy.java
 
 //最终调用位置,更新方位
 updateRotationUnchecked{

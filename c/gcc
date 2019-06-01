@@ -1,4 +1,7 @@
-//
+/*
+ gcc -v 版本
+ gcc -h 帮助
+*/
 configure --enable-checking=release --enable-languages=c,c++ --disable-multilib  --prefix=install/dir
 
 

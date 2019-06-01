@@ -1,0 +1,19 @@
+/*
+
+*/
+
+BufferQueue::createBufferQueue(sp<IGraphicBufferProducer>* outProducer,
+	sp<IGraphicBufferConsumer>* outConsumer, bool consumerIsSurfaceFlinger) {
+- sp<BufferQueueCore> core(new BufferQueueCore())
+- sp<IGraphicBufferProducer> producer(new BufferQueueProducer(core, consumerIsSurfaceFlinger))
+- sp<IGraphicBufferConsumer> consumer(new BufferQueueConsumer(core))
+- *outProducer = producer
+- *outConsumer = consumer
+}@BufferQueue.cpp
+
+
+
+
+frameworks/native/libs/gui/BufferQueue.cpp
+frameworks/native/libs/gui/BufferQueueProducer.cpp
+frameworks/native/libs/gui/BufferQueueConsumer.cpp

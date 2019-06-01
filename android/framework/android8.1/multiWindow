@@ -9,15 +9,25 @@ android:supportsPictureInPicture=["true" | "false"]
 
 */
 
-
+public void resizeStack(int stackId, Rect destBounds)
+public void resizeDockedStack(Rect dockedBounds)
+public void resizePinnedStack(Rect pinnedBounds)
 /******************************
  split-screen
 
 */
-public void resizeStack(int stackId, Rect destBounds)
-public void resizeDockedStack(Rect dockedBounds)
-public void resizePinnedStack(Rect pinnedBounds)
 
+//是否支持分屏
+supportsMultiWindow@ActivityManager.java
+
+//进入分屏
+moveTaskToDockedStack(int taskId, int createMode, boolean toTop, boolean animate,Rect initialBounds){
+- TaskRecord task = mStackSupervisor.anyTaskForIdLocked(taskId)
+- mWindowManager.setDockedStackCreateState(createMode, initialBounds)
+}@ActivityManagerService.java
+
+
+//divider
 
 /******************************
  PIP(picture in picture): PINNED_STACK_ID

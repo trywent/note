@@ -26,6 +26,7 @@ MediaCodec{
 - dequeuOutputBuffer(index)/onOutputBufferAvailable //同步/异步
 }
 
+//android4.1 同步模式
 example{
 - MediaCodec codec = MediaCodec.createDecoderByType(type);
 - codec.configure(format, ...);
@@ -57,136 +58,46 @@ example{
 - codec.release();
 }
 
-//MediaCodec================
-MediaCodec::CreateByType(mime){
-//android9.0
-- MediaCodecList::findMatchingCodecs(mime,&componentName){
-	- getInstance{
-		- IMediaPlayerService> service = interface_cast(getService("media.player"))
-		- sRemoteList = service->getCodecList //获取解码list
-		}
-	- list->findCodecByType(mime) //查找对应的几码器
-	- matchs->push(componentName) //保存
-	- 判断是否优先软解并返回
-	}@MediaCodecList.cpp
-- 从查找到的codec中初始化，codec->init(componentName)
-//android 8.1
-- codec = new MediaCodec(looper)
-- codec->init(mime)
-}@MediaCodec.cpp
+//android8.0 异步模式
+ MediaCodec codec = MediaCodec.createByCodecName(name);
+ MediaFormat mOutputFormat; // member variable
+ codec.setCallback(new MediaCodec.Callback() {
+   @Override
+   void onInputBufferAvailable(MediaCodec mc, int inputBufferId) {
+     ByteBuffer inputBuffer = codec.getInputBuffer(inputBufferId);
+     // fill inputBuffer with valid data
+     …
+     codec.queueInputBuffer(inputBufferId, …);
+   }
 
+   @Override
+   void onOutputBufferAvailable(MediaCodec mc, int outputBufferId, …) {
+     ByteBuffer outputBuffer = codec.getOutputBuffer(outputBufferId);
+     MediaFormat bufferFormat = codec.getOutputFormat(outputBufferId); // option A
+     // bufferFormat is equivalent to mOutputFormat
+     // outputBuffer is ready to be processed or rendered.
+     …
+     codec.releaseOutputBuffer(outputBufferId, …);
+   }
 
-init{
-//android9.0
-- mCodec = GetCodecBase{
-	- new ACodec //omx
-	- new MediaFilter //filter
-	}
+   @Override
+   void onOutputFormatChanged(MediaCodec mc, MediaFormat format) {
+     // Subsequent data will conform to new format.
+     // Can ignore if using getOutputFormat(outputBufferId)
+     mOutputFormat = format; // option B
+   }
 
-//android8.1
-- mCodec = GetCodecBase(name)= new　ACodec
-- 视频解码创建新线程,mCodecLooper = new ALooper
-- mCodec->setCallback(CodecCallback)
-- mBufferChannel = mCodec->getBufferChannel()
-- mBufferChannel->setCallback(BufferCallback)
-}@MediaCodec.cpp
-
-//设置surface
-MediaCodec::configure(format,surface){
-- msg = new AMessage(kWhatConfigure)
-- msg->setMessage("format", format)
-- msg->setObject("surface", surface)
-- PostAndAwaitResponse(msg, &response)-->onMessageReceived(kWhatConfigure){
-	- handleSetSurface(surface){
-		- connectToSurface(surface)-->nativeWindowConnect
-		- mSurfcae = surface
-		}
-	- format->setObject("native-window", obj)//发送surface对象到Acodec
-	- mCodec->initiateConfigureComponent
-	}
-}@MediaCodec.cpp
-
-setSurface-->onMessageReceived(kWhatSetSurface){
-- connectToSurface
-- 软解kFlagUsesSoftwareRenderer{
-	- pushBlankBuffersToNativeWindow
-	- 
-	}
-- mCodec->setSurface(surface)
-- disconnectFromSurface
-}@MediaCodec.cpp
-
-getInputBuffers(&buf)/getOutputBuffers-->onMessageReceived(kWhatGetBuffers){
-- mBufferChannel->getInputBufferArray(dstBuffers) //input
-- mBufferChannel->getOutputBufferArray(dstBuffers)//output
-}@MediaCodec.cpp
-
-
-
-allocateBuffers-->allocateBuffersOnPort
-
-
-createPersistentInputSurface@MediaCodec.java-->native_createPersistentInputSurface
--->android_media_MediaCodec_createPersistentInputSurface@android_media_MediaCodec.cpp
-CreatePersistentInputSurface{
-- OMXClient.connect()
-- omx = OMXClient.interface()
-}@MediaCodec.cpp
-
-//ACodec====================
-//状态机管理
-ACodec{ 
-- mUninitializedState = new UninitializedState(this)
-- mLoadedState = new LoadedState(this)
-- mLoadedToIdleState = new LoadedToIdleStat-(this)
-- mIdleToExecutingState = new IdleToExecutingState(this)
-- mExecutingState = new ExecutingState(this)
-- mOutputPortSettingsChangedState =new OutputPortSettingsChangedState(this)
-- mExecutingToIdleState = new ExecutingToIdleState(this)
-- mIdleToLoadedState = new IdleToLoadedState(this)
-- mFlushingState = new FlushingState(this)
-- mVideoPoewerHint = new VideoPowerHintInstance(mIsWFDRunning)
-- changeState(mUninitializedState) //初始状态
-}
-
-initiateSetup-->msg(kWhatSetup)-->UninitializedState::onSetup{
-- onAllocateComponent
-- mCodec->mLoadedState->onConfigureComponent
-- mCodec->mLoadedState->onStart
-}
-
-initiateConfigureComponent-->msg(kWhatConfigureComponent)-->LoadedState::onConfigureComponent-->
-configureCodec{
-- setComponentRole
-- haveNativeWindow = msg->findObject("native-window")//查找是否有窗口
-- haveNativeWindow{
-	- 
-	}
-- video,haveNativeWindow{
-	- mNativeWindow = static_cast<Surface *>(obj.get()) 
-	}
-}
-
-ACodec::setSurface-->/*状态机处理*/onMessageReceived(kWhatSetSurface)-->
-mCodec->handleSetSurface{
--
-- setupNativeWindowSizeFormatAndUsage
-}ACodec.cpp
-
-
-ACodec::UninitializedState::onAllocateComponent{
-- 指定componentName{
-	- index = MediaCodecList::getInstance()->findCodecByName(componentName)
-	- matchingCodecs.add
-	}
-- 没有指定componentName,MediaCodecList::findMatchingCodecs
-- sp<IOMXNode> omxNode,OMXClient client
-- sp<IOMX> omx = client.interface()
-- client.connect //连接到Omx服务
-- omx->allocateNode(componentName.c_str(), observer, &omxNode) //从Omx获取codec.保存到omxNode
-}
-
-
+   @Override
+   void onError(…) {
+     …
+   }
+ });
+ codec.configure(format, …);
+ mOutputFormat = codec.getOutputFormat(); // option B
+ codec.start();
+ // wait for processing to complete
+ codec.stop();
+ codec.release();
 
 frameworks/base/media/java/android/media/MediaCodec.java
 frameworks/base/media/jni/android_media_MediaCodec.cpp

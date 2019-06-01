@@ -16,7 +16,7 @@ onCreate{
 - this.registerReceiver(recentTaskReceiver,REMOVE_ALL_RECENT_TASKS)
 }@SystemUIService.java
 
-
+//所有服务保存在mComponents中。可以动态获取
 startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
 - 遍历SERVICES{
             Dependency.class,
@@ -36,6 +36,9 @@ startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
 - mServices[i].mComponents = mComponents //所有服务共享一个mComponents
 - Dependency.get(PluginManager.class).addPluginListener
 }@SystemUIApplication.java
+
+
+
 =======================
 /*Dependency
   大量工具类的实例加入到这里方便获取?
@@ -54,7 +57,9 @@ CommandQueueStart.start-->putComponent(CommandQueue.class, new CommandQueue())
 frameworks/base/packages/SystemUI/src/com/android/systemui/Dependency.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
 =======================
-//statusBar窗口：
+/* 
+ statusBar窗口：
+*/
 super_status_bar{
 status_bar.xml{
 - notification_lights_out
@@ -79,7 +84,6 @@ SystemBars.start-->createStatusBarFromConfig(config_statusBarComponent/*获取ba
 }@StatusBar.java
 
 }@SystemBars.java
-
 
 
 //创建statusBar,NaviBar
@@ -154,7 +158,9 @@ setIcon@StatusBarManager.java-->setIcon@StatusBarManagerService.java-->
 (通过IStatusBar设置)mBar.setIcon-->setIcon@CommandQueue.java-->updateIcon@TabletStatusBar.java
 
 =======================
-//NavigationBar
+/*
+ NavigationBar
+*/
 NavigationBarFragment.create{ //创建导航条
 - WindowManager.LayoutParams lp = new WindowManager.LayoutParams //布局参数
 - View navigationBarView = inflate(R.layout.navigation_bar_window)//导航条view
@@ -196,15 +202,58 @@ InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
 
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarInflaterView.java
-
-
-
 =======================
-//Recents：
+/*
+ Divider
+*/
+
+public void start() {
+- mWindowManager = new DividerWindowManager(mContext);
+  //加入view
+- update(mContext.getResources().getConfiguration()){
+	- addDivider(configuration)
+	}
+- putComponent(Divider.class, this);
+  //监听分屏状态
+- mDockDividerVisibilityListener = new DockDividerVisibilityListener();
+- SystemServicesProxy ssp = Recents.getSystemServices();
+- ssp.registerDockedStackListener(mDockDividerVisibilityListener)
+- mForcedResizableController = new ForcedResizableInfoActivityController(mContext)
+}@Divider.java
+
+addDivider@Divider.java-->
+add(View view, int width, int height){
+- WindowManager.LayoutParams mLp = new WindowManager.LayoutParams(width, height, TYPE_DOCK_DIVIDER)
+- mWindowManager.addView(view, mLp)
+}@DividerWindowManager.java
+
+//移动divider，调整分屏大小
+onTouch(View v, MotionEvent event) {
+- MotionEvent.ACTION_DOWN
+- MotionEvent.ACTION_MOVE{
+	- SnapTarget snapTarget = getSnapAlgorithm().calculateSnapTarget
+	- resizeStackDelayed(calculatePosition(x, y), mStartPosition, snapTarget)-->resizeStack
+	}
+- MotionEvent.ACTION_UP
+  MotionEvent.ACTION_CANCEL{
+	- stopDragging
+	}
+}@DividerView.java
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/Divider.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/DividerWindowManager.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/DividerView.java
+=======================
+/*
+ Recents：
+*/
 start{
 - sTaskLoader = new RecentsTaskLoader(mContext)
+- mHandler = new Handler()
+- mImpl = new RecentsImpl(mContext)
 - putComponent(Recents.class, this)
 }@Recents.java
+
 
 prepareNavigationBarView-->recentsButton.setOnClickListener(this::onRecentsClick)
 -->mCommandQueue.toggleRecentApps@NavigationBarFragment.java-->msg.sendToTarget(MSG_TOGGLE_RECENT_APPS)
@@ -214,6 +263,14 @@ toggleRecentApps{
 - startActivitySafely(intent)
 }@Rcents.java
 
+
+toggleRecentApps{
+  //systemUser
+- mImpl.toggleRecents(growTarget)
+  //非systemUser
+- IRecentsNonSystemUserCallbacks callbacks = mSystemToUserCallbacks.getNonSystemUserRecentsForUser(currentUser)
+- callbacks.toggleRecents(growTarget)
+}@Recents.java
 //最近任务视图
 onCreate{
 - SystemServicesProxy ssp = Recents.getSystemServices()
@@ -282,7 +339,9 @@ pickUpViewFromPool{
 
 frameworks/base/packages/SystemUI/src/com/android/systemui/recents/Recents.java
 =======================
-//quickSetting
+/*
+ quickSetting
+*/
 
 
 
@@ -298,8 +357,9 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/Rota
 frameworks/base/packages/SystemUI/src/com/android/systemui/qs/tiles/RotationLockTile.java
 frameworks/base/core/java/com/android/internal/view/RotationPolicy.java
 =======================
-
-//信号图标
+/* 
+ 信号图标
+*/
 onFinishInflate{
 //初始化并设置所有图标的view
 - mWifiSignalSpacer

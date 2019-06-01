@@ -1,0 +1,211 @@
+/*************************
+ source 提供数据
+ 获取源文件track信息,创建track
+ 读取track数据
+ 通知player
+
+*/
+0 //创建source 
+setDataSourceAsync@NuPlayer-->
+GenericSource::GenericSource:
+ Source(notify)mNotify(notify)
+ mUID(uid)
+ mFd(-1){
+- mBufferingMonitor = new BufferingMonitor(notify)//notify发送消息到NuPlayer
+- resetDataSource
+}@GenericSource.cpp
+
+setDataSourceAsync@NuPlayer.cpp-->setDataSource(int fd, int64_t offset, int64_t length){
+- mFd = dup(fd)
+- mOffset = offset
+}@GenericSource.cpp
+
+1//prepare
+prepareAsync@NuPlayerDriver.cpp-->prepareAsync-->mSource->prepareAsync@NuPlayer.cpp-->
+NuPlayer::GenericSource::prepareAsync{
+- mLooper = new ALooper;
+- mLooper->setName("generic")
+- mLooper->start()
+- mLooper->registerHandler(this)
+ //
+- sp<AMessage> msg = new AMessage(kWhatPrepareAsync, this)
+- msg->post()-->onPrepareAsync
+}@GenericSource.cpp
+
+onPrepareAsync{
+  //根据mUri,mFd 创建mDataSource
+- mUri{
+	- 检查uri是否"http"
+	- mDataSource = DataSource::CreateFromURI
+	}
+- mFd{
+	- mediaExService(getService(String16("media.extractor")) //获取extractor
+	- sp<IDataSource> source = mediaExService->makeIDataSource(mFd, mOffset, mLength)
+	- mDataSource = DataSource::CreateFromIDataSource(source)
+	}
+  //创建extrator,获取数据
+- initFromDataSource
+- finishPrepareAsync{
+	- startSources{
+		- mAudioTrack.mSource->start()
+		- mVideoTrack.mSource->start()
+		}
+	- mBufferingMonitor->prepare(mCachedSource, mDurationUs, mBitrate,mIsStreaming)
+	- mBufferingMonitorLooper = new ALooper
+	- mBufferingMonitorLooper->start()
+	- mBufferingMonitorLooper->registerHandler(mBufferingMonitor) //监听buffer?
+	- mBufferingMonitor->restartPollBuffering()
+	}
+}@GenericSource.cpp
+
+//创建DataSource
+DataSource::CreateFromIDataSource(source)-->{
+- source = new CallbackDataSource(source){
+	- mIDataSource(binderDataSource)
+	- mMemory = mIDataSource->getIMemory()
+	}
+- return new TinyCacheSource(source){
+	- mSource(source)
+	}
+}@DataSource.cpp
+
+//从DataSource获取音频视频数据信息,初始化音视频track
+initFromDataSource{
+- sp<IMediaExtractor> extractor = MediaExtractor::Create(mDataSource, NULL){
+	- mediaExService(defaultServiceManager()->getService(String16("media.extractor")))
+	- sp<IMediaExtractor> ex = mediaExService->makeExtractor(source->asIDataSource(), mime)
+	}@MediaExtractor.cpp
+- mFileMeta = extractor->getMetaData()
+  //时长
+- mFileMeta->findInt64(kKeyDuration, &duration)
+  //从文件中获取音频,视频
+- size_t numtracks = extractor->countTracks()
+- size_t maxBuffers = 1
+  //创建track
+- for (size_t i = 0; i < numtracks; ++i){
+	- sp<IMediaSource> track = extractor->getTrack(i)
+	- sp<MetaData> meta = extractor->getTrackMetaData(i
+	- meta->findCString(kKeyMIMEType, &mime) //获取数据类型.音频,视频
+	- if (!strncasecmp(mime, "audio/", 6)) {
+		- mAudioTrack.mIndex = i
+		- mAudioTrack.mSource = track
+		- mAudioTrack.mPackets = new AnotherPacketSource(mAudioTrack.mSource->getFormat())
+		}
+	- if (!strncasecmp(mime, "video/", 6)) {
+		- mVideoTrack.mIndex = i
+		- mVideoTrack.mSource = track
+		- mVideoTrack.mPackets = new AnotherPacketSource(mVideoTrack.mSource->getFormat())
+		}
+	- mSources.push(track)
+	}
+}@GenericSource.cpp
+
+
+2//start 开始读取音视频数据
+NuPlayer::onStart-->mSource->start()@NuPlayer.cpp-->
+start(){
+  //读取数据
+- postReadBuffer(MEDIA_TRACK_TYPE_AUDIO){
+	- sp<AMessage> msg = new AMessage(kWhatReadBuffer, this)
+	- msg->setInt32("trackType", trackType)
+	- msg->post()-->onMessageReceived-->onReadBuffer
+	}
+- postReadBuffer(MEDIA_TRACK_TYPE_VIDEO)
+- mStarted = true
+  //监听读取数据
+- (new AMessage(kWhatStart, this))->post()-->mBufferingMonitor->restartPollBuffering()
+}
+
+
+//开始读取数据
+onReadBuffer(const sp<AMessage>& msg){
+- msg->findInt32("trackType", &tmpType)
+- media_track_type trackType = (media_track_type)tmpType
+  //读取数据
+- readBuffer(trackType){
+- Track *track
+- switch (trackType) {
+        - MEDIA_TRACK_TYPE_VIDEO
+            track = &mVideoTrack
+            maxBuffers = 8  // too large of a number may influence seeks
+        - MEDIA_TRACK_TYPE_AUDIO
+            track = &mAudioTrack
+            maxBuffers = 64
+        - MEDIA_TRACK_TYPE_SUBTITLE
+            track = &mSubtitleTrack
+        - MEDIA_TRACK_TYPE_TIMEDTEXT
+            track = &mTimedTextTrack
+	}
+  //读取maxBuffers数据后，
+- for (size_t numBuffers = 0; numBuffers < maxBuffers; ) {
+	 //读取maxBuffers数据
+	- Vector<MediaBuffer *> mediaBuffers
+	- MediaBuffer *mbuf = NULL
+	- track->mSource->readMultiple(&mediaBuffers) //track->mSource->read(&mbuf, &options)
+	- mediaBuffers.push_back(mbuf)
+	 //遍历查找所有buffer中kKeyTime'time'
+	- size_t count = mediaBuffers.size()
+	- for (; id < count; ++id){
+	 - MediaBuffer *mbuf = mediaBuffers[id]
+	 - mbuf->meta_data()->findInt64(kKeyTime, &timeUs)
+	 - mBufferingMonitor->updateQueuedTime(true/false /* isAudio */, timeUs) //根据音视频数据时间
+	 //加入队列
+	 - queueDiscontinuityIfNeeded //非连续播放。快进
+	 - sp<ABuffer> buffer = mediaBufferToABuffer(mbuf, trackType){
+		-sp<ABuffer> ab = new ABuffer(outLength)
+		- memcpy(ab->data(),(const uint8_t *)mb->data())
+		}
+	 - track->mPackets->queueAccessUnit(buffer){
+		- mBuffers.push_back(buffer)//加入buffer
+		- mCondition.signal() //发送信号
+		}@AnotherPacketSource.cpp
+	 }
+	}
+}
+}@GenericSource.cpp
+
+NuPlayer::GenericSource::dequeueAccessUnit(bool audio, sp<ABuffer> *accessUnit){
+- if (isSeeking()) return -EWOULDBLOCK
+  //判读是否有数据读取,没有则读取数据
+- if(!track->mPackets->hasBufferAvailable(&finalResult)){
+	- if (finalResult == OK) {postReadBuffer(audio ? MEDIA_TRACK_TYPE_AUDIO : MEDIA_TRACK_TYPE_VIDEO))}
+	}
+  //读取数据
+- status_t result = track->mPackets->dequeueAccessUnit(accessUnit)-->
+	dequeueAccessUnit(sp<ABuffer> *buffer) {
+	- *buffer = *mBuffers.begin()
+	- mBuffers.erase(mBuffers.begin())
+	}@AnotherPacketSource.cpp
+  //剩余数据太少，读取数据
+- if (track->mPackets->getAvailableBufferCount(&finalResult) < 2) {
+	- postReadBuffer(audio? MEDIA_TRACK_TYPE_AUDIO : MEDIA_TRACK_TYPE_VIDEO)
+	}
+  //获取其它数据，字幕
+- sp<AMessage> msg = new AMessage(kWhatFetchSubtitleData, this)
+  msg.post
+- sp<AMessage> msg = new AMessage(kWhatFetchTimedTextData, this)
+  msg.post
+}@GenericSource.cpp
+
+
+
+//处理消息
+onMessageReceived{
+- kWhatPrepareAsync{
+	- 
+	}
+- kWhatStart:
+  kWhatResume:{
+        - mBufferingMonitor->restartPollBuffering();
+	}
+  //读取数据
+- kWhatReadBuffer:{
+	- onReadBuffer(msg)
+	}
+}
+
+frameworks/av/media/libmediaplayerservice/nuplayer/GenericSource.cpp
+frameworks/av/media/libstagefright/DataSource.cpp
+frameworks/av/media/libstagefright/CallbackDataSource.cpp
+frameworks/av/media/libstagefright/MediaExtractor.cpp
+frameworks/av/media/libstagefright/mpeg2ts/AnotherPacketSource.cpp

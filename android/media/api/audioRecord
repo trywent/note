@@ -51,18 +51,18 @@ AudioRecord::AudioRecord-->set(audio_source_t inputSource, uint32_t sampleRate, 
 	}
   //AudioFlinger端打开录音线程
 - openRecord_l{
-	  //创建RecordThread
+	  //获取input
 	- AudioSystem::getInputForAttr(根据采样率等参数，创建属性)-->aps->getInputForAttr
 		AudioPolicyManager::getInputForAttr{//获取流
-		- getDeviceAndMixForInputSource-->getDeviceForInputSource//获取input设备
+		  ////获取audio_devices_t
+		- audio_devices_t device = getDeviceAndMixForInputSource-->getDeviceForInputSource
 			-->mEngine->getDeviceForInputSource
-		- config //设置config 采样率，格式，通道
-		- mInputs中查找可用的input，若找到直接返回（实现多应用同时录音）
-		- mpClientInterface->openInput(config)-->AudioFlinger::openInput-->openInput_l
-		-
+		  //获取input
+		- audio_io_handle_t *input = getInputForDevice(device, address, session, uid, inputSource)
+		- inputDevices = mAvailableInputDevices.getDevicesFromType(device)
 		}
 	- size_t frameCount = mReqFrameCount
-	  //创建RecordTrack
+	  //创建RecordTrack，开始服务端线程读取数据
 	- sp<IAudioRecord> mAudioRecord = audioFlinger->openRecord(input,mSampleRate,mChannelMask,frameCount,iMem,bufferMem){
 		- iMem  //cblk
 		- bufferMem //flinger端mBuffer地址

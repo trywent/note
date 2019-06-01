@@ -1,0 +1,43 @@
+/*
+
+*/
+
+onStart@NuPlayer.cpp-->new Renderer(mAudioSink,notify){
+- 
+}@NuPlayerRenderer.cpp
+
+
+handleAnOutputBuffer@NuPlayerDecorder.cpp-->
+queueBuffer(bool audio,const sp<MediaCodecBuffer> &buffer)-->new AMessage(kWhatQueueBuffer, this)->post()-->
+onQueueBuffer(const sp<AMessage> &msg){
+- msg->findObject("buffer", &obj)
+- sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get())
+- QueueEntry entry
+- entry.mBuffer = buffer
+- if(audio){
+	- mAudioQueue.push_back(entry)
+	- postDrainAudioQueue_l()
+  }else{
+	- mVideoQueue.push_back(entry)
+	- postDrainVideoQueue()
+  }
+}@NuPlayerRenderer.cpp
+
+postDrainAudioQueue_l-->new AMessage(kWhatDrainAudioQueue)->post()-->
+NuPlayer::Renderer::onDrainAudioQueue(
+
+
+onMessageReceived{
+- kWhatDrainAudioQueue:{
+	- onDrainAudioQueue
+	}
+- kWhatDrainVideoQueue:{
+	- onDrainVideoQueue()
+	- postDrainVideoQueue()
+	}
+- kWhatQueueBuffer:{
+	- onQueueBuffer
+	}
+}
+
+frameworks/av/media/libmediaplayerservice/nuplayer/NuPlayerRenderer.cpp

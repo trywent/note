@@ -55,8 +55,7 @@ FOO::fun(int arg)            //FOO::fun(FOO* this,int arg)
 FOO::fun(int arg) const      //FOO::fun(const FOO* this,int arg) 
 
 调用区分当类的对象是const使，调用fun是fun(const this,arg)。其他的是fun(this ,arg)
-__________________________
-引用和指针:
+//引用和指针:
 1.A pointer can be re-assigned any number of times while a reference can not be re-seated after binding.
 2.Pointers can point nowhere (NULL), whereas reference always refer to an object.
 3.You can't take the address of a reference like you can with pointers.
@@ -75,24 +74,45 @@ RAII("Resource Acquisition Is Initialization")。资源初始化后，能够保�
 
 smart pointer: shared_ptr（会对引用进行计数，当没有引用对象时对象被释放）
 
-____________________________
+//C++中，当我们设计与编写一个类时，若不显著写明，则类会默认为我们提供如下几个函数：
+（1）构造函数
+（2）析构函数
+（3）拷贝构造函数
+（4）拷贝赋值函数（operator=）
+（5）移动构造函数
+
+以及全局的默认操作符函数
+（1）operator,
+（2）operator &
+（3）operator &&
+（4）operator *
+（5）operator->
+（6）operator->*
+(7)operator new
+(8)operator delete
+--------------------- 
+作者：lixiaogang_theanswer 
+来源：CSDN 
+原文：https://blog.csdn.net/lixiaogang_theanswer/article/details/81090622 
+版权声明：本文为博主原创文章，转载请附上博文链接！
+//
 成员初始化：
 除了显式的初始化还可默认初始化，成员的默认初始化和函数中变量初始化类似。
 对象类型数据会调用默认的构造方法，没有默认构造方法的会编译出错。
 原始类型数据不会被初始化。引用类型数据不初始化会出错。
 
-____________________________
+//
 类中成员函数最后的const：
 表示该方法不能修改类中的成员(除了声明为mutable的成员)，实际上类中的方法声明包含了类的引用：
 如：Cal::test(int i),实际的结果是test(Cal * this,int i)
     Cal::test(int i) const ，结果是test(const Cal * this,int i)
 
-___________
+//
 重载操作符语法：
 operator +=
 + * / % ^ & | ~ ! = < > += = *= /= %= ^= &= |= << >> >>= <<= == != <=
 >= && || ++ >* , > [] () new new[] delete delete[]
-___________
+//
 1、函数模板的格式：
 template <class 形参名，class 形参名，......> 返回类型 函数名(参数列表)
 {　

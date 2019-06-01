@@ -131,7 +131,7 @@ AudioFlinger::RecordThread::RecordTrack::start{
 - recordThread->start-->RecordThread::start{
 		- recordTrack->mSyncStartEvent = mAudioFlinger->createSyncEvent
 		- mActiveTracks.add(recordTrack)
-		- AudioSystem::startInput(mId, recordTrack->sessionId())
+		- AudioSystem::startInput(mId, recordTrack->sessionId())-->aps->startInput
 	}@Threads.cpp
 }@Tracks.cpp
 
