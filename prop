@@ -27,6 +27,7 @@ sys.fyt.bluetooth_type=1
 ro.fyt.bluetooth_type=1
 
 ############竖屏相关
+ro.lsec.split=true
 #android8.0之前旋转角度设置
 ro.sf.hwrotation=90                                        
 #android8.0旋转角度

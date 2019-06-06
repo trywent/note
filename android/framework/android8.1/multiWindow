@@ -23,11 +23,19 @@ supportsMultiWindow@ActivityManager.java
 //进入分屏
 moveTaskToDockedStack(int taskId, int createMode, boolean toTop, boolean animate,Rect initialBounds){
 - TaskRecord task = mStackSupervisor.anyTaskForIdLocked(taskId)
-- mWindowManager.setDockedStackCreateState(createMode, initialBounds)
+- mWindowManager.setDockedStackCreateState(createMode, initialBounds)-->
+	setDockedStackCreateStateLocked{
+	- mDockedStackCreateMode = mode
+	- mDockedStackCreateBounds = bounds
+	}@WindowManangerService.java
+- task.reparent(DOCKED_STACK_ID, toTop){
+	- 
+	}@TaskRecord.java
 }@ActivityManagerService.java
 
 
-//divider
+//设置栈窗口大小
+setBounds@TaskStack.java
 
 /******************************
  PIP(picture in picture): PINNED_STACK_ID

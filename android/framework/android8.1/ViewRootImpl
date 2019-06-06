@@ -13,7 +13,7 @@ ViewRootImpl(Context context, Display display) {
 - mChoreographer = Choreographer.getInstance() //界面刷新的脉冲驱动
 }
 
-//加入窗口,加入view DecorView extends 
+//加入窗口,加入DecorView extends 
 setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
 - mView = view //DecorView
 - mWindowAttributes.copyFrom(attrs)
@@ -43,6 +43,7 @@ reportNextDraw{
 }@ViewRootImpl.java
 
 
+// relayout从frame获取view的大小
 //
 performTraversals{
 - View host = mView
@@ -80,6 +81,18 @@ performTraversals{
 - if(didLayout){
 	- performLayout(lp, mWidth, mHeight)
 	}
+}
+
+//计算view的大小。
+getRootMeasureSpec(int windowSize, int rootDimension) {
+  switch (rootDimension)
+- ViewGroup.LayoutParams.MATCH_PARENT:
+            // Window can't resize. Force root view to be windowSize.
+            measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.EXACTLY);
+- ViewGroup.LayoutParams.WRAP_CONTENT:
+            // Window can resize. Set max size for root view.
+            measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.AT_MOST);
+- default:measureSpec = MeasureSpec.makeMeasureSpec(rootDimension, MeasureSpec.EXACTLY);
 }
 
 /*测量

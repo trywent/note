@@ -54,8 +54,14 @@ Dependency.start{
 CommandQueueStart.start-->putComponent(CommandQueue.class, new CommandQueue())
 -->mComponents@CommandQueue.java
 
+//调用systemui接口
+(获取服务StatusBarManagerService)-->setIcon-->mBar.setIcon@StatusBarManagerService.java-->
+setIcon-->mHandler.obtainMessage(what, OP_SET_ICON)-->H.handleMessage-->mCallbacks.addIcon
+@CommandQueue.java-->addIcon@PhoneStatusBar.java
+
 frameworks/base/packages/SystemUI/src/com/android/systemui/Dependency.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
+
 =======================
 /* 
  statusBar窗口：

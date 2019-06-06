@@ -87,7 +87,14 @@ getStack-->createStackOnDisplay-->createStack{//创建Activitystack
 		- createStackWindowController-->new PinnedStackWindowController
 		}
 - new ActivityStack{
-	- mWindowContainerController = createStackWindowController-->new StackWindowController
+	  //后去bounds大小
+	- mWindowContainerController = createStackWindowController(mTop,mTmpRect2)-->
+		new StackWindowController(mStackId, this, displayId, onTop, outBounds)
+	- postAddToDisplay(display, mTmpRect2.isEmpty() ? null : mTmpRect2, onTop){
+		- mBounds = bounds != null ? new Rect(bounds) : null
+		- activityDisplay.attachStack(this, findStackInsertIndex(onTop))
+		- mStackSupervisor.resizeDockedStackLocked(mBounds)
+		}
 	}@ActivityStack.java
 }@ActivityStackSupervisor.java
 
@@ -114,7 +121,7 @@ setTaskToCurrentTopOrCreateNewTask--> mTargetStack.createTaskRecord@ActivityStar
 	}
 - task.createWindowContainer{
 	- Rect bounds = updateOverrideConfigurationFromLaunchBounds()	//获取大小getLaunchBounds-->mStack.mBounds 
-	- controller = TaskWindowContainerController(taskId, this, getStack().getWindowContainerController())
+	- controller = TaskWindowContainerController(taskId, this, getStack().getWindowContainerController(),bounds)
 	- setWindowContainerController(controller){
 		- mWindowContainerController = controller
 		}

@@ -1,32 +1,42 @@
-//
-ActivityStack //activity栈
-TaskRecord  //任务，在mTaskHistory中
-ActivityRecord //activity记录
-ActivityRecord-->TaskRecord-->ActivityStack
+/*
+ 
+ stack{
+   - task {
+	- activity
+      }
+ }
 
+ task的说明
+ https://developer.android.google.cn/guide/components/tasks-and-back-stack
+
+*/
+
+task中的Activity按照启动顺序排列不会改变
 
 /*
-所有activity栈都保存在mStacks中。按照先后顺序加入到mstacks中。当有应用启动时会有移动操作
-
+ 启动
 */
-mStacks@ActivitySackSupervisor.java @ActivityStack.java
 
+//AndroidManifest定义 launchMode 
+"standard"（默认模式）
+    Activity 可以多次实例化，而每个实例均可属于不同的任务，并且一个任务可以拥有多个实例
+"singleTop"
+    如果当前任务的顶部已存在 Activity 的一个实例，则系统会通过调用该实例的 onNewIntent() 方法向其传送 Intent，而不是创建 Activity 的新实例
 
+"singleTask"
+    系统创建新任务并实例化位于新任务根部的 Activity
 
-/* 设置焦点栈mFocusStack
-*  
-*
-*/
-startActivityUncheckedLocked-->ActivityStack.moveToFront()//启动过程中设置
-@ActivityStackSuperVisor.java
+"singleInstance".
+    "singleTask" 相同，只是系统不会将任何其他 Activity 启动到包含实例的任务中。
+    该 Activity 始终是其任务唯一仅有的成员；由此 Activity 启动的任何 Activity 均在单独的任务中打开
 
-//windowManager设置，触摸stack对应所在区域时设置该栈为焦点。没有考虑这个栈是否可见
-H.handleMessage(TAP_OUTSIDE_STACK)@WindowManagerService.java-->setFocusedStack-->
-setFocusedActivityLocked@ActivityManagerService.java-->setFocusedStack-->
-task.stack.moveToFront@ActivityStackSuperVisor.java
+//intent flags
 
-
-========================
-//界面显示
-activity创建phoneWindow(View),讲View加入到ViewRootImpel
-viewRootImpl绘制数据到WindowManagerService中窗口的Surface
+FLAG_ACTIVITY_NEW_TASK 
+    在新任务中启动 Activity。与"singleTask"相同
+FLAG_ACTIVITY_SINGLE_TOP
+    与 "singleTop"相同的行为。
+FLAG_ACTIVITY_CLEAR_TOP
+    如果正在启动的 Activity 已在当前任务中运行，则会销毁当前任务顶部的所有 Activity，并通过 onNewIntent() 
+    将此 Intent 传递给 Activity 已恢复的实例（现在位于顶部），而不是启动该 Activity 的新实例。
+    FLAG_ACTIVITY_CLEAR_TOP 通常与 FLAG_ACTIVITY_NEW_TASK 结合使用

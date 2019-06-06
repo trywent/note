@@ -23,6 +23,8 @@ WindowState(WindowManagerService service, Session s, IWindow c, WindowToken toke
  mContentInsets
  mVisibleInsets
  mStableInsets
+
+ view的大小
 */
 computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
             Rect contentFrame, Rect visibleFrame, Rect decorFrame, Rect stableFrame,

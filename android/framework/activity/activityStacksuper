@@ -9,9 +9,10 @@
 
 
 
-/*
+/*******
  idle
- 处理mStoppingActivities,mFinishingActivities.
+
+ 当启动应用时，需要等待启动应用显示才能隐藏上一个应用。也就是等待idle时处理mStoppingActivities,mFinishingActivities.
 */
 processStoppingActivitiesLocked(ActivityRecord idleActivity){
 - allResumedActivitiesVisible
@@ -22,14 +23,18 @@ processStoppingActivitiesLocked(ActivityRecord idleActivity){
 }@ActivityStackSupervisor.java
 
 //从应用端回调
-activityIdle(IBinder token)-->mStackSupervisor.activityIdleInternalLocked@ActivityManagerService.java
+activityIdle(IBinder token, Configuration config, boolean stopProfiling)-->
+mStackSupervisor.activityIdleInternalLocked(false,false, config)@ActivityManagerService.java
 //ActivityService调用pause后,进入idle超时
 ActivityStackSupervisorHandler.handleMessage(IDLE_TIMEOUT_MSG/IDLE_NOW_MSG)-->activityIdleInternal-->
 activityIdleInternalLocked@ActivityStackSupervisor.java
 
-activityIdleInternalLocked(IBinder token){
+activityIdleInternalLocked(IBinder token,boolean fromTimeout,boolean processPausingActivities, Configuration config){
 - ActivityRecord r = ActivityRecord.forTokenLocked(token)
-- r.idle = true //actvityRecord idle状态
+- if (r != null) {
+	- r.finishLaunchTickingLocked()
+	- r.idle = true //actvityRecord idle状态
+	}
 - if(allResumedActivitiesIdle){
 	- ensureActivitiesVisibleLocked(null)
 	}
@@ -44,30 +49,8 @@ activityIdleInternalLocked(IBinder token){
 }ActivityStackSupervisor.java
 
 
-=====================
-配置改变：
-ensureActivityConfigurationLocked
 
-setPackageScreenCompatModeLocked@CompatModePackages.java
-restartPackage@ActivityStack.java
-
-/*
- task管理
-
-*/
-task:
-startActivityUncheckedLocked{
-- 创建新task，r.setTask(targetStack.createTaskRecord)
-}
-
-移除task：
-destroyActivityLocked-->removeActivityFromHistoryLocked@ActivityStack.java-->
-removeTask@ActivitySupervisor.java
-
-mTaskHistory
-
-
-/*
+/*******
  stack管理
 
 */
@@ -98,18 +81,26 @@ startActivityUncheckedLocked-->adjustStackFocus(ActivityRecord){
 
 
 
-=====================
-调整焦点栈：
-removeTask
+/*******
+ 设置焦点栈
 
-//查找activity对应的栈
-startActivityUncheckedLocked-->adjustStackFocus{
-- 查找并设置，mFocusedStack
-}
+*/
+moveToFront(String reason, TaskRecord task) {
+  //移动到数组前列
+- mStacks.remove(this)
+- mStacks.add(findStackInsertIndex(ON_TOP), this)
+  //设置焦点栈
+- mStackSupervisor.setFocusStackUnchecked(reason, this){
+	- mFocusedStack = focusCandidate
+	}
+  //将WindowContainerController中task移动到前列
+}@ActivityStack.java
+
+//启动时设置焦点栈
+startActivityUnchecked-->mTargetStack.moveToFront
 
 
-设置状态：
-//触摸设置焦点栈：
+//触摸设置焦点栈：android6.0
 displayContent.mTapDetector(TAP_OUTSIDE_STACK)@StackTapPointerEventListener.java
 -->setFocusedStack@WindowManagerService.java-->setFocusedStack-->setFocusedActivityLocked
 @WindowManagerService.java-->setFocusedStack{
@@ -117,21 +108,48 @@ displayContent.mTapDetector(TAP_OUTSIDE_STACK)@StackTapPointerEventListener.java
 - 若是应用栈，设置mFocusedStack，mStackState(若home栈不为in_back,则设为to_back)
 }@ActivityStackSupervisor.java
 
-//acvitiy启动完成
-allResumedActivitiesComplete{
-- mStackState（若是to_back,则设置in_back）
-- mStackState（若是to_front,则设置in_front）
+//android8.0
+handleTapOutsideTask-->mActivityManager.setFocusedTask(taskId)@WindowManangerService.java-->
+setFocusedTask(int taskId){
+- TaskRecord task = mStackSupervisor.anyTaskForIdLocked(taskId)
+- ActivityRecord r = task.topRunningActivityLocked()
+  //设置activity所在栈为焦点栈
+- mStackSupervisor.moveFocusableActivityStackToFrontLocked(r, "setFocusedTask")
+  //焦点栈执行resume。设置resumedActivity
+- mStackSupervisor.resumeFocusedStackTopActivityLocked()
+}@ActivityManagerService.java
+
+
+
+
+
+/*******
+ task管理
+
+*/
+task:
+startActivityUncheckedLocked{
+- 创建新task，r.setTask(targetStack.createTaskRecord)
 }
 
-//移动homestack
-startActivityUncheckedLocked(启动应用时设置)-->moveHomeStack{
-- 设置mStackState
-}@ActivityStackSupervisor.java
+移除task：
+destroyActivityLocked-->removeActivityFromHistoryLocked@ActivityStack.java-->
+removeTask@ActivitySupervisor.java
+
+mTaskHistory
+
 ====================
 //焦点应用
 startActivityUncheckedLocked-->setFocusedActivityLocked@ActivityStackSupervisor.java
 
 adjustFocusedActivityLocked-->setFocusedActivityLocked@ActivityStack.java
+
+=====================
+配置改变：
+ensureActivityConfigurationLocked
+
+setPackageScreenCompatModeLocked@CompatModePackages.java
+restartPackage@ActivityStack.java
 
 frameworks/base/services/java/com/android/server/am/ActivityStackSupervisor.java
 frameworks/base/services/java/com/android/server/am/ActivityStack.java

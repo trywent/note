@@ -183,17 +183,30 @@ performDisplayOverrideConfigUpdate@ActivityManagerService.java-->setNewDisplayOv
 /*
   TaskStack
 */
-StackWindowController(stackId){
+StackWindowController(int stackId, StackWindowListener listener, boolean onTop, Rect outBounds)-->
+StackWindowController(int stackId, StackWindowListener listener, boolean onTop, Rect outBounds, WindowManagerService service)
+{
 - DisplayContent dc = mRoot.getDisplayContent(displayId) //mRoot为WindowManagerService
 - TaskStack stack = dc.addStackToDisplay(stackId){
 	- TaskStack stack = getStackById(stackId)
 	- stack = new TaskStack(mService, stackId)
 	- mTaskStackContainers.addStackToDisplay(stack){//加入到TaskStackContainers(所有应用窗口的归宿)
 		- addChild(stack)
-		- stack.onDisplayChanged(DisplayContent.this) //通知displayContent变化...通知到所有child
+		- stack.onDisplayChanged(DisplayContent.this){ //通知displayContent变化...通知到所有child
+			- if (mStackId == DOCKED_STACK_ID){//设置docked栈大小
+				- getStackDockedModeBounds(mTmpRect, bounds, mStackId, mTmpRect2)
+				}
+			- if (mStackId == PINNED_STACK_ID){//设置pip栈大小
+				- getAnimationOrCurrentBounds(mTmpRect2)
+				}
+			- updateDisplayInfo(bounds)
+			}
 		}
 	}@DisplayContent.java
 - stack.setController(this) //设置controler ,container
+- getRawBounds(outBounds){
+	- 从mContainer 获取窗口大小 //从TaskStack获取
+	}
 }@StackWindowController.java
 
 //调整窗口大小,
@@ -219,12 +232,12 @@ adjustConfigurationForBounds(Rect bounds,Configuration config){
 /*
   Task
 */
-TaskWindowContainerController{
+TaskWindowContainerController(int taskId, TaskWindowContainerListener listener,StackWindowController stackController,  Rect bounds){
 - TaskStack stack = stackController.mContainer
 - Task task = createTask-->new Task(this,bounds){
 	- setController(controller)//设置controler ,container
 	- setBounds
-	}
+	}@Task.java
 - stack.addTask(task)-->addChild
 }@TaskWindowContainerController.java
 

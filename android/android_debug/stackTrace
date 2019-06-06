@@ -19,6 +19,7 @@ stack.log("TAGNAME");
 
 
 //java
+import android.util.Log;
 try {
     throw new Exception("Call Stack Trace");
 } catch (Exception e) {

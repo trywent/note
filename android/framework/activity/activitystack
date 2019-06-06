@@ -53,25 +53,44 @@ activityPausedLocked(IBinder token){
 
 completePauseLocked(boolean resumeNext){
 - ActivityRecord prev = mPausingActivity
+- if(prev.app!=null){
+	- 
+	- prev不可见加入到stopping，addToStopping
+	}
 - if(resumeNext){
 	- 
 	}
 }@ActivityStack.java
 
+
+
 /* stoping
 
- 
+ 只有不可见的Activity才加入stoping
 */
+makeInvisible(ActivityRecord r){
+- r.setVisible(false)
+- switch(r.state){
+	- STOPPING,STOPPED:{//通知应用窗口隐藏了
+		- r.app.thread.scheduleWindowVisibility(r.appToken, false)
+		}
+	- INITIALIZING,RESUMED,PAUSING,PAUSED:{
+		- addToStopping(r, true)
+		}
+	}
+}@ActivityStack.java
+
 activityIdleInternalLocked@ActivityStackSupervisor.java-->
 stopActivityLocked{
-- scheduleStopActivity
+- scheduleStopActivity-->onStop
 }@ActivityRecord.java
-
 
 activityStopped-->r.activityStoppedLocked@ActivityManangerService.java-->
 activityStoppedLocked{
 - 
 }@ActivityStack.java
+
+
 
 /* finish
 
@@ -87,7 +106,7 @@ finishActivityLocked{
 }@ActivityStack.java
 
 finishCurrentActivityLocked{
-- 当前结束activity是显示状态，加入mStoppingActivities推迟结束
+- 当前结束activity是显示状态，addToStopping,加入mStoppingActivities推迟结束
 - 已经是stop状态，destroyActivityLocked
 - 非stop，{
 	- 加入mFinishingActivities

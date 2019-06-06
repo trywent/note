@@ -6,6 +6,15 @@ resource
 
 resource ID是一个32位数.格式为:PPTTNNNN. PP资源包; TT资源类型; NNNN资源名. 应用中PP值为0x7f
 */
+
+系统私有资源需要添加res/valus/symbols.xml
+  <!--fyt add-->
+  <java-symbol type="drawable" name="fytbt_up1" />
+  <java-symbol type="drawable" name="fytbt_down1" />
+  <java-symbol type="drawable" name="fytbt_up2" />
+  <java-symbol type="drawable" name="fytbt_down2" />
+  <java-symbol type="layout" name="fyt_button" />
+  <java-symbol type="id" name="fytWinbt" />
 ===================
 //theme
 

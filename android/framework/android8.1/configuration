@@ -20,5 +20,20 @@ Configuration{
 - densityDpi //像素密度
 - assetsSeq 
 - appBounds //应用大小
-        seq = 0;
+- seq = 0;
 }
+
+computeScreenConfiguration(Configuration config){
+- config.setAppBounds(leftInset /*left*/, topInset /*top*/, leftInset + displayInfo.appWidth /*right*/,
+                topInset + displayInfo.appHeight /*bottom*/)
+}@DisplayContent.java
+
+adjustConfigurationForBounds{
+- 
+- config.setAppBounds(!bounds.isEmpty() ? bounds : null)
+}@StackWindowController.java
+
+
+frameworks/base/core/java/android/content/res/Configuration.java
+frameworks/base/services/core/java/com/android/server/wm/StackWindowController.java
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java

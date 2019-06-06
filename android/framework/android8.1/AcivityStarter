@@ -46,16 +46,25 @@ startActivity(IApplicationThread caller, Intent intent,ActivityInfo aInfo, Resol
 }@ActivityStarter.java
 
 
-startActivityUnchecked{
+startActivityUnchecked(final ActivityRecord r, ActivityRecord sourceRecord,
+	ActivityOptions options, TaskRecord inTask,ActivityRecord[] outActivity){
 - setInitialState(r,options){
 	- mStartActivity = r
 	- mIntent = r.intent
 	- mOptions = options
+	- mSourceRecord = sourceRecord
 	- mLaunchBounds = getOverrideBounds(r, options, inTask) //options是否设置activity窗口范围
 	- mLaunchFlags = adjustLaunchFlagsToDocumentMode
 	}
-- computeLaunchingTaskFlags //计算启动task
-- computeSourceStack //获取源stack
+- computeLaunchingTaskFlags{ //计算启动task
+	- if(mSourceRecord==null&&mInTask != null){
+		- mReuseTask = mInTask
+		}
+	- if(mInTask == null){
+		- 设置mLaunchFlags
+		}
+	}
+- computeSourceStack //获取源mSourceStack
 - ActivityRecord reusedActivity = getReusableIntentActivity(){//找到已存在的task,返回该task的Activity...activity被启动过
 	- 放到已有的task{
 		- mLaunchSingleInstance,mSupervisor.findActivityLocked(mIntent, mStartActivity.info)-->
@@ -66,7 +75,7 @@ startActivityUnchecked{
   //已经启动过,使用已启动的Activity
 - reusedActivity!=null{
 	- reusedActivity = setTargetStackAndMoveToFrontIfNeeded
-	- setTaskFromIntentActivity //设置task的创建Activity
+	- setTaskFromIntentActivity //设置Activity的task
 	- resumeTargetStackIfNeeded
 	}
 - dontStart{ //已经启动
@@ -109,6 +118,15 @@ resumeFocusedStackTopActivityLocked{
 }@ActivityStackSupervisor.java
 
 
+
+//计算stack
+computeStackFocus(ActivityRecord r, boolean newTask, Rect bounds,int launchFlags, ActivityOptions aOptions) {
+- TaskRecord task = r.getTask()
+- ActivityStack stack = getLaunchStack(r, launchFlags, task, aOptions){
+	- if(mReuseTask!=null)，return mReuseTask.getStack()
+	- 
+	}
+}@ActivityStarter.java
 
 //pinnedStack activity启动通知
 postStartActivityProcessing@ActivityStarter.java-->notifyPinnedActivityRestartAttempt@TaskChangeNotificationController.java

@@ -159,7 +159,10 @@ relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,
 - mPolicy.adjustWindowParamsLw(attrs) //调整属性
 - createSurfaceControl(outSurface)//surface
 - configChanged = updateOrientationFromAppTokensLocked //更新方位
-- 
+ //获取surface
+- createSurfaceControl(outSurface, result, win, winAnimator)
+ //设置frame大小
+- outFrame.set(win.mCompatFrame)
 }@WindowManagerService.java
 
 
