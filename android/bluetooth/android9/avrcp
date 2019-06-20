@@ -1,0 +1,42 @@
+/*
+ new Avrcp
+*/
+start() {
+- mCurrentData = new MediaData(null, null, null)
+- mNativeInterface = AvrcpNativeInterface.getInterface{
+	- sInstance = new AvrcpNativeInterface()
+	}
+- mNativeInterface.init(AvrcpTargetService.this)
+}@AvrcpTargetService.java
+
+init-->initNative@AvrcpNativeInterface.java-->
+initNative{
+- sServiceInterface = getBluetoothInterface()->get_avrcp_service()
+- sServiceInterface->Init(&mAvrcpInterface, &mVolumeInterface)
+}com_android_bluetooth_avrcp_target.cpp
+
+
+packages/apps/Bluetooth/src/com/android/bluetooth/newavrcp/AvrcpTargetService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/newavrcp/AvrcpNativeInterface.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp_target.cpp
+
+/*
+ bluetooth stack
+*/
+
+bluetoothInterface.get_avrcp_service@bluetooth.cc-->bluetooth::avrcp::AvrcpService::GetServiceInterface(){
+- service_interface_ = new ServiceInterfaceImpl()
+- return service_interface_
+}@avrcp_service.cc
+
+
+
+bta_av_open_rc{
+- 
+- bluetooth::avrcp::AvrcpService::Get()->ConnectDevice
+}@
+
+
+bt/btif/src/bluetooth.cc
+bt/bta/av/bta_av_aact.cc
+bt/btif/avrcp/avrcp_service.cc

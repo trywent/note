@@ -310,9 +310,4 @@ rewriteDex(DexOpt没有成功)@DexPrepare.cpp
 dalvik/vm/analysis/DexPrepare.cpp
 
 
-===================
-安装apk：
-onCreate-->initiateInstallfyt-->startInstallConfirmfyt@PackageInstallerActivity.java
 
-
-package/app/PackageInstaller/src/com/android/packageInstaller/PackageInstallerActivity.java

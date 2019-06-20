@@ -1,0 +1,14 @@
+/*
+ android 使用虚拟机dalvik
+*/
+ART android runtime
+APK means Android PacKage.
+DEX means Dalvik EXcutable file.
+//dexopt用于将dex文件生成odex
+ODEX means Optimized Dalvik EXcutable file.
+//android4.4后。OAT替代ODEX。dex2oat用于生成OAT
+OAT It’s Of Ahead Time, a silly reordering of Ahead Of Time
+//android8.0后
+VDEX store pre-validated DEX files
+//android9.0
+Cdex Compact Dex

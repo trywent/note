@@ -2,7 +2,6 @@
  btav
 */
 
-//bta接口
 bta_sys_sendmsg-->bta_av_reg->evt_hdlr--> //在线程message_loop_thread_
 bta_av_hdl_event{
 - bta_av_nsm_act[event] //非状态机处理消息
@@ -10,19 +9,10 @@ bta_av_hdl_event{
 - bta_av_ssm_execute  //状态机,av流控制处理
 }@bta_av_main.cc
 
-
-btif_queue_connect-->(切换线程)queue_int_handle_evt{//bt_jni_workqueue_thread线程
-- queue_int_add   //加入
-- queue_int_advance  //清空
-- queue_int_cleanup  //移除
-- btif_queue_connect_next-->p_head->connect_cb //执行
-}
-//回调接口切到jni上下文...上层通知一类
-btif_transfer_context-->btif_sendmsg//线程中bt_jni_workqueue_thread
-
-
 /*********************
  a2dpsink 初始化
+ 设置a2dpsink 的api @bta_av_api
+ 
 */
 static const btav_sink_interface_t bt_av_sink_interface = {
     sizeof(btav_sink_interface_t),
@@ -77,7 +67,7 @@ BTA_AvRegister(BTA_AV_CHNL_AUDIO,bte_av_sink_media_callback)-->bta_av_api_regist
 - (*bta_av_cb.p_cback)(BTA_AV_REGISTER_EVT, &bta_av_data)-->bte_av_callback
 }@bta_av_main.cc
 
-//回调
+//收到数据回调
 bte_av_callback-->btif_transfer_context(btif_av_handle_event)
 -->btif_av_handle_event{
 - BTIF_AV_CLEANUP_REQ_EVT
@@ -169,18 +159,33 @@ btif_a2dp_sink_command_ready{
 - btif_a2dp_sink_audio_rx_flush_event
 }@btif_a2dp_sink.cc
 
-//stream数据
+//stream数据解码
 bte_av_sink_media_callback@btif_av.cc
-btif_a2dp_sink_enqueue_buf{
-- fixed_queue_enqueue(btif_a2dp_sink_cb.rx_audio_queue, p_msg)         //保存数据到queue中
-- btif_a2dp_sink_audio_handle_start_decoding-->btif_decode_alarm_cb--> //播放数据
-	btif_a2dp_sink_avk_handle_timer-->btif_a2dp_sink_handle_inc_media
+btif_a2dp_sink_enqueue_buf(BT_HDR* p_pkt){
+- memcpy(p_msg->data, p_pkt->data + p_pkt->offset, p_pkt->len) //将数据拷贝到p_msg->data中
+- fixed_queue_enqueue(btif_a2dp_sink_cb.rx_audio_queue, p_msg)         //将msg加入queue中
+  //收到5个数据包才开始解码
+- if (fixed_queue_length(btif_a2dp_sink_cb.rx_audio_queue) == MAX_A2DP_DELAYED_START_FRAME_COUNT)
+   - btif_a2dp_sink_audio_handle_start_decoding{
+	- BtifAvrcpAudioTrackStart(btif_a2dp_sink_cb.audio_track)//开始AudioTrack
+	- btif_a2dp_sink_cb.decode_alarm = alarm_new_periodic("btif.a2dp_sink_decode")
+	  //20ms
+	- alarm_set(btif_a2dp_sink_cb.decode_alarm, BTIF_SINK_MEDIA_TIME_TICK_MS,btif_decode_alarm_cb)-->
+	  thread_post(btif_a2dp_sink_cb.worker_thread, btif_a2dp_sink_avk_handle_timer)
+	}
 }@btif_a2dp_sink.cc
 
-
+btif_a2dp_sink_avk_handle_timer{
+- BT_HDR* p_msg = (BT_HDR*)fixed_queue_try_dequeue(btif_a2dp_sink_cb.rx_audio_queue)
+- btif_a2dp_sink_handle_inc_media(p_msg)-->btif_a2dp_sink_cb.decoder_interface->decode_packet(p_msg)
+}@btif_a2dp_sink.cc
 
 //设置焦点
-update_audio_focus_state@btif_av.cc-->btif_a2dp_sink_set_focus_state_req@btif_a2dp_sink.cc
+update_audio_focus_state@btif_av.cc-->btif_a2dp_sink_set_focus_state_req{
+- BTIF_MEDIA_SINK_FOCUS_UPDATE* p_buf =reinterpret_cast<tBTIF_MEDIA_SINK_FOCUS_UPDATE*>(osi_malloc())
+- p_buf->hdr.event = BTIF_MEDIA_SINK_SET_FOCUS_STATE
+- fixed_queue_enqueue(btif_a2dp_sink_cb.cmd_msg_queue, p_buf)
+}@btif_a2dp_sink.cc
 
 
 

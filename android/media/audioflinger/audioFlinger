@@ -9,6 +9,7 @@ AudioFlinger{
 			- mDevicesFactory = IDevicesFactory::getService() //获取hidl接口
 			}
 	}
+  //音效
 - mEffectsFactoryHal = EffectsFactoryHalInterface::create()
 - onFirstRef-->mStandbyTimeInNsecs
 }AudioFlinger.cpp
@@ -70,22 +71,22 @@ openOutput-->openOutput_l(audio_module_handle_t module,audio_io_handle_t *output
 AudioFlinger::createTrack(output){
 - 检查参数，检查格式audio_is_linear_pcm
 - 根据output获取playbackThread，checkPlaybackThread_l //获取output对应的thread
-- 根据进程id，创建client。registerPid_l{
+- sp<Client> client = registerPid(clientPid){
 		- client = new Client-->new MemoryDealer//用于分配内存，heap由ro.af.client_heap_size_kbyte定义
 		- mClients.add(client)		
 		}
-- 创建track，thread->createTrack_l-->AudioFlinger::PlaybackThread::createTrack_l(client){
+- track= thread->createTrack_l-->AudioFlinger::PlaybackThread::createTrack_l(client){
 	- new Track()@Tracks.cpp
 	}@Threads.cpp
 - 创建new TrackHandle(track)，并返回
 }
 
 PlaybackThread::createTrack_l{
-- 创建，new Track(StreamType，client){
+- 创建，new Track(StreamType，client)-->TrackBase{
 	- 计算需要的memory大小，audio_track_cblk_t+buffersize
 	- mCblk = mCblkMemory = client->heap()->allocate-->MemoryDealer->allocate
 	- 设置mBuffer的位置 //ALLOC_CBLK mBuffer = mCblk + audio_track_cblk_t
-	}
+	}@Track.cpp
 - 加入容器，mTracks.add
 }@Threads.cpp
 

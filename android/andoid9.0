@@ -1,0 +1,13 @@
+/*
+ 访问隐藏接口
+ Accessing hidden method Landroid/bluetooth/BluetoothA2dpSink;->connect(Landroid/bluetooth/BluetoothDevice;)Z (dark greylist, linking)
+
+*/
+
+GetMemberAction@hidden_api.h-->GetMemberActionImpl@hidden_api.cc
+
+
+art/runtime/native/java_lang_Class.cc
+art/runtime/class_linker.cc
+art/runtime/hidden_api.cc
+art/runtime/hidden_api.h

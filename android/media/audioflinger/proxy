@@ -1,8 +1,74 @@
 /*
- proxy
+ proxy用于管理共享内存
 
 */
 
+/*
+ ClientProxy获取共享内存
+
+ AudioTrackClientProxy
+ 共享内存是否可用(audioFlinger Thread track没有挂掉)
+ client获取内存写入数据，
+ 通知server端读取数据
+
+*/
+//cblk包含一些共享内存控制方法
+//buffers 共享内存的数据存储区
+AudioTrackClientProxy(cblk, buffers, frameCount, mFrameSize){
+- ClientProxy(cblk, buffers, frameCount, frameSize){
+	- Proxy(cblk, buffers, frameCount, frameSize, isOut, clientInServer){
+		- mCblk(cblk)
+		- mBuffers(buffers)
+		}
+	- mTimestampObserver(&cblk->mExtendedTimestampQueue)
+	- setBufferSizeInFrames(frameCount){
+		- mBufferSizeInFrames = clippedSize
+		}
+	}
+- mPlaybackRateMutator(&cblk->mPlaybackRateQueue)
+}@AudioTrackShared.cpp	
+
+//requested请求时长，立即返回(0),一直请求(kForever)或者超时
+//front是有效数据的起始位置。rear是空白内存的起始位置
+ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *requested,struct timespec *elapsed){
+- audio_track_cblk_t* cblk = mCblk
+  //循环获取可用共享空间
+- if (mIsOut) {
+	front = android_atomic_acquire_load(&cblk->u.mStreaming.mFront);
+	rear = cblk->u.mStreaming.mRear;
+   } else {
+	rear = android_atomic_acquire_load(&cblk->u.mStreaming.mRear);
+	front = cblk->u.mStreaming.mFront;
+   }
+- ssize_t avail =  (mIsOut) ? adjustableSize - filled : filled
+ //有可用内存，获取内存并退出
+- if (avail > 0) {
+	- buffer->mRaw = part1 > 0 ? &((char *) mBuffers)[(mIsOut ? rear : front) * mFrameSize] : NULL
+	- break;
+	}
+ //没有可用内存，继续等待
+- 
+}@AudioTrackShared.cpp	
+
+//写入或读取完成后，标记有效数据位置
+ClientProxy::releaseBuffer(Buffer* buffer){
+- size_t stepCount = buffer->mFrameCount
+- audio_track_cblk_t* cblk = mCblk
+- if (mIsOut) {
+        int32_t rear = cblk->u.mStreaming.mRear;
+        android_atomic_release_store(stepCount + rear, &cblk->u.mStreaming.mRear);
+    } else {
+        int32_t front = cblk->u.mStreaming.mFront;
+        android_atomic_release_store(stepCount + front, &cblk->u.mStreaming.mFront);
+    }
+}@AudioTrackShared.cpp	
+
+
+/*
+ ServerProxy
+
+ AudioTrackServerProxy
+*/
 ServerProxy::ServerProxy(audio_track_cblk_t* cblk, void *buffers, size_t frameCount,bool isOut, bool clientInServer){
 - Proxy(cblk, buffers, frameCount, frameSize, isOut, clientInServer){
 	- mCblk(cblk), mBuffers(buffers), mFrameCount(frameCount)
@@ -27,5 +93,6 @@ AudioRecordServerProxy
 
 
 
+frameworks/av/media/libmedia/AudioTrackShared.cpp
 frameworks/av/include/private/media/AudioTrackShared.h
-frameworks/av/media/libaudioclient/AudioTrackShared.cpp
+frameworks/av/include/media/SingleStateQueue.h

@@ -1,3 +1,7 @@
+/*
+ 按键的音效
+*/
+
 (ViewRoot中创建attachInfo并实现播放音效接口)-->host.dispatchAttachedToWindow@ViewRootImpl.java
 -->dispatchAttachedToWindow@ViewGroup.java-->dispatchAttachedToWindow(设置mAttachInfo)@View.java
 

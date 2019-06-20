@@ -1,11 +1,11 @@
-/*
+/*******************************************
   profile的调用接口:
   每个profile的通过调用bta_sys_register,将接口注册到bta_sys_cb
   当上层btif调用接口后,会切换线程执行到bta上下文.bta将调用对应profile函数
 
   btif_xxx -->bta_sys_sendmsg-->profile提供的接口
 
-*/
+*******************************************/
 {
 #define BTA_ID_SYS          0            /* system manager */
 /* BLUETOOTH PART - from 0 to BTA_ID_BLUETOOTH_MAX */
@@ -35,53 +35,47 @@ bta_sys_cb{//将id和回调保存到bta_sys_cb
 - reg[BTA_ID_DM_SEARCH] = bta_dm_search_reg//bta_dm_api.c
 }
 
-//在btu线程中,执行接口
-bta_sys_sendmsg(pmsg){
-- get_message_loop-->message_loop_@btu_task.cc //获取message_loop_thread_@btu_task  在线程message_loop_thread_
+//btif接口执行。在btu线程中
+bta_sys_sendmsg(pmsg/*设置对应id*/){
+- base::MessageLoop* bta_message_loop = get_message_loop-->message_loop_@btu_task.cc //获取message_loop_thread_@btu_task  在线程message_loop_thread_
 - bta_message_loop->task_runner()->PostTask(bta_sys_event,pmsg)-->bta_sys_event(p_msg)
 	-->(*bta_sys_cb.reg[id]->evt_hdlr)(p_msg) //执行profile注册的接口
 }@bta_sys_main.c
 
 /*
- BTA_ID_SYS
- 栈的关闭打开
+ 接口注册 
 */
+//BTA_ID_SYS 栈的关闭打开
 btu_task_start_up@btu_task.c-->
 bta_sys_init{
 - bta_sys_register(BTA_ID_SYS, &bta_sys_hw_reg)
 - BTM_RegisterForDeviceStatusNotif(bta_sys_hw_btm_cback)
 }@bta_sys_main.c
 
-//执行
-bta_sys_sm_execute-->
-bta_sys_action{
-- BTA_DM_API_ENABLE_EVT
-- BTA_DM_API_SEARCH_EVT
-}
 
-system/bt/bta/sys/bta_sys_main.cc
-
-/*
- BTA_ID_DM/BTA_ID_DM_SEARCH
- 设备管理,设备扫描
-*/
+// BTA_ID_DM/BTA_ID_DM_SEARCH 设备管理,设备扫描
 BTA_EnableBluetooth{
 - bta_sys_register(BTA_ID_DM, &bta_dm_reg)
 - bta_sys_register(BTA_ID_DM_SEARCH, &bta_dm_search_reg)
 }@bta_dm_api.cc
 
 
-
 system/bt/bta/dm/bta_dm_api.cc
-
 /*
-
+ 创建线程"btu message loop"
+ 处理上层接口调用
 */
+btu_task_start_up{
+- message_loop_thread_ = thread_new("btu message loop")
+  //开始循环处理message 
+- thread_post(message_loop_thread_, btu_message_loop_run)-->btu_message_loop_run{
+	- message_loop_ = new base::MessageLoop()
+	- run_loop_ = new base::RunLoop()
+	- run_loop_->Run()
+	}
+}@btu_task.c
 
-
-
-
-
+bta_sys_sendmsg
 
 
 bta/sys/bta_sys_main.c
@@ -90,3 +84,41 @@ bta/sys/bta_sys.h
 bta/dm/bta_dm_api.c
 bta/sys/bta_sys.h
 bta/dm/bta_dm_int.h
+
+/*******************************************
+  创建线程BT_JNI_WORKQUEUE_NAME "bt_jni_workqueue"
+  回调到java接口
+
+*******************************************/
+btif_init_bluetooth{
+- bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME)"bt_jni_workqueue"
+- thread_post(bt_jni_workqueue_thread, run_message_loop)-->
+	run_message_loop{
+	- message_loop_ = new base::MessageLoop
+	- jni_run_loop = new base::RunLoop()
+  	- jni_run_loop->Run()
+	}
+}@btif_core.cc
+
+
+//回调接口切到jni上下文...线程"bt_jni_workqueue"
+btif_transfer_context(tBTIF_CBACK* p_cback, uint16_t event){
+- tBTIF_CONTEXT_SWITCH_CBACK* p_msg = (tBTIF_CONTEXT_SWITCH_CBACK*)osi_malloc
+- p_msg->hdr.event = BT_EVT_CONTEXT_SWITCH_EVT
+- btif_sendmsg(p_msg)
+}@btif_core.cc
+
+
+btif_sendmsg-->do_in_jni_thread(base::Bind(&bt_jni_msg_ready, p_msg)){
+- scoped_refptr<base::SingleThreadTaskRunner> task_runner = message_loop_->task_runner()
+- task_runner->PostTask(from_here, task)
+}@btif_core.cc
+
+
+bt/btif/src/btif_core.cc
+
+
+
+
+
+

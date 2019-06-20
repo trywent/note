@@ -24,14 +24,15 @@ static const btrc_ctrl_interface_t bt_rc_ctrl_interface = {
     cleanup_ctrl,
 }@btif_rc.cc
 
-
-(jni)-->bt_rc_ctrl_interface.init_ctrl{//controller
-- bt_rc_ctrl_callbacks //设置jni回调
-- btif_rc_cb
+//设置回调
+init_ctrl(btrc_ctrl_callbacks_t* callbacks){
+- bt_rc_ctrl_callbacks = callbacks
+- btif_rc_cb.rc_multi_cb[idx].rc_vol_label = MAX_LABEL
+- btif_rc_cb.rc_multi_cb[idx].rc_volume = MAX_VOLUME
 - lbl_init
 }@btif_rc.cc
 
-/**********************
+/*
  发送请求
 
   get_element_attr_cmd //sprd add
@@ -62,7 +63,7 @@ get_element_attribute_cmd(num_attribute,p_attr_ids){
 - build_and_send_vendor_cmd(avrc_cmd)
 }
 
-/**********************
+/*
  收到回复
 */
 btif_rc_handler{

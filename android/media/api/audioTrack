@@ -1,5 +1,11 @@
 /*audioTrack通过audioFlinger进行操作
 
+AUDIO_OUTPUT_FLAG_DIRECT	表示音频流直接输出到音频设备，不需要软件混音，一般用于 HDMI 设备声音输出
+AUDIO_OUTPUT_FLAG_PRIMARY	表示音频流需要输出到主输出设备，一般用于铃声类声音
+AUDIO_OUTPUT_FLAG_FAST	表示音频流需要快速输出到音频设备，一般用于按键音、游戏背景音等对时延要求高的场景
+AUDIO_OUTPUT_FLAG_DEEP_BUFFER	表示音频流输出可以接受较大的时延，一般用于音乐、视频播放等对时延要求不高的场景
+AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD	表示音频流没有经过软件解码，需要输出到硬件解码器，由硬件解码器进行解码
+ 
 */
 
 
@@ -80,7 +86,7 @@ AudioTrack::set(
 	- audio_track_cblk_t* mCblk = cblk = static_cast<audio_track_cblk_t*>(iMemPointer)
 	  //应用没有提供共享内存
 	- if (mSharedBuffer == 0){
-		-mProxy = new AudioTrackClientProxy(cblk, buffers, frameCount, mFrameSize)	
+		-mProxy = new AudioTrackClientProxy(cblk, buffers, frameCount, mFrameSize)
 		}
 	}
 }
@@ -126,11 +132,15 @@ native_write_byte-->android_media_AudioTrack_writeArray
   }	
 }@android_media_AudioTrack.cpp
 
-
+/*通过AudioTrackClientProxy proxy获取buffer
+*/
 AudioTrack::write(const void* buffer, size_t userSize, bool blocking){
-- 获取buffer，obtainBuffer-->obtainBuffer(Buffer*,timespec)-->obtainBuffer{
+- 获取buffer，obtainBuffer-->obtainBuffer(Buffer*,timespec)-->obtainBuffer(Buffer* audioBuffer, const struct timespec *requested){
 	- 若服务对象dead，重建AudioTrack，restoreTrack_l
-	- 通过代理从获取buffer，proxy->obtainBuffer-->ClientProxy::obtainBuffer
+	  //通过代理从获取buffer，包含帧数，内存空间信息
+	- proxy->obtainBuffer-->ClientProxy::obtainBuffer
+	- audioBuffer->size = buffer.mFrameCount * mFrameSize
+	- audioBuffer->raw = buffer.mRaw
 	}
 - 拷贝数据，memcpy(audioBuffer.i8, buffer)
 - releaseBuffer-->mProxy->releaseBuffer
@@ -146,15 +156,11 @@ processAudioBuffer{
 }@AudioTrack.cpp
 
 
-=============
-//mixer
-
-FastMixer::onWork-->AudioMixer::setParameter
-
 frameworks/base/media/java/android/media/AudioTrack.java
 frameworks/base/core/jni/android_media_AudioTrack.cpp
-frameworks/av/media/libmedia/AudioTrackShared.cpp
 frameworks/av/media/libmedia/AudioTrack.cpp
 frameworks/av/services/audioflinger/Tracks.cpp
 frameworks/av/services/audioflinger/FastMixer.cpp
 frameworks/av/services/audioflinger/AudioMixer.cpp
+
+

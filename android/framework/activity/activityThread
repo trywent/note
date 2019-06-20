@@ -103,6 +103,7 @@ handleResumeActivity{
 - View decor = r.window.getDecorView()
 - ViewManager wm = a.getWindowManager()
 - WindowManager.LayoutParams l = r.window.getAttributes()
+- l.type = WindowManager.LayoutParams.TYPE_BASE_APPLICATION
 - wm.addView(decor, l)-->//activity窗口加入WindowManager
 	addView(View view)-->mGlobal.addView(view, params, mContext.getDisplay(), mParentWindow)@WindowManagerImpl
 	-->addView(View view,mContext.getDisplay(),mParentWindow){

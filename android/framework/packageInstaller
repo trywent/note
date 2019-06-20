@@ -1,0 +1,57 @@
+/*
+ 应用安装器
+
+ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.DEFAULT] dat=file:///mnt/sdcard/000000000_com.syu.ms.apk typ=application/vnd.android.package-archive flg=0x10000000 cmp=com.android.packageinstaller/.InstallStart} from uid 10005, pid 3759
+ActivityManager: ->startActivity for ActivityRecord{4d1c65f u0 com.android.packageinstaller/.InstallStart t81} result:0
+ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.DEFAULT] dat=file:///mnt/sdcard/000000000_com.syu.ms.apk typ=application/vnd.android.package-archive flg=0x2000000 cmp=com.android.packageinstaller/.InstallStaging (has extras)} from uid 10034, pid 2416
+
+ActivityManager: ->startActivity for ActivityRecord{96becba u0 com.android.packageinstaller/.InstallStaging t81} result:0
+
+ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.DEFAULT] dat=file:///data/user_de/0/com.android.packageinstaller/no_backup/package2792227523307545888.apk flg=0x10000 cmp=com.android.packageinstaller/.PackageInstallerActivity (has extras)} from uid 10034, pid 2416
+ActivityManager: ->startActivity for ActivityRecord{9d15999 u0 com.android.packageinstaller/.PackageInstallerActivity t81} result:0
+
+*/
+
+onCreate(Bundle icicle) {
+- mPm = getPackageManager()
+- mInstaller = mPm.getPackageInstaller()
+  //安装文件路径
+- packageUri = intent.getData()
+  //检查，初始化安装
+- checkIfAllowedAndInitiateInstall{
+	 //检查是否允许安装应用
+	- installAppsRestrictionSource = mUserManager.getUserRestrictionSource(UserManager.DISALLOW_INSTALL_APPS)
+	- 
+	- 
+	- if (mAllowUnknownSources || !isInstallRequestFromUnknownSource(getIntent())){
+		- initiateInstall
+		}
+	 //检查是否允许安装未知来源应用
+	- unknownSourcesRestrictionSource = mUserManager.getUserRestrictionSource(UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES)
+	- if ((unknownSourcesRestrictionSource & UserManager.RESTRICTION_SOURCE_SYSTEM) != 0){
+		- showDialogInner(DLG_UNKNOWN_SOURCES_RESTRICTED_FOR_USER)
+		}
+	- handleUnknownSources
+	}
+}@PackageInstallerActivity.java
+
+
+handleUnknownSources{
+- appOpCode = AppOpsManager.permissionToOpCode(Manifest.permission.REQUEST_INSTALL_PACKAGES)
+- appOpMode = mAppOpsManager.checkOpNoThrow(appOpCode,mOriginatingUid, mOriginatingPackage)
+- switch (appOpMode){
+	- AppOpsManager.MODE_DEFAULT:
+	- AppOpsManager.MODE_ERRORED:{//显示未知来源弹框
+		- showDialogInner(DLG_EXTERNAL_SOURCE_BLOCKED)	
+		}
+	- AppOpsManager.MODE_ALLOWED
+	}
+}@PackageInstallerActivity.java
+
+initiateInstall{
+- String pkgName = mPkgInfo.packageName
+  //根据包名获取应用信息。是否已经安装过
+- mAppInfo = mPm.getApplicationInfo(pkgName)
+}@PackageInstallerActivity.java
+
+package/app/PackageInstaller/src/com/android/packageInstaller/PackageInstallerActivity.java

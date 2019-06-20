@@ -50,7 +50,8 @@ AudioPolicyService::onFirstRef{
 - mAudioCommandThread = new AudioCommandThread// start audio commands thread
 - mOutputCommandThread = new AudioCommandThread// start output activity command thread
 - mAudioPolicyClient = new AudioPolicyClient(this) //audioflinger的封装
-- mAudioPolicyManager = createAudioPolicyManager(mAudioPolicyClient);
+- mAudioPolicyManager = createAudioPolicyManager(mAudioPolicyClient)
+  //音效
 - mAudioPolicyEffects = new AudioPolicyEffects
 }
 

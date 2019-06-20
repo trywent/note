@@ -18,7 +18,9 @@ setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
 - mView = view //DecorView
 - mWindowAttributes.copyFrom(attrs)
 - mInputChannel = new InputChannel()
-- mWindowSession.addToDisplay(mWindow, mWindowAttributes)
+  //加入窗口，获取inset,outSet信息
+- mWindowSession.addToDisplay(mWindow, mWindowAttributes,getHostVisibility(), 
+	mAttachInfo.mContentInsets, mAttachInfo.mStableInsets,mAttachInfo.mOutsets, mInputChannel)
 }@ViewRootImpl.java
 
 //窗口状态
@@ -43,7 +45,8 @@ reportNextDraw{
 }@ViewRootImpl.java
 
 
-// relayout从frame获取view的大小
+// relayout从frame获取view的初始大小.frame大小从windowmanager获取的窗口大小
+//
 //
 performTraversals{
 - View host = mView
@@ -95,13 +98,25 @@ getRootMeasureSpec(int windowSize, int rootDimension) {
 - default:measureSpec = MeasureSpec.makeMeasureSpec(rootDimension, MeasureSpec.EXACTLY);
 }
 
-/*测量
+/*测量 
  设置View的mMeasuredWidth,mMeasuredHeight
+
+ mOutsets会影响全屏应用的测量值
 */
-performMeasure-->mView.measure@ViewRootImpl.java-->
-measure(int widthMeasureSpec, int heightMeasureSpec){
-- 
+performMeasure-->mView.measure@ViewRootImpl.java-->Measure@view.java-->
+onMeasure(int widthMeasureSpec, int heightMeasureSpec){
+  //获取显示屏信息
+- DisplayMetrics metrics = getContext().getResources().getDisplayMetrics()
+- boolean isPortrait = getResources().getConfiguration().orientation == ORIENTATION_PORTRAIT
+  //根据outset调整宽高
+- getOutsets(mOutsets)
+- heightMeasureSpec = MeasureSpec.makeMeasureSpec(height + mOutsets.top + mOutsets.bottom, mode)
+- widthMeasureSpec = MeasureSpec.makeMeasureSpec(width + mOutsets.left + mOutsets.right, mode)
 - super.onMeasure(widthMeasureSpec, heightMeasureSpec){
+	- int count = getChildCount()
+	- for (int i = 0; i < count; i++) {
+		- measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0)
+		}
 	- 
 	}@FrameLayout.java
   //调整width
@@ -125,13 +140,15 @@ onLayout(boolean changed, int left, int top, int right, int bottom){
 - super.onLayout(changed, left, top, right, bottom){
 	- 
 	}@FrameLayout.java
-- offsetLeftAndRight{
+ //根据outset调整位置
+- getOutsets(mOutsets)-->outOutsetRect.set(mAttachInfo.mOutsets)
+- offsetLeftAndRight((-mOutsets.left)){
 	- mLeft,mRight //调整offset
 	}
-- offsetTopAndBottom{
+- offsetTopAndBottom((-mOutsets.top)){
 	- mTop,mBottom //调整offset
 	}
-  //设置elevation,窗口立体高度
+  //阴影效果。设置elevation,窗口立体高度
 - updateElevation{
 	- FREEFORM_WORKSPACE_STACK_ID设置20
 	- PINNED_STACK_ID设置5

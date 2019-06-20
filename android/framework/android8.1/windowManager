@@ -45,7 +45,7 @@ addWindow(Session,IWindow client,WindowManager.LayoutParams attrs){
 - win.attach()
 - mWindowMap.put(client.asBinder(), win)
 - win.mToken.addWindow(win) //将windowState加入到AppWindowToken
-- mPolicy.getInsetHintLw(outOutsets) //获取初始窗口大小
+- mPolicy.getInsetHintLw(outOutsets) //获取窗口inset大小
 }@WindowManagerService.java
 
 relayoutWindow(Session session, IWindow client,WindowManager.LayoutParams attrs){

@@ -1,0 +1,91 @@
+/* effect
+  
+ EffectsFactory.c加载本地音效库文件 //libeffects
+ HAL层提供接口，使用libeffects //android.hardware.audio.effect@all-versions-impl
+*/
+AudioPolicyService::onFirstRef-->new AudioPolicyEffects{
+- status_t loadResult = loadAudioEffectXmlConfig()
+- if (loadResult < 0) {
+	- loadAudioEffectConfig(AUDIO_EFFECT_VENDOR_CONFIG_FILE)  "/vendor/etc/audio_effects.conf"
+	- loadAudioEffectConfig(AUDIO_EFFECT_DEFAULT_CONFIG_FILE){ "/system/etc/audio_effects.conf"
+		- Vector <EffectDesc *> effects
+		- loadEffects(root, effects)
+		- loadInputEffectConfigurations(root, effects)-->mInputSources.add(source, desc)
+		- loadStreamEffectConfigurations(root, effects)-->mOutputStreams.add(stream, desc)
+		}
+	}
+}@AudioPolicyEffects.cpp
+
+//本地库,创建音效加入链表gEffectList
+EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, effect_handle_t *pHandle){
+- list_elem_t *e = gLibraryList
+- lib_entry_t *l = NULL
+- effect_entry_t *fx
+- init()
+- findEffect(NULL, uuid, &l, &d)
+- fx = (effect_entry_t *)malloc(sizeof(effect_entry_t))
+- e = (list_elem_t *)malloc(sizeof(list_elem_t))
+- gEffectList = e
+}@EffectsFactory.c
+
+init@EffectsFactory.c-->EffectLoadEffectConfig(){
+- loadEffectConfigFile(AUDIO_EFFECT_VENDOR_CONFIG_FILE)
+  "/system/etc/audio_effects.conf"
+- loadEffectConfigFile(AUDIO_EFFECT_DEFAULT_CONFIG_FILE){
+	- loadLibraries-->loadLibrary{
+		- gLibraryList //将库信息加入到链表
+		}
+	- loadEffects-->loadEffect-->gSubEffectList //将音效加入链表
+	}
+}@EffectLoadEffectConfig
+
+frameworks/av/services/audiopolicy/service/AudioPolicyEffects.cpp
+frameworks/av/media/libeffects/factory/EffectsFactory.c
+frameworks/av/media/libeffects/factory/EffectsConfigLoader.c
+frameworks/av/media/libeffects/factory/EffectsFactoryState.c
+/*
+ hal接口
+*/
+//获取音效工厂接口
+EffectsFactoryHalInterface EffectsFactoryHalInterface::create(){
+- if (hardware::audio::effect::V4_0::IEffectsFactory::getService() != nullptr) {
+       - return new V4_0::EffectsFactoryHalHidl(){
+		- mEffectsFactory = IEffectsFactory::getService()	
+		}@EffectsFactoryHalHidl.cpp
+    }
+
+}@EffectsFactoryHalInterface.cpp
+
+
+//创建音效
+EffectsFactoryHalHidl::createEffect(const effect_uuid_t *pEffectUuid,sp<EffectHalInterface> *effect)-->
+mEffectsFactory->createEffect(hidlUuid, sessionId,
+	//hal层返回的effect
+	[&](Result r, const sp<IEffect>& result, uint64_t effectId) {
+                    *effect = new EffectHalHidl(result, effectId);
+                })@EffectsFactoryHalHidl.cpp
+
+/*hal层创建effect*/EffectsFactory::createEffect(const Uuid& uid, int32_t session, int32_t ioHandle,
+                                          createEffect_cb _hidl_cb) {
+- EffectCreate(&halUuid, session, ioHandle, &handle){
+
+	}@
+- (*handle)->get_descriptor(handle, &halDescriptor)
+- dispatchEffectInstanceCreation(halDescriptor, handle){
+	- FX_IID_AEC:new AcousticEchoCancelerEffect(handle)
+	- FX_IID_AGC:new AutomaticGainControlEffect(handle)
+	- SL_IID_BASSBOOST:new BassBoostEffect(handle)
+	- EFFECT_UIID_DOWNMIX:new DownmixEffect(handle)
+	- SL_IID_EQUALIZER:new EqualizerEffect(handle)
+	- new Effect(handle)
+	}
+}@EffectsFactory.impl.h
+
+
+
+
+frameworks/av/media/libaudiohal/EffectsFactoryHalInterface.cpp
+frameworks/av/media/libaudiohal/4.0/EffectsFactoryHalHidl.cpp
+hardware/interfaces/audio/effect/4.0/default/EffectsFactory.cpp
+hardware/interfaces/audio/effect/all-versions/default/include/effect/all-versions/default/EffectsFactory.impl.h
+frameworks/av/media/libeffects/factory/EffectsFactory.c

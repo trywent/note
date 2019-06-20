@@ -19,7 +19,14 @@ layout:从上到下调用layout(int, int, int, int)，在这个过程中父View�
     EXACTLY: 父View限定子View一个固定大小。
     AT_MOST: 父View限定子View一个最大的大小范围。所有的子View必须符合这个限定
 
+0/*
+ 加入view
+*/
 
+addViewInner(View child, int index, LayoutParams params)){
+- child.mLayoutParams = params
+- dispatchViewAdded(child)
+}@ViewGroup.java
 
 1/*
  布局,位置,大小

@@ -6,6 +6,10 @@
  
  包含布局参数
 */
+Window{
+- WindowManager.LayoutParams mWindowAttributes
+}@Window.java
+
 PhoneWindow(this)@Activity.java-->PhoneWindow extends Window{
 - mLayoutInflater = LayoutInflater //用于解析应用layout.xml
 }@Policy.java

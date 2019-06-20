@@ -13,7 +13,7 @@ Low Energy (LE)
 //从下到上层次结构
 physical channel---physical link---logical transport---logical link---L2CAP channel
 =====================
-/*base band
+/*****************************base band 建立基本通信方式
 一个piconet中的设备共享物理channel。一个piconet中只有一个master，最多7个active slave（可以有多个parked slave）
 
 保留的地址0x9E8B00-0x9E8B3F。0x9E8B33用于查询
@@ -72,7 +72,7 @@ Page Response Substates
 
 inquiry, inquiry scan, master response, slave response, inquiry response
 =====================
-/*LMP 基于ACL连接
+/*****************************LMP 基于ACL连接
  管理连接状态（像决定logical transport address (LT_ADDR)是否可以使用），role witch
 
 */
@@ -117,8 +117,9 @@ L2CAP Service Data Units(SDU)
 protocol data unit (PDU) 
 
 
-
-=====================
+/*****************************
+ profile
+*/
 Service Discovery Protocol (SDP)
 Generic Access Profile (GAP)
 Protocol Adaptation Layers (PALs)
@@ -155,8 +156,3 @@ PHY //接收数据包
 }
 
 
-
-======================
-//hfp
-hfp peer(AG audio gateway 音频流)  //一般是手机
-hfp hf(handsfree 控制接听拨号)    //耳机,车机

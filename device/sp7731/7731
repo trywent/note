@@ -28,7 +28,12 @@ dd if=/sdcard/wmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-
 
 dd if=/sdcard/sml-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/sml bs=1024 count=22
 
-dd if=/sdcard/wnvitem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/w_modem bs=1024 count=412
+
+//android 9.0
+dd if=/sdcard/boot.img  of=/dev/block/by-name/boot
+dd if=/sdcard/dtb.img  of=/dev/block/by-name/dtb
+dd if=/sdcard/dtbo.img  of=/dev/block/by-name/dtbo
+dd if=/sdcard/wmodem.bin  of=/dev/block/by-name/w_modem
 //声音
 i2s0---->8288
 

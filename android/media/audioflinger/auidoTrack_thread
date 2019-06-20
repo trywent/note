@@ -1,37 +1,82 @@
-/****************
+/***************************
  创建播放进程 MixerThread : public PlaybackThread
-*/
-AudioFlinger::openOutput-->thread = new MixerThread -->
-MixerThread(audioFlinger, AudioStreamOut* output,audio_io_handle_t id, audio_devices_t device){
-- PlaybackThread(AudioFlinger,AudioStreamOut){ //父类
-	- ThreadBase(audioFlinger)
-	- mOutput = AudioStreamOut
-	}
-- mAudioMixer = new AudioMixer
-- mOutputSink = new AudioStreamOutSink(output->stream)
-}
 
+ mMixerBuffer 混音后的数据
+ mEffectBuffer 执行音效后的数据
+ mSinkBuffer 要写入hal
+ 
+*/
+AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinger,
+                                             AudioStreamOut* output)
+{
+- mMixerBufferEnabled(AudioFlinger::kEnableExtendedPrecision)//true
+- mEffectBufferEnabled(AudioFlinger::kEnableExtendedPrecision) //true
+  //分配buffer
+- readOutputParameters_l
+}@Threads.cpp
+//分配mMixerBuffer
+//分配mEffectBuffer
+//分配mSinkBuffer
+readOutputParameters_l{
+- posix_memalign(&mSinkBuffer, 32, sinkBufferSize)
+- mMixerBufferEnabled{
+	- posix_memalign(&mMixerBuffer, 32, mMixerBufferSize)
+	}
+- mEffectBufferEnabled{
+	- posix_memalign(&mEffectBuffer, 32, mEffectBufferSize)
+	}
+}@Threads.cpp
 
 
 //thread = new MixerThread
 AudioFlinger::PlaybackThread::onFirstRef-->run-->threadLoop{
 - 处理配置事件，processConfigEvents
-- 准备工作，prepareTracks_l-->AudioFlinger::MixerThread::prepareTracks_l
-- 剩余字节mBytesRemaining为0，更新字节数{
-	- threadLoop_mix，
-	- 没有数据可写，执行睡眠threadLoop_sleepTime	
-	- 设置剩余字节数，mBytesRemaining	
-	- 若挂起则清除字节数
+  //没有活动的Track,退出线程
+-  if ((!mActiveTracks.size() && systemTime() > mStandbyTimeNs) ||isSuspended()) {
+	- if (shouldStandby_l()) threadLoop_standby()
+	- clearOutputTracks
 	}
-- 若不是等待回调waitingAsyncCallback,(playbackThread一直为false){
-	- 有要写的字节mBytesRemaining，写数据threadLoop_write{
-		- 若有mNormalSink
-		- 若没有则直接写hardware，mOutput->stream->write
+- prepareTracks_l-->AudioFlinger::MixerThread::prepareTracks_l //准备工作
+- mBytesRemaining==0{//更新字节数
+	- if (mMixerStatus == MIXER_TRACKS_READY) {//当前有数据，执行混音，设置可用数据量
+		- threadLoop_mix
+	  else if((mMixerStatus != MIXER_DRAIN_TRACK)&& (mMixerStatus != MIXER_DRAIN_ALL)){//没有数据处理，计算睡眠时间
+		- threadLoop_sleepTime	
+		}
+	  //混音buffer有效，将mMixerBuffer数据拷贝到mEffectBuffer或者mSinkBuffer
+	- if(mMixerBufferValid){
+		- void *buffer = mEffectBufferValid ? mEffectBuffer : mSinkBuffer
+		- memcpy_by_audio_format(buffer, format, mMixerBuffer, mMixerBufferFormat)
+		}
+	  //遍历mEffectChains，执行音效
+	- effectChains[i]->process_l()
+	  //音效数据有效，将音效数据拷贝到sink
+	- if (mEffectBufferValid) {
+		- memcpy_by_audio_format(mSinkBuffer, mFormat, mEffectBuffer, mEffectBufferFormat)
 		}
 	}
+- !waitingAsyncCallback{//playbackThread一直为false
+	  //mSleepTimeUs == 0 立即写数据到hardware
+	- if(mBytesRemaining){
+		threadLoop_write{
+		- if(mNormalSink){
+			- mNormalSink->write((char *)mSinkBuffer + offset, count)
+		  }else{//若没有则直接写hardware
+			- mOutput->write((char *)mSinkBuffer + offset, mBytesRemaining)
+		  }
+		}
+	   }else{
+		- threadLoop_drain
+		}
+	- 
+	  //mSleepTimeUs != 0
+	- mWaitWorkCV.waitRelative(mLock, microseconds((nsecs_t)mSleepTimeUs))
+	}
 
-- 移除要移除的tracks，threadLoop_removeTracks
+- threadLoop_removeTracks//移除要移除的tracks
 }
+
+
 
 //设置参数
 processConfigEvents_l(CFG_EVENT_SET_PARAMETER)-->
@@ -41,70 +86,117 @@ AudioFlinger::MixerThread::checkForNewParameter_l{
 - mAudioMixer = new AudioMixer()//创建mixer
 }
 
-//设置audioMixer中mState.tracks[name]对应的track
-AudioFlinger::MixerThread::prepareTracks_l{
- //遍历所有的mActiveTracks，设置audiomix的buffer，参数，
-- track = mActiveTracks[i].promote().get()
-- fastTrack{
 
- }
-- {//(track->isReady() &&!track->isPaused() && !track->isTerminated()) 
-- mAudioMixer->setBufferProvider(name, track) 
-- mAudioMixer->enable(name)
-- mAudioMixer->setParameter
--
-- }else{
+/***************************
+ mixer混音
+ class MixerThread : public PlaybackThread 
+*/
+AudioFlinger::openOutput-->thread = new MixerThread -->
+MixerThread(audioFlinger, AudioStreamOut* output,audio_io_handle_t id, audio_devices_t device){
+- PlaybackThread(AudioFlinger,AudioStreamOut){ //父类
+	- ThreadBase(audioFlinger)
+	- mOutput = AudioStreamOut
+	}
+- mAudioMixer = new AudioMixer
+- mOutputSink = new AudioStreamOutSink(output->stream){
+	- mStream(stream)
+	}@AudioStreamOutSink.cpp
+  //设置mFastMixer
+- if (initFastMixer) {//false
 
-- mAudioMixer->disable(name)
- }
+	}
+  //设置mNormalSink
+- switch(){
+	- case FastMixer_Static:
+        mNormalSink = initFastMixer ? mPipeSink : mOutputSink
+	}
 }@Threads.cpp
 
-//==================mixer
-//设置处理函数
-mAudioMixer->setParameter-->invalidateState-->mState.hook = process__validate@AudioMixer.cpp
-
-
-//mix
-AudioFlinger::MixerThread::threadLoop_mix@Threads.cpp-->mAudioMixer->process-->
-mState.hook(&mState)-->process__validate{
-- mStates->tracks{ //遍历所有track，记录enabled 的track
-	- 判断track是否要doesResample，NEEDS_RESAMPLE
-	- 需要NEEDS_RESAMPLE，t.hook = getTrackHook(TRACKTYPE_RESAMPLE){
-		- track__Resample
-		}
-	- 不需要NEEDS_RESAMPLE,channel=1， getTrackHook(TRACKTYPE_NORESAMPLEMONO)
-	- 不需要NEEDS_RESAMPLE,channel>2，getTrackHook(TRACKTYPE_NORESAMPLE){
-		- track__NoResample
-		}
+//设置audioMixer中mState.tracks[name]对应的track
+AudioFlinger::MixerThread::prepareTracks_l{
+  //若mixer有设置音效，设置主音量
+- sp<EffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX)
+- if(chain != 0){
+	- uint32_t v = (uint32_t)(masterVolume * (1 << 24))
+	- chain->setVolume_l(&v, &v)
 	}
-- countActiveTracks>0/*存在正在播音的track*/{
-	- 需要resampling，state->hook = process__genericResampling
-	- 不需要resampling，state->hook = process__genericNoResampling
+
+ //遍历所有的mActiveTracks，设置audiomix的buffer，参数，
+- size_t count = mActiveTracks.size()
+- for (size_t i=0 ; i<count ; i++) {
+	- Track* const track = mActiveTracks[i].get()
+	  //AUDIO_OUTPUT_FLAG_FAST
+	- if (track->isFastTrack()) {
+
+		}
+	- audio_track_cblk_t* cblk = track->cblk()
+	  //加入到AudioMixer	
+	- mAudioMixer->create(name,track->mChannelMask....)
+   //track准备好，if ((framesReady >= minFrames) && track->isReady() &&!track->isPaused() && !track->isTerminated()
+	- if (track->mainBuffer() != mSinkBuffer &&track->mainBuffer() != mMixerBuffer) {
+		- chain = getEffectChain_l(track->sessionId())
+		}
+	  //设置track混音音量
+	- mAudioMixer->setBufferProvider(name, track)
+	- mAudioMixer->setParameter(name, param, AudioMixer::VOLUME0, &vlf)
+	- mAudioMixer->setParameter(name, param, AudioMixer::VOLUME1, &vlf)
+	  //设置track的输出buffer
+	- if (mMixerBufferEnabled&& (track->mainBuffer() == mSinkBuffer|| track->mainBuffer() == mMixerBuffer)) {
+		- mAudioMixer->setParameter(name,AudioMixer::MIXER_FORMAT, (void *)mMixerBufferFormat)
+		- mAudioMixer->setParameter(name, AudioMixer::MAIN_BUFFER, (void *)mMixerBuffer)
+	  }else{
+		- mAudioMixer->setParameter(name,AudioMixer::MIXER_FORMAT, (void *)EFFECT_BUFFER_FORMAT)
+		- mAudioMixer->setParameter(name, AudioMixer::MAIN_BUFFER, (void *)track->mainBuffer())
+		}
+    //track停止
+	- mAudioMixer->disable(name)
+  }
+
+  //mixer的音效
+- if (getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX) != 0) {
+        mEffectBufferValid = true;
+    }
+}@Threads.cpp
+
+
+//写数据
+AudioFlinger::MixerThread::threadLoop_write{
+- if (mFastMixer != 0) {
+	
 	}
-- state->hook-->process__genericResampling/process__genericNoResampling
-
-}@AudioMixer.cpp
-
-process__genericNoResampling{
-- track__NoResample
+- AudioFlinger::PlaybackThread::threadLoop_write-->mNormalSink->write((char *)mSinkBuffer + offset, count)-->
+	AudioStreamOutSink::write-->mStream->write(buffer, count * mFrameSize, &written)
 }
 
 
-//write到hal
-PlaybackThread::threadLoop_write{
-- mOutput->stream->write-->AudioStreamOut.stream-->write@audioFlinger-->
-	AudioStreamOutALSA.write@AudioHardware.cpp
-}
 
 
-//设置参数
-sendCreateAudioPatchConfigEvent-->processConfigEvents_l(CFG_EVENT_CREATE_AUDIO_PATCH)-->
-RecordThread::createAudioPatch_l-->set_parameters@Threads.cpp
 
-
-//track
-AudioFlinger::PlaybackThread::createTrack_l{
-- track = new Track(this, client)
+frameworks/av/services/audioflinger/Threads.cpp
+frameworks/av/services/audioflinger/Threads.h
+frameworks/av/services/audioflinger/FastMixer.cpp
+frameworks/av/media/libaudioprocessing/AudioMixer.cpp
+frameworks/av/media/libnbaio/AudioStreamOutSink.cpp
+/***************************
+ track，接收应用数据，将数据填充到mMainBuffer
+ - 不混音时track的mMainBuffer为mSinkBuffer
+ - 混音时track的mMainBuffer为mMixerBuffer
+ - 有音效时，track的mMainBuffer设置为单独的buffer
+  
+*/
+//创建track
+AudioFlinger::PlaybackThread::createTrack_l(onst sp<AudioFlinger::Client>& client,
+        audio_stream_type_t streamType,
+        const audio_attributes_t& attr,
+        uint32_t *pSampleRate,
+        audio_format_t format,
+        audio_channel_mask_t channelMask,
+        size_t *pFrameCount,
+        size_t *pNotificationFrameCount,
+        uint32_t notificationsPerBuffer,
+        float speed,
+        const sp<IMemory>& sharedBuffer){
+- track = new Track(this, client, streamType, attr, sampleRate, format ....)
 - mTracks.add(track)
 }
 //加入Active track(每一个要播放的客户端对应一个track)
@@ -113,8 +205,39 @@ PlaybackThread::Track::start@Tracks.cpp-->addTrack_l{
 - mActiveTracks.add
 }
 
-frameworks/av/services/audioflinger/Threads.cpp
-frameworks/av/services/audioflinger/Threads.h
-frameworks/av/services/audioflinger/FastMixer.cpp
+AudioFlinger::PlaybackThread::Track::Track(
+            PlaybackThread *thread,
+            const sp<Client>& client,
+            audio_stream_type_t streamType,
+            const audio_attributes_t& attr,
+            uint32_t sampleRate,
+            audio_format_t format,
+            audio_channel_mask_t channelMask,
+            size_t frameCount,
+            void *buffer,
+            size_t bufferSize,
+            const sp<IMemory>& sharedBuffer){
+- TrackBase(thread, client, attr, sampleRate, format, channelMask, frameCount...){
+	- 计算需要的memory大小，audio_track_cblk_t+buffersize	
+	- mCblk = mCblkMemory = client->heap()->allocate-->MemoryDealer->allocate
+	  //在内存中创建回调。audio_track_cblk_t
+	- new(mCblk) audio_track_cblk_t()
+	- 设置mBuffer的位置 //ALLOC_CBLK mBuffer = mCblk + audio_track_cblk_t
+	}
+- if (sharedBuffer == 0) {
+        - mAudioTrackServerProxy = new AudioTrackServerProxy(mCblk, mBuffer, frameCount...){
+		-  ServerProxy(cblk, buffers, frameCount, frameSize, true /*isOut*/, clientInServer){
+			- Proxy(cblk, buffers, frameCount, frameSize, isOut, clientInServer)		
+			}
+		- mPlaybackRateObserver(&cblk->mPlaybackRateQueue)
+		}@AudioTrackShared.cpp
+    } else {
+        - mAudioTrackServerProxy = new StaticAudioTrackServerProxy(mCblk, mBuffer, frameCount...){
+		- 
+		}@AudioTrackShared.cpp
+    }
+}
+
+
 frameworks/av/services/audioflinger/Tracks.cpp
-frameworks/av/media/libaudioprocessing/AudioMixer.cpp
+frameworks/av/media/libaudioclient/AudioTrackShared.cpp

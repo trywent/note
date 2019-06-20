@@ -99,7 +99,7 @@ git checkout xxxhashnum  file
 git revert <commit log string> //撤销某次提交
 
 git stach    //save uncommitted changes
-git stash pop  apply last stash and remove it from the list
+git stash pop  //apply last stash and remove it from the list
 
 撤销add：
 git rm -r --cached <added_file_to_undo>

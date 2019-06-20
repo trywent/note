@@ -2,8 +2,7 @@
  target
  biif_rc中包含target,controller的逻辑
 */
-
-//接口,上层调用(参数传到底层,回复对端controller)
+//target接口
 static const btrc_interface_t bt_rc_interface = {
     sizeof(bt_rc_interface),
     init,
@@ -29,59 +28,28 @@ static const btrc_interface_t bt_rc_interface = {
     cleanup,
 }
 
-//回调接口，
-typedef struct {
-    /** set to sizeof(BtRcCallbacks) */
-    size_t      size;
-    btrc_remote_features_callback               remote_features_cb;
-    btrc_get_play_status_callback               get_play_status_cb;
-    btrc_list_player_app_attr_callback          list_player_app_attr_cb;
-    btrc_list_player_app_values_callback        list_player_app_values_cb;
-    btrc_get_player_app_value_callback          get_player_app_value_cb;
-    btrc_get_player_app_attrs_text_callback     get_player_app_attrs_text_cb;
-    btrc_get_player_app_values_text_callback    get_player_app_values_text_cb;
-    btrc_set_player_app_value_callback          set_player_app_value_cb;
-    btrc_get_element_attr_callback              get_element_attr_cb;
-    btrc_register_notification_callback         register_notification_cb;
-    btrc_volume_change_callback                 volume_change_cb;
-    btrc_passthrough_cmd_callback               passthrough_cmd_cb;
-    btrc_set_addressed_player_callback          set_addressed_player_cb;
-    btrc_set_browsed_player_callback            set_browsed_player_cb;
-    btrc_get_folder_items_callback              get_folder_items_cb;
-    btrc_change_path_callback                   change_path_cb;
-    btrc_get_item_attr_callback                 get_item_attr_cb;
-    btrc_play_item_callback                     play_item_cb;
-    btrc_get_total_num_of_items_callback        get_total_num_of_items_cb;
-    btrc_search_callback                        search_cb;
-    btrc_add_to_now_playing_callback            add_to_now_playing_cb;
-}
-
-
-initNative-->btInf->get_profile_interface(BT_PROFILE_AV_RC_ID)@com_android_bluetooth_avrcp.cpp
--->get_profile_interface@bluetooth.cc-->btif_rc_get_interface-->bt_rc_interface@btif_rc.cc
-
-(jni)init{//target
+init(btrc_callbacks_t* callbacks){//target
 - bt_rc_callbacks = callbacks//设置回调
 - lbl_init
 }@btif_rc.cc
 
 
-btif_rc_get_interface
 
 
-
-/*******************
+/*
  接收到命令
 */
 btif_rc_handler{
-- BTA_AV_RC_OPEN_EVT:handle_rc_connect-->handle_rc_ctrl_features-->getcapabilities_cmd(AVRC_CAP_COMPANY_ID)//发送获取CAP命令
+- BTA_AV_RC_OPEN_EVT:handle_rc_connect{
+	- handle_rc_ctrl_features-->getcapabilities_cmd(AVRC_CAP_COMPANY_ID)//发送获取CAP命令
+	}
 - BTA_AV_META_MSG_EVT{
 	- handle_rc_metamsg_cmd-->btif_rc_upstreams_evt(AVRC_PDU_GET_ELEMENT_ATTR)-->get_element_attr_cb //收到获取信息命令
 	- AVRC_OP_VENDOR:handle_avk_rc_metamsg_rsp
 	}
 }
 
-//收到消息
+//contorller收到回复消息
 handle_rc_metamsg_rsp-->btif_rc_upstreams_rsp_evt{
 - AVRC_PDU_REGISTER_NOTIFICATION
 - AVRC_PDU_SET_ABSOLUTE_VOLUME
@@ -90,7 +58,7 @@ handle_rc_metamsg_rsp-->btif_rc_upstreams_rsp_evt{
 
 
 
-/*******************
+/*
  回复信息
 */
 
@@ -107,8 +75,12 @@ get_item_attr_rsp@btif_rc
 bta_av_hdl_event@bta_av_main.cc-->
 bta_av_sm_execute-->bta_av_rc_msg-->bta_av_proc_meta_cmd@bta_av_act.cc
 
+
+
 packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp.cpp
-system/bt/btif/src/bluetooth.cc
-system/bt/btif/src/btif_rc.cc
-system/bt/bta/av/bta_av_main.cc
-system/bt/bta/av/bta_av_act.cc
+bt/btif/src/bluetooth.cc
+bt/btif/src/btif_rc.cc
+bt/bta/av/bta_av_main.cc
+bt/bta/av/bta_av_act.cc
+bt/btif/avrcp/avrcp_service.cc
+bt/profile/avrcp/connection_handler.cc

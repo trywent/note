@@ -1,6 +1,66 @@
-//
+/*mixer
 
-AudioFlinger::MixerThread::MixerThread{}
+ 
+*/
+class PassthruBufferProvider : public AudioBufferProvider 
+class CopyBufferProvider : public PassthruBufferProvider
+class DownmixerBufferProvider : public CopyBufferProvider
+class RemixBufferProvider : public CopyBufferProvider      //upmix or downmix
+class ReformatBufferProvider : public CopyBufferProvider   //format
+class ClampFloatBufferProvider : public CopyBufferProvider //
+class TimestretchBufferProvider : public PassthruBufferProvider  //time stretching 变速
+
+AudioMixer(size_t frameCount, uint32_t sampleRate)
+        : mSampleRate(sampleRate), mFrameCount(frameCount) {
+- pthread_once(&sOnceControl, &sInitRoutine)-->sInitRoutine-->DownmixerBufferProvider::init()
+}@AudioMixer.cpp
 
 
-frameworks/av/services/audioflinger/Threads.cpp
+//设置mixer中track的buffer采样率，声道，音量
+AudioMixer::setParameter(int name, int target, int param, void *value){
+- TRACK{
+	- MAIN_BUFFER:{
+		- track->mainBuffer = valueBuf
+		- invalidate
+		}
+	}
+- RESAMPLE{
+	- SAMPLE_RATE:if(track->setResampler(uint32_t(valueInt), mSampleRate)){
+		- invalidate		
+		}
+	}
+}@AudioMixer.cpp
+
+invalidate-->mHook = &AudioMixer::process__validate@AudioMixer.h
+
+//混音
+AudioFlinger::MixerThread::threadLoop_mix@Threads.cpp-->mAudioMixer->process-->
+mState.hook(&mState)-->process__validate{
+- mStates->tracks{ //遍历所有track，记录enabled 的track
+	- 判断track是否要doesResample，NEEDS_RESAMPLE
+	- 需要NEEDS_RESAMPLE，t.hook = getTrackHook(TRACKTYPE_RESAMPLE){
+		- track__Resample
+		}
+	- 不需要NEEDS_RESAMPLE,channel=1， getTrackHook(TRACKTYPE_NORESAMPLEMONO)
+	- 不需要NEEDS_RESAMPLE,channel>2，getTrackHook(TRACKTYPE_NORESAMPLE){
+		- track__NoResample
+		}
+	}
+- countActiveTracks>0/*存在正在播音的track*/{
+	- 需要resampling，state->hook = process__genericResampling
+	- 不需要resampling，state->hook = process__genericNoResampling
+	}
+- state->hook-->process__genericResampling/process__genericNoResampling
+
+}@AudioMixer.cpp
+
+process__genericNoResampling{
+- track__NoResample
+}
+
+
+frameworks/av/media/libaudioprocessing/AudioMixer.cpp
+frameworks/av/include/media/AudioMixer.h
+frameworks/av/media/libaudioprocessing/BufferProviders.cpp
+frameworks/av/include/media/BufferProviders.h
+frameworks/av/include/media/AudioBufferProvider.h

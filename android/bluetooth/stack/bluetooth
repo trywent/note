@@ -1,6 +1,33 @@
-//bluetooth stack
 /******************************************
 
+Generic Access Profile(GAP)
+Advanced Audio Distribution Profile (A2DP) //使用
+A/V Distribution Transport Protocol (AVDTP) //音频视频流的连接和传输
+Generic Audio/Video Distribution Profile (GAVDP) //使用ACDTP
+Video Distribution Profile (VDP)
+Audio/Video Control Transport Protocol specification(AVCTP) //音频视频流的控制
+Audio/Video Remote Control Profile (AVRCP) //使用AVCTP传输.定义了控制命令，格式.
+
+GAP{
+- GAVDP{
+   - A2DP
+   - VDP
+  }
+- AVRCP
+}
+
+*/
+
+
+/******************************************
+OPP：文件传输规范
+hfp：和电话相关，接听、挂断电话，以及连接sco通路
+a2dp：蓝牙立体声规范，其中包含avrcp规范，avrcp规范实现了听歌时暂停、上下歌曲选择等控制模式。目前蓝牙耳机一般都支持这两种规范。
+hid：人机交互规范，蓝牙鼠标键盘等
+phap：电话号码簿访问协议
+hdp：蓝牙医疗相关规范
+
+//bluetooth stack
 bta - Bluetooth Application
 btcore - Bluetooth Core
 btif - Bluetooth Interface
@@ -8,7 +35,8 @@ btu - Bluetooth Upper Layer  对L2CAP RFCOMM, SDP and the BTIf封装？
 btm - Bluetooth Manager 
 BTE: Bluetooth embedded system
 
-CO: call out\CI: call in
+CO: call out
+CI: call in
 HF : Handsfree Profile
 HH: HID Host Profile
 HL: Health Device Profile
@@ -18,22 +46,15 @@ ar: audio/video registration
 gattc: GATT client
 BLE: Bluetooth Low Energy
 
-
-OPP：文件传输规范
-hfp：和电话相关，接听、挂断电话，以及连接sco通路
-a2dp：蓝牙立体声规范，其中包含avrcp规范，avrcp规范实现了听歌时暂停、上下歌曲选择等控制模式。目前蓝牙耳机一般都支持这两种规范。
-hid：人机交互规范，蓝牙鼠标键盘等
-phap：电话号码簿访问协议
-hdp：蓝牙医疗相关规范
-
-
 snoop log 开关BLUETOOTH_BTSNOOP_ENABLE_PROPERTY "persist.bluetooth.btsnoopenable"
 *******************************************/
-BTA_A2DP_SOURCE_SERVICE_ID 3 /* A2DP Source profile. */
-BTA_HID_SERVICE_ID 20        /* HID */
-BTA_HFP_HS_SERVICE_ID 24     /* HSP HS role */
-BTA_SDP_SERVICE_ID 29        /* SDP Search */
-//1.
+/* 
+  jni到bluetooth库中的接口和回调
+  bluetoothInterface
+  sBluetoothCallbacks
+*/
+
+//加载蓝牙库。获取接口sBluetoothInterface
 static{classInitNative}@AdapterService.java-->
 classInitNative{
 - jniCallbackClass = env->FindClass("com/android/bluetooth/btservice/JniCallbacks")//获取回调类
@@ -44,7 +65,12 @@ classInitNative{
 - sBluetoothInterface = btStack->get_bluetooth_interface //协议栈调用接口bluetooth_interface@bluetooth.c
 }@com_android_bluetooth_btservice_AdapterService.cpp
 
-//获取栈接口后,初始化栈,并设置回到函数
+hw_module_t HAL_MODULE_INFO_SYM = {
+    .id = BT_HARDWARE_MODULE_ID,
+    .methods = &bt_stack_module_methods
+}@bluetooth.c
+
+//获取栈接口后,初始化栈,并设置回调函数
 onCreate@AdapterService.java-->
 initNative{
 - sBluetoothInterface->init(sBluetoothCallbacks)  //设置协议栈回调
@@ -57,18 +83,6 @@ initNative{
 	}
 
 }@com_android_bluetooth_btservice_AdapterService.cpp
-
-packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
-
-==============
-//bluetooth HAL
-hw_module_t HAL_MODULE_INFO_SYM = {
-    .id = BT_HARDWARE_MODULE_ID,
-    .methods = &bt_stack_module_methods
-}@bluetooth.c
-
-get_bluetooth_interface@com_android_bluetooth_btservice_AdapterService.cpp-->
-bluetooth__get_bluetooth_interface-->bluetoothInterface@bluetooth.c //接口
 
 //java--jni--stack接口
 static const bt_interface_t bluetoothInterface = {
@@ -115,7 +129,7 @@ static bt_callbacks_t sBluetoothCallbacks = {
 
 
 /*******************************************
-初始化
+stack初始化
 创建"stack_manager"线程,
 创建BT_JNI_WORKQUEUE_NAME线程,底层回调java
 
@@ -133,12 +147,16 @@ initNative-->bluetoothInterface->init(sBluetoothCallbacks){
 	- return interface //stack接口，栈初始化
 	}
 - init_stack-->thread_post(management_thread, event_init_stack)-->event_init_stack{
-	- btif_init_bluetooth@btif_core.c
+	- btif_init_bluetooth{
+		- bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME) 
+		}@btif_core.c
 	}@stack_manager.c
 }@bluetooth.c
 
+/*
+ jni回调线程。用于回调java接口
 
-
+*/
 //btif BT_JNI_WORKQUEUE_NAME线程.用于底层回调到java
 btif_init_bluetooth{
 - bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME)
@@ -162,7 +180,7 @@ btif_thread_post
 
 
 /*******************************************
- BTU
+ 打开蓝牙
  设置btu新线程BT_WORKQUEUE_NAME.用于执行上层调用stack接口bta
 
 *******************************************/

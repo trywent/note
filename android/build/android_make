@@ -1,51 +1,58 @@
-//
-源：LOCAL_SRC_FILES
-库：LOCAL_JAVA_LIBRARIES
-编译目标：include $(BUILD_PACKAGE)
+/*
+ android makefile编译
+*/
+
+{
+- BUILD_SYSTEM := $(TOPDIR)build/core
+- include $(BUILD_SYSTEM)/config.mk{
+	  //工具
+	- BUILD_SHARED_LIBRARY:= $(BUILD_SYSTEM)/shared_library.mk
+	- BUILD_EXECUTABLE:= $(BUILD_SYSTEM)/executable.mk
+	- BUILD_HOST_EXECUTABLE:= $(BUILD_SYSTEM)/host_executable.mk
+	- BUILD_PACKAGE:= $(BUILD_SYSTEM)/package.mk
+	  ....
+	- include $(BUILD_SYSTEM)/envsetup.mk{
+		- include $(SRC_TARGET_DIR)/board/$(TARGET_DEVICE)/BoardConfig.mk
+		- include $(BUILD_SYSTEM)/product_config.mk
+		}envsetup.mk
+	}@config.mk
+}build/make/core/main.mk
+
+//编译目标product设置
+{
+- include $(BUILD_SYSTEM)/product.mk
+- include $(BUILD_SYSTEM)/device.mk{
+	- get-all-product-makefiles-->_find-android-products-files
+	}
+  //获取device,vendor目录所有中AndroidProducts.mk
+- all_product_configs := $(get-all-product-makefiles)
+- current_product_makefile //查找对应product的makefile
+- $(call import-products, $(current_product_makefile))
+}product_config.mk
+
+//dex优化开关
 
 
-include $(BUILD_SYSTEM)/base_rules.mk
-|- include $(BUILD_SYSTEM)/java.mk
-   | - package.mk
+/*
+ 平台配置的makefile。 AndroidProducts.mk
+*/
 
+product_config.mk-->AndroidProducts.mk{
+- PRODUCT_MAKEFILES += (LOCAL_DIR)/sp7731e_1h10_native.mk{
+	- device/sprd/pike2/common/DeviceCommon.mk
+	}
+}
 
-LOCAL_SDK_VERSION //不能使用系统hide方法
-===============
-编译目标：
-CLEAR_VARS:= $(BUILD_SYSTEM)/clear_vars.mk
-BUILD_HOST_STATIC_LIBRARY:= $(BUILD_SYSTEM)/host_static_library.mk
-BUILD_HOST_SHARED_LIBRARY:= $(BUILD_SYSTEM)/host_shared_library.mk
-BUILD_STATIC_LIBRARY:= $(BUILD_SYSTEM)/static_library.mk
-BUILD_RAW_STATIC_LIBRARY := $(BUILD_SYSTEM)/raw_static_library.mk
-BUILD_SHARED_LIBRARY:= $(BUILD_SYSTEM)/shared_library.mk
-BUILD_EXECUTABLE:= $(BUILD_SYSTEM)/executable.mk
-BUILD_RAW_EXECUTABLE:= $(BUILD_SYSTEM)/raw_executable.mk
-BUILD_HOST_EXECUTABLE:= $(BUILD_SYSTEM)/host_executable.mk
-BUILD_PACKAGE:= $(BUILD_SYSTEM)/package.mk
-BUILD_PHONY_PACKAGE:= $(BUILD_SYSTEM)/phony_package.mk
-BUILD_HOST_PREBUILT:= $(BUILD_SYSTEM)/host_prebuilt.mk
-BUILD_PREBUILT:= $(BUILD_SYSTEM)/prebuilt.mk
-BUILD_MULTI_PREBUILT:= $(BUILD_SYSTEM)/multi_prebuilt.mk
-BUILD_JAVA_LIBRARY:= $(BUILD_SYSTEM)/java_library.mk
-BUILD_STATIC_JAVA_LIBRARY:= $(BUILD_SYSTEM)/static_java_library.mk
-BUILD_HOST_JAVA_LIBRARY:= $(BUILD_SYSTEM)/host_java_library.mk
-BUILD_DROIDDOC:= $(BUILD_SYSTEM)/droiddoc.mk
-BUILD_COPY_HEADERS := $(BUILD_SYSTEM)/copy_headers.mk
-BUILD_NATIVE_TEST := $(BUILD_SYSTEM)/native_test.mk
-BUILD_HOST_NATIVE_TEST := $(BUILD_SYSTEM)/host_native_test.mk
-BUILD_NOTICE_FILE := $(BUILD_SYSTEM)/notice_files.mk
+envsetup.mk-->BoardConfig.mk{
+- include device/sprd/pike2/common/BoardCommon.mk
+}
 
-@build/core/config.mk 
-
-默认库：
-TARGET_DEFAULT_JAVA_LIBRARIES := core core-junit ext framework framework2
-________________
-编译应用程序包：
-$(LOCAL_BUILT_MODULE): $(all_res_assets) $(jni_shared_libraries) $(full_android_manifest)
-	@echo "target Package: $(PRIVATE_MODULE) ($@)"
-
-@build/core/package.mk
-
+//自定义的编译目标
+AndroidBoard.mk{
+- bootloader
+- chipram
+- device/sprd/pike2/common/AndroidKernel.mk
+}
 
 ================
 编译使用overlay：

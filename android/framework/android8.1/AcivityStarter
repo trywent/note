@@ -99,7 +99,8 @@ startActivityUnchecked(final ActivityRecord r, ActivityRecord sourceRecord,
 	- mSupervisor.resumeFocusedStackTopActivityLocked 2-->
 	}
 - mSupervisor.updateUserStackLocked
-- mSupervisor.handleNonResizableTaskIfNeeded
+  //判断是否是小窗口（分屏）显示
+- mSupervisor.handleNonResizableTaskIfNeeded(mStartActivity.getTask(), preferredLaunchStackId,mTargetStack.mStackId)
 }@ActivityStarter.java
 
 -->1 startActivityLocked{
