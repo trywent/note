@@ -1,6 +1,6 @@
 /*
-
-
+ HCI
+　
 */
 HCI Command Packet：host发给controller，主要是HCI 命令， 注意是命令，不是数据。
 HCI Event Packet：controller发给host。对应于command packet。
@@ -110,12 +110,14 @@ btu_hci_msg_queue-->btu_hci_msg_ready-->btu_hci_msg_process{
 }@btu_task.c
 
 /*
- android 8.1
+ android 8.1　
+　通过hidl通信
 */
 //
 hci_initialize{
 - android::sp<IBluetoothHci> btHci = IBluetoothHci::getService()
 - android::sp<IBluetoothHciCallbacks> callbacks = new BluetoothHciCallbacks()
+　 //获取回调接口
 - btHci->initialize(callbacks)
 }@hci_layer_android.cc
 

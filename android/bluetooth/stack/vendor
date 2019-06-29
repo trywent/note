@@ -1,0 +1,107 @@
+/*
+ HIDL接口
+*/
+//服务启动
+main-->defaultPassthroughServiceImplementation<IBluetoothHci>(kMaxThreads)@service.cpp
+
+//hci接口(发送数据)
+interface IBluetoothHci {
+    initialize(IBluetoothHciCallbacks callback);
+    sendHciCommand(HciPacket command);
+    sendAclData(HciPacket data);
+    sendScoData(HciPacket data);
+    close();
+}
+
+hci_initialize-->btHci->initialize(callbacks)@hci_layer_android.cc-->
+BluetoothHci::initialize(const ::android::sp<IBluetoothHciCallbacks>& cb){
+- VendorInterface::Initialize(InitializeCompleteCallback initialize_complete_cb,PacketReadCallback event_cb,
+	 PacketReadCallback acl_cb, PacketReadCallback sco_cb){
+	- g_vendor_interface = new VendorInterface()
+	- g_vendor_interface->Open(initialize_complete_cb, event_cb, acl_cb,sco_cb)
+	}@vendor_interface.cc
+}@bluetooth_hci.cc
+
+
+//打开库，获取接口
+VendorInterface::Open(initialize_complete_cb, event_cb, acl_cb,sco_cb){
+- initialize_complete_cb_ = initialize_complete_cb
+ //打开库文件"libbt-vendor.so"，找到接口"BLUETOOTH_VENDOR_LIB_INTERFACE"
+- lib_handle_ = dlopen(VENDOR_LIBRARY_NAME, RTLD_NOW)
+- lib_interface_ = reinterpret_cast<bt_vendor_interface_t*>(dlsym(lib_handle_, VENDOR_LIBRARY_SYMBOL_NAME))
+　　//回调
+- lib_interface_->init(&lib_callbacks, (unsigned char*)local_bda)
+  //获取接口
+- int fd_count = lib_interface_->op(BT_VND_OP_USERIAL_OPEN, &fd_list)
+　　//设置回调函数(处理接收的数据)
+- event_cb_ = event_cb
+- PacketReadCallback intercept_events = [this](const hidl_vec<uint8_t>& event) {HandleIncomingEvent(event);} //事件处理
+- if (fd_count == 1) {//走这里
+	- hci::H4Protocol* h4_hci = new hci::H4Protocol(fd_list[0], intercept_events, acl_cb, sco_cb)
+	- hci_ = h4_hci
+  }else{
+	- hci::MctProtocol* mct_hci = new hci::MctProtocol(fd_list, intercept_events, acl_cb)
+	- hci_ = mct_hci
+	}
+}
+//回调接口(接收数据)
+
+
+system/bt/hci/src/hci_layer_android.cc
+hardware/interfaces/bluetooth/1.0/default/service.cpp
+hardware/interfaces/bluetooth/1.0/default/bluetooth_hci.cc
+hardware/interfaces/bluetooth/1.0/default/vendor_interface.cc
+
+/*
+  vendor
+　　7731配置文件CONFIGURATION_AA_FILE "wcn/connectivity_configure.ini"　
+*/
+//7731头文件
+{
+SPRD_WCNBT_PIKE2
+BLUETOOTH_UART_DEVICE_PORT = "/dev/ttyBT0"
+LPM_IDLE_TIMEOUT_MULTIPLE = 5
+BTVND_DBG = TRUE
+BTHW_DBG = TRUE
+VNDUSERIAL_DBG = TRUE
+UPIO_DBG = TRUE
+PROC_BTWRITE_TIMER_TIMEOUT_MS = 8000
+BT_WAKE_VIA_PROC = FALSE
+BT_WAKE_VIA_PROC_NOTIFY_DEASSERT = TRUE
+BYTE_ALIGNMENT = 0
+BT_SITM_SERVICE = FALSE
+BT_WCND_POWER_CTRL = FALSE
+BT_RFKILL_CTRL = TRUE
+}@vnd_pike2.txt
+
+//初始化
+init(const bt_vendor_callbacks_t* p_cb,unsigned char* local_bdaddr){
+  //串口路径
+- userial_vendor_init{
+	- nprintf(vnd_userial.port_name, VND_PORT_NAME_MAXLEN, "%s",BLUETOOTH_UART_DEVICE_PORT)"/dev/sttybt0"
+	}@userial_vendor.c
+- upio_init()
+- sprd_vendor_hci_init
+  //adapter,蓝牙模块接口，配置
+- adapter_module = get_adapter_module()
+- adapter_module->init()-->pike2_init{
+	- get_file_name(filename)
+	- vnd_load_configure(filename, &pike2_table[0])	
+	}@pike2.c
+- bt_vendor_cbacks = (bt_vendor_callbacks_t*)p_cb
+}@bt_vendor_sprd.c
+
+//接口函数
+static int op(bt_vendor_opcode_t opcode, void* param){
+- 
+- BT_VND_OP_USERIAL_OPEN{
+	- int fd = userial_vendor_open((tUSERIAL_CFG*)&userial_init_cfg)
+	- 
+	}
+}@bt_vendor_sprd.c
+
+vendor/sprd/modules/wcn/bt/libbt/src/vnd_buildcfg.mk　//txt生成头文件
+vendor/sprd/modules/wcn/bt/libbt/src/bt_vendor_sprd.c
+vendor/sprd/modules/wcn/bt/libbt/src/userial_vendor.c
+vendor/sprd/modules/wcn/bt/libbt/src/upio.c
+vendor/sprd/modules/wcn/bt/libbt/conf/sprd/pike2/src/pike2.c

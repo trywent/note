@@ -53,7 +53,7 @@ createDisplayContent(){
 - mService.mDisplaySettings.getOverscanLocked(displayInfo.name, displayInfo.uniqueId, rect)
 - isplayInfo.overscanLeft = rect.left
 - mService.mDisplayManagerInternal.setDisplayInfoOverrideFromWindowManager(displayId, displayInfo)
-}
+}@RootWindowContainer.java
 
 
 
@@ -182,6 +182,7 @@ performDisplayOverrideConfigUpdate@ActivityManagerService.java-->setNewDisplayOv
 ====== 2
 /*
   TaskStack
+  - 栈大小信息
 */
 StackWindowController(int stackId, StackWindowListener listener, boolean onTop, Rect outBounds)-->
 StackWindowController(int stackId, StackWindowListener listener, boolean onTop, Rect outBounds, WindowManagerService service)
@@ -200,7 +201,7 @@ StackWindowController(int stackId, StackWindowListener listener, boolean onTop, 
 				- getAnimationOrCurrentBounds(mTmpRect2)
 				}
 			- updateDisplayInfo(bounds)
-			}
+			}@TaskStack.java
 		}
 	}@DisplayContent.java
 - stack.setController(this) //设置controler ,container

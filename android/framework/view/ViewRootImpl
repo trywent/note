@@ -190,7 +190,7 @@ handleAppVisibility{
 }@ViewRootImpl.java
 
 
-performTraversals-->performDraw--draw{
+performTraversals-->performDraw-->draw(){
 - surface = mSurface //将数据绘制到mSurface.从windowManagerService返回
 - mHardwareRenderer没有创建则{
 	ttachInfo.mHardwareRenderer.initializeIfNeeded

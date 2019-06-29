@@ -2,6 +2,10 @@
  viewRootImpl
 
  DecorView extends FrameLayout implements RootViewSurfaceTaker, WindowCallbacks
+
+　outset  不是屏幕的部分。当前窗口不能显示.view测量时可以使用（下巴?手表　config_windowOutsetBottom)
+　inset　　　屏幕中部分被其它UI占用。当前窗口内容被遮挡部分　(systemui占用)
+
 */
 ViewRootImpl(Context context, Display display) {
 - mWindowSession = WindowManagerGlobal.getWindowSession(){
@@ -10,10 +14,13 @@ ViewRootImpl(Context context, Display display) {
 	}WindowManangerGlobal.java
 - mThread = Thread.currentThread()
 - mWindow = new W(this)
+- mAttachInfo = new View.AttachInfo(mWindowSession, mWindow, display, this, mHandler, this,context)
 - mChoreographer = Choreographer.getInstance() //界面刷新的脉冲驱动
 }
 
 //加入窗口,加入DecorView extends 
+// inset 被systemui遮挡部分
+// outset 超出屏幕部分(下巴？)但能用来测量view
 setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
 - mView = view //DecorView
 - mWindowAttributes.copyFrom(attrs)
@@ -46,7 +53,8 @@ reportNextDraw{
 
 
 // relayout从frame获取view的初始大小.frame大小从windowmanager获取的窗口大小
-//
+// performMeasure测量大小
+//　measureHierarchy测量非全屏view的大小防止全屏（弹框...）
 //
 performTraversals{
 - View host = mView
@@ -61,10 +69,10 @@ performTraversals{
 	- desiredWindowWidth,desiredWindowHeight //设置为frame大小
 	- if(desiredWindowWidth != mWidth) {mLayoutRequested = true} //大小变化
   }
-  //大小发生变化,重新测量大小
+  //大小发生变化,测量大小
 - boolean layoutRequested = mLayoutRequested && (!mStopped || mReportNextDraw);
 - if (layoutRequested) {
-	- measureHierarchy(host, lp, desiredWindowWidth, desiredWindowHeight
+	- measureHierarchy(host, lp, desiredWindowWidth, desiredWindowHeight)
 	}
   //发生变化,重新计算frame,surface大小
 - if(mFirst || windowShouldResize|| params != null||mForceNextWindowRelayout){
@@ -76,7 +84,7 @@ performTraversals{
 			- MeasureSpec.makeMeasureSpec(mWidth) //创建measureSpec	
 			}
 		- childHeightMeasureSpec = getRootMeasureSpec(mHeight, lp.height)
-		- performMeasure(childWidthMeasureSpec, childHeightMeasureSpec)
+		- performMeasure(childWidthMeasureSpec, childHeightMeasureSpec)-->mView.measure
 		}
 	}
  //,设置位置
@@ -96,12 +104,29 @@ getRootMeasureSpec(int windowSize, int rootDimension) {
             // Window can resize. Set max size for root view.
             measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.AT_MOST);
 - default:measureSpec = MeasureSpec.makeMeasureSpec(rootDimension, MeasureSpec.EXACTLY);
-}
+}@ViewRootImpl.java
+
+//测量view（对话框，正常view）
+measureHierarchy(final View host, final WindowManager.LayoutParams lp,
+            final Resources res, final int desiredWindowWidth, final int desiredWindowHeight) {
+  //包含内容布局
+- if (lp.width == ViewGroup.LayoutParams.WRAP_CONTENT) {
+	  //获取对话框大小
+	- res.getValue(com.android.internal.R.dimen.config_prefDialogWidth, mTmpValue, true)
+	- baseSize = (int)mTmpValue.getDimension(packageMetrics)
+	  //测量大小设置为baseSize	
+	-　if (baseSize != 0 && desiredWindowWidth > baseSize) {
+		- childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width)
+		- childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height)
+		- performMeasure(childWidthMeasureSpec, childHeightMeasureSpec)
+		}
+	}
+}@ViewRootImpl.java
 
 /*测量 
  设置View的mMeasuredWidth,mMeasuredHeight
 
- mOutsets会影响全屏应用的测量值
+ mOutsets虽然不可见，view的测量高宽要加上mOutsets
 */
 performMeasure-->mView.measure@ViewRootImpl.java-->Measure@view.java-->
 onMeasure(int widthMeasureSpec, int heightMeasureSpec){
@@ -124,7 +149,9 @@ onMeasure(int widthMeasureSpec, int heightMeasureSpec){
 }@DecorView.java
 
 /*布局
- 设置位置mLeft,mTop,mRight,mBottom
+  
+ 设置View位置mLeft,mTop,mRight,mBottom
+ view的位置要向左移动mOutsets的宽度偏移，向上移动mOutsets的高度偏移
 */
 performLayout(WindowManager.LayoutParams lp, int desiredWindowWidth,int desiredWindowHeight){
 - View host = mView
@@ -160,8 +187,10 @@ relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,boolean ins
 mWindowSession.relayout(mWindow, mSeq, params,mMeasuredWidth,mMeasuredHeight,mSurface)@ViewRootImpl.java
 mService.relayoutWindow@Session.java-->relayoutWindow@WindowManangerService.java
 
-
-
+/*
+  绘制
+*/
+performDraw
 
 frameworks/base/core/java/android/view/ViewRootImpl.java
 frameworks/base/core/java/com/android/internal/policy/DecorView.java

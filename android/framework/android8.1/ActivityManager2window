@@ -1,11 +1,13 @@
 /*=========================
  ActivityManagerService----WindowManagerService
 
- ActvityManager提供设置栈大小接口
+ ActvityManager中创建WindowContainerController用于管理windowMananger中WindowContainer
 
  Activity中Activitystack,taskRecord,ActivityRecord{
-    WindowContainerController{//stack,task,app
-       WindowContainer
+    - WindowContainerController{//stack,task,app
+	- WindowContainer{
+		
+		}
 	}
    }
 
@@ -16,19 +18,28 @@
 //activity对应窗口管理
  ActivityStack{
 	- StackWindowController{
-		- TaskStack
+		  //提供接口获取栈大小，改变栈大小
+		- resize
+		- getBounds
+		  //管理stack
+		- mContainer = TaskStack
 		}
 	}
 
  TaskRecord{
 	- TaskWindowContainerController{
-		- Task
+		  //提供接口获取task大小，改变task大小
+		- resize
+		- getBounds
+		  //管理task
+		- mContainer= Task
 		}
 	}
 
  ActivityRecord{
 	- AppWindowContainerController{
-		- AppWindowToken
+		  //管理AppWindowToken
+		- mContainer = AppWindowToken
 		}
 	}
 
@@ -87,7 +98,7 @@ getStack-->createStackOnDisplay-->createStack{//创建Activitystack
 		- createStackWindowController-->new PinnedStackWindowController
 		}
 - new ActivityStack{
-	  //后去bounds大小
+	  //获取bounds大小
 	- mWindowContainerController = createStackWindowController(mTop,mTmpRect2)-->
 		new StackWindowController(mStackId, this, displayId, onTop, outBounds)
 	- postAddToDisplay(display, mTmpRect2.isEmpty() ? null : mTmpRect2, onTop){
@@ -295,6 +306,7 @@ StackWindowController(stackId){
 		}
 	}@DisplayContent.java
 - stack.setController(this) //设置controler ,container
+- getRawBounds(outBounds)
 }@StackWindowController.java
 
 //调整窗口大小,

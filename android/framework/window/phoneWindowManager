@@ -173,21 +173,27 @@ layoutWindowLw(WindowState){
 - 计算大小，win.computeFrameLw(pf, df, of, cf, vf, dcf)
 }
 
-/** 
-inset距离上下左右边框的值。计算时减除可得可用的空间
-outContentInsets //去除systemui的inset。考虑当前systemui是否可见
-outStableInsets  //去除systemui的inset
-outOutsets   //一直不可见部分。模具被挡？
-**/
-getInsetHintLw(outContentInsets,outStableInsets,outOutsets){
-- outset = ScreenShapeHelper.getWindowOutsetBottomPx //获取底部outset高度
-- outOutsets.bottom +=outset
-- (FLAG_LAYOUT_IN_SCREEN | FLAG_LAYOUT_INSET_DECOR){//全屏布局
-	- outContentInsets.set
-	}
+/* 根据窗口属性，获取窗口inset,outset
+　outset  不是屏幕的部分。当前窗口不能显示.view测量时可以使用（下巴?手表　config_windowOutsetBottom)
+　inset　　　屏幕中部分被其它UI占用。当前窗口内容被遮挡部分　(systemui占用)
 
-//
-- outStableInsets.set(mStableLeft, mStableTop,availRight - mStableRight, availBottom - mStableBottom)
+　outContentInsets 考虑当前systemui是否可见设置的inset。
+　outStableInsets  去除systemui的inset
+*/
+getInsetHintLw(WindowManager.LayoutParams attrs, Rect taskBounds,
+            int displayRotation, int displayWidth, int displayHeight, Rect outContentInsets,
+            Rect outStableInsets, Rect outOutsets) {
+  //全屏窗口才需outset
+- boolean useOutsets = outOutsets != null && shouldUseOutsets(attrs, fl)
+- if (useOutsets) {
+	- int outset = ScreenShapeHelper.getWindowOutsetBottomPx(mContext.getResources())//config_windowOutsetBottom
+	- outOutsets.bottom += outset
+	}
+  //全屏布局,但是内容不被systemui遮挡
+- if(FLAG_LAYOUT_IN_SCREEN | FLAG_LAYOUT_INSET_DECOR){
+	- outContentInsets.set
+	- outStableInsets.set
+	}
 }
 
 /*starting窗口

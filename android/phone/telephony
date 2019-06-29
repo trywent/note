@@ -1,4 +1,6 @@
-//
+/*
+ 
+*/
 startOtherServices{
 - telephonyRegistry = new TelephonyRegistry(context);
 - ServiceManager.addService("telephony.registry", telephonyRegistry);

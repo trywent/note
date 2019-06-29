@@ -47,7 +47,9 @@ animate(frameTimeNs){
 	- w.performShowLocked() //窗口显示
 	}@DisplayContent.java
 - dc.updateWallpaperForAnimator
-- dc.prepareWindowSurfaces
+- dc.prepareWindowSurfaces-->forAllWindows(mPrepareWindowSurfaces, false)-->
+	w -> w.mWinAnimator.prepareSurfaceLocked(true)@DisplayContents.java-->
+	prepareSurfaceLocked@WindowStateAnimator.java
 //遍历所有dispaly
 - mService.closeSurfaceTransaction()
 
@@ -58,6 +60,8 @@ animate(frameTimeNs){
 frameworks/base/services/core/java/com/android/server/wm/WindowAnimator.java
 frameworks/base/services/core/java/com/android/server/AnimationThread.java
 frameworks/base/services/core/java/com/android/server/wm/ScreenRotationAnimation.java
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
+frameworks/base/services/core/java/com/android/server/wm/WindowStateAnimator.java
 /**********************
  stack animation
 */

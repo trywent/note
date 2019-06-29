@@ -148,6 +148,7 @@ AudioFlinger::openInput-->openInput_l(audio_module_handle_t module,audio_io_hand
 
 
 //创建RecordTrack
+//建立共享内存
 AudioFlinger::openRecord(audio_io_handle_t input, uint32_t sampleRate,audio_channel_mask_t channelMask,
 	sp<IMemory>& cblk,sp<IMemory>& buffers,){
 - checkRecordThread_l //获取input对应的线程

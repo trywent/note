@@ -75,7 +75,7 @@ PipSnapAlgorithm{
 - mMaxAspectRatioForMinSize = 1.777778
 }
 
-//
+//进入pip
 enterPictureInPictureMode-->enterPictureInPictureMode(new PictureInPictureParams.Builder().build()
 -->enterPictureInPictureMode{
 - deviceSupportsPictureInPictureMode--> //检查是否支持pip模式

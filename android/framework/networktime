@@ -7,9 +7,9 @@ Originate Timestamp：NTP请求报文离开客户端时客户端的本地时间�
 Receive Timestamp：NTP请求报文到达服务端时服务端的本地时间。服务器
 Transmit Timestamp：应答报文离开服务端时服务端的本地时间。服务器
 
-========
-通过网络更新时间(NTP服务)：
-
+/*
+ 通过网络更新时间(NTP服务)：
+*/
 注册重复设置时间(没有成功)：
 systemReady-->registerForAlarms-->(接收到ACTION_POLL)mHandler.obtainMessage(EVENT_POLL_NETWORK_TIME).sendToTarget
 MyHandler.handleMessage-->onPollNetworkTime@NetworkTimeUpdateService.java
@@ -52,9 +52,9 @@ frameworks/base/services/java/com/android/server/NetworkTimeUpdateService.java
 frameworks/base/core/java/android/util/NtpTrustedTime.java
 frameworks/base/core/java/android/net/SntpClient.java
 
-===========================
+/*
 NITZ时间更新通过gsm，cdma网络：
-
+*/
 主动查询到时间状态：
 pollStateDone(查询状态完成)-->setAndBroadcastNetworkSetTime@GsmServiceStateTracker.java
 

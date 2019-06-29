@@ -1,0 +1,16 @@
+/*
+ rkkill
+*/
+subsys_initcall(rfkill_init)-->rfkill_init{
+- class_register(&rfkill_class)
+- misc_register(&rfkill_miscdev)
+  //按键触发rf事件
+- rfkill_handler_init{
+	- rfkill_master_switch_op
+	- input_register_handler(&rfkill_handler)
+	}
+}@core.c
+
+
+
+kernel/net/rfkill/core.c

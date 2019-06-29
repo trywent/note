@@ -1,35 +1,47 @@
-//蓝牙技术有两种  频率范围2.400~2.4835GHz。79个通道，从2.402GHz开始，每隔1MHz有一个RF通道
-Basic Rate (BR){//721.2kb/s
-- Enhanced Data Rate (EDR) //2.1Mb/s
-- Media Access Control (MAC)//54Mb/s
-- Physical (PHY)
-} 
+/*****************************
+ Baseband Physic
 
-Alternate MAC/PHYs (AMPs)
-Low Energy (LE)
+ 频率范围2.400~2.4835GHz。79个通道，从2.402GHz开始，每隔1MHz有一个RF通道
+*/
+//两种蓝牙技术：
+- Basic Rate(BR)  //721.2kb/s
+	- Enhanced Data Rate (EDR) //2.1Mb/s
+	- Alternate Media Access Control (MAC) and Physical (PHY) //(AMP)  54Mb/s
+- Low Energy(LE)
 
+//蓝牙系统一般有2部分：
+- host//通过HCI和controller交互
+- controller{
+	- BR/EDR{
+		- Radio
+		- Baseband
+		- Link Manager
+		- HCI
+		}
+	- LE{
+		- LE PHY
+		- Link Layer
+		- optionally HCI
+		}
+	}
 
+//通信的层次结构：
+physical channel--> physical link--> logical transport-->logical link --> L2CAP channel
 
-//从下到上层次结构
-physical channel---physical link---logical transport---logical link---L2CAP channel
-=====================
-/*****************************base band 建立基本通信方式
+/* 
+ BaseBand
+ 
+ physical link
+
 一个piconet中的设备共享物理channel。一个piconet中只有一个master，最多7个active slave（可以有多个parked slave）
-
 保留的地址0x9E8B00-0x9E8B3F。0x9E8B33用于查询
 
-硬件channel的访问码：device access code (DAC)。 channel access code (CAC)。 inquiry access code (IAC)
+physical channel的访问码：device access code (DAC)。 channel access code (CAC)。 inquiry access code (IAC)
 
 当设备同步了physical channel的时间，频率，访问码就认为该设备该channel的连接
-
-
 */
 
-312.5 us, 625 us, 1.25 ms, 1.28 s
-CLK 0 , CLK 1 , CLK 2 , CLK 12 //3.2kHZ
-
-
-//4种物理通道：
+//4种physical channel：
 通讯
 - basic piconet channel
 - adapted piconet channel 
@@ -37,6 +49,7 @@ CLK 0 , CLK 1 , CLK 2 , CLK 12 //3.2kHZ
 - inquiry scan channel 
 连接
 - page scan channel 
+
 
 //logical transports picnet中的设备都有一个3bit地址logical transport address (LT_ADDR)。广播地址为0
 • Synchronous Connection-Oriented (SCO) logical transport
@@ -53,29 +66,16 @@ ACCESS CODE |HEADER |PAYLOAD
 3         4     1     1     1    8
 LT_ADDR |TYPE |FLOW |ARQN |SEQN |HEC
 
-
-_____________________
-//状态
-STANDBY CONNECTION PARK
-
-查询设备子状态{
-- Inquiry scan
-- Inquiry
-}
-
-建立连接的子状态{
-page 连接设备
-page scan 等待被连接
-Page Response Substates 
-}
-
-
-inquiry, inquiry scan, master response, slave response, inquiry response
-=====================
-/*****************************LMP 基于ACL连接
- 管理连接状态（像决定logical transport address (LT_ADDR)是否可以使用），role witch
-
+/* 
+ LMP 用于基带和物理层的控制协议
+ 
+ logical link
 */
+link manager protocol (LMP){
+- asynchronous connection-oriented logical transport (ACL)。默认的逻辑传输，用于LMP协议通信
+- SCO, eSCO, and CSB 传输用户数据
+}
+
 LMP message{
 - ACL-C  //默认传输方式
 - ASB-C
@@ -85,74 +85,26 @@ LMP message{
 TID |Escape OpCode |Extended OpCode |Payload  //LMP PDU with 15 bit OpCode  3bytes
 TID |OpCode |Payload  //LMP PDU with 7 bit OpCode   2bytes
 
+/***************************** 
+ L2CAP
 
-//设备功能
-LMP中PDU的类型(M/O)，Mandatory,Optional
-
-
-//一个事务(transaction)包含一组数据交换。。pair，encryption
-connection(设备连接){
-- Baseband page procedure
-- LMP procedures for clock offset request, LMP version, supported features, name request and/or detach
-- (paging deivce)LMP_host_connection_req //
-- (paged deivce)LMP_accepted or LMP_not_accepted //接收到连接请求后，设备可以请求role switch
-- LMP procedures for pairing,authentication and encryption
-- (paging deivce)LMP_setup_complete
-- (paged deivce)LMP_setup_complete
+*/
+//基带上一层是L2CAP。提供channel上层传输数据
+Logical Link Control and Adaptation protocol (L2CAP){
+- 管理channel
+- 解包打包数据
 }
-
-=====================
-//设备认证过程，maste和slave都可以作为verifier。只有双方有link key才能成功
-verfier--->LMP_au_rand(包含一个随机数challenge)--->claimant
-verfier<---LMP_sres(包含challenge,BD_ADDR,secret key/*reponse的计算需要一个共享secret key*/)<---claimant
-verfier--->(验证response，)
-
-//当设备双方没有共享key时。需要pair或ssp过程。pair通过一个pin值计算共享key
-initiator--->LMP_in_rand--->responsder
-
-=====================
-//l2cap
-
-L2CAP Service Data Units(SDU)
-protocol data unit (PDU) 
 
 
 /*****************************
- profile
+ SMP 产生密钥
+
 */
-Service Discovery Protocol (SDP)
-Generic Access Profile (GAP)
-Protocol Adaptation Layers (PALs)
 
-
-//定义了一套蓝牙实现的最基础协议
-Generic Access Profile (GAP){
-- BR/EDR{
-	Radio, Baseband, Link Manager, L2CAP, SDP
-	}
-- LE{
-	Physical Layer, Link Layer, L2CAP, Security Manager, Attribute Protocol and Generic
-	Attribute Profile
-	}
+Security Manager Protocol (SMP){
+- 使用固定L2CAP channel通信
 }
 
+/*****************************
 
-
-host{
-Security Manager Protocol (SMP) //只存在LE系统中。BR/EDR中在LMP
-Attribute Protocol (ATT)
-Generic Attribute Profile (GATT)
-Generic Access Profile (GAP)
-Alternate MAC/PHYs (AMPs)
-}
-
-Controller(BR/EDR/LE){
-Device Manager
-Link Manager Protocol (LMP)//BR/EDR
-Link Layer Protocol (LL)//LE
-Baseband Resource Manager
-Link Controller//
-PHY //接收数据包
-}
-
-
+*/

@@ -1,8 +1,18 @@
-//AdapterService
+/* AdapterService
+
+*/
 
 onCreate{//启动
-- AdapterServiceBinder
-- AdapterState.make
+- mRemoteDevices = new RemoteDevices(this)
+- mRemoteDevices.init()
+  //调用蓝牙服务的binder接口
+- mBinder = new AdapterServiceBinder(this)
+- mAdapterProperties = new AdapterProperties(this)
+- mAdapterStateMachine =  AdapterState.make(this, mAdapterProperties)
+  //回调
+- mJniCallbacks =  new JniCallbacks(mAdapterStateMachine, mAdapterProperties)
+  //初始化栈,并设置回调函数
+- initNative()
 }@AdapterService.java
 
 //加载库
@@ -52,18 +62,44 @@ onStartCommand-->doStart-->notifyProfileServiceStateChanged@ProfileService.java
 - isBleTurningOff-->sendMessage(BLE_STOPPED) //GattService
 }@AdapterService.java
 
-
-/*
- AdapterState
+/* 蓝牙当前属性AdapterProperties
+  profile 状态
 */
+STATE_DISCONNECTED  = 0
+STATE_CONNECTING    = 1
+STATE_CONNECTED     = 2
+STATE_DISCONNECTING = 3
+
+/* 蓝牙状态 AdapterState extends StateMachine 
+ mOnState mBleOnState mOffState
+*/
+make(AdapterService service, AdapterProperties adapterProperties) {
+- AdapterState as = new AdapterState(service, adapterProperties){
+	- addState(mOnState)
+	- addState(mBleOnState)
+        - addState(mOffState)
+        - addState(mPendingCommandState)
+        - mAdapterService = service
+        - mAdapterProperties = adapterProperties
+        - setInitialState(mOffState)
+	}
+- as.start()
+}@AdapterState.java
+
+//offState
 mOffState.processMessage{
 - BLE_TURN_ON{
 	- notifyAdapterStateChange(STATE_BLE_TURNING_ON)	
 	- sendMessageDelayed(BLE_START_TIMEOUT)//发送on超时消息
-	- adapterService.BleOnProcessStart
+	- adapterService.BleOnProcessStart{
+		- mRemoteDevices.reset()
+		- mAdapterProperties.init(mRemoteDevices)
+		- mBondStateMachine = BondStateMachine.make(this, mAdapterProperties, mRemoteDevices)
+		}@AdapterService.java
 	}
-
 }@AdapterState.java
+
+
 
 
 PendingCommandState.processMessage{
@@ -77,6 +113,7 @@ PendingCommandState.processMessage{
 
 }@AdapterState.java
 
+//onState
 OnState.processMessage{
 - BLE_TURN_OFF{
 	- transitionTo(mPendingCommandState)
@@ -88,7 +125,7 @@ OnState.processMessage{
 	}
 }@AdapterState.java
 
-
+//bleonState
 BleOnState.processMessage{//ble
 - USER_TURN_ON{
  	//启动profile
@@ -105,7 +142,12 @@ notifyAdapterStateChange-->adapterService.updateAdapterState(oldState, newState)
 
 
 /*
- profile启动
+ 各个profile启动
+ a2dp 
+ a2dpsink
+ hfp
+ hfpclient
+ pbap
 */
 startCoreServices{
   //获取支持的profile
@@ -117,13 +159,38 @@ startCoreServices{
 	}
 }@AdapterService.java
 
+/* 连接设备
+   RemoteDevices 接收设备状态
+*/
+BOND_STATE_NONE = 0
+BOND_STATE_BONDING = 1
+BOND_STATE_BONDED = 2
 
+mOffState.processMessage(BLE_TURN_ON)-->adapterService.BleOnProcessStart@AdapterState.java-->
+BondStateMachine.make(this, mAdapterProperties, mRemoteDevices){
+- BondStateMachine bsm = new BondStateMachine(service, prop, remoteDevices){
+	- addState(mStableState)
+	- addState(mPendingCommandState)
+	- mRemoteDevices = remoteDevices
+	- setInitialState(mStableState)
+	}
+- bsm.start()
+}@BondStateMachine.java
 
-apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
-apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterState.java
-apps/Bluetooth/src/com/android/bluetooth/btservice/ProfileService.java
-apps/Bluetooth/src/com/android/bluetooth/btservice/Config.java
-apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
+//设备连接状态
+bond_state_changed-->HAL bt_hal_cbacks->bond_state_changed_cb@btif_dm.cc-->
+bondStateChangeCallback-->mBondStateMachine.bondStateChangeCallback@JniCallbacks.java-->
+bondStateChangeCallback{
+- 
+}@BondStateMachine.java
+
+Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
+Bluetooth/src/com/android/bluetooth/btservice/AdapterState.java
+Bluetooth/src/com/android/bluetooth/btservice/ProfileService.java
+Bluetooth/src/com/android/bluetooth/btservice/Config.java
+Bluetooth/src/com/android/bluetooth/btservice/BondStateMachine.java
+Bluetooth/src/com/android/bluetooth/btservice/RemoteDevices.java
+Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
 system/bt/btif/src/bluetooth.cc
 
 

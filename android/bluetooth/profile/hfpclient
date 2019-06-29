@@ -55,7 +55,9 @@ onAudioStateChanged(state)@NativeInterface.java-->service.messageFromNative{
 }@HeadsetClientStateMachine.java 
 
 
-//Connected state
+/*
+ Connected state
+*/
 Connected.processMessage{
 - ACCEPT_CALL-->acceptCall{ //acceptCall/rejectCall@HeadsetClientService.java
 	- getCall(CALL_STATE_INCOMING|CALL_STATE_WAITING)//获取要处理的call
@@ -76,6 +78,17 @@ Connected.processMessage{
 		}
 	}
 }
+
+//手动断开
+Connected.processMessage{
+StackEvent.STACK_EVENT:{//StackEvent.STACK_EVENT = 100
+- StackEvent.EVENT_TYPE_CONNECTION_STATE_CHANGED {//StackEvent.EVENT_TYPE_CONNECTION_STATE_CHANGED = 1
+	- processConnectionEvent{
+		- HeadsetClientHalConstants.CONNECTION_STATE_DISCONNECTED
+		}
+	}
+}
+}@HeadsetClientStateMachine.java 
 
 
 /* 

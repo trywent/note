@@ -171,7 +171,7 @@ AudioFlinger::RecordThread::RecordTrack::stop{
 	- mWaitWorkCV.broadcast() //通知ThreadLoop
 	- mStartStopCond.wait(mLock) //等待停止状态
 	}
-- AudioSystem::stopInput
+- AudioSystem::stopInput-->aps->stopInput
 }@Tracks.cpp
 
 

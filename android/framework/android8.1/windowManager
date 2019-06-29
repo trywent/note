@@ -34,7 +34,8 @@ getWindowSession@WindowManagerGlobal.java-->openSession-->new Session(IInputMeth
 @WindowManagerServivce.java
 
 //window
-addWindow(Session,IWindow client,WindowManager.LayoutParams attrs){
+addWindow(Session,IWindow client,WindowManager.LayoutParams attrs,Rect outContentInsets,
+	 Rect outStableInsets, Rect outOutsets,InputChannel outInputChannel){
 - WindowToken token = displayContent.getWindowToken(attrs.token) //获取对应ActivityRecord的WindowToken(本质一个AppWindowToken)
 - AppWindowToken atoken = token.asAppWindowToken() //FIRST_APPLICATION_WINDOW -LAST_APPLICATION_WINDOW 应用窗口
 - WindowState win = new WindowState(this, session, client, token,attrs){
@@ -45,14 +46,32 @@ addWindow(Session,IWindow client,WindowManager.LayoutParams attrs){
 - win.attach()
 - mWindowMap.put(client.asBinder(), win)
 - win.mToken.addWindow(win) //将windowState加入到AppWindowToken
-- mPolicy.getInsetHintLw(outOutsets) //获取窗口inset大小
+- mPolicy.getInsetHintLw(win.mAttrs, taskBounds, displayInfo.rotation,displayInfo.logicalWidth, displayInfo.logicalHeight, 
+	outContentInsets,outStableInsets, outOutsets) //获取窗口inset大小
 }@WindowManagerService.java
 
-relayoutWindow(Session session, IWindow client,WindowManager.LayoutParams attrs){
+// surface,outset,inset信息
+//
+relayoutWindow(Session session, IWindow client, int seq,
+            WindowManager.LayoutParams attrs, int requestedWidth,
+            int requestedHeight, int viewVisibility, int flags,
+            Rect outFrame, Rect outOverscanInsets, Rect outContentInsets,
+            Rect outVisibleInsets, Rect outStableInsets, Rect outOutsets, Rect outBackdropFrame,
+            MergedConfiguration mergedConfiguration, Surface outSurface){
 - win.relayoutVisibleWindow
 - createSurfaceControl(Surface outSurface,WindowState win
+
+ //获取窗口信息
+- outFrame.set(win.mCompatFrame)
+- outOverscanInsets.set(win.mOverscanInsets)
+- outContentInsets.set(win.mContentInsets)
+- win.mLastRelayoutContentInsets.set(win.mContentInsets)
+- outVisibleInsets.set(win.mVisibleInsets)
+- outStableInsets.set(win.mStableInsets)
+- outOutsets.set(win.mOutsets)
 }
 //创建surface
+//
 relayoutWindow-->createSurfaceControl(Surface outSurface,WindowState win,WindowStateAnimator winAnimator){
 - WindowSurfaceController surfaceController = winAnimator.createSurfaceLocked(win.mAttrs.type) //创建
 - surfaceController.getSurface(outSurface)

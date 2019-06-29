@@ -40,6 +40,8 @@ int getMinBufferSize (int sampleRateInHz, int channelConfig, int audioFormat)
 }
 
 //开始当前线程AudioRecordThread,获取flinger端接口mAudioRecord
+// 获取audio_io_handle_t input
+// 创建AudioFlinger端 recordTrack
 AudioRecord::AudioRecord-->set(audio_source_t inputSource, uint32_t sampleRate, audio_format_t format,
         audio_channel_mask_t channelMask,callback_t cbf){
 - mReqFrameCount //根据参数计算帧数
@@ -50,9 +52,9 @@ AudioRecord::AudioRecord-->set(audio_source_t inputSource, uint32_t sampleRate, 
 	- mAudioRecordThread->run
 	}
   //AudioFlinger端打开录音线程
-- openRecord_l{
+- openRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName){
 	  //获取input
-	- AudioSystem::getInputForAttr(根据采样率等参数，创建属性)-->aps->getInputForAttr
+	- AudioSystem::getInputForAttr(&mAttributes, &input,mSessionId,)-->aps->getInputForAttr
 		AudioPolicyManager::getInputForAttr{//获取流
 		  ////获取audio_devices_t
 		- audio_devices_t device = getDeviceAndMixForInputSource-->getDeviceForInputSource

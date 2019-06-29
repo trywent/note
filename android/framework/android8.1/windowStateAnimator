@@ -30,6 +30,7 @@ createSurfaceLocked(windowType){
 - mService.closeSurfaceTransaction()
 }@WindowStateAnimator.java
 
+animate@WindowAnimator.java-->prepareWindowSurfaces@DisplayContent.java-->
 prepareSurfaceLocked{
 - computeShownFrameLocked
 - setSurfaceBoundariesLocked

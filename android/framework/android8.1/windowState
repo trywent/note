@@ -1,5 +1,14 @@
 /******************************
  windowsState
+ 位置：窗口在屏幕中的位置
+ 大小：窗口在屏幕中的显示区域。应用的view绘制的范围
+
+
+ mShownPosition 窗口位置。屏幕坐标
+ mVisibleInsets 决定可见区域的inset。窗口坐标
+ mContentInsets 被systmui,输入法遮蔽区域的inset位置。窗口坐标
+ mOverscanInsets  显示屏overscan区域inset。窗口坐标
+ mOutsets     surface之外的区域。应用还是可以绘制
 
 */
 WindowState(WindowManagerService service, Session s, IWindow c, WindowToken token,
@@ -20,9 +29,6 @@ WindowState(WindowManagerService service, Session s, IWindow c, WindowToken toke
 }
 
 /*计算窗口大小
- mContentInsets
- mVisibleInsets
- mStableInsets
 
  view的大小
 */
