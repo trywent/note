@@ -59,7 +59,10 @@ relayoutWindow(Session session, IWindow client, int seq,
             Rect outVisibleInsets, Rect outStableInsets, Rect outOutsets, Rect outBackdropFrame,
             MergedConfiguration mergedConfiguration, Surface outSurface){
 - win.relayoutVisibleWindow
-- createSurfaceControl(Surface outSurface,WindowState win
+- createSurfaceControl(Surface outSurface,WindowState win){
+	- WindowSurfaceController surfaceController = winAnimator.createSurfaceLocked(win.mAttrs.type, win.mOwnerUid)
+	- surfaceController.getSurface(outSurface)
+	}
 
  //获取窗口信息
 - outFrame.set(win.mCompatFrame)
@@ -70,13 +73,6 @@ relayoutWindow(Session session, IWindow client, int seq,
 - outStableInsets.set(win.mStableInsets)
 - outOutsets.set(win.mOutsets)
 }
-//创建surface
-//
-relayoutWindow-->createSurfaceControl(Surface outSurface,WindowState win,WindowStateAnimator winAnimator){
-- WindowSurfaceController surfaceController = winAnimator.createSurfaceLocked(win.mAttrs.type) //创建
-- surfaceController.getSurface(outSurface)
-}@WindowManagerService.java
-
 =====================
 /*
  屏幕显示方位

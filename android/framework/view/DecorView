@@ -1,0 +1,28 @@
+/*
+
+*/
+DecorView extends FrameLayout implements RootViewSurfaceTaker, WindowCallbacks
+-->DecorView(Context context, int featureId, PhoneWindow window,WindowManager.LayoutParams params){
+  //应用窗口为-1
+- mFeatureId = featureId
+  //
+- mShowInterpolator = AnimationUtils.loadInterpolator(context,android.R.interpolator.linear_out_slow_in)
+- mHideInterpolator = AnimationUtils.loadInterpolator(context,android.R.interpolator.fast_out_linear_in)
+- setWindow(window)
+- sDebugDispatchInput = SystemProperties.getBoolean(PROPERTY_PROFILE_DISPATCHINPUT, false)
+}@DeocrView.java
+
+
+//是否接管surface。。。一般不会使用这个
+willYouTakeTheSurface@RootViewSurfaceTaker.java-->willYouTakeTheSurface{
+  //应用可以设置接管surface
+- mFeatureId < 0 ? mWindow.mTakeSurfaceCallback : null
+}@DeocrView.java
+
+
+
+
+
+
+frameworks/base/core/java/com/android/internal/view/RootViewSurfaceTaker.java
+frameworks/base/core/java/com/android/internal/policy/DecorView.java

@@ -1,105 +1,440 @@
 /***********************
-
+ inputFlinger服务 （没有使用）
 */
-EventHub从设备文件读取事件:DEVICE_PATH = "/dev/input";//监听文件夹中的输入设备
+INPUT_HARDWARE_MODULE_ID "input"
+INPUT_INSTANCE_EVDEV "evdev"
 
-初始时要扫描设备：
-getEvents(判断mNeedToScanDevices，只扫描一次)-->scanDevicesLocked-->scanDirLocked(扫描/dev/input目录下设备)-->openDeviceLocked-->addDeviceLocked@EventHub(增加设备)
-
-读取监听mEpollFd中的事件：
-EventHub::getEvents(设备改变事件，唤醒事件，输入事件)-->epoll_wait@EventHub.cpp
-
-----------------------------
-设备事件处理：
-EventHub::readNotifyLocked(读取事件)-->(设备增加)openDeviceLocked(获取输入设备的信息多点触摸，触摸球...
-,将设备加入监听mEpollFd)--(创建new Device，加载键值表loadKeyMapLocked)addDeviceLocked@EventHub.cpp
-
-EventHub::readNotifyLocked(读取事件)-->(设备移除)closeDeviceByPathLocked-->closeDeviceLocked
-(从设备列表中移除设备)@EventHub.cpp
-
-加载键值表：
-loadKeyMapLocked-->device->keyMap.load@EventHub.cpp-->KeyMap::load-->
-probeKeyMap(deviceIdenfifier, String8("Generic")-->probeKeyMap(查找文件/usr/Generic.kl)-->
-KeyLayoutMap::load@Keyboard.cpp-->parser.parse(处理key，axis)-->parseKey(将Genelric.kl中的键值对加入
-到map中)@KeyLayoutMap.cpp-->getKeyCodeByLabel(传入android中的键字符,KEYCODES)-->lookupValueByLabel
-(在KEYCODES中查找对应的键值)@Keyboard.cpp
+//服务加入到ServiceManager
+main(int, char**)-->BinderService<InputFlinger>::publishAndJoinThreadPool(true)@main.cpp-->
+InputFlinger{
+- mHost = new InputHost()
+- mHost->registerInputDriver(new InputDriver(INPUT_INSTANCE_EVDEV)){ 
+	- new InputDriver(INPUT_INSTANCE_EVDEV)){
+		- const hw_module_t* module
+		- input_open(&module, name)-->hw_get_module_by_class(INPUT_HARDWARE_MODULE_ID, type, module)
+		- mHal = reinterpret_cast<const input_module_t*>(module)
+		}
+	- InputHost::registerInputDriver(InputDriverInterface* driver)-->driver->init()
+		-->mHal->init(mHal, static_cast<input_host_t*>(this), kCallbacks)
+	}
+}@InputFlinger.cpp
 
 
+frameworks/native/services/inputflinger/host/main.cpp
+frameworks/native/services/inputflinger/host/InputFlinger.cpp
+frameworks/native/services/inputflinger/host/InputHost.cpp
+frameworks/native/services/inputflinger/host/InputDriver.cpp
+
+/***********************
+ inputMananger（当前使用）
+*/
+InputManagerService{
+- this.mHandler = new InputManagerHandler
+- mPtr = nativeInit-->NativeInputManager{//返回NativeInputManager
+	- eventHub = new EventHub()
+	- mInputManager = new InputManager(eventHub) //inputManager
+	}@com_android_server_input_InputManagerService.cpp
+}@InputManagerService.java
+
+new InputManager(eventHub){
+- mDispatcher = new InputDispatcher(dispatcherPolicy)
+- mReader = new InputReader(eventHub, mDispatcher)
+- initialize{
+	- mReaderThread = new InputReaderThread(mReader)
+	- mDispatcherThread = new InputDispatcherThread(mDispatcher)
+	}
+}@InputMananger.cpp
+
+new InputManager(eventHub){
+- mDispatcher = new InputDispatcher(dispatcherPolicy)
+- mReader = new InputReader(eventHub, mDispatcher)
+- initialize{
+	- mReaderThread = new InputReaderThread(mReader)
+	- mDispatcherThread = new InputDispatcherThread(mDispatcher)
+	}
+}@InputMananger.cpp
+
+//开始读取分发线程
+WindowManagerService-->mInputManager.start@WindowManagerService.java-->start@InputManagerService.java
+-->nativeStart-->im->getInputManager()->start()@com_android_server_input_InputManagerService.cpp-->
+start{
+- mDispatcherThread->run("InputDispatcher")
+- mReaderThread->run("InputReader")
+}@InputManager.cpp
+
+
+//Event type 事件类型
+DEVICE_ADDED = 0x10000000          //设备加入事件类型
+DEVICE_REMOVED = 0x20000000
+FINISHED_DEVICE_SCAN = 0x30000000
+EV_SYN 0x00  //分隔事件
+EV_KEY 0x01  //按键类型
+EV_ABS 0x03  //绝对坐标，触摸屏
+
+//Event codes 事件编码(事件的精确类型)
+EV_SYN{
+- SYN_REPORT 0   //一组事件发送完成。鼠标一个坐标REL_X，REL_Y，SYN_REPORT
+- SYN_CONFIG
+- SYN_MT_REPORT
+- SYN_DROPPED		
+}
+
+EV_KEY{
+- KEY_A xxxx //按键
+}
+
+EV_ABS{
+- ABS_MT_POSITION_X 0x35
+- ABS_MT_POSITION_Y 0x36
+}
+
+/***********************
+ eventhub
+*/
+static const char *DEVICE_PATH = "/dev/input"
+
+EventHub(void){
+  //监听目录/dev/input
+- mEpollFd = epoll_create(EPOLL_SIZE_HINT)  
+- mINotifyFd = inotify_init()
+- inotify_add_watch(mINotifyFd, DEVICE_PATH, IN_DELETE | IN_CREATE)
+- struct epoll_event eventItem
+- eventItem.events = EPOLLIN //监听数据可读
+- eventItem.data.u32 = EPOLL_ID_INOTIFY  //标记
+- epoll_ctl(mEpollFd, EPOLL_CTL_ADD, mINotifyFd, &eventItem)
+  //监听管道数据。唤醒
+- int wakeFds[2]
+- pipe(wakeFds)
+- mWakeReadPipeFd = wakeFds[0];mWakeWritePipeFd = wakeFds[1]
+- fcntl(mWakeReadPipeFd, F_SETFL, O_NONBLOCK)
+- fcntl(mWakeWritePipeFd, F_SETFL, O_NONBLOCK)
+- eventItem.data.u32 = EPOLL_ID_WAKE //标记
+- epoll_ctl(mEpollFd, EPOLL_CTL_ADD, mWakeReadPipeFd, &eventItem)
+}@EventHub.cpp
+
+//读取事件，设备变化事件，输入事件
+EventHub::getEvents(int timeoutMillis, RawEvent* buffer, size_t bufferSize) {
+- struct input_event readBuffer[bufferSize] //读取缓存
+- RawEvent* event = buffer //事件数据保存位置
+ //循环处理
+ {
+- nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC)
+- if (mNeedToReopenDevices) {
+	- closeAllDevicesLocked
+	}
+ //上报移除设备
+- while (mClosingDevices) {
+	- event->type = DEVICE_REMOVED
+	}
+ //需要扫描设备
+- if (mNeedToScanDevices) {
+        - scanDevicesLocked()
+	}
+ //上报添加设备
+- while (mOpeningDevices != NULL) {
+	- event->type = DEVICE_ADDED
+	}
+ //有数据处理
+- while (mPendingEventIndex < mPendingEventCount) {
+	- const struct epoll_event& eventItem = mPendingEventItems[mPendingEventIndex++]
+	  //设备事件，延后处理
+	- if (eventItem.data.u32 == EPOLL_ID_INOTIFY) {
+		- mPendingINotify = true	
+		}
+	  //唤醒
+	- if (eventItem.data.u32 == EPOLL_ID_WAKE) {
+		- awoken = true
+		}
+	  //其它的就是输入事件
+	- ssize_t deviceIndex = mDevices.indexOfKey(eventItem.data.u32)
+	- Device* device = mDevices.valueAt(deviceIndex)
+	- int32_t readSize = read(device->fd, readBuffer,sizeof(struct input_event) * capacity
+	- struct input_event& iev = readBuffer[i]
+	- event->when = nsecs_t(iev.time.tv_sec) * 1000000000LL + nsecs_t(iev.time.tv_usec) * 1000LL //设置event
+	- event->deviceId = deviceId
+	- event->type = iev.type
+	- event->code = iev.code
+	- event->value = iev.value
+	- event += 1
+	}
+ //等待事件
+- nt pollResult = epoll_wait(mEpollFd, mPendingEventItems, EPOLL_MAX_EVENTS, timeoutMillis)
+ }//循环处理
+- return event - buffer
+}@EventHub.cpp
+
+
+
+//扫描"/dev/input"，打开设备,初始化设备
+scanDevicesLocked-->scanDirLocked(DEVICE_PATH)-->
+openDeviceLocked(devname){
+  //获取输入设备信息
+- int fd = open(devicePath, O_RDWR | O_CLOEXEC | O_NONBLOCK)
+- ioctl(fd, EVIOCGNAME(sizeof(buffer) - 1), &buffer) //设备名
+- ioctl(fd, EVIOCGVERSION, &driverVersion) //驱动版本
+- ioctl(fd, EVIOCGID, &inputId)  //identifer标识
+- ioctl(fd, EVIOCGUNIQ(sizeof(buffer) - 1), &buffer) //唯一id
+  //创建设备
+- assignDescriptorLocked(identifier)
+- Device* device = new Device(fd, deviceId, String8(devicePath), identifier)
+- loadConfigurationLocked(device){
+	  //获取设备配置文件 .idc
+	- device->configurationFile = getInputDeviceConfigurationFilePathByDeviceIdentifier
+	- PropertyMap::load(device->configurationFile,&device->configuration)
+	}
+  //获取输入设备支持的事件。判断是否支持按键
+- ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(device->keyBitmask)), device->keyBitmask)
+- ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(device->absBitmask)), device->absBitmask)
+- haveKeyboardKeys，haveGamepadButtons
+  //设置输入设备类型
+- if (haveKeyboardKeys || haveGamepadButtons) device->classes |= INPUT_DEVICE_CLASS_KEYBOARD //键盘类型
+- device->classes |= INPUT_DEVICE_CLASS_TOUCH | INPUT_DEVICE_CLASS_TOUCH_MT //触摸，多点触摸
+ //加载设备键值表，KeyMap
+- loadKeyMapLocked(device){
+	- 
+	}
+ //监听设备，用于读取输入事件
+- registerDeviceForEpollLocked(Device* device){
+	- eventItem.events = EPOLLIN
+	- if (mUsingEpollWakeup) {
+       		eventItem.events |= EPOLLWAKEUP
+    		}
+	- eventItem.data.u32 = device->id
+	- epoll_ctl(mEpollFd, EPOLL_CTL_ADD, device->fd, &eventItem)
+	}
+- configureFd(device)
+- addDeviceLocked(device)-->mDevices.add(device->id, device) //保存到mDevice
+}@EventHub.cpp
+
+
+frameworks/native/services/inputflinger/EventHub.cpp
 frameworks/base/libs/androidfw/Keyboard.cpp
 frameworks/base/libs/androidfw/KeyLayoutMap.cpp
 frameworks/native/libs/utils/Tokenizer.cpp
 frameworks/base/include/androidfw/KeycodeLabels.h
-____________________________
-加入输入设备：
-loopOnce(eventHub中读取设备)-->processEventsLocked-->addDeviceLocked【createDeviceLocked创建device，根
-据classes不同创建不同mapper device->addMapper(new MultiTouchInputMapper(device))】-->mDevices.add
-@inputReader.cppopenDeviceLocked(设备是多点出屏device->classes |= INPUT_DEVICE_CLASS_TOUCH | INPUT_DEVICE_CLASS_TOUCH_MT)-->addDeviceLocked@EventHub.cpp-->addDeviceLocked-->createDeviceLocked(
-创建new InputDevice(context为InputReader))-->device->addMapper(加入对应的mapper)@InputReader.cpps
 
-kenerl和android键值映射:
-EventHub::mapKey-->(mKeyCharacterMap)kcm->mapKey--()device->keyMap.keyLayoutMap->mapKey
-(设置对应的键值)@EventHub.cpp-->mapKey-->getKey-->(一个map)mKeysByScanCode.valueAt@KeyLayoutMap.cpp
+/***********************
+ InputDispatcher
+ 
+*/
+InputDispatcher(dispatcherPolicy){
+- mPolicy(policy)
+- mLooper = new Looper(false)
+}@InputDispatcher.cpp
 
-====================================
-inputReader读取事件:  将EventHub读取的事件传到inputDispatcher
+InputDispatcherThread(mDispatcher):Thread(/*canCallJava*/ true), mDispatcher(dispatcher)@InputDispatcher.cpp
 
-threadLoop-->mReader->loopOnce-->mEventHub->getEvent获取事件--处理事件--processEventsLocked(循环处理
-buffer中事件)-->processEventsForDeviceLocked(处理输入事件,从mDevice中取得对应的输入设备)-->device->process-->InputDevice::process-->mapper->process-->KeyboardInputMapper(以按键为例)-->KeyboardInputMapper::process
-【这里应该会进行扫描的按键值与按键值表的映射getEventHub()->mapKey】-->KeyboardInputMapper::processKey(
-处理转换后的keyCode)@InputReader.cpp-->getListener()->notifyKey(&args)-->InputReader::ContextImpl::getListener
--->mReader->mQueuedListener.get(返回一个mDispatcher，在创建时传入)-->(到分发处理)InputDispatcher::notifyKey-->
----------------------------------------------------
----------处理预先截获的按键（power home）-----------
-mPolicy->interceptKeyBeforeQueueing(截获要处理的按键.mPolicy由InputManager构造方法传入到InputDispatcher,
-是一个NativeInputManager实例)@InputDispatcher.cpp-->NativeInputManager::interceptKeyBeforeQueueing-->
-interceptKeyBeforeQueueing@InputManagerServcie.java-->mCallbacks.interceptKeyBeforeQueueing
-(mCallbacks是在构造时传入的mInputMonitor)-->interceptKeyBeforeQueueing@InputMonitor.java-->
-mService.mPolicy.interceptKeyBeforeQueueing(mPolicy是makeNewWindowManager@PolicyManager.java,)-->
-interceptKeyBeforeQueueing@PhoneWindowManager.java
----------------------------------------------------
-将事件加入到dispatcher的队列中：
-(notifyMotion,injectInputEvent)notifyKey-->enqueueInboundEventLocked-->mInboundQueue.enqueueAtTail
+//开始处理数据
+mDispatcherThread->run("InputDispatcher")-->InputDispatcherThread::threadLoop()-->mDispatcher->dispatchOnce()
+InputDispatcher::dispatchOnce(){
 
-====================================
-触摸事件：
-(加入触摸设备)addDeviceLocked-->createDeviceLocked-->device->addMapper(new MultiTouchInputMapper(device))
-@InputReader.cpp
+}@InputDispatcher.cpp
 
-保存事件：
-InputDevice::process-->mapper->process-->MultiTouchInputMapper::process-->
-mMultiTouchMotionAccumulator.process-->MultiTouchMotionAccumulator::process(将坐标值加入mSlots)
-@InputReader.cpp
 
-同步事件：
-MultiTouchInputMapper::process-->TouchInputMapper::process-->sync-->syncTouch-->
-MultiTouchInputMapper::syncTouch-->mMultiTouchMotionAccumulator.getSlot(读出数据)-->
-mCurrentRawPointerData(保存数据)@InputReader.cpp
+frameworks/native/services/inputflinger/InputDispatcher.cpp
+/***********************
+ InputReader
+ 
+ InputReader Pointer
 
-调整坐标值：
-TouchInputMapper::process-->sync-->cookPointerData(根据比例调整输入的坐标值){
--
+ 读取触摸事件，时间打印为100ms一个坐标
+*/
+InputReader(eventHub, mDispatcher){
+- mContext(this), mEventHub(eventHub), mPolicy(policy)
+  //mDispatcher为listener
+- mQueuedListener = new QueuedInputListener(listener){
+	
+	}
+- refreshConfigurationLocked(0){
+	- mPolicy->getReaderConfiguration(&mConfig)
+	- mEventHub->setExcludedDevices(mConfig.excludedDeviceNames)
+	- for (size_t i = 0; i < mDevices.size(); i++) {
+		- InputDevice* device = mDevices.valueAt(i)
+		- device->configure(now, &mConfig, changes)
+		}
+	}
+- updateGlobalMetaStateLocked{
+	- 
+	}
+}@InputReader.cpp
 
+InputReaderThread(mReader):Thread(/*canCallJava*/ true), mReader(reader)@InputReader.cpp
+
+//开始读取数据
+mReaderThread->run("InputReader")-->InputReaderThread::threadLoop()-->mReader->loopOnce()
+InputReader::loopOnce() {
+- size_t count = mEventHub->getEvents(timeoutMillis, mEventBuffer, EVENT_BUFFER_SIZE)
+- processEventsLocked(mEventBuffer, count){
+	 //遍历mEventBuffer,处理event
+	- for (const RawEvent* rawEvent = rawEvents; count;) {
+		- int32_t type = rawEvent->type
+		- if (type < EventHubInterface::FIRST_SYNTHETIC_EVENT) {//输入事件
+			- 查找同一类型的事件，batchSize 
+			- processEventsForDeviceLocked(deviceId, rawEvent, batchSize){
+				- ssize_t deviceIndex = mDevices.indexOfKey(deviceId)
+				- InputDevice* device = mDevices.valueAt(deviceIndex)
+				- device->process(rawEvents, count)	
+				}
+		  }else{//设备事件
+			- EventHubInterface::DEVICE_ADDED:addDeviceLocked(rawEvent->when, rawEvent->deviceId)
+			- EventHubInterface::DEVICE_REMOVED:removeDeviceLocked(rawEvent->when, rawEvent->deviceId)
+			- EventHubInterface::FINISHED_DEVICE_SCAN:handleConfigurationChangedLocked
+			}
+		}
+	}
 }@InputReader.cpp
 
 
+//加入输入设备
+InputReader::addDeviceLocked(nsecs_t when, int32_t deviceId) {
+- InputDeviceIdentifier identifier = mEventHub->getDeviceIdentifier(deviceId)
+- uint32_t classes = mEventHub->getDeviceClasses(deviceId)
+  //创建设备
+- InputDevice* device = createDeviceLocked(deviceId, controllerNumber, identifier, classes){
+	- InputDevice* device = new InputDevice(&mContext, deviceId, bumpGenerationLocked(),controllerNumber, identifier, classes)
+	- device->addMapper(new KeyboardInputMapper(device, keyboardSource, keyboardType))
+	- device->addMapper(new MultiTouchInputMapper(device))
+	}
+- device->configure(when, &mConfig, 0)
+- mDevices.add(deviceId, device)
+}@InputReader.cpp
 
-分发触摸事件：
-TouchInputMapper::sync-->syncTouch--TouchInputMapper::dispatchTouches(判断是滑动，按下，提起)-->
-TouchInputMapper::dispatchMotion(分发滑动，按下，提起事件)-->getListener()->notifyMotion-->
-InputReader::ContextImpl::getListener()->notifyMotion-->mQueuedListener.get()->notifyMotion
-@InputReader.cpp-->notifyMotion-->enqueueInboundEventLocked@InputDispatcher.cpp
+//移除输入设备
+InputReader::removeDeviceLocked(nsecs_t when, int32_t deviceId) {
+- 
+}@InputReader.cpp
 
-查找窗口：
-dispatchOnceInnerLocked()-->dispatchMotionLocked-->findTouchedWindowTargetsLocked{
--查找状态为windowInfo->visible的窗口，是否包含触摸坐标
--检查窗口的状态是否是暂停，若是则不会处理事件
+//事件处理
+InputReader::processEventsForDeviceLocked(int32_t deviceId,const RawEvent* rawEvents, size_t count)-->
+device->process(rawEvents, count)-->InputDevice::process(const RawEvent* rawEvents, size_t count){
+- size_t numMappers = mMappers.size()
+- for (const RawEvent* rawEvent = rawEvents; count--; rawEvent++) {
+	- if (mDropUntilNextSync) {
 
-}-->findTouchedWindowAtLocked@InputDispatcher.cpp
+	  }else if(){
 
-分发触摸事件处理：
-dispatchOnceInnerLocked()-->dispatchMotionLocked-->dispatchEventLocked
-____________________________
-触摸坐标根据屏幕比例进行缩放，使触摸坐标(x,y)与屏幕坐标(x1,y1)能够对应。
+	  }else{
+	   //遍历mapper
+	  - mapper->process(rawEvent)
+	  }
+	}
+
+}@InputReader.cpp
+
+//键盘mapper
+void KeyboardInputMapper::process(const RawEvent* rawEvent) {
+
+}@InputReader.cpp
+
+/* 触摸事件 TouchInputMapper 
+  事件保存到 mRawStatesPending
+*/
+void TouchInputMapper::process(const RawEvent* rawEvent) {
+- mCursorButtonAccumulator.process(rawEvent)
+- mCursorScrollAccumulator.process(rawEvent)
+- mTouchButtonAccumulator.process(rawEvent)
+  //一个完整事件周期
+- if (rawEvent->type == EV_SYN && rawEvent->code == SYN_REPORT) {
+	- sync(rawEvent->when)
+	}
+}@InputReader.cpp
+
+//一个事件完成，提交事件。正常一个坐标跟随一个sync
+TouchInputMapper::sync(nsecs_t when) {
+  // Push a new state.
+- mRawStatesPending.push()
+- RawState* next = &mRawStatesPending.editTop()
+- next->buttonState = mTouchButtonAccumulator.getButtonState()| mCursorButtonAccumulator.getButtonState()
+- next->rawVScroll = mCursorScrollAccumulator.getRelativeVWheel()
+- next->rawHScroll = mCursorScrollAccumulator.getRelativeHWheel()
+  //获取触摸状态
+- syncTouch(when, next)
+  //提交事件到dispatcher
+- processRawTouches(false)-->TouchInputMapper::processRawTouches(bool timeout)
+}@InputReader.cpp
+
+//上报事件
+TouchInputMapper::processRawTouches(bool timeout){
+- const size_t N = mRawStatesPending.size()
+- for(count = 0; count < N; count++) {
+	- const RawState& next = mRawStatesPending[count]
+	- mCurrentRawState.copyFrom(next)
+	- cookAndDispatch(mCurrentRawState.when)
+	}
+}@InputReader.cpp
+
+cookAndDispatch(mCurrentRawState.when){
+- consumeRawTouches(when, policyFlags)
+}
+/* 单点触摸 SingleTouchInputMapper 
+
+*/
+class SingleTouchInputMapper : public TouchInputMapper
+
+/* 多点触摸 MultiTouchInputMapper */
+class MultiTouchInputMapper : public TouchInputMapper
+
+void MultiTouchInputMapper::process(const RawEvent* rawEvent) {
+- TouchInputMapper::process(rawEvent)
+- mMultiTouchMotionAccumulator.process(rawEvent){
+	- 
+	}
+}@InputReader.cpp
+
+MultiTouchInputMapper::syncTouch(nsecs_t when, RawState* outState) {
+- size_t inCount = mMultiTouchMotionAccumulator.getSlotCount()
+  //遍历solts
+- for (size_t inIndex = 0; inIndex < inCount; inIndex++) {
+	- const MultiTouchMotionAccumulator::Slot* inSlot = mMultiTouchMotionAccumulator.getSlot(inIndex)
+	- RawPointerData::Pointer& outPointer = outState->rawPointerData.pointers[outCount]
+	- outPointer.x = inSlot->getX()
+	- outPointer.y = inSlot->getY()
+	}
+}@InputReader.cpp
+
+/* Keeps track of the state of mouse or touch pad buttons. 
+   鼠标左右键？
+*/
+class CursorButtonAccumulator
+
+//保存键值
+CursorButtonAccumulator::process(const RawEvent* rawEvent) {
+- BTN_LEFT:mBtnLeft = rawEvent->value
+- BTN_RIGHT:mBtnRight = rawEvent->value
+}
+
+/* Keeps track of cursor movements. 
+  鼠标坐标
+*/
+class CursorMotionAccumulator
+
+CursorScrollAccumulator::process(const RawEvent* rawEvent) {
+
+/* Keeps track of cursor scrolling motions. 
+  鼠标滚轮
+*/
+class CursorScrollAccumulator
+
+CursorScrollAccumulator::process(const RawEvent* rawEvent) {
+- REL_WHEEL:mRelWheel = rawEvent->value
+- REL_HWHEEL:mRelHWheel = rawEvent->value
+}
+
+/* Keeps track of the state of touch, stylus and tool buttons. 
+  触摸按键
+*/
+class TouchButtonAccumulator
+
+TouchButtonAccumulator::process(const RawEvent* rawEvent) {
+- BTN_TOUCH:mBtnTouch = rawEvent->value
+- BTN_STYLUS:mBtnStylus = rawEvent->value
+- BTN_TOOL_FINGER:mBtnToolFinger = rawEvent->value
+- BTN_TOOL_PEN:mBtnToolPen = rawEvent->value
+}
+
+
+
+//触摸坐标根据屏幕比例进行缩放，使触摸坐标(x,y)与屏幕坐标(x1,y1)能够对应。
 
 设置输入配置信息：
 NativeInputManager::setDisplayOrientation-->(更新读取器信息)mInputManager->getReader()->
@@ -147,16 +482,6 @@ notifySwitch{
 - mWindowManagerCallbacks.notifyCameraLensCoverSwitchChanged
 - mWiredAccessoryCallbacks.notifyWiredAccessoryChanged
 }
-
-
-
-
-
-frameworks/base/services/core/jni/com_android_server_input_InputManagerService.cpp
-frameworks/base/services/core/java/com/android/server/input/InputManagerService.java
-============
-addDeviceLocked-->createDeviceLocked
-
 
 
 frameworks/native/services/inputflinger/InputReader.cpp

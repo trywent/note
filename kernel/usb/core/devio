@@ -1,0 +1,41 @@
+/*
+ devio
+ 
+ 设备节点/dev/bus/usb/001
+*/
+#define USB_DEVICE_MAJOR		189
+
+//接口初始化
+//设置所有usb设备的操作函数
+usb_devio_init(void){
+  //注册设备号189(0-255)
+- register_chrdev_region(USB_DEVICE_DEV, USB_DEVICE_MAX,"usb_device")
+- cdev_init(&usb_device_cdev, &usbdev_file_operations)
+- cdev_add(&usb_device_cdev, USB_DEVICE_DEV, USB_DEVICE_MAX)
+  //class
+- usb_classdev_class = class_create(THIS_MODULE, "usb_device")
+  //注册监听。当usb改变时会被调用
+- usb_register_notify(&usbdev_nb)
+}@devio.c
+
+//监听到设备加入
+usbdev_notify(struct notifier_block *self,unsigned long action, void *dev){
+- USB_DEVICE_ADD:usb_classdev_add(dev){
+	  //创建设备节点
+	- device_create(usb_classdev_class, &dev->dev, dev->dev.devt,NULL, "usbdev%d.%d", dev->bus->busnum,dev->devnum)
+	- dev->usb_classdev = cldev
+	}
+- USB_DEVICE_REMOVE{
+	- usb_classdev_remove(dev)
+	- usbdev_remove(dev)
+	}
+}@devio.c
+
+
+usbfs_add_device-->fs_create_file(&usbdev_file_operations)@inode.c
+
+
+
+kernel/drivers/usb/core/devio.c
+kernel/drivers/usb/core/inode.c
+kernel/drivers/usb/core/notify.c

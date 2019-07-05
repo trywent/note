@@ -1,0 +1,148 @@
+/*****************
+ 打开文件。读写文件
+*/
+int open(const char *pathname, int flags, mode_t mode);
+pathname:文件路径
+flags:必须包含O_RDONLY,  O_WRONLY,  or  O_RDWR之一
+	文件打开标识 O_CREAT, O_EXCL,O_NOCTTY, and O_TRUNC
+	文件状态标识，可以通过fcntl进行修改
+mode:需要创建文件时，设置文件的权限
+
+ssize_t read(int fd, void *buf, size_t count);//返回实际读取的数据个数
+ssize_t write(int fd, const void *buf, size_t count);//返回写入的数据个数
+
+//流操作stream
+fdopen 
+
+
+/*****************
+select,pselect:等待文件描述符准备好执行IO操作
+
+
+
+*/
+#include <sys/select.h>
+
+/*
+参数：
+readfds   监听可读
+writefds  监听可写
+exceptfds 监听抛异常的fd
+timeout  等待时间
+
+返回数据可用的fd个数
+*/
+int select(int nfds, fd_set *readfds, fd_set *writefds,
+                  fd_set *exceptfds, struct timeval *timeout);
+
+int pselect(int nfds, fd_set *readfds, fd_set *writefds,
+                   fd_set *exceptfds, const struct timespec *timeout,
+                   const sigset_t *sigmask);
+
+void FD_CLR(int fd, fd_set *set)
+int  FD_ISSET(int fd, fd_set *set)
+void FD_SET(int fd, fd_set *set)
+void FD_ZERO(fd_set *set)
+
+
+/*****************
+poll监听文件描述符，是否有数据(等待事件)
+
+ppoll与poll的区别是，ppoll除了超时结束等待，还会在收到某个信号后结束等待。
+*/
+#include <poll.h>
+
+struct pollfd {
+ int   fd;         //监听的文件
+ short events;     //监听的事件类型
+ short revents;    //收到的事件
+}
+
+//events revents 事件类型
+POLLIN  有数据可读
+POLLPRI  有紧急数据
+POLLOUT  可写
+
+/*
+参数：
+fds   监听的文件描述符,事件
+nfds  文件描述符的个数
+timeout  等待时间
+*/
+int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+int ppoll(struct pollfd *fds, nfds_t nfds,
+               const struct timespec *tmo_p, const sigset_t *sigmask);
+
+
+
+
+/*****************
+ epoll:(仅比poll快)
+ poll的变种可用做边界触发，水平触发，能够监听多个文件描述符
+
+*/
+
+typedef union epoll_data {
+ void    *ptr;
+ int      fd;
+ uint32_t u32;
+ uint64_t u64;
+} epoll_data_t;
+
+struct epoll_event {
+ uint32_t     events;    /* Epoll events */
+ epoll_data_t data;      /* User data variable */
+};
+
+
+1/*创建epoll 返回一个epoll实例*/
+int epoll_create(int size)
+
+2/*设置epoll,设置监听的文件，事件类型
+pfd  epoll实例
+op    操作类型
+	EPOLL_CTL_ADD 注册fd到epoll,关联event到fd
+	EPOLL_CTL_MOD 改变监听事件
+	EPOLL_CTL_DEL 注销监听
+fd    要监听的文件
+event
+	EPOLLIN 关联的文件可读
+	EPOLLOUT 关联的文件可写
+*/
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+
+3/*等待事件
+epfd  epoll实例
+event 返回的事件
+*/
+int epoll_wait(int epfd, struct epoll_event *events,
+                      int maxevents, int timeout);
+
+int epoll_pwait(int epfd, struct epoll_event *events,
+                      int maxevents, int timeout,
+                      const sigset_t *sigmask);
+
+
+
+
+
+/*****************
+ event
+
+*/
+int eventfd(unsigned int initval, int flags);
+
+read
+writeq
+poll/select
+
+/*****************
+ 监听文件系统事件
+ inotify
+
+*/
+#include <sys/inotify.h>
+
+inotify_init(2)
+inotify_add_watch(2)
+inotify_rm_watch(2)

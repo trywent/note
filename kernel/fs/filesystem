@@ -1,4 +1,61 @@
 /***********************
+ filesystem 系统调用
+
+*/
+//mknod
+SYSCALL_DEFINE4(mknodat, int, dfd, const char __user *, filename, umode_t, mode,unsigned, dev){
+- struct dentry *dentry = user_path_create(dfd, filename, &path, lookup_flags)
+- security_path_mknod(&path, dentry, mode, dev)
+- switch(mode & S_IFMT){
+	- S_IFREG{//普通文件
+		- vfs_create2(path.mnt, path.dentry->d_inode,dentry,mode,true)
+		}
+	- S_IFCHR,S_IFBLK{//字符文件，块文件
+		- vfs_mknod2(path.mnt, path.dentry->d_inode,dentry,mode,new_decode_dev(dev))
+		}
+	- S_IFIFO,S_IFSOCK{//pipe socket
+		- vfs_mknod(path.dentry->d_inode,dentry,mode,0)
+		}
+	}
+}namei.c
+
+//设备节点
+int vfs_mknod2(struct vfsmount *mnt, struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev){
+- int error = may_create(mnt, dir, dentry)
+- devcgroup_inode_mknod(mode, dev)
+- security_inode_mknod(dir, dentry, mode, dev)
+- dir->i_op->mknod(dir, dentry, mode, dev)
+}@namei.c
+
+
+//mkdir
+
+//mount：
+compat_sys_mount@compat.c-->do_mount-->do_new_mount-->do_kern_mount-->vfs_kern_mount
+@namespace.c-->mount_fs-->(不同的文件系统file_system_type)type->mount@super.c-->
+(FAT32)vfat_mount@namei_vfat.c
+
+//sys_open
+SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
+(构造sys_open)sys_open-->do_sys_open@open.c-->do_filp_open-->path_openat@namei.c
+
+//sys_read
+SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+(构造系统调用函数)sys_read-->vfs_read-->do_sync_read-->filp->f_op->aio_read@read_write.c
+-->(vFAT)generic_file_aio_read@filemap.c
+
+static struct file_system_type *file_systems;
+register_filesystem(将文件系统加入到file_system链表)@filesystems.c
+
+
+
+
+fs/filesystems.c
+fs/read_write.c
+fs/open.c
+fs/namei.c
+
+/***********************
  filesystem
 
 */
@@ -63,38 +120,5 @@ struct kernfs_node *__kernfs_create_file(struct kernfs_node *parent,
 kernel/fs/kernfs/dir.c
 kernel/fs/kernfs/file.c
 
-/***********************
- filesystem 系统调用
 
-*/
-
-//mkdir
-
-//mknod
-
-//mount：
-compat_sys_mount@compat.c-->do_mount-->do_new_mount-->do_kern_mount-->vfs_kern_mount
-@namespace.c-->mount_fs-->(不同的文件系统file_system_type)type->mount@super.c-->
-(FAT32)vfat_mount@namei_vfat.c
-
-//sys_open
-SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
-(构造sys_open)sys_open-->do_sys_open@open.c-->do_filp_open-->path_openat@namei.c
-
-//sys_read
-SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
-(构造系统调用函数)sys_read-->vfs_read-->do_sync_read-->filp->f_op->aio_read@read_write.c
--->(vFAT)generic_file_aio_read@filemap.c
-
-static struct file_system_type *file_systems;
-register_filesystem(将文件系统加入到file_system链表)@filesystems.c
-
-
-
-
-fs/filesystems.c
-fs/read_write.c
-fs/open.c
-fs/namei.c
-=================================
 

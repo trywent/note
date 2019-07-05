@@ -24,11 +24,23 @@ ViewRootImpl(Context context, Display display) {
 setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
 - mView = view //DecorView
 - mWindowAttributes.copyFrom(attrs)
+  //
+- if (view instanceof RootViewSurfaceTaker) {
+
+	}
+
 - mInputChannel = new InputChannel()
   //加入窗口，获取inset,outSet信息
 - mWindowSession.addToDisplay(mWindow, mWindowAttributes,getHostVisibility(), 
 	mAttachInfo.mContentInsets, mAttachInfo.mStableInsets,mAttachInfo.mOutsets, mInputChannel)
 }@ViewRootImpl.java
+
+//relayout,设置mSurface,获取frame大小
+relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,boolean insetsPending){
+- mWindowSession.relayout(mWindow, mSeq, params,mMeasuredWidth,mMeasuredHeight,mSurface)@ViewRootImpl.java
+  -->mService.relayoutWindow@Session.java-->relayoutWindow@WindowManangerService.java
+}@ViewRootImpl.java
+
 
 //窗口状态
 performRestart/performStop-->WindowManagerGlobal.getInstance().setStoppedState(mToken, true)@Activity.java
@@ -182,15 +194,17 @@ onLayout(boolean changed, int left, int top, int right, int bottom){
 	}
 }@DecorView.java
 
-//relayout,创建surface,获取frame大小
-relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,boolean insetsPending)-->
-mWindowSession.relayout(mWindow, mSeq, params,mMeasuredWidth,mMeasuredHeight,mSurface)@ViewRootImpl.java
-mService.relayoutWindow@Session.java-->relayoutWindow@WindowManangerService.java
+
 
 /*
   绘制
 */
 performDraw
+
+
+draw(boolean fullRedrawNeeded) {
+- 
+}@ViewRootImpl.java
 
 frameworks/base/core/java/android/view/ViewRootImpl.java
 frameworks/base/core/java/com/android/internal/policy/DecorView.java

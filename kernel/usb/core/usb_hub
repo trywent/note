@@ -1,0 +1,100 @@
+/* usb hub
+
+  struct usb_hcd
+*/
+usb_init@usb.c-->usb_hub_init{
+  //注册hub驱动
+- usb_register(&hub_driver)  //usb_driver interface驱动
+- kthread_run(hub_thread)-->hub_thread(void *__unused){
+	- hub_events
+  	//等待事件
+	- wait_event_freezable(khubd_wait,!list_empty(&hub_event_list) ||kthread_should_stop())
+	}
+- usb_deregister(&hub_driver)
+}@hub.c
+
+//处理事件
+hub_events(void){
+- int connect_change
+  //获取事件
+- struct list_head tmp = hub_event_list.next
+  //获取事件对应的hub设备
+- struct usb_hub hub = list_entry(tmp, struct usb_hub, event_list)
+- struct usb_device *hdev = hub->hdev
+- struct device * hub_dev = hub->intfdev
+- struct usb_interface *intf = to_usb_interface(hub_dev)
+  //遍历端口，获取端口状态
+- for (i = 1; i <= hub->descriptor->bNbrPorts; i++) {
+	- connect_change = test_bit(i, hub->change_bits)
+	- hub_port_status(hub, i,&portstatus, &portchange)
+	- 
+	- if (connect_change)
+		- hub_port_connect_change(hub, i,portstatus, portchange)
+	}
+  //获取hub状态，
+- hub_hub_status(hub, &hubstatus, &hubchange)
+- if (hubchange & HUB_CHANGE_LOCAL_POWER) {
+
+	}
+- if (hubchange & HUB_CHANGE_OVERCURRENT) {
+
+	}
+}@hub.c
+
+//端口状态变化
+hub_port_connect_change(struct usb_hub *hub, int port1,u16 portstatus, u16 portchange){
+- 
+ //端口上已有设备
+- udev = hdev->children[port1-1]
+- if (udev) usb_disconnect(&hdev->children[port1-1])
+ //设备没有连接。防抖失败
+- if (portchange & (USB_PORT_STAT_C_CONNECTION |USB_PORT_STAT_C_ENABLE)) {
+	- hub_port_debounce(hub, port1)
+	}
+- if (!(portstatus & USB_PORT_STAT_CONNECTION) ||test_bit(port1, hub->removed_bits)) {
+	- if (portstatus & USB_PORT_STAT_ENABLE) goto done;
+	- return
+	}
+  //创建usb_device
+- for (i = 0; i < SET_CONFIG_TRIES; i++) {
+	- struct usb_device *udev = usb_alloc_dev(hdev, hdev->bus, port1)
+	- usb_set_device_state(udev, USB_STATE_POWERED)
+	- hub_port_init(hub, udev, port1, i)
+	- usb_new_device(udev)
+	}
+}@hub.c
+
+//初始化usb_device。并注册
+usb_new_device(struct usb_device *udev){
+  //初始化设备信息
+- usb_enumerate_device(udev){
+	  //获取usb_device的config信息
+	- usb_get_configuration(udev)
+	- udev->product,udev->manufacturer,udev->serial
+	- usb_enumerate_device_otg(udev)
+	}
+  //赋值设备号
+- udev->dev.devt = MKDEV(USB_DEVICE_MAJOR)
+  //为usb设备信息创建属性文件
+- announce_device(udev)
+- device_add(&udev->dev)
+- usb_create_ep_devs(&udev->dev, &udev->ep0, udev)
+}@hub.c
+
+//加入hub事件
+usb_fill_int_urb(hub_irq)
+kick_khubd-->list_add_tail(&hub->event_list, &hub_event_list)@hub.c
+
+
+___________________
+//操作函数
+
+
+
+
+
+
+
+
+
+

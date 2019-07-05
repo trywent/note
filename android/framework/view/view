@@ -113,9 +113,6 @@ SYSTEM_UI_FLAG_VISIBLE:
  绘制
 
 */
-
-
-
 scheduleTraversals-->mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable)
 @ViewRootImpl.java-->doFrame-->doCallback-->c.run@Choreographer.java-->
 TraversalRunnable.run-->doTraversal-->performTraversals-->mView.draw@ViewRootImpl.java

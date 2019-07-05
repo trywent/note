@@ -1,10 +1,53 @@
-/*
+/***********************
 
 */
-设备如何产生事件，事件如何保存，事件如何被获取
+//Event type 事件类型
+EV_SYN 0x00  //分隔事件
+EV_KEY 0x01  //按键类型
+EV_REL 0x02  //相对坐标，鼠标
+EV_ABS 0x03  //绝对坐标，触摸屏
+EV_MSC 0x04  //杂项
+EV_SW 0x05
+EV_LED 0x11
+EV_SND 0x12
+EV_REP 0x14
+EV_FF 0x15
+EV_PWR 0x16
+EV_FF_STATUS 0x17
+EV_MAX 0x1f
 
-=============================
-核心部分是input模块，是设备驱动和事件处理器的桥梁。
+SYN_REPORT 0
+SYN_CONFIG 1
+
+//Event codes 事件编码(事件的精确类型)
+EV_SYN{
+- SYN_REPORT   //一组事件发送完成。鼠标一个坐标REL_X，REL_Y，SYN_REPORT
+- SYN_CONFIG
+- SYN_MT_REPORT
+- SYN_DROPPED		
+}
+
+EV_KEY{
+- KEY_A xxxx //按键
+- BTN_TOOL_<name> //BTN_TOOL_FINGER  BTN_TOOL_TRIPLETAP
+- BTN_TOUCH       //触摸屏有接触时上报
+}
+
+EV_REL{
+- REL_WHEEL   //竖直滑轮
+- REL_HWHEEL  //水平滑轮
+- REL_{X,Y}
+}
+
+EV_ABS{
+- ABS_DISTANCE
+- ABS_MT_<name> //多点触摸
+- ABS_{X,Y}
+}
+
+
+kernel/Documentation/input/event-codes.txt
+
 
 ----------------------------
 Device drivers：

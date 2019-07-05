@@ -1,0 +1,55 @@
+/*
+ 获取usb信息接口
+*/
+
+//获取设备descriptor
+usb_get_descriptor(struct usb_device *dev, unsigned char type,unsigned char index, void *buf, int size){
+- 
+
+}@message.c
+
+
+//
+usb_set_configuration(struct usb_device *dev, int configuration){
+  //选择对应的usb_host_config cp
+- if (dev->config[i].desc.bConfigurationValue ==configuration) 
+	- struct usb_host_config *cp = &dev->config[i]
+  //创建interface
+- nintf = cp->desc.bNumInterfaces
+- struct usb_interface **new_interfaces = kmalloc(nintf * sizeof(*new_interfaces),GFP_NOIO)
+- for (; n < nintf; ++n) {//创建nintf个usb_interface
+	- new_interfaces[n] = kzalloc(sizeof(struct usb_interface)
+	}
+- usb_hcd_alloc_bandwidth(dev, cp, NULL, NULL)
+  //初始化interface
+- for (i = 0; i < nintf; ++i) {
+	- cp->interface[i] = intf = new_interfaces[i]
+	- intf->cur_altsetting = alt
+	- intf->dev.bus = &usb_bus_type
+	- intf->dev.type = &usb_if_device_type
+	- device_initialize(&intf->dev)
+	}
+  //注册inteface设备
+- for (i = 0; i < nintf; ++i) {
+	- struct usb_interface *intf = cp->interface[i]
+	- device_add(&intf->dev)
+	- create_intf_ep_devs(intf)
+	}
+}@message.c
+
+
+kernel/drivers/usb/core/message.c
+
+
+/*
+ config
+*/
+usb_get_configuration(struct usb_device *dev){
+- 
+}@config.c
+
+
+
+
+
+kernel/drivers/usb/core/config.c

@@ -45,6 +45,10 @@ sysfs_create_file(struct kobject *kobj,const struct attribute *attr)-->sysfs_cre
 }@file.c
 
 
+DEVICE_ATTR(_name, _mode, _show, _store)
+DEVICE_ATTR_RW(_name)
+DEVICE_ATTR_RO(_name)
+
 kernel/include/linux/sysfs.h
 kernel/fs/sysfs/dir.c
 kernel/fs/sysfs/file.c

@@ -435,7 +435,7 @@ enablePointerLocation{
 - 加入窗口，wm.addView(mPointerLocationView)
 - 创建事件通道，mPointerLocationInputChannel
 - 
-}
+}@PhoneWindowMananger.java
 
 
 

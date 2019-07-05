@@ -1,4 +1,6 @@
-//
+/*
+ 
+*/
 设置permission，feature：
 readPermissionsFromXml(/etc/permissions/ *.xml)@ApplicationPackageManager.java
 

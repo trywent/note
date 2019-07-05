@@ -166,8 +166,9 @@ setPictureInPictureActions-->getWindowContainerController().setPictureInPictureA
 
 }@PinnedStackWindowController.java
 
-//窗口变化
-
+//监听器
+registerTaskStackListener(ITaskStackListener listener)@ActivityManagerService.java-->
+registerTaskStackListener(listener)@TaskChangeNotificationController.java
 
 notifyMovementBoundsChanged
 
@@ -204,6 +205,7 @@ frameworks/base/core/java/android/app/PictureInPictureParams.java
 frameworks/base/services/core/java/com/android/server/am/PinnedActivityStack.java
 frameworks/base/services/core/java/com/android/server/wm/PinnedStackWindowController.java
 frameworks/base/services/core/java/com/android/server/wm/PinnedStackController.java
+frameworks/base/services/core/java/com/android/server/am/TaskChangeNotificationController.java
 
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipMotionHelper.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/pip/phone/PipTouchHandler.java

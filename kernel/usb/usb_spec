@@ -1,4 +1,10 @@
-//
+/*
+
+*/
+//id  state=0 为host
+对于Host端，只需将连接线的USB_ID pin和地短接即可，
+对于Slave端，USB连接线的USB_IDpin是悬空的
+
 Default Address:
 当usb设备第一次上电或复位后使用的地址，默认值是00H。
 

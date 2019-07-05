@@ -1,4 +1,6 @@
 /*
+ 无障碍
+
  dumpsys accessibility
 */
 AccessibilityManagerService{
@@ -28,6 +30,7 @@ AccessibilityManagerService{
 - new AccessibilityContentObserver(mMainHandler).register() 
 }@AccessibilityManagerService.java
 
+
 //systemui发送USER_PRESENT
 onBootCompleted-->sendUserPresentBroadcast-->mContext.sendBroadcastAsUser(USER_PRESENT_INTENT)@KeyguardViewMediator.java
 
@@ -42,5 +45,43 @@ readConfigurationForUserStateLocked(UserState userState){
 - readEnabledAccessibilityServicesLocked(UserState userState)
 }@AccessibilityManagerService.java
 
+//client监听状态
+addClient(IAccessibilityManagerClient client, int userId) {
+- final int resolvedUserId = mSecurityPolicy.resolveCallingUserIdEnforcingPermissionsLocked(userId)
+- UserState userState = getUserStateLocked(resolvedUserId)  
+- if (mSecurityPolicy.isCallerInteractingAcrossUsers(userId)) {//系统用户  
+	- mGlobalClients.register(client)
+	- return IntPair.of(userState.getClientState(), userState.mLastSentRelevantEventTypes)
+  }else{//普通用户
+	- userState.mUserClients.register(client)
+	- return IntPair.of( userState.getClientState(), userState.mLastSentRelevantEventTypes)
+  }
+}@AccessibilityManagerService.java
+
+
+/*
+ Manager 
+*/
+AccessibilityManager(Context context, IAccessibilityManager service, int userId){
+- mCallback = new MyCallback()
+- mHandler = new Handler(context.getMainLooper(), mCallback)
+- tryConnectToServiceLocked(service){
+	  //获取服务
+	- if (service == null) {
+		- IBinder iBinder = ServiceManager.getService(Context.ACCESSIBILITY_SERVICE)
+		- service = IAccessibilityManager.Stub.asInterface(iBinder)
+		}
+	  //当前状态
+	- final long userStateAndRelevantEvents = service.addClient(mClient, mUserId)
+	- setStateLocked(IntPair.first(userStateAndRelevantEvents))
+	}
+}@AccessibilityManager.java
+//触摸高亮
+isTouchExplorationEnabled{
+- 
+}
+
+
 frameworks/base/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/keyguard/KeyguardViewMediator.java
+frameworks/base/core/java/android/view/accessibility/AccessibilityManager.java

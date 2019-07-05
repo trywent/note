@@ -7,7 +7,7 @@
  事件获取和处理都在当前的线程中执行.出现处理不及时会是什么问题?
  
 */
-
+//获取脉冲事件
 {
 - nativeInit //初始化
 - nativeDispose //销毁释放
@@ -52,7 +52,7 @@ FrameHandler.handleMessage(Message msg){
 - MSG_DO_FRAME:doFrame(System.nanoTime())
   //请求事件,每个线程必须主动请求?
 - MSG_DO_SCHEDULE_VSYNC:doScheduleVsync{
-	- mFrameScheduled,scheduleVsyncLocked
+	- scheduleVsyncLocked
 	}
 - MSG_DO_SCHEDULE_CALLBACK:doScheduleCallback(msg.arg1){
 	- scheduleFrameLocked
@@ -70,7 +70,7 @@ scheduleFrameLocked(long now){
 		- mHandler.sendMessageAtFrontOfQueue(msg)
 		} 
 	}
-- 不使用USE_VSYNC{//直接调用doFrame
+- 不使用,!USE_VSYNC{//直接调用doFrame
 	- 计算时间,long nextFrameTime = Math.max
 	- Message msg = mHandler.obtainMessage(MSG_DO_FRAME)
 	- mHandler.sendMessageAtTime(msg, nextFrameTime)
@@ -113,7 +113,7 @@ postCallbackDelayedInternal(CALLBACK_ANIMATION,callback)-->
 
 */
 FrameDisplayEventReceiver{
--onVsync(long timestampNanos, int builtInDisplayId, int frame/*递增的帧号*/){
+- onVsync(long timestampNanos, int builtInDisplayId, int frame/*递增的帧号*/){
 - mHavePendingVsync = true //有待处理同步事件
 - mTimestampNanos = timestampNanos //记录收到事件的时间
 - mFrame = frame

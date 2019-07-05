@@ -1,0 +1,63 @@
+/* usb host
+
+  struct usb_hcd //主控
+
+*/
+HCD(USB Host Controller Driver):
+创建HCD：
+xxxusb_probe{
+ //创建hcd
+- otg20_hcd_init/host20_hcd_init-->usb_create_hcd(/*设置驱动*/&dwc_otg_hc_driver)@hcd.c
+- usb_add_hcd //加入hcd
+}@xxxusb_otg/host_driver.c
+
+
+//创建usb_hcd
+struct usb_hcd *usb_create_hcd(const struct hc_driver *driver,struct device *dev, const char *bus_name)-->
+usb_create_shared_hcd(const struct hc_driver *driver,struct device *dev, const char *bus_name,struct usb_hcd *primary_hcd){
+- struct usb_hcd *hcd = kzalloc(sizeof(*hcd) + driver->hcd_priv_size, GFP_KERNEL)
+  //初始化bus
+- usb_bus_init(&hcd->self)
+- hcd->self.controller = dev
+- hcd->self.bus_name = bus_name
+  //hcd
+- hcd->driver = driver
+- hcd->speed = driver->flags & HCD_MASK
+}@hcd.c
+
+
+//添加hcd
+usb_add_hcd(struct usb_hcd *hcd,unsigned int irqnum, unsigned long irqflags){
+- hcd_buffer_create(hcd)
+  //注册hcd bus(作为一个总线？)
+- usb_register_bus(&hcd->self)
+  //创建 usb_device初始化主控的root_hub
+- struct usb_device *rhdev = usb_alloc_dev(NULL, &hcd->self, 0)
+- hcd->self.root_hub = rhdev
+- usb_hcd_request_irqs-->request_irq(irqnum, &usb_hcd_irq)//中断处理
+- hcd->driver->start
+  //加入root hub
+- register_root_hub(hcd)
+- sysfs_create_group(&rhdev->dev.kobj, &usb_bus_attr_group)
+}@hcd.c
+
+register_root_hub(struct usb_hcd *hcd){
+- struct device *parent_dev = hcd->self.controller
+- struct usb_device *usb_dev = hcd->self.root_hub
+  //设备号为1
+- const int devnum = 1
+- usb_dev->devnum = devnum
+- usb_set_device_state(usb_dev, USB_STATE_ADDRESS)
+- usb_new_device(usb_dev)
+}@hcd.c
+
+中断初始化：
+usb_add_hcd-->usb_hcd_request_irqs-->request_irq(irqnum, &usb_hcd_irq...)@hcd.c
+
+中断处理：
+usb_hcd_irq-->hcd->driver->irq(该driver在usb_create_hcd时传入)@hcd-->ehci_irq@ehci-hcd.c
+
+
+drivers/usb/core/usb.c
+drivers/usb/core/hcd.c
+

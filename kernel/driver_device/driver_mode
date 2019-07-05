@@ -1,4 +1,6 @@
-//
+/*
+ 
+*/
 struct device_driver {
 	const char		*name;
 	struct bus_type		*bus;
@@ -11,5 +13,65 @@ struct driver_attribute {}
 driver_create_file-->sysfs_create_file@driver.c//创建属性文件
 
 
+//驱动注册：
+driver_register(struct device_driver *drv){
+- 驱动是否有bus，且bus和驱动都实现的probe函数，则打印警告(使用bus中的probe)。
+- driver_find //判断驱动是否已经注册
+- bus_add_driver(struct device_driver *drv){//将驱动加入到总线
+	- struct bus_type *bus = bus_get(drv->bus) //获取总线
+	- struct driver_private * priv = kzalloc(sizeof(*priv), GFP_KERNEL)
+	- klist_init(&priv->klist_devices, NULL, NULL)
+	- priv->driver = drv
+	- kobject_init_and_add(&priv->kobj, &driver_ktype, NULL,"%s", drv->name)
+	  //加入总线
+	- klist_add_tail(&priv->knode_bus, &bus->p->klist_drivers)
+	  //bus设置自动匹配
+	- if (drv->bus->p->drivers_autoprobe) {
+		- if (driver_allows_async_probing(drv)) { //异步匹配
+			- async_schedule(driver_attach_async, drv)
+		  }else{ //马上匹配
+			- driver_attach(drv)
+			}
+		}
+	}@bus.c
+- 加入属性文件组，bus_add_driver{
+
+	}
+}@driver.c
+
+//查找总线是否有匹配当前驱动的设备
+//使用总线中的匹配方法，drv->bus->match(dev, drv)
+driver_attach(struct device_driver *drv)-->bus_for_each_dev(drv->bus, NULL, drv, __driver_attach)-->
+bus_for_each_dev(struct bus_type *bus, struct device *start,void *data, int (*fn)(struct device *, void *)){
+- struct klist_iter i
+- struct device *dev
+ //遍历总线上的设备
+- klist_iter_init_node(&bus->p->klist_devices, &i,(start ? &start->p->knode_bus : NULL))
+- while ((dev = next_device(&i)) && !error)
+	fn(dev, data)-->__driver_attach(struct device *dev, void *data)){
+	- struct device_driver *drv = data
+	  //判断是否匹配
+	- driver_match_device(drv, dev){
+		- drv->bus->match(dev, drv)
+		}
+	- driver_probe_device(drv, dev)
+	}
+}@dd.c
+
+//probe 设备
+driver_probe_device(struct device_driver *drv, struct device *dev)-->
+really_probe(struct device *dev, struct device_driver *drv){
+- dev->driver = drv
+  //优先执行bus中probe
+- if (dev->bus->probe) {
+	- ret = dev->bus->probe(dev)
+  } else if (drv->probe) {
+	- ret = drv->probe(dev)
+  }
+- driver_bound(dev)
+}@dd.c
+
 kernel/include/linux/device.h
 kernel/drivers/base/driver.c
+kernel/drivers/base/bus.c
+kernel/drivers/base/dd.c

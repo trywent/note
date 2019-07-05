@@ -1,0 +1,21 @@
+/*
+
+*/
+
+ActivityManagerService-->mRecentTasks = new RecentTasks(this, mStackSupervisor)
+RecentTasks(ActivityManagerService service, ActivityStackSupervisor mStackSupervisor){
+- File systemDir = Environment.getDataSystemDirectory()
+- mService = service
+- mTaskPersister = new TaskPersister(systemDir, mStackSupervisor, service, this)
+- mStackSupervisor.setRecentTasks(this)
+}@RecentTasks.java
+
+
+TaskPersister(File systemDir, ActivityStackSupervisor stackSupervisor,
+            ActivityManagerService service, RecentTasks recentTasks){
+  //IMAGES_DIRNAME = "recent_images"
+- final File legacyImagesDir = new File(systemDir, IMAGES_DIRNAME)
+}@TaskPersister.java
+
+frameworks/base/services/core/java/com/android/server/am/RecentTasks.java
+frameworks/base/services/core/java/com/android/server/am/TaskPersister.java

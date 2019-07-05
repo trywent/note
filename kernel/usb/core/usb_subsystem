@@ -1,0 +1,194 @@
+/*********************
+ usb SubSystem
+
+ hub       监听端口，获取usb状态。创建并加入usb_device
+ message   获取设备信息接口
+ generic   设备驱动。配置设备，通知设备加入。configured
+ devio     监听设备加入。设备操作接口
+   
+
+*/
+
+struct usb_endpoint_descriptor
+
+struct usb_hub
+
+//主控端的interface
+struct usb_host_interface{
+- struct usb_interface_descriptor	desc
+- struct usb_host_endpoint *endpoint
+}
+//usb设备
+struct usb_device
+
+//usb_driver用来操作的接口
+struct usb_interface
+
+
+//USB device driver
+struct usb_device_driver {
+- const char *name
+- int (*probe) (struct usb_device *udev)
+}
+
+//USB interface driver
+struct usb_driver {
+- const char *name
+- int (*probe) (struct usb_interface *intf,const struct usb_device_id *id)
+- void (*disconnect) (struct usb_interface *intf)
+}
+
+/*********************
+ bus
+*/
+struct bus_type usb_bus_type = {
+	.name =		"usb",
+	.match =	usb_device_match,
+	.uevent =	usb_uevent,
+	struct kset drivers,//驱动链表
+	struct kset devices,//设备链表
+}@driver.c
+
+
+//usb总线上设备和驱动匹配
+usb_device_match(struct device *dev, struct device_driver *drv)
+{
+- if (is_usb_device(dev)) {//usb_device 设备类型usb_device_type
+	- is_usb_device_driver(drv))
+ } else if (is_usb_interface(dev)) {//usb_interface  设备类型usb_ep_device_type
+	- const struct usb_device_id *id
+	- struct usb_interface *intf = to_usb_interface(dev)
+	- struct usb_driver *usb_drv = to_usb_driver(drv)
+	  //匹配id_table
+	- id = usb_match_id(intf, usb_drv->id_table)
+	  //
+	- id = usb_match_dynamic_id(intf, usb_drv)
+	}
+}@driver.c
+
+
+//usb 子系统开始
+subsys_initcall(usb_init)-->usb_init{
+- bus_register(&usb_bus_type)
+  //文件操作接口
+- usb_major_init()
+- usb_register(&usbfs_driver)
+  //io接口
+- usb_devio_init
+- usbfs_init
+  //启动hub线程
+- usb_hub_init
+  //通用驱动
+- usb_register_device_driver(&usb_generic_driver)
+}@usb.c
+
+
+/*********************
+  usb设备创建。usb_device
+
+*/
+struct usb_device *usb_alloc_dev(struct usb_device *parent,struct usb_bus *bus, unsigned port1){
+- struct usb_hcd *usb_hcd = container_of(bus, struct usb_hcd, self)
+  //创建
+- struct usb_device *dev = zalloc(sizeof(*dev), GFP_KERNEL)
+- device_initialize(&dev->dev)
+- dev->dev.bus = &usb_bus_type
+  //设置类型
+- dev->dev.type = &usb_device_type
+- usb_enable_endpoint(dev, &dev->ep0, false)
+- if (unlikely(!parent)) {//host设备，hub
+	- dev->devpath[0] = '0'
+	- dev_set_name(&dev->dev, "usb%d", bus->busnum)
+	- root_hub = 1
+ }else{
+	- dev->dev.parent = &parent->dev
+	- dev_set_name(&dev->dev, "%d-%s", bus->busnum, dev->devpath)
+ }
+- dev->portnum = port1
+- dev->bus = bus
+- if (root_hub){
+	- dev->authorized = 1
+ }else{
+	- dev->authorized = usb_hcd->authorized_default
+ } 
+}@usb.c
+
+//设备注册
+usb_new_device(struct usb_device *udev)@hub.c-->device_add(&udev->dev)
+
+
+/*********************
+ usb驱动
+ 
+ deivce driver(generic驱动)：
+	获取设备信息。配置设备。（使能设备的功能，匹配interface driver）
+ 
+ interface driver：
+	设备功能驱动
+*/
+
+//interface驱动注册
+usb_register(struct usb_driver *driver)-->
+usb_register_driver(struct usb_driver *new_driver, struct module *owner,const char *mod_name){
+  //设置drvwrap。并主持drvwrap.driver
+- new_driver->drvwrap.for_devices = 0 //非usb设备驱动
+- new_driver->drvwrap.driver.probe = usb_probe_interface
+- driver_register(&new_driver->drvwrap.driver)
+- usbfs_update_special()
+- usb_create_newid_file(new_driver)
+- usb_create_removeid_file(new_driver)
+}@driver.c
+
+//设备驱动注册
+usb_register_device_driver(struct usb_device_driver *new_udriver,struct module *owner){
+- new_udriver->drvwrap.for_devices = 1 //usb设备驱动
+- new_udriver->drvwrap.driver.name = (char *) new_udriver->name
+- new_udriver->drvwrap.driver.bus = &usb_bus_type
+- new_udriver->drvwrap.driver.probe = usb_probe_device
+- driver_register(&new_udriver->drvwrap.driver)
+}@driver.c
+
+
+
+//generic驱动
+struct usb_device_driver usb_generic_driver = {
+	.name =	"usb",
+	.probe = generic_probe,
+	.disconnect = generic_disconnect,
+}@generic.c
+
+//usb设备注册后
+generic_probe(struct usb_device *udev){
+- if (usb_device_is_owned(udev)){
+  }else if(udev->authorized == 0){
+
+  }else{
+	- int c = usb_choose_configuration(udev){ //选择设备的config
+		- c = udev->config
+		  //遍历查找
+		- num_configs = udev->descriptor.bNumConfigurations
+		- for (i = 0; i < num_configs; (i++, c++)) {
+			- best = c
+			}
+		}
+	  //使能设备的一个功能。设置一个interface
+	- usb_set_configuration(udev, c)
+  }
+  //通知加入设备。devio会接收通知
+- usb_notify_add_device(udev)
+}@generic.c
+
+/*********************
+ 接口操作函数
+
+*/
+#define USB_MAJOR			180
+#define USB_DEVICE_MAJOR		189
+
+usb_major_init(void)-->register_chrdev(USB_MAJOR, "usb", &usb_fops)@file.c
+
+
+kernel/drivers/usb/core/usb.c
+kernel/drivers/usb/core/driver.c
+kernel/drivers/usb/core/generic.c
+kernel/drivers/usb/core/file.c

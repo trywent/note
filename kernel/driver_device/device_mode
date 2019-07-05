@@ -3,6 +3,8 @@
 */
 struct bus_type {
 	struct device		*dev_root;
+	int (*match)(struct device *dev, struct device_driver *drv) //用来匹配设备和驱动
+	int (*probe)(struct device *dev)
 }
 struct bus_attribute {
 	struct attribute	attr;
@@ -17,6 +19,7 @@ int __must_check bus_register(struct bus_type *bus){
 - kset_register(&priv->subsys)
 - bus_create_file(bus, &bus_attr_uevent)-->sysfs_create_file//bus属性文件
 }
+
 void bus_unregister(struct bus_type *bus)
 
 /***********************
@@ -86,77 +89,63 @@ struct device *device_create(struct class *class, struct device *parent,
 - dev->class = class
 - device_add(dev) //加入
 }
-//注册
-int __must_check device_register(struct device *dev){
-- device_initialize(dev)
-- device_add(dev)
-}
-void device_unregister(struct device *dev);
 
 //加入设备
 int device_add(struct device *dev){
+- dev = get_device(dev)
 - dev_set_name //设置kobject name
 - kobject_add(&dev->kobj, dev->kobj.parent)  //加入kobj
 - device_create_file(dev, &dev_attr_uevent)-->sysfs_create_file //创建device属性文件,包含字符设备编号
 - device_add_attrs
+- bus_add_device(dev)
+- if(MAJOR(dev->devt)){
+	- device_create_file(dev, &dev_attr_dev)
+	- device_create_sys_dev_entry(dev)
+	}
 }@core.c
 
 
+//驱动与设备匹配：@driver/base
+//设备注册：
+device_register(struct device *dev){
+- device_initialize(dev){
+	- dev->kobj.kset = devices_kset //kset
+	- kobject_init(&dev->kobj, &device_ktype)//kobject
+	- device_pm_init(dev)
+	}
+- device_add(dev){
+	- kobject_add(&dev->kobj, dev->kobj.parent)
+	- device_create_file(dev, &dev_attr_uevent)
+	- device_add_attrs(dev)
+	- kobject_uevent(&dev->kobj, KOBJ_ADD) //设备时间
+	- bus_probe_device //探测设备驱动
+	}
+
+}@core.c
+
+//查找设备对应的驱动
+bus_probe_device(struct device *dev)-->device_initial_probe(dev)@bus.c
+-->device_initial_probe(struct device *dev)-->__device_attach(dev, true)-->
+__device_attach(struct device *dev, bool allow_async){
+- if (dev->driver) {//已经绑定了驱动
+	- device_bind_driver(dev)
+ }else{
+	- bus_for_each_drv(dev->bus, NULL, &data,__device_attach_driver)
+ }
+}@dd.c
+
+__device_attach_driver(struct device_driver *drv, void *_data){
+- driver_match_device(drv, dev){
+	- drv->bus->match(dev, drv)
+	}
+ //是否异步probe
+- async_allowed = driver_allows_async_probing(drv)
+ //马上probe。和driver注册一样
+- driver_probe_device(drv, dev)
+}@dd.c
 
 kernel/include/linux/device.h
 kernel/drivers/base/bus.c
 kernel/drivers/base/class.c
 kernel/drivers/base/core.c
-/***********************
- char_dev:创建字符设备
 
- 设备号可以自动分配,可以手动创建
-*/
-struct cdev {
-	struct kobject kobj;
-	struct module *owner;
-	const struct file_operations *ops;
-	struct list_head list;
-	dev_t dev;
-	unsigned int count;
-}
-
-static struct kobj_type ktype_cdev_dynamic = {
-	.release	= cdev_dynamic_release,
-}
-//设备号
-int register_chrdev_region(dev_t first, unsigned int count,char *name)
-
-//创建
-struct cdev *cdev_alloc(void)
-{
-- struct cdev *p = kzalloc(sizeof(struct cdev), GFP_KERNEL);
-- kobject_init(&p->kobj, &ktype_cdev_dynamic)
-}
-//初始化
-void cdev_init(struct cdev *cdev, const struct file_operations *fops)
-{
-- kobject_init(&cdev->kobj, &ktype_cdev_default);
-- cdev->ops = fops;
-}
-
-//加入
-int cdev_add(struct cdev *p, dev_t dev, unsigned count)
-{
-- p->dev = dev;
-- kobj_map(cdev_map, dev, count, p) //创建struct kobj_map
-- kobject_get(p->kobj.parent)
-}
-
-//注册设备.major==0自动分配设备号... class设备使用这种方式创建字符设备
-register_chrdev(unsigned int major, const char *name,const struct file_operations *fops)@fs.c-->
-__register_chrdev
-{
-- struct char_device_struct *cd = __register_chrdev_region(major)
-- struct cdev *cdev = cdev_alloc()
-- cdev->ops = fops
-- cdev_add(cdev, MKDEV(cd->major, baseminor)
-}@char_dev.c
-
-kernel/include/linux/cdev.h
-kernel/fs/char_dev.c

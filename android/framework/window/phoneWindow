@@ -26,7 +26,10 @@ setWindowManager(WindowManager wm, IBinder appToken, String appName){
 onCreate-->getWindow().setContentView(layoutResID)@Activity-->setContentView{
 - ViewGroup mContentParent==null
 	installDecor{
-		- DecorView mDecor= generateDecor-->new DecorView //包含content	
+		- DecorView mDecor= generateDecor(-1){//包含content	
+			- context = getContext()
+			- new DecorView(context, featureId, this, getAttributes())
+			}
 		- mContentParent = generateLayout(mDecor){
 			- TypedArray a = getWindowStyle() //获取style
 			- requestFeature //根据style,请求feature
@@ -49,20 +52,21 @@ setLogo(Drawable)@Toolbar.java
 //立体显示效果?
 setElevation
 
+
+//应用自己接管窗口
+onCreate-->getWindow().takeSurface(this)@NavtiveActivity.java-->
+takeSurface(Callback2 callback) {
+- mTakeSurfaceCallback = callback
+}@PhoneWindow.java
+
+
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindow.java
 frameworks/base/core/java/com/android/internal/widget/ActionBarOverlayLayout.java
 frameworks/base/core/java/android/widget/Toolbar.java
-_______________________
-//获取contentInset，侧边：
-setView-->sWindowSession.add(..mAttachInfo.mContentInsets..)@ViewRootImpl.java
-add-->mService.addWindow@Session.java-->addWindow-->mPolicy.getContentInsetHintLw
-@WindowManagerService.java-->getContentInsetHintLw@PhoneWindowManager.java
 
-应用contentInset：
-performTraversals{
-- 设置值，mFitSystemWindowsInsets.set(mAttachInfo.mContentInsets)
-- 设置到各个View中，host.fitSystemWindows(mFitSystemWindowsInsets)
-}
+
+
+
 =======================
 /*******************
  从layout.xml解析view

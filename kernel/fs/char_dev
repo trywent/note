@@ -1,0 +1,107 @@
+/***********************
+ 字符设备 struct cdev
+ 
+ 文件节点只对应设备号。根据设备号查找对应的cdev
+  cdev可以对应多个设备号。cdev包含文件的操作函数
+*/
+//保存所有字符设备
+static struct char_device_struct {
+	struct char_device_struct *next;
+	unsigned int major;
+	unsigned int baseminor;
+	int minorct;
+	char name[64];
+	struct cdev *cdev;		/* will die */
+} *chrdevs[CHRDEV_MAJOR_HASH_SIZE]
+
+//字符设备的默认打开操作函数(inode)。用来替换正确的操作函数
+const struct file_operations def_chr_fops = {
+	.open = chrdev_open,
+	.llseek = noop_llseek,
+}
+
+struct cdev {
+	struct kobject kobj;
+	struct module *owner;
+	const struct file_operations *ops;
+	struct list_head list;
+	dev_t dev;
+	unsigned int count;
+}
+
+static struct kobj_type ktype_cdev_dynamic = {
+	.release	= cdev_dynamic_release,
+}
+
+//注册设备号
+int register_chrdev_region(dev_t first, unsigned int count,char *name){
+ //遍历注册从first开始count个设备号（不超过当前major。。255个minor）
+- __register_chrdev_region(MAJOR(n), MINOR(n),next - n, name){
+	  //分配一个字符设备，结构
+	- struct char_device_struct *cd = kzalloc(sizeof(struct char_device_struct), GFP_KERNEL)
+	- cd->major = major
+	- cd->baseminor = baseminor
+	- cd->minorct = minorct //注册minor个数
+	- strlcpy(cd->name, name, sizeof(cd->name))
+	  //查找当前major中所在位置
+	- cd->next = *cp
+	}
+}@char_dev.c
+
+//创建
+struct cdev *cdev_alloc(void)
+{
+- struct cdev *p = kzalloc(sizeof(struct cdev), GFP_KERNEL);
+- kobject_init(&p->kobj, &ktype_cdev_dynamic)
+}
+//初始化
+void cdev_init(struct cdev *cdev, const struct file_operations *fops)
+{
+- kobject_init(&cdev->kobj, &ktype_cdev_default);
+- cdev->ops = fops;
+}
+
+//加入设备。字符文件节点的设备号，若在dev+count中。则文件的操作函数都使用这个cdev
+int cdev_add(struct cdev *p, dev_t dev, unsigned count)
+{
+- p->dev = dev
+- p->count = count
+- kobj_map(cdev_map, dev, count, p) //创建struct kobj_map
+- kobject_get(p->kobj.parent)
+}@char_dev.c
+
+//字符设备打开。替换操作函数为cdev_add中设置的操作函数
+//根据设备号查找已经注册的字符设备
+static int chrdev_open(struct inode *inode, struct file *filp){
+- struct cdev *p = inode->i_cdev
+  //从cdev_map获取 cdev
+- kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx)
+- if(!p){
+	- struct kobject *kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx)
+	  //根据设备号
+	- struct cdev *new = container_of(kobj, struct cdev, kobj)
+	- inode->i_cdev = p = new
+	- cdev_get(p)
+	}
+  //替换操作函数
+- const struct file_operations *fops = fops_get(p->ops)
+- replace_fops(filp, fops)
+- filp->f_op->open(inode, filp)
+}@char_dev.c
+
+
+/*
+ 注册设备.major==0自动分配设备号...
+
+*/
+register_chrdev(unsigned int major, const char *name,const struct file_operations *fops)@fs.c-->
+__register_chrdev
+{
+- struct char_device_struct *cd = __register_chrdev_region(major)
+- struct cdev *cdev = cdev_alloc()
+- cdev->ops = fops
+- cdev_add(cdev, MKDEV(cd->major, baseminor)
+}@char_dev.c
+
+kernel/include/linux/cdev.h
+kernel/fs/char_dev.c

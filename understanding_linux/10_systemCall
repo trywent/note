@@ -26,14 +26,5 @@ NR_syscalls系统可实现的系统调个数
 
 
 
-=============================
-include/linux/syscalls.h
 
-In include/linux/syscalls.h under your kernel source directory, you find this:
-
-asmlinkage long sys_mkdir(const char __user *pathname, int mode);
-Then in /usr/include/asm*/unistd.h, you find this:
-
-#define __NR_mkdir                              83
-__SYSCALL(__NR_mkdir, sys_mkdir)
 

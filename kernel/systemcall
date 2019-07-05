@@ -1,0 +1,71 @@
+/*
+  系统调用。用户空间
+*/
+//创建节点
+mknod(const char* path, mode_t mode, dev_t dev)-->
+mknodat(AT_FDCWD, path, mode, dev)@mknod.cpp-->
+ENTRY(mknodat)
+    mov     ip, r7
+    .cfi_register r7, ip
+    ldr     r7, =__NR_mknodat
+    swi     #0
+    mov     r7, ip
+    .cfi_restore r7
+    cmn     r0, #(MAX_ERRNO + 1)
+    bxls    lr
+    neg     r0, r0
+    b       __set_errno_internal
+END(mknodat)@mknodat.S
+
+//系统调用函数编号
+#define __NR_SYSCALL_BASE 0    
+@unistd.h
+#define __NR_restart_syscall (__NR_SYSCALL_BASE + 0)
+#define __NR_exit (__NR_SYSCALL_BASE + 1)
+#define __NR_fork (__NR_SYSCALL_BASE + 2)
+#define __NR_read (__NR_SYSCALL_BASE + 3)
+#define __NR_write (__NR_SYSCALL_BASE + 4)
+#define __NR_open (__NR_SYSCALL_BASE + 5)
+#define __NR_close (__NR_SYSCALL_BASE + 6)
+#define __NR_creat (__NR_SYSCALL_BASE + 8)
+#define __NR_link (__NR_SYSCALL_BASE + 9)
+#define __NR_unlink (__NR_SYSCALL_BASE + 10)
+#define __NR_execve (__NR_SYSCALL_BASE + 11)
+#define __NR_chdir (__NR_SYSCALL_BASE + 12)
+@unistd-common.h
+
+bionic/libc/bionic/xxxx.cpp
+bionic/libc/arch-arm/syscalls/
+bionic/libc/kernel/uapi/asm-arm/asm/unistd.h
+bionic/libc/kernel/uapi/asm-arm/asm/unistd-common.h
+
+/*
+ systemcall kernel
+
+ arm
+*/
+
+//将系统调用编号和函数名关联
+#define __SYSCALL(nr, call) [nr] = (call)
+示例：
+/* fs/namei.c */
+#define __NR_mknodat 33
+__SYSCALL(__NR_mknodat, sys_mknodat)
+@unistd.h
+
+
+//定义系统调用函数。后面数字为参数个数，参数(类型，名字)
+#define SYSCALL_DEFINE1(name, ...) SYSCALL_DEFINEx(1, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE2(name, ...) SYSCALL_DEFINEx(2, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE3(name, ...) SYSCALL_DEFINEx(3, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE4(name, ...) SYSCALL_DEFINEx(4, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE5(name, ...) SYSCALL_DEFINEx(5, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE6(name, ...) SYSCALL_DEFINEx(6, _##name, __VA_ARGS__)
+
+示例：
+SYSCALL_DEFINE4(mknodat, int, dfd, const char __user *, filename, umode_t, mode,unsigned, dev)@fs/namei.c
+
+
+include/linux/syscalls.h
+include/uapi/asm-generic/unistd.h
+

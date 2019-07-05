@@ -1,4 +1,6 @@
+/*
 
+*/
 设备号：
 <linux/kdev_t.h>
 MAJOR(dev_t dev);//主
