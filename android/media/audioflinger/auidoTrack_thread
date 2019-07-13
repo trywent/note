@@ -6,6 +6,12 @@
  mSinkBuffer 要写入hal
  
 */
+class PlaybackThread : public ThreadBase, public StreamOutHalInterfaceCallback, public VolumeInterface 
+class MixerThread : public PlaybackThread 
+
+
+
+
 AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinger,
                                              AudioStreamOut* output)
 {
@@ -137,6 +143,9 @@ AudioFlinger::MixerThread::prepareTracks_l{
 		- chain = getEffectChain_l(track->sessionId())
 		}
 	  //设置track混音音量
+	- uint32_t vl, vr;       // in U8.24 integer format
+	- float vlf, vrf, vaf // in [0.0, 1.0] float format
+	- float typeVolume = mStreamTypes[track->streamType()].volume
 	- mAudioMixer->setBufferProvider(name, track)
 	- mAudioMixer->setParameter(name, param, AudioMixer::VOLUME0, &vlf)
 	- mAudioMixer->setParameter(name, param, AudioMixer::VOLUME1, &vlf)

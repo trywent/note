@@ -91,10 +91,11 @@ AudioTrack::set(
 	}
 }
 
-//音量
-setStereoVolume-->native_setVolume@AudioTrack.java-->android_media_AudioTrack_set_volume
+//设置音量,设置到共享内存的mVolumeLR。服务端通过getVolumeLR获取音量
+setVolume(float gain)-->setStereoVolume-->native_setVolume@AudioTrack.java-->android_media_AudioTrack_set_volume
 @android_media_AudioTrack.cpp-->setVolume-->mProxy->setVolumeLR@AudioTrack.cpp
-mCblk->mVolumeLR@AudioTrackShared.h
+mCblk->mVolumeLR = volumeLR@AudioTrackShared.h
+
 //设置outputdevice
 AudioTrack::setOutputDevice
 

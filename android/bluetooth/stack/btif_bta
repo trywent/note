@@ -27,6 +27,15 @@ BTA_DM_API_DISCOVER_EVT,
 BTA_DM_INQUIRY_CMPL_EVT,
 }@bta_dm_int.h
 
+
+
+
+/* 接口注册
+
+  1-stack中profile中注册一个接口处理函数。保存到bta_sys_cb.reg
+  2-上层调用，btifxxx-->bta_sys_sendmsg(event)-->bta_sys_cb.reg[id]->evt_hdlr
+ 
+*/
 //注册提供给上层的接口
 bta_sys_register(ID,tBTA_SYS_REG)-->
 bta_sys_cb{//将id和回调保存到bta_sys_cb
@@ -35,16 +44,7 @@ bta_sys_cb{//将id和回调保存到bta_sys_cb
 - reg[BTA_ID_DM_SEARCH] = bta_dm_search_reg//bta_dm_api.c
 }
 
-//btif接口执行。在btu线程中
-bta_sys_sendmsg(pmsg/*设置对应id*/){
-- base::MessageLoop* bta_message_loop = get_message_loop-->message_loop_@btu_task.cc //获取message_loop_thread_@btu_task  在线程message_loop_thread_
-- bta_message_loop->task_runner()->PostTask(bta_sys_event,pmsg)-->bta_sys_event(p_msg)
-	-->(*bta_sys_cb.reg[id]->evt_hdlr)(p_msg) //执行profile注册的接口
-}@bta_sys_main.c
 
-/*
- 接口注册 
-*/
 //BTA_ID_SYS 栈的关闭打开
 btu_task_start_up@btu_task.c-->
 bta_sys_init{
@@ -75,7 +75,12 @@ btu_task_start_up{
 	}
 }@btu_task.c
 
-bta_sys_sendmsg
+//btif接口执行。在btu线程中
+bta_sys_sendmsg(pmsg/*设置对应id*/){
+- base::MessageLoop* bta_message_loop = get_message_loop-->message_loop_@btu_task.cc //获取message_loop_thread_@btu_task  在线程message_loop_thread_
+- bta_message_loop->task_runner()->PostTask(bta_sys_event,pmsg)-->bta_sys_event(p_msg)
+	-->(*bta_sys_cb.reg[id]->evt_hdlr)(p_msg) //执行profile注册的接口
+}@bta_sys_main.c
 
 
 bta/sys/bta_sys_main.c

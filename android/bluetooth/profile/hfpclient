@@ -1,5 +1,7 @@
-//client
-===============
+/* client
+
+
+*/
 static{ classInitNative}//设置jni回调函数
 {
 onConnectionStateChanged
@@ -23,9 +25,13 @@ initializeNative{
 - sBluetoothHfpClientInterface->init(&sBluetoothHfpClientCallbacks) //设置回调
 }@com_android_bluetooth_hfpclient.cpp
 
+//保存执行的操作。（发送命令后，等待命令返回，执行相应的操作）
+addQueuedAction--> mQueuedActions.add(new Pair<Integer, Object>(action, data))
 
-/* 
- connect
+
+/*  connecting state
+
+
 */
 connect(BluetoothDevice)-->service.connect@BluetoothHeadsetClient.java-->
 connect-->sm.sendMessage(CONNECT)@HeadsetClientService.java-->Disconnected.processMessage(CONNECT)
@@ -37,8 +43,9 @@ sBluetoothHfpClientCallbacks.connection_state_cb-->connection_state_cb@com_andro
 -->onConnectionStateChanged-->service.messageFromNative(event)@NativeInterface.java-->
 messageFromNative-->sm.sendMessage(StackEvent.STACK_EVENT,event)@HeadsetClientService.java
 
-/*
- connectAudio/disconnectAudio
+/*  connectAudio/disconnectAudio
+
+
  */
 connectAudio-->sm.sendMessage(HeadsetClientStateMachine.CONNECT_AUDIO)@HeadsetClientService.java
 -->NativeInterface.connectAudioNative@HeadsetClientStateMachine.java-->connectAudioNative
@@ -55,9 +62,21 @@ onAudioStateChanged(state)@NativeInterface.java-->service.messageFromNative{
 }@HeadsetClientStateMachine.java 
 
 
-/*
- Connected state
+/*  Connected state
+
+
 */
+callsetup status:
+0 - No current call is in setup
+1 - Incoming call process ongoing
+2 - Outgoing call process ongoing
+3 - Remote party being alerted for outgoing call
+
+mCall_state:
+0 - 没有通话
+1 - 正在通话
+
+
 Connected.processMessage{
 - ACCEPT_CALL-->acceptCall{ //acceptCall/rejectCall@HeadsetClientService.java
 	- getCall(CALL_STATE_INCOMING|CALL_STATE_WAITING)//获取要处理的call
@@ -70,10 +89,15 @@ Connected.processMessage{
 	- EVENT_TYPE_CALL-->updateCallIndicator
 	- EVENT_TYPE_CALLSETUP-->updateCallSetupIndicator
 	- EVENT_TYPE_CALLHELD-->updateCallHeldIndicator
-	- EVENT_TYPE_CMD_RESULT{//发送蓝牙命令后，返回结果
-		- 获取发送过的命令数据，mQueuedActions.poll()
-		- ACCEPT_CALL{
-			- 接听成功，mPendingAction = queuedAction
+	  //电话状态
+	- StackEvent.EVENT_TYPE_CURRENT_CALLS{
+		-  queryCallsUpdate(event.valueInt, event.valueInt3,event.valueString...)
+		}
+	  //发送蓝牙命令后，返回结果
+	- EVENT_TYPE_CMD_RESULT{
+		- Pair<Integer, Object> queuedAction = mQueuedActions.poll() //获取发送过的命令数据
+		- switch (queuedAction.first) {
+			- QUERY_CURRENT_CALLS:queryCallsDone()
 			}
 		}
 	}
@@ -91,13 +115,81 @@ StackEvent.STACK_EVENT:{//StackEvent.STACK_EVENT = 100
 }@HeadsetClientStateMachine.java 
 
 
-/* 
- 查询call 
-*/
-queryCallsDone-->sendMessageDelayed(QUERY_CURRENT_CALLS)-->Connected.processMessage(QUERY_CURRENT_CALLS)-->
-queryCallsStart@HeadsetClientStateMachine.java-->queryCurrentCallsNative-->sBluetoothHfpClientInterface->query_current_calls
-@com_android_bluetooth_hfpclient.cpp-->
+/*  AudioOn state
 
+
+*/
+
+
+
+/* 查询call
+*/
+queryCallsStart(){
+- NativeInterface.queryCurrentCallsNative(getByteAddress(mCurrentDevice))
+- addQueuedAction(QUERY_CURRENT_CALLS, 0)
+}
+
+//收到stack事件。获取最新的电话状态
+queryCallsUpdate{
+- mCallsUpdate.put(id, new BluetoothHeadsetClientCall( mCurrentDevice, id, state, number, multiParty, outgoing))
+}
+
+queryCallsDone(int id, int state, String number, boolean multiParty,boolean outgoing)) {
+  //当前记录的call
+- currCallIdSet.addAll(mCalls.keySet())
+- currCallIdSet.remove(HF_ORIGINATED_CALL_ID)
+  //最新从底层获取的当前call
+- newCallIdSet.addAll(mCallsUpdate.keySet())
+  //新增的call
+- callAddedIds.addAll(newCallIdSet)
+- callAddedIds.removeAll(currCallIdSet)
+  //需要移除的call
+- callRemovedIds.addAll(currCallIdSet)
+- callRemovedIds.removeAll(newCallIdSet)
+  //保留的call
+- callRetainedIds.addAll(currCallIdSet)
+- callRetainedIds.retainAll(newCallIdSet)
+
+
+- sendCallChangedIntent(c)
+
+  //有通话，每隔2s查询call状态
+-  if (mCalls.size() > 0) {
+	- sendMessageDelayed(QUERY_CURRENT_CALLS, QUERY_CURRENT_CALLS_WAIT_MILLIS)
+	}
+}
+
+
+
+//acceptCall
+acceptCall(int flag){
+- BluetoothHeadsetClientCall c = getCall(BluetoothHeadsetClientCall.CALL_STATE_INCOMING,)
+- switch (c.getState()) {
+	- BluetoothHeadsetClientCall.CALL_STATE_INCOMING:
+		action = HeadsetClientHalConstants.CALL_ACTION_ATA
+	- BluetoothHeadsetClientCall.CALL_STATE_WAITING:
+		action = HeadsetClientHalConstants.CALL_ACTION_CHLD_2 /CALL_ACTION_CHLD_1
+	- BluetoothHeadsetClientCall.CALL_STATE_HELD
+		action = HeadsetClientHalConstants.CALL_ACTION_CHLD_2 /CALL_ACTION_CHLD_3
+	}
+  //CALL_ACCEPT_HOLD 设置通路
+- routeHfpAudio(true)
+- NativeInterface.handleCallActionNative(getByteAddress(mCurrentDevice), action, 0)
+}
+//rejectCall
+
+//holdCall
+
+//terminateCall
+terminateCall() {
+- int action = HeadsetClientHalConstants.CALL_ACTION_CHUP
+- BluetoothHeadsetClientCall c = getCall(BluetoothHeadsetClientCall.CALL_STATE_DIALING,BluetoothHeadsetClientCall.CALL_STATE_ALERTING)
+- NativeInterface.handleCallActionNative(getByteAddress(mCurrentDevice), action, 0)
+}
+
+//发送电话命令。接听，挂断
+handleCallActionNatives-->BluetoothHfpClientInterface->handle_call_action((const RawAddress*)addr, (bthf_client_call_action_t)action, (int)index)
+@com_android_bluetooth_hfpclient.cpp
 
 packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientService.java
 packages/apps/Bluetooth/src/com/android/bluetooth/hfpclient/HeadsetClientStateMachine.java 

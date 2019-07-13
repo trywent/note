@@ -4,7 +4,13 @@ kill  -s 3 <pid>
 
 
 kill -s 6 pid  //dump core logcat -s DEBUG
-//按键5s
+/*
+ 按键5s
+*/
+//超时时间
+KEY_DISPATCHING_TIMEOUT = ActivityManager.isLowRamDeviceStatic()? 10*1000 : 8*1000;
+@ActivityManagerService.java
+
 handleTargetsNotReadyLocked-->onANRLocked-->doNotifyANRLockedInterruptible
 @InputDispatcher.cpp-->notifyANR@InputManagerService.java-->notifyANRf{
 - 应用不为空，appWindowToken.appToken.keyDispatchingTimedOut@InputMonitor.java-->
@@ -20,7 +26,14 @@ frameworks/base/services/java/com/android/server/input/InputManagerService.java
 frameworks/base/services/input/InputDispatcher.cpp
 frameworks/base/services/java/com/android/server/am/ActivityRecord.java
 
-//广播10s
+/* 
+ 广播10s
+*/
+//超时时间
+static final int BROADCAST_FG_TIMEOUT = 20*1000;
+static final int BROADCAST_BG_TIMEOUT = 90*1000;
+@ActivityManagerService.java
+
 processNextBroadcast{
 - mParallelBroadcasts{//处理Parallel广播
 	- deliverToRegisteredReceiverLocked
@@ -49,7 +62,14 @@ sendFinished-->am.finishReceiver@BroadcastReceiver.java-->finishReceiver{
 
 frameworks/base/services/java/com/android/server/am/BroadcastQueue.java
 
-//服务10s
+/* 服务10s
+
+*/
+//超时时间
+static final int SERVICE_TIMEOUT = ActivityManager.isLowRamDeviceStatic() ? 40*1000 : 20*1000;
+static final int SERVICE_BACKGROUND_TIMEOUT = SERVICE_TIMEOUT * 10;
+static final int SERVICE_START_FOREGROUND_TIMEOUT = ActivityManager.isLowRamDeviceStatic() ? 10*1000 : 8*1000;
+@ActiveServices.java
 bumpServiceExecutingLocked(开始启动服务)-->
 scheduleServiceTimeoutLocked(ProcessRecord)-->serviceTimeout(SERVICE_TIMEOUT_MSG)@ActiveServices.java
 -->serviceTimeout@ActivityManagerService.java-->mAm.appNotResponding
@@ -79,9 +99,15 @@ scheduleBindService{
 MainHandler.handleMessage(SERVICE_TIMEOUT_MSG)-->mServices.serviceTimeout@ActivityManagerService.java
 
 
-
-
 frameworks/base/services/java/com/android/server/am/ActiveServices.java
+/*
+ provider
+
+*/
+//超时时间
+static final int CONTENT_PROVIDER_PUBLISH_TIMEOUT = SystemProperties.getBoolean("ro.config.low_ram", false) ? 20*1000 : 10*1000;
+@ActivityManangerService.java
+
 ===================
 
 appNotRespondingViaProvider

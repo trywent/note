@@ -1,4 +1,7 @@
-//应用接口
+/* 
+ audioManager接口
+
+*/
 AudioManager = Context.getSystemService("audio")
 
 

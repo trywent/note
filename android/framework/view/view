@@ -1,14 +1,23 @@
 /******************************
- android draw views:
+ public class View
+ extends Object implements Drawable.Callback, KeyEvent.Callback, AccessibilityEventSource 
+
  ViewGroup：子类 FrameLayout, GridLayout, LinearLayout, PagerTitleStrip, RelativeLayout等
 
 */
+view{
+位置：left,top,
+大小：宽高
+pading：(left,top,right,bottom)边界缩进位置
+}
 
+viewGroup{
+margin:布局时所有子view的边界
+}
 
 //layout两个过程：measure,layout
 measure:从上到下遍历ViewGroup中view.调用view.measure(int, int)，最后每个view保存自己的测量结果。
 layout:从上到下调用layout(int, int, int, int)，在这个过程中父View根据measure的结果，确定子View的位置
-
 
 //LayoutParams：view的大小
     an exact number:确定值
@@ -113,9 +122,40 @@ SYSTEM_UI_FLAG_VISIBLE:
  绘制
 
 */
+
+//强制view绘制。必须在主线程中执行。非主线程执行postInvalidate()
+invalidate()-->invalidate(true)-->
+invalidateInternal(int l, int t, int r, int b, boolean invalidateCache,boolean fullInvalidate){
+- 
+- if(skipInvalidate()) return;
+- if ((mPrivateFlags & (PFLAG_DRAWN | PFLAG_HAS_BOUNDS)) == (PFLAG_DRAWN | PFLAG_HAS_BOUNDS)||
+	){
+	- mPrivateFlags |= PFLAG_DIRTY
+	}
+ //
+- AttachInfo ai = mAttachInfo
+- ViewParent p = mParent
+- if (p != null && ai != null && l < r && t < b) {
+	- Rect damage = ai.mTmpInvalRect
+	- damage.set(l, t, r, b)
+	- p.invalidateChild(this, damage)
+	}
+}@View.java
+
 scheduleTraversals-->mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable)
 @ViewRootImpl.java-->doFrame-->doCallback-->c.run@Choreographer.java-->
 TraversalRunnable.run-->doTraversal-->performTraversals-->mView.draw@ViewRootImpl.java
+
+
+updateDisplayListIfDirty()-->draw(canvas)
+
+buildDrawingCacheImpl(boolean autoScale)-->draw(canvas)
+
+createSnapshot(Bitmap.Config quality, int backgroundColor, boolean skipChildren)-->draw(canvas)
+
+
+dispatchDraw-->ViewGroup.drawChild()@ViewGroup.java-->
+draw(Canvas canvas, ViewGroup parent, long drawingTime)-->draw(canvas)
 
 
 draw(Canvas canvas, ViewGroup parent){

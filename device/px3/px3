@@ -3,3 +3,11 @@
 */
 
 gpu型号mali400
+
+dd if=/sdcard/kernel.img of=/dev/block/platform/emmc/by-name/kernel
+dd if=/sdcard/boot.img of=/dev/block/platform/emmc/by-name/boot
+
+//device
+write /sys/bus/platform/drivers/usb20_otg/force_usb_mode 2
+//host
+write /sys/bus/platform/drivers/usb20_otg/force_usb_mode 1

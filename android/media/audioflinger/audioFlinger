@@ -61,7 +61,20 @@ openOutput-->openOutput_l(audio_module_handle_t module,audio_io_handle_t *output
 		}
 	- ppStreamOut = outputStream 
 	}@AudioHwDevice.cpp
-- new MixerThread(this, outputStream, *output/*playThread的句柄*/) //创建thread
+- if(flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ){
+	- sp<MmapPlaybackThread> thread = new MmapPlaybackThread(this, *output, outHwDev, outputStream,devices, AUDIO_DEVICE_NONE)
+	- mMmapThreads.add(*output, thread)
+  }else{
+	- sp<PlaybackThread> thread
+	- if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
+		- thread = new OffloadThread(this, outputStream, *output, devices, mSystemReady)
+	 }else((flags & AUDIO_OUTPUT_FLAG_DIRECT)||!isValidPcmSinkFormat(config->format)){
+		- thread = new DirectOutputThread(this, outputStream, *output, devices, mSystemReady)
+	 }else{
+		- thread = new MixerThread(this, outputStream, *output/*playThread的句柄*/) //创建thread
+	  }
+  }
+  //保存到mPlaybackThreads
 - mPlaybackThreads.add(*output, thread)
 }@AudioFlinger.cpp
 
@@ -111,8 +124,21 @@ AudioFlinger::MixerThread::prepareTracks_l-->removeTracks_l-->mActiveTracks.remo
 
 
 //设置音量
-setStreamVolume-->mPlaybackThreads.valueAt(i)->setStreamVolume@AudioFlinger.cpp-->
-AudioFlinger::PlaybackThread::setStreamVolume-->设置mStreamTypes[stream].volume@Threads.cpp
+AudioFlinger::setStreamVolume(audio_stream_type_t stream, float value,audio_io_handle_t output){
+- checkStreamType(stream)
+- Vector<VolumeInterface *> volumeInterfaces = getVolumeInterface_l(output){
+	- VolumeInterface *volumeInterface = mPlaybackThreads.valueFor(output).get()
+	- return volumeInterface
+	}
+- volumeInterfaces.add(volumeInterface)
+- mStreamTypes[stream].volume = value
+  //thread设置音量
+- for (size_t i = 0; i < volumeInterfaces.size(); i++) {
+	-  volumeInterfaces[i]->setStreamVolume(stream, value){
+		- mStreamTypes[stream].volume = value
+		}@Threads.cpp
+	}
+}@AudioFlinger.cpp
 
 PlaybackThread::threadLoop-->prepareTracks_l{
 - (设置音量)track->mCachedVolume

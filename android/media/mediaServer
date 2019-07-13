@@ -25,11 +25,18 @@ BinderService::instantiate-->publish{
 frameworks/av/media/mediaserver/main_mediaserver.cpp
 frameworks/native/include/binder/BinderService.h
 
-//android8.1
+/* android8.1
+
+*/
+LOCAL_SHARED_LIBRARIES := \
+	libaaudioservice \
+	libaudioflinger \
+	libaudiopolicyservice \
+
 int main(int argc __unused, char **argv)
 {
 - AudioFlinger::instantiate()
 - AudioPolicyService::instantiate()
 
-}
+}@main_audioserver.cpp
 frameworks/av/media/audioserver/main_audioserver.cpp

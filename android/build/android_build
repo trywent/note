@@ -267,3 +267,6 @@ PRODUCT_AAPT_PREF_CONFIG := xhdpi
 ldpi
 mdpi  //density 160
 hdpi
+
+关闭优化
+WITH_DEXPREOPT=false

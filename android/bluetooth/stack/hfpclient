@@ -3,7 +3,6 @@
  hf(hands free):控制设备
 
  提供上层调用接口:BTA_ID_HS - bta_hf_client_reg
-
 */
  //jni接口
 bthfClientInterface = {
@@ -12,6 +11,9 @@ bthfClientInterface = {
     .connect = connect,
     .disconnect = disconnect,
     .connect_audio = connect_audio,
+    .dial = dial,
+    .dial_memory = dial_memory,
+    .handle_call_action = handle_call_action,
     .disconnect_audio = disconnect_audio,
     .query_current_calls = query_current_calls,
 }@btif_hf_client.c
@@ -37,7 +39,7 @@ bta_hf_client_api_enable{
 
 
 /*
- java上层调用stack
+ java上层调用stack接口
 
  状态机处理回调btif-->bta. bta-->btif
  状态表有4中状态,st_init,st_opening,st_open,st_closing
@@ -59,7 +61,7 @@ bta_hf_client_sm_execute{
 
 
 
- //connect_audio
+//connect_audio
 connect_audio{
 - cb = btif_hf_client_get_cb_by_bda(*bd_addr)//获取连接的设备
 - 若设备支持codec协商,BTA_HfClientSendAT(BTA_HF_CLIENT_AT_CMD_BCC)
@@ -69,12 +71,7 @@ connect_audio{
 	-->@btif_core.cc-->btif_in_hf_client_generic_evt
 }@btif_hf_client.c
 
-BTA_HfClientSendAT-->bta_sys_sendmsg(BTA_HF_CLIENT_SEND_AT_CMD_EVT)@btif_hf_client.c-->
-bta_hf_client_action[BTA_HF_CLIENT_SEND_AT_CMD]@bta_hf_client_main.cc-->
-bta_hf_client_send_at_cmd{
-- bta_hf_client_send_at_bcc
-- BTA_HF_CLIENT_AT_CMD_CLCC
-}@btif_hf_client.c
+
 
 
 BTA_HfClientAudioOpen-->bta_sys_sendmsg(BTA_HF_CLIENT_API_AUDIO_OPEN_EVT)@btif_hf_client.c-->
@@ -83,9 +80,60 @@ bta_hf_client_sco_open-->bta_hf_client_sco_event(BTA_HF_CLIENT_SCO_OPEN_E)@bta_h
  //disconnect_audio
 
 
- //查询电话状态
+//查询电话状态
 query_current_calls-->BTA_HfClientSendAT(cb->handle, BTA_HF_CLIENT_AT_CMD_CLCC)@btif_hf_client.cc-->
 BTA_HfClientSendAT-->bta_sys_sendmsg@bta_hf_client_api.cc
+
+
+//接听，挂断通话
+handle_call_action(const RawAddress* bd_addr,bthf_client_call_action_t action,int idx){
+- btif_hf_client_cb_t* cb = btif_hf_client_get_cb_by_bda(*bd_addr)
+- switch (action) {
+	- BTHF_CLIENT_CALL_ACTION_CHLD_0:BTA_HfClientSendAT(cb->handle, BTA_HF_CLIENT_AT_CMD_CHLD, 0, 0, NULL)
+	  //挂断
+	- BTHF_CLIENT_CALL_ACTION_CHUP:BTA_HfClientSendAT(cb->handle, BTA_HF_CLIENT_AT_CMD_CHUP, 0, 0, NULL)
+	}
+}@btif_hf_client.cc
+
+
+//hfp发送at命令
+BTA_HfClientSendAT(uint16_t handle, tBTA_HF_CLIENT_AT_CMD_TYPE at,uint32_t val1, uint32_t val2, const char* str){
+- tBTA_HF_CLIENT_DATA_VAL* p_buf = (tBTA_HF_CLIENT_DATA_VAL*)osi_malloc(sizeof(tBTA_HF_CLIENT_DATA_VAL))
+- p_buf->hdr.event = BTA_HF_CLIENT_SEND_AT_CMD_EVT
+- p_buf->uint8_val = at
+- p_buf->uint32_val1 = val1
+- p_buf->hdr.layer_specific = handle
+  //发送事件，切换到bta上下文
+- bta_sys_sendmsg(p_buf)
+}@bta_hf_client_api.cc
+
+bta_hf_client_send_at_cmd((tBTA_HF_CLIENT_DATA* p_data)){
+- tBTA_HF_CLIENT_CB* client_cb = bta_hf_client_find_cb_by_handle(p_data->hdr.layer_specific)
+  //命令类型
+- tBTA_HF_CLIENT_DATA_VAL* p_val = (tBTA_HF_CLIENT_DATA_VAL*)p_data
+- switch(p_val->uint8_val){
+	- BTA_HF_CLIENT_AT_CMD_VTS:bta_hf_client_send_at_vts(client_cb, (char)p_val->uint32_val1)
+	- BTA_HF_CLIENT_AT_CMD_CLCC:bta_hf_client_send_at_clcc(client_cb){
+		- buf = "AT+CLCC\r"
+		- bta_hf_client_send_at(client_cb, BTA_HF_CLIENT_AT_CLCC, buf, strlen(buf))
+		}
+	}
+}@bta_hf_client_at.cc
+
+
+bta_hf_client_send_at(tBTA_HF_CLIENT_CB* client_cb,tBTA_HF_CLIENT_AT_CMD cmd, const char* buf,uint16_t buf_len) {
+  //当前可以发送AT命令
+- if ((client_cb->at_cb.current_cmd == BTA_HF_CLIENT_AT_NONE ||client_cb->svc_conn == false) &&
+	!alarm_is_scheduled(client_cb->at_cb.hold_timer)) {
+	- client_cb->at_cb.current_cmd = cmd
+	- PORT_WriteData(client_cb->conn_handle, buf, buf_len, &len)
+	//加入命令回复计时器
+	- bta_hf_client_start_at_resp_timer(client_cb)-->alarm_set_on_mloop(client_cb->at_cb.resp_timer, BTA_HF_CLIENT_AT_TIMEOUT,
+                     bta_hf_client_at_resp_timer_cback)
+	}
+ //延时发送AT
+- bta_hf_client_queue_at(client_cb, cmd, buf, buf_len)
+}@bta_hf_client_at.cc
 
  //命令超时
 bta_hf_client_at_resp_timer_cback(void* data){
@@ -94,8 +142,17 @@ bta_hf_client_at_resp_timer_cback(void* data){
 - bta_hf_client_sm_execute(BTA_HF_CLIENT_API_CLOSE_EVT, &msg)
 }@bta_hf_client_at.cc
 
+/*
+ 状态机处理事件
+*/
+
+bta_hf_client_hdl_event-->bta_hf_client_sm_execute-->bta_hf_client_action[BTA_HF_CLIENT_SEND_AT_CMD]-->
+bta_hf_client_send_at_cmd{
+-
+}@bta_hf_client_at.cc
 
 
+===================
 /*
  底层回调到java
 
@@ -125,7 +182,9 @@ btif_hf_client_upstreams_evt{
 
 
 ===================
-//sco
+/*
+ sco
+ */
 bta_hf_client_sm_execute-->bta_hf_client_action{
 - bta_hf_client_sco_open
 - bta_hf_client_sco_close
@@ -163,7 +222,9 @@ BTM_CreateSco{
 }
 
 ===================
-//rfc
+/*
+  rfc
+*/
 bta_hf_client_port_cback-->bta_sys_sendmsg(BTA_HF_CLIENT_RFC_DATA_EVT)
 
 (状态机执行)bta_hf_client_action(bta_hf_client_st_open[RFC_DATA_EVT])-->bta_hf_client_rfc_data

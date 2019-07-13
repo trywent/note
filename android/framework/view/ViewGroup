@@ -1,0 +1,59 @@
+/*
+ ViewGroup
+
+*/
+
+//加入view
+addView(View child)-->addView(View child, int index)-->addView(View child, int width, int height)
+-->addView(View child, LayoutParams params)-->addView(View child, int index, LayoutParams params){
+- requestLayout()
+- invalidate(true)
+- addViewInner(child, -1/*index*/, params, false){
+	- if (index < 0) {
+            index = mChildrenCount;
+       	   }
+	- addInArray(child, index) //加入到mChildren
+	- child.mParent = this
+	- child.dispatchAttachedToWindow(mAttachInfo, (mViewFlags&VISIBILITY_MASK))
+	- dispatchViewAdded(child)
+	  //默认焦点
+	- if (child.hasDefaultFocus()) {
+		- setDefaultFocus(child)
+		}
+	}
+}@ViewGroup.java
+
+
+invalidateChild(View child, final Rect dirty) {
+  //使用硬件加速
+- AttachInfo attachInfo = mAttachInfo
+- if (attachInfo != null && attachInfo.mHardwareAccelerated) {
+            - onDescendantInvalidated(child, child)
+            - return
+        }
+ //不使用硬件加速
+- 
+}
+
+
+/*
+ FrameLayout
+
+*/
+public class FrameLayout extends ViewGroup
+
+
+
+
+/*
+ DecorView
+
+*/
+public class DecorView extends FrameLayout implements RootViewSurfaceTaker, WindowCallbacks
+
+
+
+
+
+frameworks/base/core/java/android/view/ViewGroup.java
+frameworks/base/core/java/com/android/internal/policy/DecorView.java

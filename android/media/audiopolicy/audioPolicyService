@@ -44,7 +44,7 @@ HwModule{
 
 AudioOutputDescriptor //output
 
-
+main(int argc __unused, char **argv)-->AudioPolicyService::instantiate()@main_audioserver.cpp-->
 AudioPolicyService::onFirstRef{
 - mTonePlaybackThread = new AudioCommandThread        
 - mAudioCommandThread = new AudioCommandThread// start audio commands thread
