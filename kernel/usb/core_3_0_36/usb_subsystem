@@ -85,7 +85,7 @@ subsys_initcall(usb_init)-->usb_init{
 
 /*********************
   usb设备创建。usb_device
-
+  hub中监听到端口变化，创建设备
 */
 struct usb_device *usb_alloc_dev(struct usb_device *parent,struct usb_bus *bus, unsigned port1){
 - struct usb_hcd *usb_hcd = container_of(bus, struct usb_hcd, self)
@@ -132,6 +132,7 @@ usb_register(struct usb_driver *driver)-->
 usb_register_driver(struct usb_driver *new_driver, struct module *owner,const char *mod_name){
   //设置drvwrap。并主持drvwrap.driver
 - new_driver->drvwrap.for_devices = 0 //非usb设备驱动
+- new_driver->drvwrap.driver.bus = &usb_bus_type
 - new_driver->drvwrap.driver.probe = usb_probe_interface
 - driver_register(&new_driver->drvwrap.driver)
 - usbfs_update_special()

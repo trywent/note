@@ -1,10 +1,17 @@
-//
+/**************************
+  分析系统调用
+  strace - trace system calls and signals
+*/
+
+
+/*
+  android4.4
+
+  Fuse(Filesystem in Userspace)
+*/
 service sdcard /system/bin/sdcard -u 1023 -g 1023 -l /data/media /mnt/shell/emulated
     class main
 @init.rk30board.rc
-
-
-=====================
 
 main{
 - 解析参数
@@ -22,7 +29,7 @@ handle_fuse_requests{
 - 处理请求，handle_fuse_request
 }
 
-创建：
+//创建：
 handle_fuse_request-->handle_mknod/handle_mkdir-->fuse_reply_entry-->acquire_or_create_child_locked
 -->create_node_locked{
 - 设置要创建文件的权限，derive_permissions_locked
@@ -43,3 +50,16 @@ Posix_open-->throwIfMinusOne(env, "open", TEMP_FAILURE_RETRY(open(path.c_str(), 
 static rc_t throwIfMinusOne
 
 libcore/luni/src/main/native/libcore_io_Posix.cpp
+/**************************
+  android6.0
+*/
+
+
+
+
+
+/**************************
+  android8.1
+*/
+
+

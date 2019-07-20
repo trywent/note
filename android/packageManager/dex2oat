@@ -1,0 +1,38 @@
+/******************** android6.0
+ dex2oat
+*/
+
+pakcageManagerService ----> installd ----> dexopt
+
+main(int argc, char** argv)-->art::dex2oat(argc, argv){
+- TimingLogger timings("compiler", false, false)
+- Dex2Oat dex2oat(&timings)
+- dex2oat.ParseArgs(argc, argv)
+- LOG(INFO) << StrippedCommandLine() // "Starting dex2oat "
+  //设置
+- dex2oat.Setup()
+- if (dex2oat.IsImage()) { //编译系统
+    	- CompileImage(dex2oat)
+  }else{ //编译应用
+	- CompileApp(dex2oat)
+	}
+}
+
+Setup() {
+- 
+}
+
+CompileUseInterpreterOnly
+
+CompileApp(Dex2Oat& dex2oat) {
+- 
+}@dex2oat.cpp
+
+frameworks/base/services/core/java/com/android/server/pm/PackageManagerService.java
+frameworks/base/services/core/java/com/android/server/pm/PackageDexOptimizer.java
+art/dex2oat/dex2oat.cc
+
+
+/******************** android8.0
+
+*/

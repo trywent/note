@@ -146,18 +146,10 @@ scheduleTraversals-->mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSA
 @ViewRootImpl.java-->doFrame-->doCallback-->c.run@Choreographer.java-->
 TraversalRunnable.run-->doTraversal-->performTraversals-->mView.draw@ViewRootImpl.java
 
-
-updateDisplayListIfDirty()-->draw(canvas)
-
-buildDrawingCacheImpl(boolean autoScale)-->draw(canvas)
-
-createSnapshot(Bitmap.Config quality, int backgroundColor, boolean skipChildren)-->draw(canvas)
-
-
-dispatchDraw-->ViewGroup.drawChild()@ViewGroup.java-->
-draw(Canvas canvas, ViewGroup parent, long drawingTime)-->draw(canvas)
-
-
+//绘制
+updateDisplayListIfDirty()-->draw(canvas) /
+buildDrawingCacheImpl(boolean autoScale)-->draw(canvas) /
+createSnapshot(Bitmap.Config quality, int backgroundColor, boolean skipChildren)-->draw(canvas)-->
 draw(Canvas canvas, ViewGroup parent){
 - boolean hardwareAcceleratedCanvas = canvas.isHardwareAccelerated() //硬件加速
   //动画
@@ -169,6 +161,12 @@ draw(Canvas canvas, ViewGroup parent){
 	- 
 	}
 }@View.java
+
+dispatchDraw-->ViewGroup.drawChild(Canvas canvas, View child, long drawingTime)@ViewGroup.java-->
+draw(Canvas canvas, ViewGroup parent, long drawingTime)-->draw(canvas)
+
+
+
 
 
 getDisplayList

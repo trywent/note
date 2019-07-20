@@ -41,6 +41,7 @@ usb_add_hcd(struct usb_hcd *hcd,unsigned int irqnum, unsigned long irqflags){
 - sysfs_create_group(&rhdev->dev.kobj, &usb_bus_attr_group)
 }@hcd.c
 
+//创建hub设备
 register_root_hub(struct usb_hcd *hcd){
 - struct device *parent_dev = hcd->self.controller
 - struct usb_device *usb_dev = hcd->self.root_hub
@@ -48,6 +49,8 @@ register_root_hub(struct usb_hcd *hcd){
 - const int devnum = 1
 - usb_dev->devnum = devnum
 - usb_set_device_state(usb_dev, USB_STATE_ADDRESS)
+  //获取设备信息。设备类型bDeviceClass ，idVendor，idProduct
+- usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE)
 - usb_new_device(usb_dev)
 }@hcd.c
 

@@ -1,43 +1,4 @@
 /***********************
-  gnss(Global Navigation Satellite System )
-
-  卫星信号速度50 bit/s.下载卫星数据需要很长时间(通常第一次定位时间30-40s)
-  信号差时定位可能需要12.5min.
-  A-GPS中服务器缓存卫星数据,设备可以通过网络直接下载这些卫星数据
-
-*/
-//卫星：
-azimuth 方位角，航向
-elevation 高度，海拔
-PRN       伪随机码
-SRN       信噪比
-almanac   历书,年历
-ephemeris 星历,日历
-usedInFix 最近定位中被使用
-
-历书与星历都是表示卫星运行的参数。历书包括全部卫星的大概位置，用于卫星预报；星历只是当前接收机观测到的卫星的精确位置，用于定位。
-历书是从导航电文中提取的，每12.5分钟的导航电文才能得到一组完整的历书.GPS卫星星历参数包含在导航电文的第二和第三子帧中
-
-//A-GPS
-两种模式:
-Mobile Station Assisted (MSA) //mobile service provider..设备使用服务器计算的位置?
-Mobile Station Based (MSB) //A-GPS server..设备从服务器获取卫星信息
-
-//NMEA格式
-$ <发送器标示,数据类型> {,<数值>} *<校验和> <CR><LF>
-
-GGA //接收机定位数据
-GLL //地理位置——纬度/经度
-GSA //精度因子(DOP)与有效卫星
-GSV //可见卫星
-RMC //推荐的最少专用导航数据
-VTG //对地速度与航向
-ZDA //时间与日期
-GRS //卫星残差
-TXT //文本传送
-
-
-/***********************
  locationManagerService
 
 */
@@ -127,8 +88,79 @@ jb/frameworks/base/services/java/com/android/server/LocationManagerService.java
 jb/frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
 frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 
-//===================================== HAL
-status回调：
+/***********************
+  gps hal
+
+*/
+struct hw_module_t HAL_MODULE_INFO_SYM = {
+  .tag = HARDWARE_MODULE_TAG,
+  .id            = GPS_HARDWARE_MODULE_ID,
+  .methods       = &gps_module_methods{
+		     - .open = open_gps(struct hw_module_t* module,struct hw_device_t** device){
+			- struct gps_device_t *dev = malloc
+			- dev->get_gps_interface = get_gps_interface //返回hw_device_t 获取接口
+			- _gps_state->init = 0 //Struct GpsState
+			- device = dev
+		}
+	}
+}
+
+static const GpsInterface  GpsInterface = {
+  .size  = sizeof(GpsInterface),
+  .init  = gps_init,
+  .start = gps_start,
+  .stop  = 
+  .cleanup = 
+  .inject_time =
+  .inject_location = 
+  .delete_aiding_data =
+  .set_position_mode = 
+  .get_extension =
+};
+
+//设置回调接口,用于通知上层
+gps_init(GpsCallbacks* callbacks){
+- GpsState*  s = _gps_state
+- s->callbacks = *callbacks
+- load_conf
+- gps_state_init(state){
+	- state->fd //设置gps数据fd
+	- socketpair( AF_LOCAL, SOCK_STREAM, 0, state->control )//创建socketPair用于.系统gps服务和,gps线程通信
+	- state->thread = state->callbacks.create_thread_cb( "gps_state_thread", gps_state_thread) //创建读取nmea线程
+	}
+}@gps.c
+
+gps_start{
+- write( s->control[0], &cmd, 1 ) //开始
+- s->callbacks.create_thread_cb("supl_thread", supl_thread) //创建supl线程
+}@gps.c
+
+
+//读取解析nmea
+gps_state_thread{
+- NmeaReader  reader[1]
+- nmea_reader_init( reader )
+ //监听gps数据(从gps模块),gps命令(从gps服务)
+- epoll_fd   = epoll_create(2)
+  epoll_register( epoll_fd, state->fd )
+  epoll_register( epoll_fd, state->control[1] )
+- 循环读取数据
+{
+- epoll_wait( epoll_fd, events)
+- control_fd{//控制命令
+	- CMD_START:{
+		- nmea_reader_set_nmea_callback(nmea_cb)
+		- nmea_reader_set_callback(location_cb)
+		}
+	- CMD_STOP:
+	}
+- gps_fd{//数据
+	- nmea_reader_addc
+	}
+ }
+}
+
+//status回调：
 nmea_reader_parse-->gps_state->callbacks.location_cb@MstarGps.c-->
 location_callback-->method_reportLocation@com_android_server_location_GpsLocationProvider.cpp
 -->reportLocation(onFirstFix固定地址)，reportNmea(onNmeaReceived卫星消息)，
@@ -167,8 +199,6 @@ native_init@GpsLocationProvider.java-->android_location_GpsLocationProvider_init
 sGpsInterface->init@com_android_server_location_GpsLocationProvider.cpp-->
 mstar_gps_init-->gps_state_init-->gps_state_thread(循环等待命令，gps消息串)-->
 nmea_reader_addc(读取串口消息)-->nmea_reader_parse(根据消息调用回调函数callbacks)@MstarGps.c
-
-
 
 /***********************
  应用使用位置服务：
@@ -220,9 +250,7 @@ LocationManager{
 }
 
 
-__________________________________
-
-获取LocationProvider：
+//获取LocationProvider：
 LocationManager.getBestProvider-->getProviders-->_getProvidersLocked-->mProviders.get(从mProvider获取)
 @LoacationManagerService.java
 
@@ -258,7 +286,7 @@ addGpsStatusListener-->new GpsStatusListenerTransport-->mService.addGpsStatusLis
 @LocationManager.java
 
 获取卫星状态：
-GpsStatusListenerTransport.onGpsStatusChanged(状态变化)-->LocationManager. getGpsStatus
+GpsStatusListenerTransport.onGpsStatusChanged(状态变化)-->LocationManager.getGpsStatus
 -->status.setStatus(mGpsStatus)@LocationManager.java
 
 底层上报状态：

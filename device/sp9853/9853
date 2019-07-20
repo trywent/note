@@ -20,7 +20,7 @@ setprop sys.fyt.setparama lsecadbdebug9
 
 dd if=/mnt/usbdisk/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/boot bs=1024 count=16000
 
-dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/boot bs=1024 count=16000
+dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/boot
 
 dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/uboot bs=1024 count=600
 

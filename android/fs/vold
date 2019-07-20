@@ -1,0 +1,55 @@
+/**************************
+  android6.0
+*/
+service vold /system/bin/vold \
+        --blkid_context=u:r:blkid:s0 --blkid_untrusted_context=u:r:blkid_untrusted:s0 \
+        --fsck_context=u:r:fsck:s0 --fsck_untrusted_context=u:r:fsck_untrusted:s0
+@init.rc
+
+main(int argc, char** argv) {
+- VolumeManager *vm = VolumeManager::Instance()
+  //监听内核消息
+- NetlinkManager *nm = NetlinkManager::Instance()
+  //监听上层命令
+- CommandListener *cl = new CommandListener()
+- vm->setBroadcaster((SocketListener *) cl)-->mBroadcaster = sl
+- nm->setBroadcaster((SocketListener *) cl)-->mBroadcaster = sl
+- vm->start()
+- nm->start()
+- cl->startListener()
+}@main.cpp
+
+
+//volumeManager
+VolumeManager::start() {
+- unmountAll()
+ //创建虚拟volume
+- mInternalEmulated = std::shared_ptr<android::vold::VolumeBase>(new android::vold::EmulatedVolume("/data/media")){
+	- VolumeBase(Type::kEmulated) //虚拟
+	- mRawPath = rawPath
+	}
+- mInternalEmulated->create()-->VolumeBase::create(){
+	- setState(State::kUnmounted) //通知MountService
+	}@VolumeBase.cpp
+}@VolumeManager.cpp
+
+
+/*
+ 内部虚拟存储
+*/
+kFusePath = "/system/bin/sdcard"
+
+EmulatedVolume::doMount() {
+- if (!(mFusePid = fork())) {//父进程
+	- execl(kFusePath, kFusePath,"-u", "1023","-g", "1023","-m","-w")
+	}
+}
+
+system/vold/main.cpp
+system/vold/VolumeManager.cpp
+system/vold/VolumeBase.cpp
+system/vold/EmulatedVolume.cpp
+/**************************
+  android8.0
+*/
+

@@ -1,0 +1,59 @@
+/*
+ hub
+*/
+//hub驱动注册
+usb_hub_init{  
+- usb_register(&hub_driver)
+- struct workqueue_struct *hub_wq = alloc_workqueue("usb_hub_wq", WQ_FREEZABLE, 0)
+}@hub.c
+
+//hub设备,host创建usb_device。获取的类型是USB_CLASS_HUB
+register_root_hub(struct usb_hcd *hcd)@hcd.c-->usb_new_device(usb_dev)@hub.c
+
+//侦测设备
+hub_probe(struct usb_interface *intf, const struct usb_device_id *id){
+- struct usb_device *hdev = interface_to_usbdev(intf)
+- struct usb_hub *hub = kzalloc(sizeof(*hub), GFP_KERNEL)
+- INIT_DELAYED_WORK(&hub->init_work, NULL)
+- INIT_WORK(&hub->events, hub_event)
+- hub_configure(hub, endpoint){
+	- 
+	}
+}@hub.c
+
+
+//
+usb_hcd_resume_root_hub-->queue_work(pm_wq, &hcd->wakeup_work)-->hcd_resume_work(struct work_struct *work)
+-->usb_remote_wakeup(struct usb_device *udev)@hub.c-->usb_autoresume_device(struct usb_device *udev)@driver.c
+usb_device_pm_ops.runtime_resume@usb.c-->usb_runtime_resume-->usb_resume_both-->usb_resume_device-->
+udriver->resume@driver.c-->hub_resume-->hub_activate{
+- 
+}@hub.c
+
+//将work加入workqueue。处理hub event
+kick_hub_wq(struct usb_hub *hub)-->queue_work(hub_wq, &hub->events)-->
+hub_event(struct work_struct *work){
+- struct usb_hub *hub = container_of(work, struct usb_hub, events)
+- struct usb_interface *intf = to_usb_interface(hub_dev)
+  //处理端口状态。检测event_bits，change_bits，wakeup_bits
+- for (i = 1; i <= hdev->maxchild; i++) {
+	- struct usb_port *port_dev = hub->ports[i - 1]
+	- port_event(hub, i)
+	}
+  //处理hub状态
+}@hub.c
+
+
+
+//
+port_event(struct usb_hub *hub, int port1){
+- int connect_change = test_bit(port1, hub->change_bits)
+  //获取端口状态
+- hub_port_status(hub, port1, &portstatus, &portchange)
+- hub_port_connect_change(hub, port1, portstatus, portchange)
+}@hub.c
+
+
+
+kernel/drivers/usb/core/usb.c
+kernel/drivers/usb/core/driver.c

@@ -1,0 +1,172 @@
+/**********************android6.0
+ installer接口 。使用socket
+*/
+Installer(Context context) extends SystemService {
+- super(context);
+- mInstaller = new InstallerConnection()
+}@Installer.java
+
+//连接到install服务
+onStart-->mInstaller.waitForConnection()@Installer.java-->waitForConnection-->execute("ping")@InstallerConnection.java
+
+//安装
+nstall(String uuid, String name, int uid, int gid, String seinfo)-->mInstaller.execute(builder.toString())@Installer.java
+
+//dex2oat
+dexopt(String apkPath, int uid, boolean isPublic,String instructionSet, int dexoptNeeded)-->
+mInstaller.dexopt(apkPath, uid, isPublic, pkgName,....)@Installer.java-->execute(builder.toString())@InstallerConnection.java
+
+//执行命令
+execute(String cmd) {
+- String res = transact(cmd){
+	- connect(){
+		- mSocket = new LocalSocket()
+		- LocalSocketAddress address = new LocalSocketAddress("installd",LocalSocketAddress.Namespace.RESERVED)		
+		- mSocket.connect(address)
+		- mIn = mSocket.getInputStream()
+           	- mOut = mSocket.getOutputStream()
+		}
+	 //写入命令
+	- writeCommand(String cmdString){
+		- mOut.write(buf, 0, 2)//长度
+		- mOut.write(cmd, 0, len)
+		}
+	  //读取返回值
+	- readReply(){
+		- readFully(buf, 2)
+		- readFully(buf, len)
+		}
+	}
+  //结果
+- Integer.parseInt(res)
+}@InstallerConnection.java
+
+
+frameworks/base/services/core/java/com/android/server/pm/Installer.java
+frameworks/base/core/java/com/android/internal/os/InstallerConnection.java
+/*
+
+*/
+service installd /system/bin/installd
+    class main
+    socket installd stream 600 system system
+@init.rc
+
+main(const int argc __unused, char *argv[]) {
+- initialize_globals()
+- initialize_directories()
+  //获取socket  "installd"
+- lsocket = android_get_control_socket(SOCKET_PATH)
+- listen(lsocket, 5)
+  //循环等待连接
+- for (;;) {
+	- accept(lsocket, &addr, &alen)
+	  //读取
+	- for (;;) {
+		- readx(s, &count, sizeof(count))
+		- execute(s, buf)
+		}
+	} 
+}
+execute(int s, char cmd[BUFFER_MAX]){
+  //查找cmds中名字相同命令
+- cmds[i].func(arg + 1, reply)
+}
+
+
+//install
+do_install
+
+
+//dex2oat
+do_dexopt@installd.cpp-->dexopt(const char *apk_path, uid_t uid, bool is_public,
+           const char *pkgname, const char *instruction_set, int dexopt_needed,
+           bool vm_safe_mode, bool debuggable, const char* oat_dir){
+- input_fd = open(input_file, O_RDONLY, 0)
+- out_fd = open(out_path, O_RDWR | O_CREAT | O_EXCL, 0644)
+  //创建子进程处理dexopt
+- pid_t pid = fork()
+- if (pid == 0) {
+	  //设置调整当前应用进程优先级。不被杀
+	- update_oom_score_adj(getpid(), 0)
+	- run_dex2oat(input_fd, out_fd, input_file_name, out_path, swap_fd, pkgname,instruction_set, vm_safe_mode, debuggable)
+  }
+- 
+}@commands.cpp
+
+//执行
+run_dex2oat(int zip_fd, int oat_fd, const char* input_file_name,
+    const char* output_file_name, int swap_fd, const char *pkgname, const char *instruction_set,
+    bool vm_safe_mode, bool debuggable){
+- static const char* DEX2OAT_BIN = "/system/bin/dex2oat"
+ 
+ //创建参数
+- const char* argv[7+x]
+- argv[i++] = DEX2OAT_BIN
+- execv(DEX2OAT_BIN, (char * const *)argv)
+}@commands.cpp
+
+frameworks/native/cmds/installd/installd.cpp
+frameworks/native/cmds/installd/commands.cpp
+/**********************android8.0
+ installer接口 。使用binder
+*/
+
+
+
+
+frameworks/base/services/core/java/com/android/server/pm/Installer.java
+/*
+ installer服务
+*/
+
+
+service installd /system/bin/installd@installd.rc
+
+
+main(const int argc __unused, char *argv[])-->
+android::installd::installd_main(argc, argv){
+- selinux_set_callback(SELINUX_CB_LOG, cb)
+  //获取路径
+- initialize_globals{
+	- const char* data_path = getenv("ANDROID_DATA")
+	- const char* root_path = getenv("ANDROID_ROOT")
+	- init_globals_from_data_and_root(data_path, root_path){
+		- android_data_dir 		"/data/"
+		- android_app_dir 		"/data/app/"
+		- android_app_private_dir	"/data/priv-app/"
+		- android_app_ephemeral_dir	"/data/app-ephemeral/"
+		- android_app_lib_dir		"/data/app-ephemeral/"
+		- android_asec_dir		"ASEC_MOUNTPOINT"
+		- android_media_dir		"/data/media/"
+		- android_mnt_expand_dir	"/mnt/expand/"
+		- android_profiles_dir		"/data/misc/profiles"
+		  //4个系统应用
+		- android_system_dirs  "/system/app""/system/priv-app""/vendor/app""/oem/app"
+		}
+	}
+- initialize_directories() {
+	- 
+	}
+  //初始navite服务
+- InstalldNativeService::start(){
+	- BinderService<InstalldNativeService>::publish()
+	- sp<ProcessState> ps(ProcessState::self())
+	- ps->startThreadPool()
+	}@InstalldNativeService.cpp
+- IPCThreadState::self()->joinThreadPool()
+}
+
+
+frameworks/native/cmds/installd/installd.cpp
+frameworks/native/cmds/installd/globals.cpp
+frameworks/native/cmds/installd/InstalldNativeService.cpp
+
+
+
+
+
+
+
+
+

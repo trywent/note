@@ -5,6 +5,19 @@
  MATCH_DIRECT_BOOT_UNAWARE
  MATCH_DIRECT_BOOT_AWARE
 */
+//启动
+startBootstrapServices{
+- Installer installer = mSystemServiceManager.startService(Installer.class)
+- mPackageManagerService = PackageManagerService.main(mSystemContext, installer,mFactoryTestMode != FactoryTest.FACTORY_TEST_OFF, mOnlyCore)
+}@SystemServer.java
+
+main(Context context, Installer installer,boolean factoryTest, boolean onlyCore){
+- PackageManagerService m = new PackageManagerService(context, installer,factoryTest, onlyCore)
+- ServiceManager.addService("package", m)
+}@PackageManagerService.java
+
+
+//PackageManagerService
 final ArrayMap<String, PackageParser.Package> mPackages = new ArrayMap<String, PackageParser.Package>
 
 PackageManagerService(Context context, Installer installer,
@@ -30,7 +43,7 @@ PackageManagerService(Context context, Installer installer,
 - requestCopyPreoptedFiles //copy files
   //扫描应用
 - scanDirTracedLI
-}
+}@PackageManagerService.java
 
 
 

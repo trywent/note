@@ -1,4 +1,6 @@
-//=====================================
+/*
+
+*/
 //LI必须获得锁lock install。LP必须获得锁lock package
 package服务:
 startBootstrapServices-->PackageManagerService.main@SystemServer.java-->
@@ -74,9 +76,20 @@ PackageHelper.mountSdDir@PackageManagerService.java-->getMountService().mountSec
 (通过socket)-->mountAsec(创建/mnt/asec/xxx挂载点)@VolumeManager.cpp
 
 安装codePath，scanPackageLI(File)
+/*
+ dexopt
 
-===================
-//dexopt
+*/
+PackageManagerService{
+- for (SharedUserSetting setting : mSettings.getAllSharedUsersLPw()) {
+	- adjustCpuAbisForSharedUserLPw(setting.packages, null /* scanned package */,false /* force dexopt */, false /* defer dexopt */)
+	}
+}
+
+performDexOpt(PackageParser.Package pkg, String[] instructionSets,boolean forceDex, boolean defer, boolean inclDependencies)-->
+performDexOptLI(PackageParser.Package pkg, String[] targetInstructionSets, boolean forceDex, boolean defer, ArraySet<String> done)
+@PackageDexOptimizer.java
+
 performBootDexOpt{
 - ms = PackageHelper.getMountService不为空{
 	- doTrim  = isUpgrade = isUpgrade() //是否执行优化
@@ -93,23 +106,15 @@ performBootDexOpt{
 scanPackageLI(PackageParser.Package, parseFlags, scanMode, currentTime)-->scanPackageDirtyLI
 -->performDexOptLI(若!forceDex && defer则将apk加入容器)
 
-
--->performDexOptLI-->mInstaller.dexopt@PackageManagerService.java-->
-dexopt(发送命令dexopt)-->execute-->transaction-->(mOut是连接"installd"地址套接字的输出流)mOut.writeCommand
-@Installer.java-->
-
-installd守护程序：
-main-->accept(接收消息)-->execute(处理消息，执行cmds[i].func)-->(若是dexopt命令)do_dexopt@install.c
--->dexopt-->run_dexopt-->execl(执行"/system/bin/dexopt")@commands.c-->main-->fromZip-->
-processZipFile-->extractAndProcessZip@OptMain.cpp-->dvmContinueOptimization-->rewriteDex@DexPrepare.cpp
-
-
+frameworks/base/services/core/java/com/android/server/pm/PackageManagerService.java
+frameworks/base/services/core/java/com/android/server/pm/PackageDexOptimizer.java
 frameworks/base/services/core/java/com/android/server/pm/ParallelPackageParser.java
 dalvik/dexopt/OptMain.cpp
 dalvik/vm/analysis/DexPrepare.cpp
 dalvik/vm/Init.cpp
-===================
-//权限
+/* 权限
+
+*/
 updateSettingsLI-->updateSettingsInternalLI-->updatePermissionsLPw-->grantPermissionsLPw
 
 installPackageFromSystemLIF-->updatePermissionsLPw
@@ -134,8 +139,9 @@ grantPermissionsLPw(package){
 
 
 
-===================
-//读取偏好设置：
+/*
+ 读取偏好设置：
+*/
 startActivityMayWait-->resolveActivity@ActivityStack.java-->resolveIntent-->
 chooseBestActivity(查找合适的app，没有找到则返回选择对话框)-->findPreferredActivity
 (查找以前选择过的app)@PackageManagerService.java
@@ -247,27 +253,9 @@ installPackageTracedLI-->installPackageLI-->installNewPackageLIF{
 }
 
 
-
-===================
+/*
 开机提示：Android is upgrading...
-run{
-- startBootstrapServices-->PackageManagerService.main
-- startOtherServices-->mPackageManagerService.performBootDexOpt
-}@SystemServer.java
-//扫描模式scanMode = SCAN_MONITOR | SCAN_NO_PATHS | SCAN_DEFER_DEX | SCAN_BOOTING
-main-->PackageManagerService-->scanDirLI-->scanPackageLI-->performDexOptLI{
-- dalvik.system.DexFile.isDexOptNeeded-->Dalvik_dalvik_system_DexFile_isDexOptNeeded
-	@dalvik_system_DexFile.cpp-->dvmDexCacheStatus@JarFile.cpp
-}
-
-dvmDexCacheStatus{
-- 查看apk路径下是否有odex文件
-- 没有则解压apk，dexZipFindEntry
-- 获取cache文件路径，/data/dalvik-cache/system@app@appname@
-}
-@dalvik/vm/native/dalvik_system_DexFile.cpp
-@dalvik/vm/JarFile.cpp
-
+*/
 ServerThread.run()-->pm.performBootDexOpt(处理mDeferredDexOpt中的apk)@SystemServer.java
 -->performBootDexOpt-->(不是第一次启动)ActivityManagerNative.getDefault().showBootMessage
 @PackageManagerService.java-->showBootMessage-->mWindowManager.showBootMessage

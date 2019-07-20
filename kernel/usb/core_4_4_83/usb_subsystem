@@ -1,0 +1,26 @@
+/*
+ subsystem
+
+ 
+
+*/
+
+subsys_initcall(usb_init){
+  //总线
+- bus_register(&usb_bus_type)
+  //监听总线上的设备
+- bus_register_notifier(&usb_bus_type, &usb_bus_nb)
+- usb_register(&usbfs_driver)
+  //设备操作接口
+- usb_devio_init()
+  //hub
+- usb_hub_init()
+- usb_register_device_driver(&usb_generic_driver, THIS_MODULE)
+}@usb.c
+
+
+
+
+
+
+kernel/drivers/usb/core/usb.c

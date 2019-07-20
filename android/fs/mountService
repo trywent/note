@@ -1,0 +1,91 @@
+/*
+ android6.0
+ 
+ dumpsys mount
+ vold 发现disk，volume,通知mountService
+ MountService  接收vold消息。挂载，卸载volume
+
+*/
+startOtherServices-->mSystemServiceManager.startService(MOUNT_SERVICE_CLASS)@SystemServer.java
+
+Lifecycle-->onStart(){
+- mMountService = new MountService(getContext())
+- publishBinderService("mount", mMountService)
+}@MountService.java
+
+MountService(Context context) {
+- mCallbacks = new Callbacks(FgThread.get().getLooper())
+  //handler
+- HandlerThread hthread = new HandlerThread(TAG)
+- hthread.start()
+- mHandler = new MountServiceHandler(hthread.getLooper())
+  //
+- mSettingsFile = new AtomicFile(new File(Environment.getSystemSecureDirectory(), "storage.xml"))
+- readSettingsLocked()
+  //连接vold
+- mConnector = new NativeDaemonConnector(this, "vold", MAX_CONTAINERS * 2, VOLD_TAG, 25,null){
+	- mCallbacks = callbacks
+	- mSocket = socket
+	- mResponseQueue = new ResponseQueue(responseQueueSize)
+	}
+- Thread thread = new Thread(mConnector, VOLD_TAG)
+- thread.start()
+  //crypt
+- mCryptConnector = new NativeDaemonConnector(this, "cryptd",MAX_CONTAINERS * 2, CRYPTD_TAG, 25, null)
+  //内置存储
+- addInternalVolume(){
+	- VolumeInfo internal = new VolumeInfo(VolumeInfo.ID_PRIVATE_INTERNAL,VolumeInfo.TYPE_PRIVATE, null, null)
+	- mVolumes.put(internal.id, internal)
+	}
+}@MountService.java
+
+
+/* 接收vold消息
+   
+*/
+run() {
+- mCallbackHandler = new Handler(mLooper, this)
+- listenToSocket{
+	- LocalSocket socket = new LocalSocket()
+	- LocalSocketAddress address = determineSocketAddress()-->new LocalSocketAddress(mSocket)
+	- socket.connect(address)
+	- InputStream inputStream = socket.getInputStream()
+	  //读取消息
+	- inputStream.read(buffer, start, BUFFER_SIZE - start)
+	- mCallbackHandler.sendMessage(mCallbackHandler.obtainMessage(event.getCode(), event.getRawEvent()))
+	}
+}@NativeDaemonConnector.java
+
+handleMessage(Message msg)-->mCallbacks.onEvent(msg.what, event, NativeDaemonEvent.unescapeArgs(event))@NativeDaemonConnector.java
+-->onEvent(int code, String raw, String[] cooked)-->
+onEventLocked(int code, String raw, String[] cooked) {
+  //disk
+- VoldResponseCode.DISK_CREATED: {}
+- VoldResponseCode.DISK_DESTROYED: {}
+  //volume
+- VoldResponseCode.VOLUME_CREATED: {
+	- VolumeInfo vol = new VolumeInfo(id, type, disk, partGuid)
+	- mVolumes.put(id, vol)
+	- onVolumeCreatedLocked(vol)
+	}
+- VoldResponseCode.VOLUME_STATE_CHANGED: {
+	- 
+	}
+}@MountService.java
+
+//voluem创建
+onVolumeCreatedLocked(VolumeInfo vol) {
+- vol.type == VolumeInfo.TYPE_EMULATED{
+
+	}
+- vol.type == VolumeInfo.TYPE_PUBLIC{
+
+	}
+- vol.type == VolumeInfo.TYPE_PRIVATE 
+}@MountService.java
+
+/* 发送vold消息
+   
+*/
+frameworks/base/services/core/java/com/android/server/MountService.java
+frameworks/base/services/core/java/com/android/server/NativeDaemonConnector.java

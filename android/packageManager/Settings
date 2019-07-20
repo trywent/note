@@ -1,0 +1,99 @@
+/*
+ 保存应用信息
+*/
+
+PackageManagerService{
+- mSettings = new Settings(mPackages){
+	- mSystemDir = new File(dataDir, "system")
+	- mSettingsFilename = new File(mSystemDir, "packages.xml");
+        - mBackupSettingsFilename = new File(mSystemDir, "packages-backup.xml");
+        - mPackageListFilename = new File(mSystemDir, "packages.list");
+	}
+- mSettings.readLPw(sUserManager.getUsers(false))
+}@PakcageManagerService.java
+
+
+/* 加载配置。所有用户
+
+*/
+readLPw(List<UserInfo> users) {
+- FileInputStream str = null
+  //首先读取备份配置"/data/system/packages-backup.xml"
+- if (mBackupSettingsFilename.exists()) {
+	- str = new FileInputStream(mBackupSettingsFilename)
+	- if (mSettingsFilename.exists()) mSettingsFilename.delete()
+	}
+  //没有备份
+- if (str == null) {
+	- if (!mSettingsFilename.exists()) {
+		- return //配置文件不存在，返回		
+		}
+	- str = new FileInputStream(mSettingsFilename)
+	}
+  //读取并解析xml文件
+- XmlPullParser parser = Xml.newPullParser()
+- parser.setInput(str, StandardCharsets.UTF_8.name())
+- while ((type = parser.next()) != XmlPullParser.END_DOCUMENT){
+	- "package" readPackageLPw(parser)
+	- "permissions" readPermissionsLPw(mPermissions, parser)
+	- "permission-trees" readPermissionsLPw(mPermissionTrees, parser)
+	- "shared-user" readSharedUserLPw(parser)
+	}
+}@Settings.java
+
+
+//读取已存在xml配置
+readPackageLPw(XmlPullParser parser){
+- PackageSetting packageSetting = null
+  //信息
+- name = parser.getAttributeValue(null, ATTR_NAME)
+- primaryCpuAbiString = parser.getAttributeValue(null, "primaryCpuAbi")
+- packageSetting = addPackageLPw(name.intern(), realName, new File(codePathStr),
+ 	  new File(resourcePathStr), legacyNativeLibraryPathStr, primaryCpuAbiString ....){
+	- p = new PackageSetting(name, realName, codePath, resourcePath,legacyNativeLibraryPathString, primaryCpuAbiString,....)
+	- addUserIdLPw(uid, p, name)
+	- mPackages.put(name, p)
+	}
+- 
+}@Settings.java
+
+/* 保存应用信息
+ 
+*/
+writeLPr() {
+- if (mSettingsFilename.exists()) {
+	- if (!mBackupSettingsFilename.exists()) {//将当前信息保存到backup
+		- mSettingsFilename.renameTo(mBackupSettingsFilename)
+	  }else{//清除当前信息
+		- mSettingsFilename.delete() 
+		}
+	}
+  //打开packages.xml文件
+- FileOutputStream fstr = new FileOutputStream(mSettingsFilename)
+- BufferedOutputStream str = new BufferedOutputStream(fstr)
+  //写入package
+- for (final PackageSetting pkg : mPackages.values()) {
+	- writePackageLPr(serializer, pkg)
+        }
+  //写入不可用的应用
+- for (final PackageSetting pkg : mDisabledSysPackages.values()) {
+	- writeDisabledSysPackageLPr(serializer, pkg)
+        }
+  //写入sharedUser
+- 
+}@Settings.java
+
+
+
+isEnabledAndMatchLPr(ComponentInfo componentInfo, int flags, int userId){
+- PackageSetting ps = mPackages.get(componentInfo.packageName)
+- PackageUserState userState = ps.readUserState(userId)
+- userState.isMatch(componentInfo, flags)
+}@Settings.java
+
+
+
+frameworks/base/services/core/java/com/android/server/pm/Settings.java
+frameworks/base/services/core/java/com/android/server/pm/PackageSetting.java
+frameworks/base/services/core/java/com/android/server/pm/PackageSettingBase.java
+frameworks/base/core/java/android/content/pm/PackageUserState.java

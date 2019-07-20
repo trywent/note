@@ -1,5 +1,5 @@
 /*
- usb设备
+ otg
 */
 
 usb2: usb2@e2500000 {
@@ -7,15 +7,28 @@ usb2: usb2@e2500000 {
 }@sc9853i.dts
 
 //driver
-dwc_otg_driver_init{
+module_init(dwc_otg_driver_init)-->dwc_otg_driver_init{
 - platform_driver_probe(&dwc_otg_driver, dwc_otg_driver_probe)//"sprd,usb-v2.0"
 - driver_create_file(&dwc_otg_driver.driver, &driver_attr_version)
 }@dwc_otg_driver.c
 
+
+//检测到设备
 dwc_otg_driver_probe(struct platform_device *_dev){
 - dwc_otg_device_t *dwc_otg_device = dwc_alloc(sizeof(dwc_otg_device_t))
 - platform_set_drvdata(_dev, dwc_otg_device)
+  //dwc_otg_core_if_t
+- dwc_otg_device->core_if = dwc_otg_cil_init(dwc_otg_device->os_dep.base){
+	- dwc_otg_core_if_t *core_if = DWC_ALLOC(sizeof(dwc_otg_core_if_t))
+	- core_if->core_global_regs = (dwc_otg_core_global_regs_t *) reg_base
+	- dwc_otg_dev_if_t *dev_if = DWC_ALLOC(sizeof(dwc_otg_dev_if_t))
+	- dwc_otg_host_if_t *host_if = DWC_ALLOC(sizeof(dwc_otg_host_if_t))
+	  //工作队列
+	- core_if->wq_otg = DWC_WORKQ_ALLOC("dwc_otg")
+	- core_if->wkp_timer = DWC_TIMER_ALLOC("Wake Up Timer", w_wakeup_detected, core_if)
+	}@dwc_otg_cil.c
 - dwc_otg_attr_create(_dev)
+  //中断处理
 - request_irq(irq, dwc_otg_common_irq)
 - dwc_otg_core_init(dwc_otg_device->core_if)
   //PCD
@@ -25,6 +38,37 @@ dwc_otg_driver_probe(struct platform_device *_dev){
 - udc_enable(USB_DR_MODE_HOST)
 - hcd_init(_dev)
 }@dwc_otg_driver.c
+
+
+
+//中断处理
+dwc_otg_common_irq(int irq, void *dev)-->dwc_otg_handle_common_intr(otg_dev->core_if)@dwc_otg_driver.c
+dwc_otg_handle_common_intr(dwc_otg_core_if_t *core_if){
+- 
+- if (gintsts.b.wkupintr) {
+	- retval |= dwc_otg_handle_wakeup_detected_intr(core_if);
+	}
+}@dwc_otg_cil_intr.c
+
+dwc_otg_handle_wakeup_detected_intr{
+- if (dwc_otg_is_device_mode(core_if)) {//device
+ 	- 	
+  }else{//host
+	- pcgcctl.b.stoppclk = 1
+	- DWC_TIMER_SCHEDULE(core_if->wkp_timer, 71)-->w_wakeup_detected
+  }
+}@dwc_otg_cil_intr.c
+
+w_wakeup_detected(void *p){
+- dwc_otg_core_if_t *core_if = (dwc_otg_core_if_t *) p
+  //读取端口状态
+- hprt0_data_t hprt0 = {.d32 = 0 }
+- hprt0.d32 = dwc_otg_read_hprt0(core_if)
+- cil_hcd_resume(core_if){
+	- core_if->hcd_cb->resume_wakeup
+	}
+- core_if->lx_state = DWC_OTG_L0;
+}@dwc_otg_cil_intr.c
 
 
 /*
@@ -81,16 +125,41 @@ __udc_shutdown
 /*
  HCD (Host Controller Device).usb主控
 */
+hcd_init(struct platform_device *_dev){
+- dwc_otg_device_t *otg_dev = platform_get_drvdata(_dev)
+- struct usb_hcd * hcd = usb_create_hcd(&dwc_otg_hc_driver, &_dev->dev, dev_name(&_dev->dev))
+- dwc_otg_hcd_t *dwc_otg_hcd = dwc_otg_hcd_alloc_hcd()
+  //初始化dwc_otg_hcd_t，设置回调处理函数
+- dwc_otg_hcd_init(dwc_otg_hcd, otg_dev->core_if){
+	- hcd->core_if = core_if
+	- dwc_otg_cil_register_hcd_callbacks(hcd->core_if,&hcd_cil_callbacks, hcd)-->core_if->hcd_cb = cb//回调
+	  //定时器，任务
+	- hcd->conn_timer = DWC_TIMER_ALLOC("Connection timer",dwc_otg_hcd_connect_timeout, 0)
+	- hcd->reset_tasklet = DWC_TASK_ALLOC("reset_tasklet", reset_tasklet_func, hcd)
+	}@dwc_otg_hcd.c
+- usb_add_hcd(hcd, irq, IRQF_SHARED | IRQF_NO_SUSPEND)
+  //检测连接
+- DWC_WORKQ_SCHEDULE_DELAYED(otg_dev->core_if->wq_otg, usb_otg_cable_detect_work, otg_dev, 500, "OTG cable connect state change")
+}@dwc_otg_hcd_linux.c
 
-kernel/drivers/staging/sprd_usb/dwc_otg_driver.c
-kernel/drivers/staging/sprd_usb/dwc_otg_pcd_linux.c
-kernel/drivers/staging/sprd_usb/dwc_otg_pcd.c
+//回调
+static dwc_otg_cil_callbacks_t hcd_cil_callbacks = {
+	.start = dwc_otg_hcd_start_cb,
+	.stop = dwc_otg_hcd_stop_cb,
+	.disconnect = dwc_otg_hcd_disconnect_cb,
+	.session_start = dwc_otg_hcd_session_start_cb,
+	.resume_wakeup = dwc_otg_hcd_rem_wakeup_cb,
+}@dwc_otg_hcd.c
+
+
 kernel/drivers/staging/sprd_usb/dwc_otg_hcd_linux.c
-kernel/drivers/staging/sprd_usb/usb_hw.c
-
+kernel/drivers/staging/sprd_usb/dwc_otg_hcd.c
 /*
  UDC (USB Device Controller).usb设备
 */
+
+
+
 
 /*
  power
@@ -106,9 +175,10 @@ rpm_idle@runtime.c-->usb_device_pm_ops.runtime_idle@usb.c-->usb_runtime_idle@dri
 
 kick_hub_wq-->queue_work(hub_wq, &hub->events)-->hub_event@hub.c
 
-kernel/drivers/base/power/runtime.c
-kernel/drivers/usb/core/usb.c
-kernel/drivers/usb/core/driver.c
-kernel/drivers/usb/core/hub.c
+kernel/drivers/staging/sprd_usb/dwc_otg_driver.c
+kernel/drivers/staging/sprd_usb/dwc_otg_cil_intr.c
+kernel/drivers/staging/sprd_usb/dwc_otg_pcd_linux.c
+kernel/drivers/staging/sprd_usb/dwc_otg_pcd.c
+kernel/drivers/staging/sprd_usb/dwc_otg_hcd_linux.c
+kernel/drivers/staging/sprd_usb/usb_hw.c
 
-kernel/drivers/power/sprd_2731_charge.c

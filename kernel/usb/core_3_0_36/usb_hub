@@ -13,7 +13,33 @@ usb_init@usb.c-->usb_hub_init{
 - usb_deregister(&hub_driver)
 }@hub.c
 
-//处理事件
+//hub设备,host创建usb_device。获取的类型是USB_CLASS_HUB
+register_root_hub(struct usb_hcd *hcd)@hcd.c-->usb_new_device(usb_dev)@hub.c
+
+
+//hub驱动
+static const struct usb_device_id hub_id_table[] = {
+    { .match_flags = USB_DEVICE_ID_MATCH_DEV_CLASS,
+      .bDeviceClass = USB_CLASS_HUB},
+    { .match_flags = USB_DEVICE_ID_MATCH_INT_CLASS,
+      .bInterfaceClass = USB_CLASS_HUB},
+}
+static struct usb_driver hub_driver = {
+	.name =		"hub",
+	.probe =	hub_probe,
+	.id_table =	hub_id_table,
+}
+
+  //usb_device读取的设备类型为USB_CLASS_HUB
+static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id){
+- struct usb_hub *hub = kzalloc(sizeof(*hub), GFP_KERNEL)
+- g_root_hub20 = hub
+- hub_configure(hub, endpoint)
+}@hub.c
+
+/*处理事件
+
+*/
 hub_events(void){
 - int connect_change
   //获取事件

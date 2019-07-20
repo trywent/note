@@ -1,0 +1,18 @@
+/*
+ hfp
+*/
+
+//连接步骤
+1 连接RFCOMM
+
+
+
+2 服务层连接
+HF						AG
+		RFCOMM connection 
+	AT+BRSF=<HF supported features> ---->
+	+BRSF: <AG supported features>  <----
+	AT+BAC=<HF Available Codecs >   ---->
+		OK			<----
+		AT+CIND=?		---->
+		+CIND:...		<----

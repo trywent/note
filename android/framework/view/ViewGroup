@@ -35,6 +35,10 @@ invalidateChild(View child, final Rect dirty) {
 - 
 }
 
+//绘制
+dispatchDraw(Canvas canvas)
+
+
 
 /*
  FrameLayout

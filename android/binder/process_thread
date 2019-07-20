@@ -61,7 +61,8 @@ IPCThreadState::self()->joinThreadPool{
 	- pthread_key_create(&gTLS, threadDestructor)
 	}
 - joinThreadPool{
-	- getAndExecuteCommand{//循环执行
+	//循环执行
+	- getAndExecuteCommand{
 		- talkWithDriver
 		- executeCommand
 		}
