@@ -59,7 +59,7 @@ SurfaceHolder.Callback.surfaceDestroyed()之间
 
 
 /******************************
-//通过SurfaceHolder来操作Surface
+ 通过SurfaceHolder来操作Surface
 */
 
 SurfaceView{
@@ -68,25 +68,33 @@ SurfaceView{
 
 //操作surface
 SurfaceHolder{
-SurfaceHolder.addCallback() //加入回调函数
+SurfaceHolder.addCallback(Callback callback) //加入回调函数
 }
-
 //surface 变化的回调函数
 SurfaceHolder.Callback{
 surfaceChanged(SurfaceHolder holder, int format, int width, int height)
 surfaceCreated(SurfaceHolder holder)
 surfaceDestroyed(SurfaceHolder holder)
 }
+//获取surface
+public Surface getSurface()
 
+//获取canvas
+public Canvas lockCanvas(Rect inOutDirty) 
 
-
-
+frameworks/base/core/java/android/view/SurfaceView.java
+/******************************
+ surfaceView
+*/
 
 //visible
 setVisibility(设置mRequestedVisible)-->
 updateSurface{
-- creating = (mSurfaceControl == null || formatChanged || visibleChanged)&& mRequestedVisible //请求显示时才会创建
-- if(creating|visibleChanged...){ //创建surface,显示变化
+  //需要创建surface
+- boolean creating = (mSurfaceControl == null || formatChanged || visibleChanged)&& mRequestedVisible
+  //大小变化
+- boolean sizeChanged = mSurfaceWidth != myWidth || mSurfaceHeight != myHeight
+- if(creating||sizeChanged||visibleChanged...){ //创建surface,显示变化
 	- if(creating){
 		- mSurfaceSession = new SurfaceSession
 		- mSurfaceControl = new SurfaceControlWithBackground
@@ -103,7 +111,8 @@ updateSurface{
 		- mSurfaceCreated = false
 		- mSurface.forceScopedDisconnect()
 		}
-	- 若是创建,mSurface.copyFrom(mSurfaceControl)
+	  //若是创建,初始化surface
+	- mSurface.copyFrom(mSurfaceControl)
 	- if(visible && mSurface.isValid()){ //surface可见,通知创建信息
 		- surfaceCreated
 		- surfaceChanged
@@ -117,7 +126,26 @@ updateSurface{
   }else{
 	- 
 	}
+}@SurfaceView.java
+
+//大小变化
+setFrame(int left, int top, int right, int bottom) {
+- super.setFrame
+- updateSurface()
 }
+
+
+//SurfaceControlWithBackground
+SurfaceControlWithBackground extends SurfaceControl(String name, boolean opaque, SurfaceControl.Builder b){
+  //surfaceSession
+- super(b.setName(name).build())
+  //Background surfaceSession
+- mBackgroundControl = b.setName("Background for -" + name)
+                    .setFormat(OPAQUE)
+                    .setColorLayer(true)
+                    .build()
+- 
+}@SurfaceView.java
 
 
 
@@ -125,12 +153,8 @@ updateSurface{
 show/hide@SurfaceControl.java-->nativeSetFlags@android_view_SurfaceControl.cpp
 
 
-//lsec
-"sys.fyt_hidevideo";
-
-        //
-
 frameworks/base/core/java/android/view/SurfaceView.java
-frameworks/base/core/java/android/view/SurfaceControl.java
-frameworks/base/core/jni/android_view_SurfaceControl.cpp
+
+
+
 

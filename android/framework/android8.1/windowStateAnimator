@@ -10,7 +10,8 @@ WindowStateAnimator(WindowState win){//windowState中创建
 
 
 //创建 surfaceControl
-createSurfaceControlSurface outSurface, int result, WindowState win,WindowStateAnimator winAnimator)@WindowManagerService.java-->
+relayoutWindow-->
+createSurfaceControl(Surface outSurface, int result, WindowState win,WindowStateAnimator winAnimator)@WindowManagerService.java-->
 createSurfaceLocked(windowType){
   //surfacecontroller
 - mSurfaceController = new WindowSurfaceController(mSession.mSurfaceSession,width, height){

@@ -1,59 +1,5 @@
 /******************************
- SurfaceSession 应用client端到surfaceflinger的一个连接(一个用于创建surface的接口)
- surfaceControl 操作surface
-*/
-//activity创建SurfaceSession,surfaceControl
-addWindow@WindowManagerService.java-->attach@WindowState.java-->
-windowAddedLocked{
-- mSurfaceSession = new SurfaceSession()
-- mService.mSessions.add(this)
-}@Session.java
-
-relayoutWindow(session){//surfaceControl
-- createSurfaceLocked@WindowStateAnimator.java--winAnimator.createSurfaceLocked{
-	- mSurfaceController = new WindowSurfaceController(mSession.mSurfaceSession)-->new SurfaceControlWithBackground
-	- return mSurfaceController
-	}@WindowStateAnimator.java
-}@WindowManagerService.java
-
-//surfaceView创建SurfaceSession,surfaceControl
-updateSurface{
--  mSurfaceSession = new SurfaceSession(viewRoot.mSurface)
-- new SurfaceControlWithBackground(mSurfaceSession)-->new SurfaceControl
-}@SurfaceView.java
-
-
-//surfaceSession
-SurfaceSession-->nativeCreate@SurfaceSession.java-->nativeCreate-->
-SurfaceComposerClient* client = new SurfaceComposerClient()@android_view_SurfaceSession.cpp-->
-SurfaceComposerClient(创建Composer)-->onFirstRef{
-- sp<ISurfaceComposer> sm(ComposerService::getComposerService())-->
-	ComposerService::getComposerService-->ComposerService::connectLocked{
-	- getService("SurfaceFlinger")
-	}
-- ISurfaceComposerClient mClient = sm->createConnection-->(/*SurfaceFlinger*/)new Client@SurfaceFlinger
-}@SurfaceComposerClient.cpp
-
-//surfaceControl
-SurfaceControl-->nativeCreate@SurfaceControl.java-->
-nativeCreate{
-- sp<SurfaceComposerClient> client(android_view_SurfaceSession_getClient) //session
-- sp<SurfaceControl> surface = client->createSurface()-->
-      createSurface{
-	- sp<IBinder> handle
-	- sp<IGraphicBufferProducer> gbp
-	- mClient->createSurface(name, w, h, format, &handle, &gbp)
-	- new SurfaceControl(this, handle, gbp)
-	}@SurfaceComposerClient.cpp
-}@android_view_SurfaceControl.cpp
-
-
-destory-->nativeDestroy@SurfaceControl.java-->
-destroy-->mClient->destroySurface(mHandle)@SurfaceControl.cpp
-
-
-/******************************
- Composer:用于记录本地设置值
+ SurfaceComposerClient(对应java SurfaceSession)   创建操作surface的接口
 
 //本地实现接口，设置layer（surface）的位置大小...
 setPosition
@@ -62,6 +8,24 @@ status_t setLayer
 openGlobalTransaction
 closeGlobalTransaction
 */
+SurfaceComposerClient(创建Composer)-->onFirstRef{
+- sp<ISurfaceComposer> sm(ComposerService::getComposerService())-->
+	ComposerService::getComposerService-->ComposerService::connectLocked{
+	- getService("SurfaceFlinger")
+	}
+- ISurfaceComposerClient mClient = sm->createConnection-->(/*SurfaceFlinger*/)new Client@SurfaceFlinger
+}@SurfaceComposerClient.cpp
+
+
+//创建surfaceControl
+createSurface(const String8& name,uint32_t w,uint32_t h, PixelFormat format, uint32_t flags,SurfaceControl* parent,int32_t windowType,int32_t ownerUid)
+-->createSurfaceChecked(String8(name.c_str()), w, h, format, &surface,){
+- sp<IBinder> handle
+- sp<IGraphicBufferProducer> gbp
+- mClient->createSurface(name, w, h, format, flags, parentHandle,windowType, ownerUid, &handle, &gbp)
+- *outSurface = new SurfaceControl(this, handle, gbp, true /* owned */)
+}SurfaceComposerClient.cpp
+
 //开始
 nativeOpenTransaction-->SurfaceComposerClient::openGlobalTransaction-->
 Composer::openGlobalTransaction-->Composer::getInstance().openGlobalTransactionImpl
@@ -95,6 +59,91 @@ setTransactionState{
 		}
 	}
 }@Surfaceflinger.cpp
+
+/*
+ surfaceControl
+
+*/
+SurfaceControl(const sp<SurfaceComposerClient>& client,const sp<IBinder>& handle,const sp<IGraphicBufferProducer>& gbp,bool owned){
+- mClient(client)
+- mHandle(handle)
+- mGraphicBufferProducer(gbp)
+- mOwned(owned)
+}@SurfaceControl.cpp
+
+
+//创建surface
+getSurface-->generateSurfaceLocked{
+- sp<Surface> mSurfaceData = new Surface(mGraphicBufferProducer, false)
+}@SurfaceControl.cpp
+
+
+
+
+
+frameworks/native/libs/gui/SurfaceControl.cpp
+
+
+/*
+ surface (native)
+ 应用端绘制和提交数据
+
+*/
+Surface(const sp<IGraphicBufferProducer>& bufferProducer, bool controlledByApp){
+- mGraphicBufferProducer(bufferProducer)
+- mCrop(Rect::EMPTY_RECT)
+}@Surface.cpp
+
+//获取ANativeWindow_Buffer
+surface->lock(outBuffer,dirtyRectPtr)@android_view_Surface.cpp-->
+Surface::lock( ANativeWindow_Buffer* outBuffer, ARect* inOutDirtyBounds){
+- Surface::connect(NATIVE_WINDOW_API_CPU){
+	- IGraphicBufferProducer::QueueBufferOutput output
+	- mGraphicBufferProducer->connect(listener, api, mProducerControlledByApp, &output)
+	}
+- ANativeWindowBuffer* out
+- dequeueBuffer(&out, &fenceFd){ //获取一个buffer
+	- int buf = -1
+	- sp<Fence> fence
+	- mGraphicBufferProducer->dequeueBuffer(&buf, &fence, reqWidth, reqHeight..)//返回一个可用的buffer编号
+	  //需要重新分配
+	- if ((result & IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION) || gbuf == nullptr) {
+		- mGraphicBufferProducer->requestBuffer(buf, &gbuf)
+		}
+	- sp<GraphicBuffer>& gbuf(mSlots[buf].buffer)//获取返回的编号buffer
+	- *buffer = gbuf.get()
+	}
+- sp<GraphicBuffer> backBuffer(GraphicBuffer::getSelf(out))
+- fence->waitForever("Surface::lock")
+- 设置新脏区域为大小newDirtyRegion，设置为指定大小否则设置为buffer大小
+  //是否能复用前一个buffer的数据
+- mPostedBuffer(绘制部分脏区域时可用){
+	- 若可复用，则拷贝数据copyBit
+	- 不能复用，设置脏区域为整个buffer，newDirtyRegion.set(bounds)
+	}
+  //设置outbuffer,宽高地址
+- void* vaddr
+- backBuffer->lockAsync(newDirtyRegion.bounds(), &vaddr, fenceFd)
+- mLockedBuffer = backBuffer
+- outBuffer->width  = backBuffer->width
+- outBuffer->bits   = vaddr
+}@surface.cpp
+
+
+//提交buffer数据。传送给bufferQueue
+surface->unlockAndPost{
+- mLockedBuffer->unlockAsync(&fd)
+- queueBuffer(mLockedBuffer.get(), fd){
+	- int i = getSlotFromBufferLocked(buffer)
+	- sp<Fence> fence(fenceFd >= 0 ? new Fence(fenceFd) : Fence::NO_FENCE)
+	- IGraphicBufferProducer::QueueBufferOutput output
+	- IGraphicBufferProducer::QueueBufferInput input(timestamp, isAutoTimestamp,static_cast<android_dataspace>(mDataSpace)...)
+	- input.setSurfaceDamage(Region::INVALID_REGION)
+	- mGraphicBufferProducer->queueBuffer(i, input, &output)
+	- mQueueBufferCondition.broadcast()
+	}
+- mPostedBuffer = mLockedBuffer
+}@Surface.cpp
 
 
 frameworks/base/core/java/android/view/SurfaceSession.java
@@ -161,54 +210,7 @@ frameworks/native/services/surfaceflinger/Client.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 frameworks/native/services/surfaceflinger/Layer.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlingerConsumer.cpp
-/******************************
- 应用端绘制和提交数据
- * 1，绘制数据 lockCanvas-->
- * 2，提交数据 unlockCanvasAndPost-->
-*/
-//lockCanvas 返回一个canvas用于绘制，传入inOutDirty指定绘制大小(可能会被改变)
-lockCanvas@Surface.java-->nativeLockCanvas{
-- 计算脏区域大小，surface->lock(&outBuffer, dirtyRectPtr)
-- 创建canvas，SkNEW_ARGS(SkCanvas, (bitmap))
-- 关联canvas到java层，swapCanvasPtr
-- 创建lockedSurface
-}@surface.cpp
 
-Surface::lock(outBuffer,dirtyRectPtr){	
-- dequeueBuffer{ //获取一个buffer
-	- mGraphicBufferProducer->dequeueBuffer(buf中)//返回一个可用的buffer编号
-		dequeueBuffer@BufferQueue.cpp
-	- 获取返回的编号buffer，gbuf(mSlots[buf].buffer)
-	- 若返回BUFFER_NEEDS_REALLOCATION，重新分配mGraphicBufferProducer->requestBuffer
-	- 设置fenceFd
-	- 设置buffer为gbuf.get
-	}
-- 将buffer指针转换成，<GraphicBuffer> backBuffer
-- fence->waitForever("Surface::lock")
-- 设置新脏区域为大小newDirtyRegion，设置为指定大小否则设置为buffer大小
-- 是否能服用前一个buffer的数据mPostedBuffer(绘制部分脏区域时可用){
-	- 若可复用，则拷贝数据copyBit
-	- 不能复用，设置脏区域为整个buffer，newDirtyRegion.set(bounds)
-	}
-- backBuffer->lock
-- mLockedBuffer = backBuffer
-}@surface.cpp
-
-
-//提交绘制。将一个填充了绘制数据的buffer，传送给bufferQueue
-unlockCanvasAndPost-->nativeUnlockCanvasAndPost@Surface.java-->nativeUnlockCanvasAndPost{
-- 设置新canvas并关联到java层，swapCanvasPtr
-- surface->unlockAndPost
-}
-
-
-surface->unlockAndPost{
-- mLockedBuffer->unlock
-- queueBuffer{
-	- 获取buffer编号，getSlotFromBufferLocked
-	- mGraphicBufferProducer->queueBuffer@IGraphicBufferProducer.cpp
-	}
-}@Surface.cpp
 
 //layer提交数据到flinger
 queueBuffer@BufferQueue.cpp-->Layer::onFrameAvailable@Layer.cpp-->
@@ -235,6 +237,7 @@ doComposition-->doDisplayComposition{
 - doComposeSurfaces
 - SurfaceFlinger::doDisplayComposition-->hw->swapBuffers
 }
+
 //提交数据
 swapBuffers@DisplayDevice.cpp-->eglSwapBuffers-->(获取nativeWindow，提交数据)
 d->swapBuffers-->egl_window_surface_v2_t::swapBuffers-->nativeWindow->

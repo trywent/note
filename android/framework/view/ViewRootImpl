@@ -63,6 +63,12 @@ setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
 }@ViewRootImpl.java
 
 
+//relayout,设置mSurface.用于绘制数据
+//public final Surface mSurface = new Surface()
+relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,boolean insetsPending){
+- mWindowSession.relayout(mWindow, mSeq, params,mMeasuredWidth,mMeasuredHeight,mSurface)@ViewRootImpl.java
+  -->mService.relayoutWindow@Session.java-->relayoutWindow@WindowManangerService.java
+}@ViewRootImpl.java
 
 
 //记录窗口状态
@@ -159,11 +165,7 @@ measureHierarchy(final View host, final WindowManager.LayoutParams lp,
 	}
 }@ViewRootImpl.java
 
-//relayout,设置mSurface,获取frame大小
-relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,boolean insetsPending){
-- mWindowSession.relayout(mWindow, mSeq, params,mMeasuredWidth,mMeasuredHeight,mSurface)@ViewRootImpl.java
-  -->mService.relayoutWindow@Session.java-->relayoutWindow@WindowManangerService.java
-}@ViewRootImpl.java
+
 
 /*测量 
  设置View的mMeasuredWidth,mMeasuredHeight
