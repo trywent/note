@@ -30,7 +30,7 @@ btif_hf_client_execute_service-->BTA_HfClientEnable(bta_hf_client_evt,BTIF_HF_CL
 bta_hf_client_api_enable{
 - bta_sys_register(BTA_ID_HS, &bta_hf_client_reg)
 - bta_hf_client_cb_arr_init   //初始化control block...回调接口,函数接口
-  //设置接口回调到java
+  //设置接口回调到java...底层通知到java
 - bta_hf_client_cb_arr.p_cback = bta_hf_client_evt  
 - bta_sys_collision_register(BTA_ID_HS, bta_hf_client_collision_cback)
 }@bta_hf_client_main.c
@@ -140,9 +140,14 @@ bta_hf_client_send_at(tBTA_HF_CLIENT_CB* client_cb,tBTA_HF_CLIENT_AT_CMD cmd, co
  //命令超时
 bta_hf_client_at_resp_timer_cback(void* data){
 - tBTA_HF_CLIENT_CB* client_cb = (tBTA_HF_CLIENT_CB*)data
+  //AT_CNUM AT_CLCC
+- bta_hf_client_handle_ok(client_cb)
+  //其它命令
 - msg.hdr.layer_specific = client_cb->handle
 - bta_hf_client_sm_execute(BTA_HF_CLIENT_API_CLOSE_EVT, &msg)
 }@bta_hf_client_at.cc
+
+
 /*
   收到命令
 */
@@ -151,15 +156,35 @@ bta_hf_client_rfc_data(tBTA_HF_CLIENT_DATA* p_data) {
   //读取数据，解析数据
 - PORT_ReadData(client_cb->conn_handle, buf, BTA_HF_CLIENT_RFC_READ_MAX,&len)
 - bta_hf_client_at_parse(client_cb, buf, len){
-	- bta_hf_client_at_parse_start(client_cb)
+	- bta_hf_client_at_parse_start(client_cb){
+		}
 	- bta_hf_client_at_clear_buf(client_cb)
 	}@bta_hf_client_at.cc
 }@bta_hf_client_act.cc
 
 //解析收到的命令
 bta_hf_client_at_parse_start(client_cb){
-- 
+ //遍历解析函数。查找对应的解析函数
+- bta_hf_client_parser_cb[i](client_cb, buf)
 }@bta_hf_client_act.cc
+
+//收到clcc回复
+bta_hf_client_parse_clcc(tBTA_HF_CLIENT_CB* client_cb,char* buffer){
+- bta_hf_client_handle_clcc(client_cb, idx, dir, status, mode, mpty, numstr,type)-->
+  bta_hf_client_clcc(tBTA_HF_CLIENT_CB* client_cb, uint32_t idx,bool incoming, uint8_t status, bool mpty,char* number){
+	- evt.clcc.idx = idx
+	- evt.clcc.inc = incoming
+	- evt.clcc.status = status
+	- bta_hf_client_app_callback(BTA_HF_CLIENT_CLCC_EVT, &evt)-->bta_hf_client_cb_arr.p_cback(event, data)
+	}
+ //发送命令完成回调
+- bta_hf_client_handle_ok(client_cb)-->
+  bta_hf_client_at_result(tBTA_HF_CLIENT_CB* client_cb,tBTA_HF_CLIENT_AT_RESULT_TYPE type, uint16_t cme){
+	- evt.result.type = type //0 ok.1 error
+	- evt.result.cme = cme
+	}
+}@bta_hf_client_act.cc
+
 
 /*
  状态机处理事件
@@ -175,7 +200,7 @@ bta_hf_client_send_at_cmd{
 /*
  底层回调到java
 
- bta_hf_client_cb.p_cback
+ bta_hf_client_cb_arr.p_cback
 */
 bta_hf_client_app_callback-->bta_hf_client_cb.p_cback@bta_hf_client_main.c
 bta_hf_client_evt(event)-->btif_transfer_context(btif_hf_client_upstreams_evt,event)
@@ -184,10 +209,17 @@ btif_hf_client_upstreams_evt{
 	- btif_hf_client_cb.state = BTHF_CLIENT_CONNECTION_STATE_CONNECTED
 	- HAL_CBACK(bt_hf_client_callbacks, connection_state_cb)//回调
 	}
-- BTA_HF_CLIENT_IND_EVT:process_ind_evt{//电话状态
+  //电话状态
+- BTA_HF_CLIENT_IND_EVT:process_ind_evt{
 	- HAL_CBACK(bt_hf_client_callbacks, call_cb)
-	- HAL_CBACK(bt_hf_client_callbacks, callsetup_cb
+	- HAL_CBACK(bt_hf_client_callbacks, callsetup_cb)
 	}
+  //命令处理结束
+- BTA_HF_CLIENT_AT_RESULT_EVT:
+	- HAL_CBACK(bt_hf_client_callbacks, cmd_complete_cb)
+  //通话状态
+- BTA_HF_CLIENT_CLCC_EVT:
+	- HAL_CBACK(bt_hf_client_callbacks, current_calls_cb)
 - BTA_HF_CLIENT_AUDIO_OPEN_EVT://接听
 	- HAL_CBACK(bt_hf_client_callbacks, audio_state_cb, BTHF_CLIENT_AUDIO_STATE_CONNECTED)
 	
@@ -195,8 +227,6 @@ btif_hf_client_upstreams_evt{
 	- HAL_CBACK(bt_hf_client_callbacks, audio_state_cb, BTHF_CLIENT_AUDIO_STATE_DISCONNECTED)
 
 }@btif_hf_client.c
-
-
 
 
 

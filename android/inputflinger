@@ -63,6 +63,12 @@ start{
 }@InputManager.cpp
 
 
+/*
+ event:type code
+
+ keyevent:type code(上层键值) scanCode(kernel键值值)
+*/
+
 //Event type 事件类型
 DEVICE_ADDED = 0x10000000          //设备加入事件类型
 DEVICE_REMOVED = 0x20000000
@@ -213,25 +219,7 @@ frameworks/base/libs/androidfw/KeyLayoutMap.cpp
 frameworks/native/libs/utils/Tokenizer.cpp
 frameworks/base/include/androidfw/KeycodeLabels.h
 
-/***********************
- InputDispatcher
- 
-*/
-InputDispatcher(dispatcherPolicy){
-- mPolicy(policy)
-- mLooper = new Looper(false)
-}@InputDispatcher.cpp
 
-InputDispatcherThread(mDispatcher):Thread(/*canCallJava*/ true), mDispatcher(dispatcher)@InputDispatcher.cpp
-
-//开始处理数据
-mDispatcherThread->run("InputDispatcher")-->InputDispatcherThread::threadLoop()-->mDispatcher->dispatchOnce()
-InputDispatcher::dispatchOnce(){
-
-}@InputDispatcher.cpp
-
-
-frameworks/native/services/inputflinger/InputDispatcher.cpp
 /***********************
  InputReader
  
@@ -431,11 +419,148 @@ TouchButtonAccumulator::process(const RawEvent* rawEvent) {
 - BTN_TOOL_FINGER:mBtnToolFinger = rawEvent->value
 - BTN_TOOL_PEN:mBtnToolPen = rawEvent->value
 }
+/***********************
+ InputDispatcher
+ 
+*/
+InputDispatcher(dispatcherPolicy){
+- mPolicy(policy)
+- mLooper = new Looper(false)
+}@InputDispatcher.cpp
+
+InputDispatcherThread(mDispatcher):Thread(/*canCallJava*/ true), mDispatcher(dispatcher)@InputDispatcher.cpp
+
+//加入事件
+InputDispatcher::notifyKey(const NotifyKeyArgs* args) {
+-
+- mPolicy->interceptKeyBeforeQueueing(&event, /*byref*/ policyFlags)
+  //是否不分发
+- if (shouldSendKeyToInputFilterLocked(args)) {
+	- (!mPolicy->filterInputEvent(&event, policyFlags)) return;
+	}
+  //将事件加入队列末尾
+- enqueueInboundEventLocked(newEntry){
+	- mInboundQueue.enqueueAtTail(entry)
+	- EventEntry::TYPE_KEY{
+	
+		}
+	- EventEntry::TYPE_MOTION{
+		- 
+		}
+	}
+}@InputDispatcher.cpp
 
 
+//开始处理数据
+mDispatcherThread->run("InputDispatcher")-->InputDispatcherThread::threadLoop()-->mDispatcher->dispatchOnce()
+InputDispatcher::dispatchOnce(){
+- nsecs_t nextWakeupTime = LONG_LONG_MAX
+  //分发事件
+- dispatchOnceInnerLocked(&nextWakeupTime)
+  //执行命令
+- runCommandsLockedInterruptible
+}@InputDispatcher.cpp
 
-//触摸坐标根据屏幕比例进行缩放，使触摸坐标(x,y)与屏幕坐标(x1,y1)能够对应。
+//分发事件
+dispatchOnceInnerLocked(&nextWakeupTime){
+ //mInboundQueue 获取队列头事件
+- if (! mPendingEvent) {
+	- if (mInboundQueue.isEmpty()) {
+	
+	  }else{
+		- mPendingEvent = mInboundQueue.dequeueAtHead()	
+		}
+	}
+- EventEntry::TYPE_CONFIGURATION_CHANGED{
 
+	}
+- EventEntry::TYPE_DEVICE_RESET{
+
+	}
+- EventEntry::TYPE_KEY{
+
+	}
+- EventEntry::TYPE_MOTION
+ //事件是否丢弃
+- if (dropReason != DROP_REASON_NOT_DROPPED) {
+	- dropInboundEventLocked(mPendingEvent, dropReason)
+	}
+}
+
+synthesizeCancelationEventsForConnectionLocked
+
+
+//分发完成
+finishDispatchCycleLocked(nsecs_t currentTime,const sp<Connection>& connection, uint32_t seq, bool handled)-->
+onDispatchCycleFinishedLocked(currentTime, connection, seq, handled)-->
+postCommandLocked(& InputDispatcher::doDispatchCycleFinishedLockedInterruptible)-->
+doDispatchCycleFinishedLockedInterruptible{
+- 
+}@InputDispatcher.cpp
+
+//将事件加入到目标窗口(connection)的队列
+enqueueDispatchEntryLocked(const sp<Connection>& connection, EventEntry* eventEntry, const InputTarget* inputTarget,int32_t dispatchMode){
+- DispatchEntry* dispatchEntry = new DispatchEntry(eventEntry,inputTargetFlags, inputTarget->xOffset, inputTarget->yOffset...)
+- switch (eventEntry->type) {
+	- EventEntry::TYPE_KEY{
+		- KeyEntry* keyEntry = static_cast<KeyEntry*>(eventEntry)
+		  //若不是跟踪的key则丢弃(现在是没有丢弃。都上报了)
+		- connection->inputState.trackKey(keyEntry,dispatchEntry->resolvedAction...)-->
+		}
+	- EventEntry::TYPE_MOTION{
+
+		}
+	}
+- connection->outboundQueue.enqueueAtTail(dispatchEntry)
+}@InputDispatcher.cpp
+
+//跟踪每次Down状态按键
+InputDispatcher::InputState::trackKey(const KeyEntry* entry, int32_t action, int32_t flags){
+- AKEY_EVENT_ACTION_UP{
+	  //查找相同键值的按键，并移除
+	- ssize_t index = findKeyMemento(entry){
+		- 遍历mKeyMementos
+		}
+	- mKeyMementos.removeAt(index)
+	}
+- AKEY_EVENT_ACTION_DOWN{
+	  //查找是否已经存在按键。存在则移除，加入新按键
+	- ssize_t index = findKeyMemento(entry)
+	- mKeyMementos.removeAt(index)
+	- addKeyMemento(entry, flags){
+		- mKeyMementos.push()
+		- KeyMemento& memento = mKeyMementos.editTop()
+		- memento.keyCode = entry->keyCode			
+		}
+	}
+}@
+
+/*
+ 窗口注册获取事件
+*/
+registerInputChannel(const sp<InputChannel>& inputChannel,const sp<InputWindowHandle>& inputWindowHandle, bool monitor) {
+- sp<Connection> connection = new Connection(inputChannel, inputWindowHandle, monitor)
+- int fd = inputChannel->getFd()
+- mConnectionsByFd.add(fd, connection)
+- mMonitoringChannels.push(inputChannel)
+  //监听client
+- mLooper->addFd(fd, 0, ALOOPER_EVENT_INPUT, handleReceiveCallback, this)
+}@InputDispatcher.cpp
+
+//收到处理结果
+handleReceiveCallback(int fd, int events, void* data){
+  //获取收到回复的connection
+- ssize_t connectionIndex = d->mConnectionsByFd.indexOfKey(fd)
+- sp<Connection> connection = d->mConnectionsByFd.valueAt(connectionIndex)
+}
+
+
+frameworks/native/services/inputflinger/InputDispatcher.cpp
+
+
+/*
+ 触摸坐标根据屏幕比例进行缩放，使触摸坐标(x,y)与屏幕坐标(x1,y1)能够对应。
+*/
 设置输入配置信息：
 NativeInputManager::setDisplayOrientation-->(更新读取器信息)mInputManager->getReader()->
 requestRefreshConfiguration

@@ -34,13 +34,6 @@ dd if=/sdcard/boot.img  of=/dev/block/by-name/boot
 dd if=/sdcard/dtb.img  of=/dev/block/by-name/dtb
 dd if=/sdcard/dtbo.img  of=/dev/block/by-name/dtbo
 dd if=/sdcard/wmodem.bin  of=/dev/block/by-name/w_modem
-//声音
-i2s0---->8288
-
-bta_av_sink_data_cback
-
-//bluetooth
-WCN->CP0->DSP->2731
 
 
 //uart

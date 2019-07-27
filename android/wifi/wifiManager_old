@@ -1,36 +1,100 @@
-//
-WifiController{
-- 设置mWifiStateMachine = service.mWifiStateMachine
-- addState(mApStaDisabledState, mDefaultState)    //wifi关闭时
-- addState(mStaDisabledWithScanState, mDefaultState) //wifi打开时
-- wifi打开设置初始状态，setInitialState(mStaDisabledWithScanState)
-- wifi关闭设置初始状态，setInitialState(mApStaDisabledState)
+/*
+ wifiService
+
+*/
+initAndLoop-->new WifiService(context)@SystemServer.java-->
+WifiService(Context context) {
+- mContext = context
+  //开始状态机
+- mInterfaceName =  SystemProperties.get("wifi.interface", "wlan0")
+- mWifiStateMachine = new WifiStateMachine(mContext, mInterfaceName)
+- mWifiStateMachine.enableRssiPolling(true)
+  //创建线程。开始controller
+- HandlerThread wifiThread = new HandlerThread("WifiService")
+- mClientHandler = new ClientHandler(wifiThread.getLooper())
+- mWifiStateMachineHandler = new WifiStateMachineHandler(wifiThread.getLooper())
+- mWifiController = new WifiController(mContext, this, wifiThread.getLooper())
+- mWifiController.start()
+}@WifiService.java
+
+
+
+/*
+ wifiController
+ 
+ 控制wifi打开，模式设置....
+*/
+
+WifiController(Context context, WifiService service, Looper looper){
+- mWifiStateMachine = service.mWifiStateMachine
+  //设置状态机
+- addState(mDefaultState)
+- addState(mApStaDisabledState, mDefaultState)
+- addState(mStaDisabledWithScanState, mDefaultState)
+  ....
+  //设置初始状态
+- if (isWifiEnabled && isScanningAlwaysAvailable) {//
+	- setInitialState(mStaDisabledWithScanState)
+  }else{
+	- setInitialState(mApStaDisabledState)//关闭状态
+	}
+  //监听设置
+- initializeAndRegisterForSettingsChange(looper)
 }
 
-//1，开始状态ApStaDisabledState
+//开始状态ApStaDisabledState
 WifiService-->WifiController.start--ApStaDisabledState{
 - enter-->mWifiStateMachine.setSupplicantRunning
 - CMD_WIFI_TOGGLED打开wifi，transitionTo(mDeviceActiveState)
 }
 
-//2，DeviceActiveState
+//DeviceActiveState
 DeviceActiveState{
 - enter{
-	- 
+	- mWifiStateMachine.setOperationalMode(WifiStateMachine.CONNECT_MODE) //自动连接模式
 	- mWifiStateMachine.setDriverStart //加载驱动
 	}
 - 
 }
 
+
+
+frameworks/base/services/java/com/android/server/wifi/WifiService.java
+frameworks/base/wifi/java/android/net/wifi/WifiStateMachine.java
 frameworks/base/services/java/com/android/server/wifi/WifiController.java
 
-=================
-WifiStateMachine{
-- 创建WifiNative //驱动加载
-- 创建WifiMonitor //监听supplicant
-- 加入状态，设置初始状态setInitialState(mInitialState)
-- 开始start()
-}
+/*
+ WifiStateMachine
+
+ wifi的初始化，接收wpasupplicant信息
+*/
+WifiStateMachine(mContext, mInterfaceName/*wlan0*/){
+- mInterfaceName = wlanInterface
+- mNetworkInfo = new NetworkInfo(ConnectivityManager.TYPE_WIFI, 0, NETWORKTYPE, "")
+  //获取网络服务
+- IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE)
+- mNwService = INetworkManagementService.Stub.asInterface(b)
+  //发送命令的接口
+- mWifiNative = new WifiNative(mInterfaceName)
+- mWifiMonitor = new WifiMonitor(this, mWifiNative)
+  //suplicant
+- mSupplicantStateTracker = new SupplicantStateTracker(context, this, mWifiConfigStore,getHandler())
+- mLinkProperties = new LinkProperties()
+  //监听网络
+- mInterfaceObserver = new InterfaceObserver(this)
+- mNwService.registerObserver(mInterfaceObserver)
+  //创建状态机结构。并设置初始状态
+- addState(mDefaultState)
+- setInitialState(mInitialState)
+- start()
+}@WifiStateMachine
+
+//接口
+setDriverStart(boolean enable) //加载驱动
+setOperationalMode(int mode) //设置连接模式
+disconnectCommand()-->sendMessage(CMD_DISCONNECT)
+reconnectCommand()-->sendMessage(CMD_RECONNECT)
+reassociateCommand()-->sendMessage(CMD_REASSOCIATE)
 
 //1,开始连接supplicant
 InitialState{
@@ -83,6 +147,28 @@ DisconnectedState{
 	
 	}
 }
+
+/*
+ wifiNative
+ 
+ 提供访问驱动，访问supplicant的接口
+*/
+WifiNative(String interfaceName) {
+- mInterfaceName = interfaceNam
+- if (!interfaceName.equals("p2p0")) {
+	- mInterfacePrefix = "IFNAME=" + interfaceName + " "
+   } else {
+        - mInterfacePrefix = ""
+   }
+}
+doBooleanCommand(String command)-->doBooleanCommandNative(mInterfacePrefix + command)
+
+reconnect-->doBooleanCommand("RECONNECT")@WifiNative.java
+
+
+
+frameworks/base/wifi/java/android/net/wifi/WifiNative.java
+frameworks/base/core/jni/android_net_wifi_WifiNative.cpp
 _________________
 //WifiMonitor 监听supplicant消息
 WifiMonitorSingleton.startMonitoring{

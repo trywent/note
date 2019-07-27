@@ -1,10 +1,12 @@
-//===========================
-状态机:
+/*
+StateMachine:
 发送消息
 |
 当前state处理消息----->(不能处理)由父state处理
 |
 执行状态切换(或结束)
+
+*/
 
 state{
   public void enter()
@@ -12,13 +14,59 @@ state{
   public boolean processMessage(Message msg) 
   ...
 }
-----------
-构成StateMachine流程：
-new StateMachine-->addState(sun,parent)-->setInitialState(设置初始state)-->start@StateMachine.java-->
+
+//构成StateMachine结构流程：
+1 StateMachine(String name) {
+- mSmThread = new HandlerThread(name)
+- mSmThread.start()
+- Looper looper = mSmThread.getLooper()
+- initStateMachine(name, looper){
+	- mName = name
+	- mSmHandler = new SmHandler(looper, this)-->
+	  SmHandler(Looper looper, StateMachine sm) {
+		- super(looper)
+		- mSm = sm
+  		//设置默认的两个状态
+		- addState(mHaltingState, null)
+		- addState(mQuittingState, null)
+		}@StateMachine.java
+	}
+}@StateMachine.java
+2 addState(sun,parent)-->mSmHandler.addState(state, parent) //加入状态
+  StateInfo addState(State state, State parent) {
+	- StateInfo parentStateInfo 
+	- if(parent!= null){
+		- parentStateInfo = addState(parent, null)
+		}
+	  //设置stateInfo.保存到mStateInfo
+	- StateInfo stateInfo = mStateInfo.get(state)
+	- if (stateInfo == null) {
+		 stateInfo = new StateInfo()
+		 mStateInfo.put(state, stateInfo)
+		}
+	- stateInfo.state = state
+	- stateInfo.parentStateInfo = parentStateInfo
+	- stateInfo.active = false
+	}@StateMachine.java
+3 setInitialState(state)-->mSmHandler.setInitialState(initialState)-->mInitialState = initialState //设置初始状态
+4 start-->smh.completeConstruction()-->completeConstruction{
+	 //查找状态机最深深度
+	- int maxDepth = depth
+	- mStateStack = new StateInfo[maxDepth]
+	- mTempStateStack = new StateInfo[maxDepth]
+	  //初始当前状态的父系结构。保存到mStateStack
+	- setupInitialStateStack{
+		- StateInfo curStateInfo = mStateInfo.get(mInitialState)
+		- mTempStateStack
+		- mStateStack
+		}
+	- sendMessageAtFrontOfQueue(obtainMessage(SM_INIT_CMD, mSmHandlerObj))
+	}
+
+//开始
 enter(从初始化state的层次结构中，最高父state开始)-->enter(子state)@State.java
 
-----------
-处理消息：
+//处理消息：
 StateMachine.sendMessage(StateMachine.obtainMessage)-->SmHandler.handleMessage{
 - processMsg{
 	- 当前状态处理消息，curStateInfo.state.processMessage{//state实现该方法
@@ -36,6 +84,7 @@ processMessage-->transitionTo(state)
 deferMessage将消息延迟到下个状态中处理
 
 退出状态机：quit(不再处理消息)
+
 
 frameworks/base/services/java/com/android/server/wifi/WifiController.java
 frameworks/base/core/java/com/android/internal/util/StateMachine.java

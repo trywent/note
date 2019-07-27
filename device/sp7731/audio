@@ -2,4 +2,17 @@
  audio
 */
 
+//声音
+i2s0---->8288
+
+bta_av_sink_data_cback
+
+//bluetooth
+WCN->CP0->DSP->2731
+
+
+44 SYS_IIS0: vbc_iis1 >vbc_iis2 vbc_iis3 ap_iis0 ap_iis1 ap_iis2 ap_iis3 pubcp_iis0 tgdsp_iis0 tgdsp_iis1 tgdsp_iis2 tgdsp_iis3
+45 SYS_IIS1: vbc_iis1 vbc_iis2 vbc_iis3 >ap_iis0 ap_iis1 ap_iis2 ap_iis3 pubcp_iis0 tgdsp_iis0 tgdsp_iis1 tgdsp_iis2 tgdsp_iis3
+46	ENUM	1	SYS_IIS2                                 vbc_iis1
+47	ENUM	1	SYS_IIS3                                 vbc_iis1
 

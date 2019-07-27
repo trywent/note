@@ -21,9 +21,15 @@ range:Multi-Level Security(MLS)//安全级别 s0
 
 attribute: domain/type //类型集合
 
+
+//根据log生成规则
+adb shell "cat /proc/kmsg | grep avc" > avc_log.txt
+audit2allow -i avc_log.txt
+
 /******************************
  定义类型,设置文件类型,设置进程类型,设置权限
  
+ SELinux Common Intermediate Language (CIL
 */
 
 规则:
@@ -61,10 +67,55 @@ class class_name [ inherits common_name ] { permission_name ... }
 file_contexts 编译生成file_contexts.bin
 security_classes​，*.te,其它文件生成​ policy.conf
 
-=============
-//根据log生成规则
-adb shell "cat /proc/kmsg | grep avc" > avc_log.txt
-audit2allow -i avc_log.txt
+//编译 平台sepolicy device/xxx/common/plat_sepoliy
+system/sepolicy/private/access_vectors //定义操作集
+
+/******************************
+ 加载
+
+*/
+main(int argc, char** argv) {
+- selinux_initialize(true)
+- selinux_android_restorecon("/init", 0)
+- selinux_initialize(false)
+- selinux_restore_context()
+}@init.cpp
+
+selinux_initialize(bool in_kernel_domain) {
+- if(in_kernel_domain){
+	- selinux_load_policy-->selinux_load_split_policy
+	 //是能selinux
+	- bool is_enforcing = selinux_is_enforcing()
+	- security_setenforce(is_enforcing)
+  }else{
+	- selinux_init_all_handles
+  }
+}
+
+//
+selinux_load_split_policy{
+  //查找policy文件 "/vendor/etc/selinux/precompiled_sepolicy"	
+- selinux_find_precompiled_split_policy(&precompiled_sepolicy_file)
+- android::base::unique_fd fd(open(precompiled_sepolicy_file.c_str(), O_RDONLY | O_CLOEXEC | O_BINARY))	
+- selinux_android_load_policy_from_fd(fd, precompiled_sepolicy_file.c_str()){
+	  //设置selinux的写入目录"/sys/fs/selinux" 
+	- set_selinuxmnt(SELINUXMNT)
+	- void *map = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0)
+	  //加载
+	- security_load_policy(void *data, size_t len)
+	}@android_platform.c
+}@init.cpp
+
+//将数据写入到 /sys/fs/selinux目录下
+security_load_policy(void *data, size_t len){
+- snprintf(path, sizeof path, "%s/load", selinux_mnt)
+- write(fd, data, len)
+}@load_policy.c
+
+system/core/init/init.cpp
+external/selinux/libselinux/src/android/android_platform.c
+external/selinux/libselinux/src/setenforce.c
+external/selinux/libselinux/src/load_policy.c
 
 
 //更新policy
@@ -76,9 +127,3 @@ directory so that it is picked up by the reload property):
 adb push out/target/product/<device>/root/sepolicy /data/security/current
 3. Then load the new policy by:
 adb shell su setprop selinux.reload_policy 1
-
-=============
-//编译 平台sepolicy device/xxx/common/plat_sepoliy
-
-
-system/sepolicy/private/access_vectors //定义操作集

@@ -1,14 +1,50 @@
+/*
+  systemimg
+*/
+file xxxx.img //查看文件格式
+两种格式分别为：  
+ext4 filesystem data
+Android sparse image
+
+//sparse image转化成为ext4的raw imge
+Usage: simg2img <sparse_image_files> <raw_image_file>  
+
+//ext4的raw image to  sparse image
+Usage: img2simg <raw_image_file> <sparse_image_file> [<block_size>]
+
+
+1：先将system.img文件转化为ext4的raw image file（只要这个格式的system.img可以挂载）
+
+2：然后挂载system.img
+sudo  mount system.img /mnt/system
+
+3:然后根据自己的需要，修改/mnt/system目录下的文件
+
+4：重新打包
+sudo make_ext4fs -s -l 3096M   new.img /mnt/system
+
+5:重新打包后的文件new.img是sparse image格式，所以需要转化成ext4的 raw image
+ sim2img new.img system.img
+
+6:至此，修改system.img，重新打包的过程完成
+
+/*
+ bootimg
+*/
+//创建bootimg
+mkbootimg --kernel dir/kernel --ramdisk dir/ramdisk.img --output dir/boot.img 
+@system/core/mkbootimg/mkbootimg.c
+
 //创建rootfs
 mkbootfs dir/root | minigzip > dir/ramdisk.img
 
 @system/core/cpio/mkbootfs.c
 
-//创建bootimg
-mkbootimg --kernel dir/kernel --ramdisk dir/ramdisk.img --output dir/boot.img 
+//解压bootimg
+mkdir boot  &&  cd boot
+abooting -x  ../boot.img //得到这三个文件 ：bootimg.cfg  initrd.img  zImage
 
-@system/core/mkbootimg/mkbootimg.c
-
-//=================解压ramdisk
+//解压ramdisk
 #那么先解压，因为后缀不是.gz，所以用-s 选项
 gunzip -S .img ramdisk.img
 #查看是什么格式

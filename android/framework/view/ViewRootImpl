@@ -93,7 +93,8 @@ reportNextDraw{
 }@ViewRootImpl.java
 
 
-/* 执行测量布局
+/***********************
+ 执行测量布局
  relayout从frame获取view的初始大小.frame大小从windowmanager获取的窗口大小
  performMeasure测量大小
 　measureHierarchy测量非全屏view的大小防止全屏（弹框...）
@@ -167,7 +168,8 @@ measureHierarchy(final View host, final WindowManager.LayoutParams lp,
 
 
 
-/*测量 
+/***********************
+ 测量 
  设置View的mMeasuredWidth,mMeasuredHeight
 
  mOutsets虽然不可见，view的测量高宽要加上mOutsets
@@ -192,8 +194,9 @@ onMeasure(int widthMeasureSpec, int heightMeasureSpec){
 - int width = getMeasuredWidth()
 }@DecorView.java
 
-/*布局
-  
+
+/***********************
+ 布局  
  设置View位置mLeft,mTop,mRight,mBottom
  view的位置要向左移动mOutsets的宽度偏移，向上移动mOutsets的高度偏移
 */
@@ -228,7 +231,7 @@ onLayout(boolean changed, int left, int top, int right, int bottom){
 
 
 
-/*
+/***********************
   绘制
 */
 setAppVisibility-->wtoken.sendAppVisibilityToClients@WindowManagerService.java-->
@@ -294,6 +297,8 @@ getDisplayList{
  }
 - 
 }
+
+
 
 frameworks/base/core/java/android/view/ViewRootImpl.java
 frameworks/base/core/java/com/android/internal/policy/DecorView.java

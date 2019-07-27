@@ -1,0 +1,182 @@
+/***********************
+ 事件处理
+
+*/
+setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
+  //创建channel
+- InputChannel mInputChannel = new InputChannel()
+- setView-->mWindowSession.addToDisplay(window,inputChannel)@ViewRootImpl.java-->
+	addWindow-->mInputManager.registerInputChannel@WindowManagerService.java
+- mInputEventReceiver = new WindowInputEventReceiver(mInputChannel,Looper.myLooper())
+  
+- InputStage mSyntheticInputStage = new SyntheticInputStage
+- InputStage viewPostImeStage = new ViewPostImeInputStage(syntheticInputStage)
+- InputStage nativePostImeStage = new NativePostImeInputStage(viewPostImeStage)
+- InputStage earlyPostImeStage = new EarlyPostImeInputStage(nativePostImeStage)
+- InputStage imeStage = new ImeInputStage(earlyPostImeStage)
+- InputStage viewPreImeStage = new ViewPreImeInputStage(imeStage)
+- InputStage nativePreImeStage = new NativePreImeInputStage(viewPreImeStage)
+- mFirstInputStage = nativePreImeStage
+- mFirstPostImeInputStage = earlyPostImeStage
+
+}@ViewRootImpl.java
+
+
+
+//输入事件
+dispatchInputEvent-->sendMessage(MSG_DISPATCH_INPUT_EVENT)-->enqueueInputEvent
+
+//输入法事件
+dispatchKeyFromIme-->sendMessage(MSG_DISPATCH_KEY_FROM_IME)@ViewRootImpl.java
+
+
+//处理输入事件
+WindowInputEventReceiver.onInputEvent(InputEvent event, int displayId)-->enqueueInputEvent(event, this, 0, true)-->
+enqueueInputEvent(InputEvent event,InputEventReceiver receiver, int flags, boolean processImmediately){
+- adjustInputEventForCompatibility(event)
+  //创建queueInputEevent并加入队列mPendingInputEventTail
+- QueuedInputEvent q = obtainQueuedInputEvent(event, receiver, flags)
+- mPendingInputEventTail= q
+- if (processImmediately){
+	- doProcessInputEvents()
+  }else{
+	- scheduleProcessInputEvents()
+	}
+}@ViewRootImpl.java
+
+doProcessInputEvents(){
+ //遍历队列
+- while (mPendingInputEventHead != null) {
+	- QueuedInputEvent q = mPendingInputEventHead，mPendingInputEventHead = q.mNext
+	- deliverInputEvent(q){
+		- if (q.shouldSendToSynthesizer()) {//是否同步
+			- stage = mSyntheticInputStage
+		   }else{//是否跳过IME处理
+			- stage = q.shouldSkipIme() ? mFirstPostImeInputStage : mFirstInputStage
+			}
+		- stage.deliver(q)
+		}
+	}
+- mProcessInputEventsScheduled = false
+- mHandler.removeMessages(MSG_PROCESS_INPUT_EVENTS)
+}@ViewRootImpl.java
+
+//处理结束
+finishInputEvent(QueuedInputEvent q){
+
+}@ViewRootImpl.java
+
+/***********************
+ InputStage
+
+*/
+abstract class InputStage {
+  //创建
+- public InputStage(InputStage next){
+	- mNext = next
+	}
+  //处理
+- deliver(QueuedInputEvent q) {
+	- if ((q.mFlags & QueuedInputEvent.FLAG_FINISHED) != 0) {
+		- forward(q)-->onDeliverToNext(q)
+	  }else if(shouldDropInputEvent(q)){//丢弃
+		- finish(q, false){
+			- q.mFlags |= QueuedInputEvent.FLAG_FINISHED
+			- forward(q)		
+			}
+	  }else{//处理
+		- apply(q, onProcess(q))
+		}
+	}
+  //
+- apply(QueuedInputEvent q, int result){
+	- result == FORWARD:forward(q)
+	- result == FINISH_HANDLED:finish(q, true)
+	- result == FINISH_NOT_HANDLED:finish(q, false)
+  }
+  //传到下一个状态
+- onDeliverToNext(QueuedInputEvent q){
+	- if (mNext != null) { 
+		- mNext.deliver(q) 		
+   	  }else{//没有下一个状态，处理完成
+	 	- finishInputEvent(q)
+	 	}
+	}
+}@ViewRootImpl.java
+
+
+
+
+/*
+
+*/
+NativePreImeInputStage.onProcess{
+- mInputQueue为空FORWARD
+}
+
+/*
+
+*/
+ViewPreImeInputStage.onPorcess{
+- 按键processKeyEvent
+- 触摸事件FORWARD
+}
+/*
+
+*/
+ImeInputStage.onProcess{
+- 输入法焦点，imm.dispatchInputEvent
+- FORWARD
+}
+
+/*
+
+*/
+EarlyPostImeInputStage.onProcess{
+- 按键，processKeyEvent{
+	- 
+	- FORWARD	
+	}
+- pointer，processPointerEvent
+}
+
+/*
+
+*/
+NativePostImeInputStage.onProcess{
+- mInputQueue不为空，mInputQueue.sendInputEvent
+- FORWARD
+}
+
+/*
+ ViewPostImeInputStage extends InputStage
+*/
+ViewPostImeInputStage.onProcess{
+  //keyEevnt
+- processKeyEvent{
+	  //首先让view处理
+	- mView.dispatchKeyEvent(event)-->dispatchKeyEvent@DeocorView.java
+	}
+  //其它事件
+- final int source = q.mEvent.getSource()
+- SOURCE_CLASS_POINTER:processPointerEvent(q)
+- SOURCE_CLASS_TRACKBALL:processTrackballEvent
+- motion:processGenericMotionEvent
+}
+
+
+
+AsyncInputStage.apply(NativePreImeInputStage.onProcess)-->defer-->
+	enqueue(加入队列mQueueTail)
+
+/*
+
+*/
+
+
+
+
+frameworks/base/core/java/android/view/ViewRootImpl.java
+
+
+

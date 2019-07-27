@@ -60,14 +60,10 @@ getTopLevelResources-->mResourcesManager.getResources@ActivityThread.java-->getR
 //display信息：
 // 通过WindowManager获取
         DisplayMetrics dm = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(dm);
-        System.out.println("width-display :" + dm.widthPixels);
-        System.out.println("heigth-display :" + dm.heightPixels);
+        getWindowManager().getDefaultDisplay().getMetrics(dm)
 
 // 通过Resources获取
-        DisplayMetrics dm2 = getResources().getDisplayMetrics();
-        System.out.println("width-display :" + dm2.widthPixels);
-        System.out.println("heigth-display :" + dm2.heightPixels);
+        DisplayMetrics dm2 = getResources().getDisplayMetrics()
 
 
 getDisplayMetricsLocked(DEFAULT_DISPLAY){
