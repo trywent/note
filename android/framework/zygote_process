@@ -25,7 +25,19 @@ service zygote /system/bin/app_proces@init.rc-->main-->runtime.start("com.androi
 
 //fork进程
 forkAndSpecialize-->nativeForkAndSpecialize@Zygote.java-->com_android_internal_os_Zygote_nativeForkAndSpecialize
--->ForkAndSpecializeCommon-->fork@com_android_internal_os_Zygote.cpp
+-->ForkAndSpecializeCommon{
+  //设置子进程退出信号处理
+- SetSignalHandlers{
+	- sig_chld.sa_handler = SigChldHandler
+	- sigaction(SIGCHLD, &sig_chld, NULL)	
+	}
+- pid_t pid = fork{}
+- if(pid==0){
+
+  }else{//父进程
+
+  }
+}@com_android_internal_os_Zygote.cpp
 
 //进程初始化
 RuntimeInit.zygoteInit{
@@ -39,6 +51,16 @@ RuntimeInit.zygoteInit{
 	- throw new ZygoteInit.MethodAndArgsCaller-->MethodAndArgsCaller.run-->mMethod.invoke
 	}@ZygoteInit.java	
 }@RuntimeInit.java
+
+
+//子进程退出处理（systemServer）
+SigChldHandler{
+- while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+	- if (pid == gSystemServerPid) {//systemServier退出
+		- kill(getpid(), SIGKILL) //杀掉zygote
+		}
+	}
+}
 
 
 //加载"libandroid_servers.so":包含服务的jni，其他应用不能调用

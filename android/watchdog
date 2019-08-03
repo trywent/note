@@ -1,0 +1,97 @@
+/*
+ watchDog
+ 
+ 当前只监听了当前进程中binder处理消息的线程池  mMonitorChecker
+ 各种Thread只有一个示例
+
+*/
+
+//FgThread usb/
+
+//UiThread  WindowManagerService/DisplayManagerService.java
+
+//IoThread
+
+//DisplayThread
+//90s或者60s
+DEFAULT_TIMEOUT = ActivityManager.isLowRamDeviceStatic() ? 90*1000 : 60*1000
+
+startOtherServices{
+- Watchdog watchdog = Watchdog.getInstance()-->new Watchdog{
+	- super("watchdog")-->Thread("watchdog")
+	  //
+	- mMonitorChecker = new HandlerChecker(FgThread.getHandler(),"foreground thread", DEFAULT_TIMEOUT)
+	  //把checker保存到list
+	- mHandlerCheckers.add(mMonitorChecker)
+	- mHandlerCheckers.add(new HandlerChecker(new Handler(Looper.getMainLooper()),"main thread", DEFAULT_TIMEOUT))
+	- mHandlerCheckers.add(new HandlerChecker(UiThread.getHandler(),"ui thread", DEFAULT_TIMEOUT))
+	- mHandlerCheckers.add(new HandlerChecker(IoThread.getHandler(),"i/o thread", DEFAULT_TIMEOUT))
+	- mHandlerCheckers.add(new HandlerChecker(DisplayThread.getHandler(),"display thread", DEFAULT_TIMEOUT))
+	  //监听当前进程binder是否有空闲线程
+	- addMonitor(new BinderThreadMonitor())-->mMonitorChecker.addMonitor(monitor)
+	}
+- watchdog.init(context, mActivityManagerService){
+	- mResolver = context.getContentResolver()
+	- mActivity = activity
+	  //接收reboot广播
+	- context.registerReceiver(new RebootRequestReceiver(), new IntentFilter(Intent.ACTION_REBOOT))
+	}
+}@SystemServer.java
+
+
+systemReady-->Watchdog.getInstance().start()@SystemServer.java-->
+start-->run(){
+- synchronized (this) {
+	- HandlerChecker hc = mHandlerCheckers.get(i);hc.scheduleCheckLocked()
+	}
+  //等待90/2,60/2
+- long timeout = CHECK_INTERVAL;
+- wait(timeout)
+  //
+- boolean fdLimitTriggered = mOpenFdMonitor.monitor()
+- if (!fdLimitTriggered) {
+	- int waitState = evaluateCheckerCompletionLocked()
+	- COMPLETED/WAITING/WAITED_HALF continue
+	 //卡死
+	- blockedCheckers = getBlockedCheckersLocked() //获取超时的handlerChecker
+	- subject = describeCheckersLocked(blockedCheckers) //
+  }else{
+	- blockedCheckers = Collections.emptyList()
+	- subject = "Open FD high water mark reached"
+  }
+ //系统卡死
+- File stack = ActivityManagerService.dumpStackTraces
+- doSysRq('w')，doSysRq('l') //dump kernel cpu信息
+- Process.killProcess(Process.myPid())
+- System.exit(10)
+}@Watchdog.java
+
+
+/*
+ HandlerChecker
+*/
+scheduleCheckLocked{
+- mStartTime = SystemClock.uptimeMillis()
+- mHandler.postAtFrontOfQueue(this)-->run{
+	- final int size = mMonitors.size()
+	- for (int i = 0 ; i < size ; i++) {
+		- mCurrentMonitor.monitor()
+		}
+	  //完成
+	- mCompleted = true
+	}
+}
+
+//是否超时
+evaluateCheckerCompletionLocked{
+- HandlerChecker hc = mHandlerCheckers.get(i)
+- state = Math.max(state, hc.getCompletionStateLocked())-->getCompletionStateLocked
+}
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/Watchdog.java
+frameworks/base/core/jni/android_server_Watchdog.cpp
+system/core/init/watchdogd.cpp

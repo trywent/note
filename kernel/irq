@@ -20,5 +20,61 @@
 
 
 
-//查看CPU状态 System Request Key Hacks
-echo l > /proc/sysrq-trigger
+/*
+ System Request Key Hacks 查看CPU状态 
+ /proc/sysrq-trigger
+ 
+ kernel/Documentation/sysrq.txt
+*/
+'b'     - Will immediately reboot the system without syncing or unmounting
+          your disks.
+
+'c'	- Will perform a system crash by a NULL pointer dereference.
+          A crashdump will be taken if configured.
+
+'d'	- Shows all locks that are held.
+
+'e'     - Send a SIGTERM to all processes, except for init.
+
+'f'	- Will call the oom killer to kill a memory hog process, but do not
+	  panic if nothing can be killed.
+
+'g'	- Used by kgdb (kernel debugger)
+
+'h'     - Will display help (actually any other key than those listed
+          here will display help. but 'h' is easy to remember :-)
+
+'i'     - Send a SIGKILL to all processes, except for init.
+
+'j'     - Forcibly "Just thaw it" - filesystems frozen by the FIFREEZE ioctl.
+
+'k'     - Secure Access Key (SAK) Kills all programs on the current virtual
+          console. NOTE: See important comments below in SAK section.
+
+'l'     - Shows a stack backtrace for all active CPUs.
+
+'m'     - Will dump current memory info to your console.
+
+'n'	- Used to make RT tasks nice-able
+
+'o'     - Will shut your system off (if configured and supported).
+
+'p'     - Will dump the current registers and flags to your console.
+
+'q'     - Will dump per CPU lists of all armed hrtimers (but NOT regular
+          timer_list timers) and detailed information about all
+          clockevent devices.
+
+'r'     - Turns off keyboard raw mode and sets it to XLATE.
+
+'s'     - Will attempt to sync all mounted filesystems.
+
+'t'     - Will dump a list of current tasks and their information to your
+          console.
+
+'u'     - Will attempt to remount all mounted filesystems read-only.
+
+'v'	- Forcefully restores framebuffer console
+'v'	- Causes ETM buffer dump [ARM-specific]
+
+'w'	- Dumps tasks that are in uninterruptable (blocked) state.

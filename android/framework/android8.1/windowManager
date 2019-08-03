@@ -180,7 +180,12 @@ relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,
 - outFrame.set(win.mCompatFrame)
 }@WindowManagerService.java
 
+//窗口层次
+getWindowLayerFromTypeLw@WindowManagerPolicy.java
 
+
+
+frameworks/base/core/java/android/view/WindowManagerPolicy.java
 =====================
 /* 冻结画面
   设置旋转动画到WindowAnimator

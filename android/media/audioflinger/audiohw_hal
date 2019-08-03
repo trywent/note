@@ -82,7 +82,7 @@ struct audio_stream_in stream;
 int device; //当前input打开的设备
 }
 
-open_input_stream -->adev_open_input_stream{
+open_input_stream-->adev_open_input_stream{
 - 
 }@audio_hw.c
 

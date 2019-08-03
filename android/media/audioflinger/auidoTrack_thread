@@ -146,6 +146,7 @@ AudioFlinger::MixerThread::prepareTracks_l{
 	- uint32_t vl, vr;       // in U8.24 integer format
 	- float vlf, vrf, vaf // in [0.0, 1.0] float format
 	- float typeVolume = mStreamTypes[track->streamType()].volume
+	  //设置track的buffer
 	- mAudioMixer->setBufferProvider(name, track)
 	- mAudioMixer->setParameter(name, param, AudioMixer::VOLUME0, &vlf)
 	- mAudioMixer->setParameter(name, param, AudioMixer::VOLUME1, &vlf)

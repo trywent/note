@@ -18,12 +18,14 @@ AudioMixer(size_t frameCount, uint32_t sampleRate)
 
 //设置mixer中track的buffer采样率，声道，音量
 AudioMixer::setParameter(int name, int target, int param, void *value){
+  //设置buffer
 - TRACK{
 	- MAIN_BUFFER:{
 		- track->mainBuffer = valueBuf
 		- invalidate
 		}
 	}
+  //设置采样率
 - RESAMPLE{
 	- SAMPLE_RATE:if(track->setResampler(uint32_t(valueInt), mSampleRate)){
 		- invalidate		
@@ -56,6 +58,8 @@ mState.hook(&mState)-->process__validate{
 
 process__genericNoResampling{
 - track__NoResample
+  //操作track结束。释放buffer
+- t.bufferProvider->releaseBuffer(&t.buffer)
 }
 
 

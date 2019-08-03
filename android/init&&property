@@ -1,4 +1,7 @@
-//
+/*
+ init
+
+*/
 分析文件init.rc-->将分析的结果，按顺序加入到执行队列-->
 
 SECTION:import，on和service是SECTION类型。处理init.rc中都是按每个SECTION来处理。
@@ -13,8 +16,8 @@ queue_builtin_action//执行传入的操作
 执行顺序，由action的加入顺序决定。
 on early-init
     start ueventd
-______________________________________________
-处理init.rc文件：
+
+//处理init.rc文件：
 main@init.c-->init_parse_config_file@init_parser.c-->parse_config@init_parser.c-->next_token@parser.c-->
 (处理SECTION)parse_line--parse_new_section==>(处理service，on，import)
 ==>parse_service(构建service结构，加入到service_list)--parse_line_service(设置处理函数)@init_parser.c
@@ -52,7 +55,9 @@ main-->execute_one_command-->action_remove_queue_head(从action_queue队列获�
 --get_first_command(获取action中第一个命令)--cur_command->func(执行相应的命令)-->
 命令实现在do_xxx@builtins.c
 
-______________________________________________
+/*
+ 服务
+*/
 service的启动：
 
 on boot
@@ -69,18 +74,14 @@ property_set("ctl.start", xxx)-->property_set@property_service.c-->handle_proper
 @property_service.c-->handle_control_message-->(start)msg_start@init.c-->
 service_start-->fork--execve@@init.c--notify_service_state-->(设置系统属性init.svc.%s)
 
-proterty_set好像通过unix domain socket设置，不知道原理。有时间看看
-main@init.c-->handle_property_set_fd@property_service.c
+
+//监听服务进程状态
+main-->signal_handler_init@
 
 
-handle_property_set@property_service.cpp-->handle_control_message{
-- ServiceManager::GetInstance().FindServiceByName(name)
-- svc->Start/stop/restart-->StopOrReset(SVC_DISABLED)@service.cpp
-}@init.cpp
 
 
---------------------------
-创建socket：
+//创建socket：
 start_service@init.c-->create_socket@util.c
 		     ----publish_socket-->add_environment@init.c	
 service中的socket通过设置环境变量传递给其他需要的进程,
@@ -95,8 +96,10 @@ critical服务崩溃4min内4次，进入recovery：
 
 signal_init_action@init.c-->handle_signal-->wait_for_one_process@signal_handler.c
 
-______________________________________________
-初始化property存储区:
+/*
+ 属性
+*/
+//初始化property存储区:
 main{
 - property_load_boot_defaults //加载default属性
 - start_property_service
@@ -114,31 +117,18 @@ load_persistent_properties(加载/data/property/中的属性，都是永久保�
 加载kernel属性：
 main-->process_kernel_cmdline-->export_kernel_boot_props@init.c
 
----------------------------
-属性文件:
-build/tools/buildinfo.sh
-device/xxx/xxx/system.prop
+//属性设置 设置property：通过socket通信设置。PROP_SERVICE_NAME "property_service"
 
-生成文件：
-/system/build.prop
-/default.prop
-
-
-fcntl(fd,cmd,arg...)处理文件描述符的函数
-fturncate(fd,size)设置文件大小
----------------------------
-设置property：通过socket通信设置。PROP_SERVICE_NAME "property_service"
-main@init.c-->handle_property_set_fd(从socket读取消息,要设置的属性，值)-->property_set@property_service.c
-
-客户端：
+client：
 set-->native_set@SystemProperties.java-->SystemProperties_set@android_os_SystemProperties.cpp-->
 property_set-->(gPropFd管道connectToServer("/tmp/android-sysprop"))write(gPropFd)@propertie.c
 
-服务端：
-main@init.c-->handle_property_set_fd-->check_perms(检查权限)--property_set@propertiy_service.c
-
-property权限：
-property_perms(各个属性设置的权限)@property_service.c
+server(init)：
+main@init.c-->handle_property_set_fd-->check_perms(检查权限)--property_set@propertiy_service.c-->
+handle_property_set@property_service.cpp-->handle_control_message{
+- ServiceManager::GetInstance().FindServiceByName(name)
+- svc->Start/stop/restart-->StopOrReset(SVC_DISABLED)@service.cpp
+}@init.cpp
 
 system/core/init/property_service.c
 bionic/libc/include/sys/_system_properties.h
@@ -207,10 +197,15 @@ do_mount_all{
 system/core/init/builtins.c
 system/core/fs_mgr/fs_mgr.c
 
-//========================8.1
+/*
+ android 8.1
+*/
 AddSingleLineParser@uevent.cpp-->line_callbacks_@init_parser.cpp//line分析函数
 
 main{
+  //监听子进程状态(service)
+- signal_handler_init
+ //
 - parser.AddSectionParser("service",ServiceManager) //设置字符分析函数
 - parser.AddSectionParser("on",ActionManager)
 - parser.AddSectionParser("import",Parser)
@@ -218,6 +213,38 @@ main{
 
 }@init.cpp
 
+
+//处理子进程结束信号
+signal_handler_init{
+- socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0, s)
+- signal_write_fd = s[0]
+- signal_read_fd = s[1]
+ //子进程结束信号
+- sigaction(SIGCHLD, &act, 0)
+- register_epoll_handler(signal_read_fd, handle_signal){
+	- epoll_event ev
+	- ev.data.ptr = reinterpret_cast<void*>(fn)
+	- epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev)
+	}@init.cpp
+  -->handle_signal-->ServiceManager::GetInstance().ReapAnyOutstandingChildren()
+}@signal_handler.cpp
+
+ReapAnyOutstandingChildren-->ServiceManager::ReapOneProcess(){
+  //等待结束
+- TEMP_FAILURE_RETRY(waitid(P_ALL, 0, &siginfo, WEXITED | WNOHANG | WNOWAIT))
+- auto pid = siginfo.si_pid
+- Service* svc = FindServiceByPid(pid)
+- svc->Reap(){
+	  //需要重启服务
+	- KillProcessGroup(SIGKILL)
+	- flags_ |= SVC_RESTARTING
+	- onrestart_.ExecuteAllCommands()
+	}
+}@service.cpp
+
+
 system/core/init/init.cpp
+system/core/init/signal_handler.cpp
 system/core/init/init_parser.cpp
 system/core/init/ueventd.cpp
+system/core/init/service.cpp

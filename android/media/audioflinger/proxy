@@ -1,6 +1,8 @@
 /*
  proxy用于管理共享内存
 
+ AudioTrack ,AudioRecord  对应ClientProxy
+ track    		  对应ServerProxy
 */
 
 /*
@@ -46,8 +48,8 @@ ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *requested,struc
 	- buffer->mRaw = part1 > 0 ? &((char *) mBuffers)[(mIsOut ? rear : front) * mFrameSize] : NULL
 	- break;
 	}
- //没有可用内存，继续等待
-- 
+ //没有可用内存，继续等待...等待共享内存中mFutex的值置CBLK_FUTEX_WAKE
+- syscall(__NR_futex, &cblk->mFutex,mClientInServer ? FUTEX_WAIT_PRIVATE : FUTEX_WAIT, old & ~CBLK_FUTEX_WAKE, ts)
 }@AudioTrackShared.cpp	
 
 //写入或读取完成后，标记有效数据位置
@@ -80,6 +82,19 @@ ServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush){
 - audio_track_cblk_t* cblk = mCblk
 - buffer->mRaw = &((char *) mBuffers)[(mIsOut ? front : rear) * mFrameSize] //从mBuffer中分配
 }
+
+ServerProxy::releaseBuffer(Buffer* buffer){
+- 
+  //通知client,buffer可用，置CBLK_FUTEX_WAKE
+- android_atomic_or(CBLK_FUTEX_WAKE, &cblk->mFutex)
+}
+
+ServerProxy::flushBufferIfNeeded(){
+-
+  //通知client,buffer可用，置CBLK_FUTEX_WAKE
+- android_atomic_or(CBLK_FUTEX_WAKE, &cblk->mFutex)
+}
+
 
 //play
 AudioTrackServerProxy
