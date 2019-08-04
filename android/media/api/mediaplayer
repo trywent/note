@@ -25,7 +25,9 @@
 }mediaplayer.cpp
 
 
-1. //初始：new MediaPlayer
+1.
+/*初始：new MediaPlayer
+*/
 new MediaPlayer-->native_setup@MediaPlayer.java-->android_media_MediaPlayer_native_setup(设置player)
 @android_media_MediaPlayer.cpp-->new MediaPlayer(创建本地mediaPlayer)@mediaplayer.cpp
 
@@ -45,7 +47,9 @@ IMediaDeathNotifier::DeathNotifier::binderDied-->notifier->died@IMediaDeathNotif
 -->MediaPlayer::died--> notify(MEDIA_ERROR_SERVER_DIED)@mediaplayer.cpp
 
 frameworks/av/media/libmedia/IMediaDeathNotifier.cpp
-2. //设置流类型：setAudioStreamType
+2.
+/*设置流类型：setAudioStreamType
+*/
 setAudioStreamType@MediaPlayer.java-->android_media_MediaPlayer_setAudioStreamType
 -->mp->setAudioStreamType@android_media_MediaPlayer.cpp-->MediaPlayer::setAudioStreamType
 (设置mStreamType值)@mediaplayer.cpp
@@ -55,7 +59,11 @@ MediaPlayer::prepareAsync_l-->mPlayer->setAudioStreamType(mStreamType)@mediaplay
 -->MediaPlayerService::Client::setAudioStreamType-->mAudioOutput->setAudioStreamType
 @MediaPlayerService.cpp
 
-3. //设置源：setDataSource   创建服务端player
+3.
+/* 设置源：setDataSource   创建服务端player
+
+
+*/
 
 //设置文件源
 setDataSource(String path)-->setDataSource(String path, String[] keys, String[] values,List<HttpCookie> cookies){
@@ -76,7 +84,7 @@ setDataSource(int fd, int64_t offset, int64_t length){
 	- 设置服务，sMediaPlayerService = interface_cast<IMediaPlayerService>(binder)
 	}
   //服务端player
-- 通过服务创建palyer，service->create(this, mAudioSessionId)
+- sp<IMediaPlayer> palyer = service->create(this, mAudioSessionId)
 - doSetRetransmitEndpoint(player)
 - 设置源，player->setDataSource(fd, offset, length)
 - 设置mPlayer，attachNewPlayer(player)
@@ -91,7 +99,9 @@ setDataSource(httpService, pathStr,&headersVector){
 - player->setDataSource(httpService, url, headers)) 
 }@mediaplayer.cpp
 
-4. //准备:prepare
+4.
+/* 准备:prepare
+*/
 prepare@MediaPlayer.java-->android_media_MediaPlayer_prepare-->
 process_media_player_call@android_media_MediaPlayer.cpp-->
 MediaPlayer::prepare-->MediaPlayer::prepareAsync_l{
@@ -105,13 +115,17 @@ MediaPlayer::prepare-->MediaPlayer::prepareAsync_l{
 
 
 
-5. //开始播放:start
+5. 
+/*开始播放:start
+*/
 start-->_start@MediaPlayer.java-->android_media_MediaPlayer_start-->getMediaPlayer.start
 @android_media_MediaPlayer.cpp-->MediaPlayer::start-->mPlayer->start@mediaplayer.cpp-->
 MediaPlayerService::Client::start-->getPlayer()->start@MediaPlayerService.cpp
 
 
-6.//视频设置surface
+6.
+/*视频设置surface
+*/
 setSurface/setDisplay@MediaPlayer.java-->android_media_MediaPlayer_setVideoSurface-->
 setVideoSurface-->getMediaPlayer().setVideoSurfaceTexture@android_media_MediaPlayer.cpp
 -->setVideoSurfaceTexture(bufferProducer)-->mPlayer->setVideoSurfaceTexture@mediaplayer.cpp

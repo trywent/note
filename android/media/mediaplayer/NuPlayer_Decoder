@@ -1,6 +1,6 @@
 /*
- NuPlayerDecoder,Nuplayer使用的帮助函数
- 使用MediaCodec
+ Decoder,Nuplayer使用的帮助函数
+ Decoder ---> MediaCodec ---> Acodec ---> OMXCodec
 
 */
 
@@ -10,7 +10,7 @@ onStart-->instantiateDecoder(bool audio,&decoder){
 - (*decoder)->configure(format)  //初始化
 }@NuPlayer.cpp
 
-onStart-->instantiateDecoder(bool audio,&decoder)-->
+
 NuPlayer::Decoder::Decoder(const sp<AMessage> &notify,
         const sp<Source> &source,
         pid_t pid,

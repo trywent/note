@@ -21,16 +21,28 @@ enum State {
         STATE_STOPPED_AND_PREPARING,    // equivalent to PAUSED, but seeking
         STATE_STOPPED_AND_PREPARED,     // equivalent to PAUSED, but seek complete
 }
+//factory
+MediaPlayerService::MediaPlayerService@MediaPlayerService.cpp-->
+registerBuiltinFactories{
+- registerFactory_l(new StagefrightPlayerFactory(), STAGEFRIGHT_PLAYER)
+- registerFactory_l(new NuPlayerFactory(), NU_PLAYER)
+- registerFactory_l(new TestPlayerFactory(), TEST_PLAYER)
+- registerFactory_l(new ApePlayerFactory(),APE_PLAYER);
+}@MediaPlayerFactory.cpp
 
-//开始线程 "NuPlayerDriver Looper"
+
+//创建NuPlayerDriver 开始线程 "NuPlayerDriver Looper"
 createPlayer(NU_PLAYER)-->factory->createPlayer@MediaPlayerService.cpp-->
 createPlayer-->new NuPlayerDriver@MediaPlayerFactory.cpp-->
 NuPlayerDriver{
-- mLooper(new ALooper)
-- mPlayer(new NuPlayer(pid))
+- sp<ALooper> mLooper = new ALooper
+- sp<NuPlayer> mPlayer = new NuPlayer(pid)
 - mLooper->start
 - mLooper->registerHandler(mPlayer)
-- mPlayer->setDriver(this)
+- mPlayer->init(this){
+	- mDriver = driver
+	- mMediaClock->setNotificationMessage(notify)
+	}
 }@NuPlayerDriver.cpp
 
 //设置文件源
@@ -57,7 +69,8 @@ notifySetDataSourceCompleted{
 //perpare
 NuPlayerDriver::prepare()-->prepare_l
 
-/*NULPlayer:  mDriver为NuPlayerDriver
+/*************************
+ NULPlayer:  mDriver为NuPlayerDriver
 
 */
 struct NuPlayer: public AHandler{
@@ -82,11 +95,14 @@ NuPlayer::setDriver(const wp<NuPlayerDriver> &driver)-->mDriver = driver@NuPlaye
 /*设置mSource
   
 */
+
+
+//本地文件源
 setDataSourceAsync(int fd, int64_t offset, int64_t length){
 - msg = new AMessage(kWhatSetDataSource)
 - notify = new AMessage(kWhatSourceNotify)
 - source = new GenericSource(notify, mUIDValid, mUID)
-- source->setDataSource(fd, offset, length)
+- sp<GenericSource> source->setDataSource(fd, offset, length)
   //通知设置mSource
 - msg->post(source)-->onMessageReceived(kWhatSetDataSource)-->mSource
 }@NuPlayer.cpp
@@ -136,7 +152,7 @@ onStart(int64_t startPositionUs, MediaPlayerSeekMode mode){
   获取数据格式创建解码器
 */
 instantiateDecoder(bool audio,&decoder){
-- sp<AMessage> format = mSource->getFormat(audio) //获取格式
+- sp<AMessage> format = mSource->getFormat(audio) //获取音视频的格式
   //创建字符解码
 - !audio{
 	- ccNotify = new AMessage(kWhatClosedCaptionNotify)

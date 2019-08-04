@@ -117,6 +117,7 @@ ACodec::BaseState::onOMXFillBufferDone(IOMX::buffer_id bufferID,size_t rangeOffs
 1/* 
  UninitializedState
 
+ 找到对应的解码器
  
 */
 initiateSetup-->msg->setWhat(kWhatSetup)-->onSetup

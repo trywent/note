@@ -1,41 +1,42 @@
 /* mediaPlayerService
 
- player :public MediaPlayerInterface : public MediaPlayerBase
+  mediaplayer用与client操作mediaplayerservice
+  Nuplayer mediaplayerService的本地播放器
 
 */
 main--> MediaPlayerService::instantiate@main_mediaserver.cpp
 MediaPlayerService::instantiate-->addService(String16("media.player"), new MediaPlayerService())
-@MediaPlayerService.cpp
-
-
-//注册播放器内置factory：
-MediaPlayerService::MediaPlayerService@MediaPlayerService.cpp-->
-registerBuiltinFactories{
-- registerFactory_l(new StagefrightPlayerFactory(), STAGEFRIGHT_PLAYER)
-- registerFactory_l(new NuPlayerFactory(), NU_PLAYER)
-- registerFactory_l(new TestPlayerFactory(), TEST_PLAYER)
-- registerFactory_l(new ApePlayerFactory(),APE_PLAYER);
-}@MediaPlayerFactory.cpp
+-->{
+- mNextConnId = 1
+ //注册播放器内置factory
+- MediaPlayerFactory::registerBuiltinFactories()
+}@MediaPlayerService.cpp
 
 
 /*
- 服务端client
+ 服务端mediaplayer,连接client
+
+ 返回IMediaPlayer
 */
 service->create@mediaplayer.cpp-->create(const sp<IMediaPlayerClient>& client,audio_session_t audioSessionId){
+  //class Client : public BnMediaPlayer :public BnInterface<IMediaPlayer>
 - sp<Client> c = new Client(this, pid, connId, client){
 	- mService = service
 	- mClient = client
 	}
 - mClients.add(w)
+- return c
 }@MediaPlayerService.cpp
 
 
-/*
+/*设置源
  setDataSource{
-	- setDataSource_pre 创建player
+	- setDataSource_pre 创建NuPlayer
 	- MediaPlayerBase->setDataSource
 	- setDataSource_post
  }
+
+
 */
 
 //http
@@ -60,7 +61,9 @@ MediaPlayerService::Client::setDataSource(int fd, int64_t offset, int64_t length
  //设置player
 - playerType = MediaPlayerFactory::getPlayerType(this,fd)
 - sp<MediaPlayerBase> p = setDataSource_pre(playerType)
-- setDataSource_post(p, p->setDataSource(fd, offset, length))
+- setDataSource_post(p, p->setDataSource(fd, offset, length)){
+	- mPlayer = p
+	}
 }@MediaPlayerService.cpp
 
 
@@ -76,24 +79,22 @@ MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client, const char* ur
 - bestScore==0.0 getDefaultPlayerType //分数为0,返回默认播放器NU_PLAYER
 @MediaPlayerFactory.cpp
 
-/* 创建player
- 
- IOmx::getService()  解码
- AudioOutput 声音播放
+/* 创建NuPlayer
+  AudioOutput 声音播放
 */
 setDataSource_pre(player_type){
   //player
-- createPlayer(playerType)-->MediaPlayerFactory::createPlayer{
+- sp<MediaPlayerBase> p = createPlayer(playerType)-->MediaPlayerFactory::createPlayer{
 	- factory = sFactoryMap.valueFor(playerType)
-	- p = factory->createPlayer(pid)-->NuPlayerFactory::createPlayer-->new NuPlayerDriver
+	- sp<MediaPlayerBase> p = factory->createPlayer(pid)-->NuPlayerFactory::createPlayer-->new NuPlayerDriver
 	- p->initCheck
 	- p->setNotifyCallback
 	}@MediaPlayerFactory.cpp
-  //文件extractor
+  //监听extractor进程
 - binder = defaultServiceManager()->getService(String16("media.extractor")
 - mExtractorDeathListener=new ServiceDeathNotifier(binder)
 - binder->linkToDeath(mExtractorDeathListener)
-  //codec
+  //监听codec进程
 - sp<IOmx> omx = IOmx::getService()//默认执行
 - mCodecDeathListener = new ServiceDeathNotifier(omx)
 - omx->linkToDeath(mCodecDeathListener)
