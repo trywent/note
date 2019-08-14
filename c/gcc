@@ -18,11 +18,9 @@ g++ -shared base_shared.o -o libbase_shared.so  //创建共享库(动态库)
 //g++ base.cc -L`pwd` -lbase_shared             //使用自己共享库，直接链接不用加载()
 //g++ base1.cc  -l ld                           //使用加载库的函数(dlopen)所在的库(ld)
 
-打开库：
+//动态加载库，不需要编译时链接
 lib = dlopen("libshared.so",)
-查找库中函数：
 sym = dlsym(lib, "func")
-调用函数：
 (void (*)(void))sym;
 _____________________________
 创建静态库：
@@ -44,12 +42,16 @@ int main(int argc, char* argv[]) {
   //调用库函数
 }
 
-链接静态库：
+//链接静态库：
 gcc -static main.c -L. -lmean -o statically_linked
 Note: 库名mean
 
-链接动态库：
+//链接动态库：
 gcc main.c -o dynamically_linked -L. -lmean
+
+
+//查看可执行文件对库的依赖
+ldd xxx
 
 ============================
 防止编译器重排序，优化代码：

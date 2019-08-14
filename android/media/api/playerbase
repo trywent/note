@@ -1,0 +1,19 @@
+/*
+
+ 将播放状态通知到AudioService
+
+*/
+
+
+
+
+
+
+frameworks/base/media/java/android/media/PlayerBase.java
+
+
+
+
+//native层
+
+frameworks/av/media/libaudioclient/PlayerBase.cpp

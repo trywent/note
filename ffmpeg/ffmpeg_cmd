@@ -23,3 +23,25 @@ enum AVSampleFormat {
 ffprobe file //查看文件编码信息
 
 ffplay file //播放
+
+
+
+
+/*
+ 编译ffmpeg
+ git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+*/
+./configure
+make -j8
+
+
+/*
+ 编译SDL
+ 源码：http://www.libsdl.org/
+
+ 手册：http://wiki.libsdl.org/Tutorials
+       https://www.willusher.io/pages/sdl2/
+*/
+./configure
+make
+make install exec_prefix=/foo //安装到指定目录

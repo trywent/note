@@ -1,0 +1,18 @@
+//ubuntu使用两种声音系统
+
+
+/*
+ PulseAudio
+
+*/
+
+pactl list //查看
+
+/*
+ ALSA
+
+*/
+
+aplay -l //查看
+
+alsamixer

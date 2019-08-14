@@ -1,7 +1,7 @@
 //logcat
 
 //android4.4 创建anr目录
-kill -s 3pid
+kill -s 3 pid
 
 //
 kill -s 6 pid 

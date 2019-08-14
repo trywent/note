@@ -1,0 +1,49 @@
+/*
+  mediaplayer
+*/
+MediaPlayer::MediaPlayer(){
+- mAudioSessionId = AudioSystem::newAudioSessionId()
+}
+
+MediaPlayer::setDataSource(int fd, int64_t offset, int64_t length){
+- const sp<IMediaPlayerService>& service(getMediaPlayerService())
+- sp<IMediaPlayer> player(service->create(this, mAudioSessionId))
+- player->setDataSource(fd, offset, length)
+}@mediaplayer.cpp
+
+
+
+
+frameworks/av/media/libmedia/mediaplayer.cpp
+/*
+  mediaplayerService
+*/
+MediaPlayerService-->MediaPlayerFactory::registerBuiltinFactories(){
+- registerFactory_l(new StagefrightPlayerFactory(), STAGEFRIGHT_PLAYER)
+- registerFactory_l(new NuPlayerFactory(), NU_PLAYER)
+- registerFactory_l(new SonivoxPlayerFactory(), SONIVOX_PLAYER);
+- registerFactory_l(new ApePlayerFactory(),APE_PLAYER)
+- registerFactory_l(new FFPlayerFactory(),FF_PLAYER)
+}@MediaPlayerFactory.cpp
+
+
+//设置player audio
+MediaPlayerService::Client::setDataSource_pre{
+- sp<MediaPlayerBase> p = createPlayer(playerType)
+- mAudioOutput = new AudioOutput(mAudioSessionId, IPCThreadState::self()->getCallingUid()){
+	- mSessionId = sessionId
+	- setMinBufferCount()
+	}
+- p.get()->setAudioSink(mAudioOutput)
+}@MediaPlayerService.cpp
+
+
+palyer-->
+MediaPlayerService::AudioOutput::open(uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,
+        audio_format_t format, int bufferCount, AudioCallback cb, void *cookie,audio_output_flags_t flags....){
+- sp<AudioTrack> t =  new AudioTrack( mStreamType,sampleRate,format,channelMask,frameCount,flags,mSessionId...)
+}@MediaPlayerService.cpp
+
+
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp

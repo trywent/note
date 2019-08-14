@@ -25,7 +25,7 @@ dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/b
 dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/uboot
 
 dd if=/sdcard/wmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/w_modem bs=1024 count=16384
-
+dd if=/sdcard/wcnmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/wcnmodem
 dd if=/sdcard/sml-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/sml bs=1024 count=22
 
 

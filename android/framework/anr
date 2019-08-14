@@ -1,8 +1,10 @@
 //No response to an input event (such as key press or screen touch events) within 5 seconds.
 //A BroadcastReceiver hasn't finished executing within 10 seconds.
+
+//android4.4  8
 kill  -s 3 <pid>  
 
-
+//android6,
 kill -s 6 pid  //dump core logcat -s DEBUG
 /*
  按键5s
