@@ -1,7 +1,6 @@
-//vim
-apt-get install vim vim-scripts vim-doc
-
-打开文件：
+/*
+ 打开文件
+*/
 :e filepath
 //标签中打开文件
 :tabe <filepath> //在tab中打开新文件

@@ -15,6 +15,7 @@ Plugin 'VundleVim/Vundle.vim'
 " plugin on GitHub repo
 Plugin 'tpope/vim-fugitive'
 Plugin 'scrooloose/nerdtree'
+Plugin 'jistr/vim-nerdtree-tabs'
 
 " plugin from http://vim-scripts.org/vim/scripts.html
 " Plugin 'L9'
@@ -50,6 +51,11 @@ filetype plugin indent on    " required
 "
 " see :h vundle for more details or wiki for FAQ
 " Put your non-Plugin stuff after this line
+" 设置nerdtree{
+autocmd vimenter * NERDTree
+let NERDTreeMouseMode=2
+let g:nerdtree_tabs_open_on_console_startup=1
+" }
 " 设置文件编码
 set fileencodings=utf-8,gb2312,gbk,gb18030
 set mouse=a
