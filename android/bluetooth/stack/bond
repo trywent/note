@@ -1,5 +1,5 @@
-//
-//扫描 device manager
+/* 扫描 device manager
+*/
 startDiscovery@Bluetooth.c-->btif_dm_start_discovery{
 - BTA_DmBleScanFilterSetup(BTA_DM_BLE_SCAN_COND_DELETE)
 - BTA_DmBleScanFilterSetup(BTA_DM_BLE_SCAN_COND_ADD)
@@ -7,15 +7,13 @@ startDiscovery@Bluetooth.c-->btif_dm_start_discovery{
 }btif_dm.c
 
 
-/*
-search函数表
+//search函数表
 const tBTA_DM_ST_TBL bta_dm_search_st_tbl[] = {
     bta_dm_search_idle_st_table,
     bta_dm_search_search_active_st_table,
     bta_dm_search_search_cancelling_st_table,
     bta_dm_search_disc_active_st_table
 }
-*/
 
 btif_dm_start_discovery(mode=BTA_DM_GENERAL_INQUIRY)@btif_dm.c-->
 BTA_DmSearch(BTA_DM_API_SEARCH_EVT)@bta_dm_api.c-->bta_sys_sendmsg@bta_sys_main.c-->fixed_queue_enqueue-->
@@ -26,9 +24,8 @@ bta_dm_search_reg.evt_hdlr@bta_dm_api.c-->bta_dm_search_sm_execute-->bta_dm_sear
 //返回设备信息
 remote_device_properties_cb
 
-//扫描到设备
+//通知上层扫描的设备
 device_found_cb
-
 
 
 btif_dm_search_devices_evt{
@@ -51,15 +48,62 @@ tif_set_adapter_property-->execute_storage_request(BTIF_CORE_STORAGE_ADAPTER_WRI
 btif_storage_set_adapter_property(property)-->prop2cfg-->btif_config_set_str@btif_storage.cc
 
 
-//set NAME
+/* set NAME蓝牙名称
+
+*/
 btif_set_adapter_property-->execute_storage_request(BTIF_CORE_STORAGE_ADAPTER_WRITE)
 btif_storage_set_adapter_property(property/*BT_PROPERTY_BDNAME*/)-->prop2cfg-->btif_config_set_str@btif_storage.cc
 
 btif_get_default_local_name//获取默认蓝牙名
 
-//bond
-btu_hcif_process_event(HCI_CONNECTION_REQUEST_EVT)-->btu_hcif_connection_request_evt@btu_hcif.c
--->btm_sec_conn_req@btm_sec.c-->l2c_link_hci_conn_req@l2c_link.c
+/* bond配对
+
+*/
+static btif_dm_pairing_cb_t pairing_cb;
+
+create_bond@bluetooth.c-->btif_dm_create_bond(bd_addr, transport){
+  //记录配置event
+- btif_stats_add_bond_event(*bd_addr, BTIF_DM_FUNC_CREATE_BOND,pairing_cb.state)
+  //btif task 执行配对任务
+- btif_transfer_context(btif_dm_generic_evt, BTIF_DM_CB_CREATE_BOND,(char*)&create_bond_cb,...)-->
+	btif_dm_generic_evt(uint16_t event, char* p_param){
+	- BTIF_DM_CB_CREATE_BOND{
+		- btif_dm_create_bond_cb_t* create_bond_cb = (btif_dm_create_bond_cb_t*)p_param
+		- btif_dm_cb_create_bond(create_bond_cb->bdaddr, create_bond_cb->transport)
+		}
+	}
+}@btif_dm.c
+
+//配对
+btif_dm_cb_create_bond(const RawAddress& bd_addr,tBTA_TRANSPORT transport){
+  //设置BONDING状态
+- bond_state_changed(BT_STATUS_SUCCESS, bd_addr, BT_BOND_STATE_BONDING)
+  //设置要连接的设备信息？
+- btif_storage_set_remote_addr_type(&bd_addr, addr_type)
+- BTA_DmAddBleDevice(bd_addr, addr_type, device_type)
+  //开始连接
+- if (is_hid && (device_type & BT_DEVICE_TYPE_BLE) == 0) {//POINTING 无按键输入设备
+	- bt_status_t status = (bt_status_t)btif_hh_connect(&bd_addr)
+  }else{
+	- BTA_DmBondByTransport(bd_addr, transport)-->
+	}
+}@btif_dm.c
+
+//收到配对
+bte_dm_evt(tBTA_DM_SEC_EVT event, tBTA_DM_SEC* p_data)-->
+btif_dm_upstreams_evt{
+- BTA_DM_ENABLE_EVT{
+	
+	}
+- BTA_DM_PIN_REQ_EVT{
+	- btif_dm_pin_req_evt(&p_data->pin_req)
+	}
+- BTA_DM_AUTH_CMPL_EVT{
+	- btif_dm_auth_cmpl_evt(&p_data->auth_cmpl)
+	}
+}btif_dm.c
+
+btif_dm_pin_req_evt
 
 
 //获取信息

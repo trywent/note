@@ -1,4 +1,6 @@
-//
+/*
+ audio接口
+*/
 {
 - setDeviceConnectionState/getDeviceConnectionState  //device state
 - initStreamVolume/setStreamVolumeIndex/getStreamVolumeIndex //volume
@@ -7,6 +9,7 @@
 }AudioSystem.java
 
 
+//接口
 {
 //audioflinger
 - get_audio_flinger
@@ -24,12 +27,51 @@
 - getOutput/getOutputForAttr/startOutput/stopOutput/releaseOutput //output
 - getInputForAttr/startInput/stopInput/releaseInput   //input
 
-
 }AudioSystem.cpp
 
 
+JNIAudioPortCallback::sendEvent(int event)-->
+env->CallStaticVoidMethod(mClass, gAudioPortEventHandlerMethods.postEventFromNative, mObject, event)@android_media_AudioSystem.cpp
 
 
-frameworks\base\media\java\android\media\AudioSystem.java
-frameworks\base\core\jni\android_media_AudioSystem.cpp
+frameworks/base/media/java/android/media/AudioSystem.java
+frameworks/base/core/jni/android_media_AudioSystem.cpp
 frameworks/av/media/libmedia/AudioSystem.cpp
+/*
+ audio端口状态
+
+ AudioFlinger将状态信息更新到client(每个client通过AudioSystem注册到AudioFlinger)
+*/
+AudioPortEventHandler sAudioPortEventHandler = new AudioPortEventHandler()@AudioManager.java
+
+//注册监听器
+registerAudioPortUpdateListener(OnAudioPortUpdateListener l){
+- sAudioPortEventHandler.init(){
+	- mHandler = new Handler(looper)
+	- native_setup(new WeakReference<AudioPortEventHandler>(this))
+	}
+- sAudioPortEventHandler.registerListener(l)
+}@AudioManager.java
+
+
+//注册回调
+native_setup(new WeakReference<AudioPortEventHandler>(this))-->android_media_AudioSystem_eventHandlerSetup{
+- sp<JNIAudioPortCallback> callback = new JNIAudioPortCallback(env, thiz, weak_this)
+- AudioSystem::addAudioPortCallback(callback){
+	- sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service(){
+		  //auiod_policy
+		- binder = sm->getService(String16("media.audio_policy"))
+		- gAudioPolicyService = interface_cast<IAudioPolicyService>(binder)
+		- gAudioPolicyServiceClient = new AudioPolicyServiceClient()
+		  //注册到audioFlinger
+		- af->registerClient(afc)
+		}
+	- gAudioPolicyServiceClient->addAudioPortCallback(callback)-->mAudioPortCallbacks.add(callback)
+	  //开始监听
+	- aps->setAudioPortCallbacksEnabled(true)
+	}
+- setJniCallback(env, thiz, callback)
+}@android_media_AudioSystem.cpp
+
+frameworks/base/media/java/android/media/AudioPortEventHandler.java
+

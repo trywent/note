@@ -177,6 +177,9 @@ BondStateMachine.make(this, mAdapterProperties, mRemoteDevices){
 - bsm.start()
 }@BondStateMachine.java
 
+mBondStateMachine.sendMessage@AdapterService.java-->processMessage(CREATE_BOND)-->createBond-->
+mAdapterService.createBondNative
+
 //设备连接状态
 bond_state_changed-->HAL bt_hal_cbacks->bond_state_changed_cb@btif_dm.cc-->
 bondStateChangeCallback-->mBondStateMachine.bondStateChangeCallback@JniCallbacks.java-->

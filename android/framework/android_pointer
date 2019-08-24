@@ -1,44 +1,155 @@
-==============================
- SurfaceFlinger 继承:
-        public BinderService<SurfaceFlinger>,
-        public BnSurfaceComposer,
-        public IBinder::DeathRecipient,
-        protected Thread
-——————————————————————————————
-weakReference ,strongReference：
-RefBase
-↳Thread
-------------------------------
-构造流程：
-RefBase::RefBase()-->mRefs(new weakref_impl(this))-->weakref_impl(RefBase* base){ 
- mStrong(INITIAL_STRONG_VALUE),//强引用计数，设置为初始值
- mWeak(0),                     //弱引用计数
- mBase(base),                  //设置为该类的引用
- mFlags(0)
+/*
+ RefBase
+ weakref_impl
+
+*/
+
+class RefBase {
+- weakref_impl* const mRefs
 }
 
-RefBase::~RefBase()析构函数：不是强引用或不是弱引用计数为0，删除mRefs(是一个weakref_impl)
+class RefBase::weakref_impl : public RefBase::weakref_type{
+- std::atomic<int32_t>    mStrong //计数
+- std::atomic<int32_t>    mWeak
+- RefBase* const          mBase   //原始对象
+- std::atomic<int32_t>    mFlags
+- mutable Mutex mMutex
+- ref_entry* mStrongRefs
+- ref_entry* mWeakRefs   //ref_entry 链表
+}
 
-子类可以通过覆盖onFirstRef()，onLastStrongRef执行初始化和析构的处理
-------------------------------
-weakref_impl类：
-class RefBase::weakref_impl : public RefBase::weakref_type
-------------------------------
-sp<T>构造方法中调用：弱引用，强引用都增加
-sp()@StrongPointer.h-->incStrong-->refs->incWeak(mWeak增加)--android_atomic_inc(&refs->mStrong)--><如果是第一次执行>-->
-android_atomic_add(-INITIAL_STRONG_VALUE, &refs->mStrong)-- refs->mBase->onFirstRef()@RefBase.cpp
+//构造方法,创建weakref_impl
+RefBase::weakref_type* RefBase::RefBase()-->mRefs(new weakref_impl(this))-->
+weakref_impl(RefBase* base){ 
+- mStrong(INITIAL_STRONG_VALUE),//强引用计数，设置为初始值(1<<28)
+- mWeak(0),                     //弱引用计数
+- mBase(base),                  //设置为该类的引用
+- mFlags(0)
+}@RefBase.cpp
+
+//创建弱引用
+RefBase::createWeak(const void* id)-->mRefs->incWeak(id)@RefBase.cpp
 
 
-赋值操作符的重载：
-operator = (<T> value)-->(不同的类型会有强制转换过程)value->incStrong(this)@StrongPointer.h-->
-incStrong-->refs->mBase->onFirstRef(执行第一次被引用的处理函数，可重写改方法)@RefBase.cpp
+RefBase::weakref_type::incWeak(const void* id){
+- weakref_impl* const impl = static_cast<weakref_impl*>(this)
+ //加入到mWeakRefs
+- impl->addWeakRef(id)-->addRef(&mWeakRefs, id, mWeak.load(std::memory_order_relaxed)){
+	- ref_entry* ref = new ref_entry
+	- ref->ref = mRef
+	- ref->next = mWeakRefs
+	- mWeakRefs = ref
+	}
+}@RefBase.cpp
 
-析构函数：
-～sp()@StrongPointer.h-->decStrong--> android_atomic_dec(&refs->mStrong)--refs->decWeak(id)-->
-------------------------------
-wp<T>::wp(const wp<U>& other)-->m_refs->incWeak(this)-->android_atomic_inc(&impl->mWeak)
-增加弱引用计数
+void RefBase::weakref_type::decWeak(const void* id){
+- weakref_impl* const impl = static_cast<weakref_impl*>(this)
+- impl->removeWeakRef(id)
+- if (c != 1) return
+  //最后的引用
+- atomic_thread_fence(std::memory_order_acquire)
+- int32_t flags = impl->mFlags.load(std::memory_order_relaxed)
+- if ((flags&OBJECT_LIFETIME_MASK) == OBJECT_LIFETIME_STRONG) { //好像是不会跑到这里来
+	- if (impl->mStrong.load(std::memory_order_relaxed)== INITIAL_STRONG_VALUE){
+		- 
+	  }else{//删除weak_ref
+		- delete impl 
+		}
+  }else{//删除对象
+	- impl->mBase->onLastWeakRef(id)
+	- delete impl->mBase
+  }
+}@RefBase.cpp
 
-jb/frameworks/native/libs/utils/RefBase.cpp
-jb/frameworks/native/include/utils/RefBase.h
-jb/frameworks/native/include/utils/StrongPointer.h
+
+RefBase::incStrong(this){
+- weakref_impl* const refs = mRefs
+- refs->incWeak(id)
+  //加入到mStrongRefs
+- refs->addStrongRef(id)-->addRef(&mStrongRefs, id, mStrong.load(std::memory_order_relaxed))
+- refs->mBase->onFirstRef()
+}@RefBase.cpp
+
+void RefBase::decStrong(const void* id) const{
+- weakref_impl* const refs = mRefs
+- refs->removeStrongRef(id)-->addRef(&mStrongRefs, id, -mStrong.load(std::memory_order_relaxed))
+  //最后的强引用
+- const int32_t c = refs->mStrong.fetch_sub(1, std::memory_order_release)
+- if (c == 1) {
+	- refs->mBase->onLastStrongRef(id)
+	- if ((flags&OBJECT_LIFETIME_MASK) == OBJECT_LIFETIME_STRONG) {
+		- delete this //删除对象
+		}
+	}
+- refs->decWeak(id)
+}@RefBase.cpp
+
+
+
+
+
+/*
+ wp
+
+
+*/
+template <typename T>
+class wp{
+- T* 		  m_ptr  //使用的对象
+- weakref_type*   m_refs //管理对象的对象
+}
+//构造方法，other为RefBase
+wp<T>::wp(T* other){
+- m_ptr(other)
+- m_refs = other->createWeak(this) //创建
+}@RefBase.h
+
+//赋值
+template<typename T>
+wp<T>& wp<T>::operator = (T* other){
+- weakref_type* newRefs = other ? other->createWeak(this) : 0;
+  //m_refs减数，可能导致释放当前m_ptr
+- if (m_ptr) m_refs->decWeak(this);
+  //赋值新ptr
+- m_ptr = other
+- m_refs = newRefs
+- return *this;
+}@RefBase.h
+
+
+/*
+ sp
+
+*/
+class sp {
+- T* m_ptr
+}
+
+//构造函数
+sp<T>::sp(T* other) {
+- m_ptr(other)
+- other->incStrong(this){
+	- weakref_impl* const refs = mRefs
+	- refs->incWeak(id)
+	- refs->addStrongRef(id)
+	- refs->mBase->onFirstRef()
+	}@RefBase.cpp
+}@StringPointer.h
+
+//赋值
+template<typename T>
+sp<T>& sp<T>::operator =(sp<T>&& other) {
+- T* oldPtr(*const_cast<T* volatile*>(&m_ptr))
+  //删除老对象
+- if (oldPtr) oldPtr->decStrong(this)
+- if (oldPtr != *const_cast<T* volatile*>(&m_ptr)) sp_report_race();
+  //赋值新对象
+- m_ptr = other.m_ptr;
+- other.m_ptr = nullptr;
+- return *this;
+}
+
+
+system/core/libutils/RefBase.cpp
+system/core/libutils/include/utils/RefBase.h
+system/core/libutils/include/utils/StrongPointer.h

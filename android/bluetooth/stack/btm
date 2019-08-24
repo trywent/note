@@ -1,15 +1,15 @@
 //bluetooth manager
 
-
-//btu_init_core-->btm_init 从btu启动
-btm_init{
-- btm_inq_db_init                   /* Inquiry Database and Structures */
-- btm_acl_init                      /* ACL Database and Structures */
-- btm_sec_init(BTM_SEC_MODE_SP)       /* Security Manager Database and Structures */
-- btm_sco_init                      /* SCO Database and Structures (If included) */
-- btm_dev_init                      /* Device Manager Structures & HCI_Reset */
-}
-
+btu_message_loop_run@btu_task.c-->btif_init_ok-->BTA_EnableBluetooth(bte_dm_evt)@btif_core-->
+BTA_EnableBluetooth(tBTA_DM_SEC_CBACK* p_cback) {
+- bta_sys_register(BTA_ID_DM, &bta_dm_reg)
+- bta_sys_register(BTA_ID_DM_SEARCH, &bta_dm_search_reg)
+- bta_sys_eir_register(bta_dm_eir_update_uuid)
+  //打开,设置事件回调处理bte_dm_evt
+- p_msg->hdr.event = BTA_DM_API_ENABLE_EVT
+- p_msg->p_sec_cback = p_cback
+- bta_sys_sendmsg(p_msg)
+}@bta_dm_api.cc
 
 //search
 BTM_StartInquiry
@@ -20,10 +20,8 @@ BTM_StartInquiry
 
 
 
-
-system/bt/stack/btm/btm_main.c
-stack/btm/btm_inq.c
-stack/btm/btm_ble_gap.c
+bt/bta/dm/bta_dm_api.cc
+bt/bta/dm/bta_dm_main.cc
 
 ===================
 //btm security

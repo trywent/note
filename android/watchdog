@@ -1,18 +1,17 @@
 /*
  watchDog
  
- 当前只监听了当前进程中binder处理消息的线程池  mMonitorChecker
+ 监听了当前进程中binder处理消息的线程池  mMonitorChecker
+ 监听main thread,ui thread,io thread,display thread
  各种Thread只有一个示例
 
 */
 
-//FgThread usb/
+FgThread  	//usb/
+UiThread  	//WindowManagerService/DisplayManagerService.java
+IoThread  	//
+DisplayThread  	//
 
-//UiThread  WindowManagerService/DisplayManagerService.java
-
-//IoThread
-
-//DisplayThread
 //90s或者60s
 DEFAULT_TIMEOUT = ActivityManager.isLowRamDeviceStatic() ? 90*1000 : 60*1000
 
@@ -21,9 +20,10 @@ startOtherServices{
 	- super("watchdog")-->Thread("watchdog")
 	  //
 	- mMonitorChecker = new HandlerChecker(FgThread.getHandler(),"foreground thread", DEFAULT_TIMEOUT)
-	  //把checker保存到list
+	  //把checker保存到mHandlerCheckers
 	- mHandlerCheckers.add(mMonitorChecker)
-	- mHandlerCheckers.add(new HandlerChecker(new Handler(Looper.getMainLooper()),"main thread", DEFAULT_TIMEOUT))
+	  //监听系统服务主线程是否卡住（会在主线程执行一些语句，没有monitor）
+	- mHandlerCheckers.add(new HandlerChecker(new Handler(Looper.getMainLooper()),"main thread", DEFAULT_TIMEOUT)) 
 	- mHandlerCheckers.add(new HandlerChecker(UiThread.getHandler(),"ui thread", DEFAULT_TIMEOUT))
 	- mHandlerCheckers.add(new HandlerChecker(IoThread.getHandler(),"i/o thread", DEFAULT_TIMEOUT))
 	- mHandlerCheckers.add(new HandlerChecker(DisplayThread.getHandler(),"display thread", DEFAULT_TIMEOUT))
@@ -41,6 +41,7 @@ startOtherServices{
 
 systemReady-->Watchdog.getInstance().start()@SystemServer.java-->
 start-->run(){
+  //开始监听
 - synchronized (this) {
 	- HandlerChecker hc = mHandlerCheckers.get(i);hc.scheduleCheckLocked()
 	}
@@ -68,10 +69,22 @@ start-->run(){
 
 
 /*
- HandlerChecker
+ HandlerChecker有独立的线程（服务主线程，ui线程,io线程）
+ scheduleCheckLocked后执行run。若线程卡主则不能返回，导致超时
 */
+HandlerChecker(Handler handler, String name, long waitMaxMillis) {
+- mHandler = handler
+- mWaitMax = waitMaxMillis
+}@Watchdog.java
+
+
+//加入monitor
+addMonitor(Monitor monitor)-->mMonitors.add(monitor)@Watchdog.java
+
+//开始检测
 scheduleCheckLocked{
-- mStartTime = SystemClock.uptimeMillis()
+- mCompleted = false
+- mStartTime = SystemClock.uptimeMillis() //记录开始时间
 - mHandler.postAtFrontOfQueue(this)-->run{
 	- final int size = mMonitors.size()
 	- for (int i = 0 ; i < size ; i++) {
@@ -85,7 +98,15 @@ scheduleCheckLocked{
 //是否超时
 evaluateCheckerCompletionLocked{
 - HandlerChecker hc = mHandlerCheckers.get(i)
-- state = Math.max(state, hc.getCompletionStateLocked())-->getCompletionStateLocked
+- state = Math.max(state, hc.getCompletionStateLocked())-->getCompletionStateLocked{
+	- if (mCompleted){
+		- return COMPLETED
+	  }else{
+		- long latency = SystemClock.uptimeMillis() - mStartTime
+		- (latency < mWaitMax/2) return WAITING//继续等待
+		- (latency < mWaitMax)  return WAITED_HALF//超时
+		} 
+	}
 }
 
 

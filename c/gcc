@@ -50,9 +50,9 @@ Note: 库名mean
 gcc main.c -o dynamically_linked -L. -lmean
 
 
-//查看可执行文件对库的依赖
-ldd xxx
 
+ldd xxx  //查看可执行文件对库的依赖 
+objdump  //查看obj文件信息
 ============================
 防止编译器重排序，优化代码：
 __asm__ __volatile__ ("" : : : "memory");

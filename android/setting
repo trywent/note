@@ -1,10 +1,50 @@
 /*
 
-
+ 设置应用
 */
 
+//单独的activtiy extends SettingsActivity
+{
+
+public static class NightDisplaySuggestionActivity extends NightDisplaySettingsActivity { /* empty */ }
+public static class DeviceInfoSettingsActivity extends SettingsActivity { /* empty */ }
+public static class ApplicationSettingsActivity extends SettingsActivity { /* empty */ }
+public static class ManageApplicationsActivity extends SettingsActivity { /* empty */ }
+}@Settings.java
+
+//启动Activity。。SettingsActivity extends SettingsDrawerActivity
+onCreate(Bundle savedState) {
+- super.onCreate(savedState)
+  //获取对应的fragment.AndroidManifext中定义"com.android.settings.FRAGMENT_CLASS"
+- getMetaData{
+	- ActivityInfo ai = getPackageManager().getActivityInfo(getComponentName())
+	- mFragmentClass = ai.metaData.getString(META_DATA_KEY_FRAGMENT_CLASS)
+	}
+- getIntent(){//修改intent
+	- String startingFragment = getStartingFragmentClass(superIntent)
+	- Intent modIntent = new Intent(superIntent)
+	- modIntent.putExtra(EXTRA_SHOW_FRAGMENT, startingFragment)
+	- return modIntent
+	}
+- final String initialFragmentName = intent.getStringExtra(EXTRA_SHOW_FRAGMENT) //要启动的界面
+  //获取component
+- final ComponentName cn = intent.getComponent()
+- mIsShowingDashboard = className.equals(Settings.class.getName())//是不是仪表板()
+- setContentView(mIsShowingDashboard ? R.layout.settings_main_dashboard : R.layout.settings_main_prefs)
+  //启动
+- launchSettingFragment(initialFragmentName, isSubSettings, intent){
+	- if (!mIsShowingDashboard && initialFragmentName != null){
+		- setTitleFromIntent(intent)
+		- switchToFragment(initialFragmentName, initialArguments, true, false....)
+	   }else{
+		- mInitialTitleResId = R.string.dashboard_title
+		- switchToFragment(DashboardSummary.class.getName(), ...mInitialTitleResId, mInitialTitle)
+		}	
+	}
+}@SettingsActivity.java
 
 
+packages/apps/Settings/src/com/android/settings/Settings.java
 packages/apps/Settings/src/com/android/settings/SettingsActivity.java
 
 /*

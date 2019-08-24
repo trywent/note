@@ -113,7 +113,15 @@ btu_hci_msg_queue-->btu_hci_msg_ready-->btu_hci_msg_process{
  android 8.1　
 　通过hidl通信
 */
-//
+hci_module_start_up(void) {
+- thread = thread_new("hci_thread")
+- packet_fragmenter->init(&packet_fragmenter_callbacks)
+- thread_post(thread, message_loop_run, NULL)-->message_loop_run(UNUSED_ATTR void* context){
+	- message_loop_->task_runner()->PostTask(FROM_HERE,base::Bind(&hci_initialize))
+	- run_loop_->Run()
+	}
+}
+//vendor初始化
 hci_initialize{
 - android::sp<IBluetoothHci> btHci = IBluetoothHci::getService()
 - android::sp<IBluetoothHciCallbacks> callbacks = new BluetoothHciCallbacks()
@@ -135,6 +143,10 @@ class BluetoothHciCallbacks : public IBluetoothHciCallbacks {
 - aclDataReceived
 - scoDataReceived
 }@hci_layer_android.cc
+
+
+//服务
+
 
 
 system/bt/main/bte_main.c

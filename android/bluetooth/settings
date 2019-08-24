@@ -1,5 +1,5 @@
 //
-onCreaet@Settings.java-->onCreate{
+onCreate@Settings.java-->onCreate{
 - setContentView(settings_main_dashboard)//主界面，settings_main_prefs子界面。dashboard包含该一个搜索头和content
 - mContent = findViewById(R.id.main_content) //content
 - launchSettingFragment-->switchToFragment(DashboardSummary.class.getName())//替换R.id.main_content

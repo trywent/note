@@ -37,7 +37,7 @@ addCachedDevices{
 }@DeviceListPreferenceFragment.java
 
 ================
-//配对
+//收到配对
 BluetoothPairingRequest.onReceive(ACTION_PAIRING_REQUEST)-->startActivity(pairingIntent)@BluetoothPairingRequest.java
 -->onCreate{
 - mType= intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT)//获取连接类型
@@ -103,6 +103,8 @@ Just Works
 
 Out of Band 
 两设备的通过别的途径交换配对信息，例如一些NFC蓝牙音箱。*/
+
+
 //请求配对
 onPreferenceTreeClick-->onDevicePreferenceClick-->btPreference.onClicked@DeviceListPreferenceFragment.java
 -->onClicked-->pair@BluetoothDevicePreference.java-->mCachedDevice.startPairing-->startPairing@CachedBluetoothDevice.java
@@ -116,9 +118,14 @@ btif_context_switched(p_msg)-->p->p_cb@btif_core.c-->btif_dm_generic_evt(BTIF_DM
 
 createBond-->mAdapterService.createBondNative@BondStateMachine.java-->(/*收到回调*/)pinRequestCallback
 
-//接收到配对请求
-PendingCommandState(SSP_REQUEST/PIN_REQUEST)-->sendDisplayPinIntent@BondStateMachine.java
-ACTION_PAIRING_REQUES
+//接收到配对请求,显示配对框
+sBluetoothCallbacks.pin_request_callback-->sCallbackEnv->CallVoidMethod(sJniCallbacksObj, method_pinRequestCallback)
+@com_android_bluetooth_btservice_AdapterService.cpp-->pinRequestCallback-->mBondStateMachine.pinRequestCallback@JniCallbacks.java
+-->pinRequestCallback-->sendMessage(PIN_REQUEST)-->
+sendDisplayPinIntent{ //发送广播显示配对框
+- Intent intent = new Intent(BluetoothDevice.ACTION_PAIRING_REQUEST)
+- mAdapterService.sendOrderedBroadcast(intent, mAdapterService.BLUETOOTH_ADMIN_PERM)
+}@BondStateMachine.java
 
 
 //pin
@@ -162,6 +169,7 @@ packages/apps/Bluetooth/src/com/android/bluetooth/btservice/JniCallbacks.java
 packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterProperties.java
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/RemoteDevices.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
 ================
 //stack
 smp_sm_event-->(*smp_sm_action[action])@smp_main.c-->
