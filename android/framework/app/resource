@@ -23,6 +23,24 @@ theme.obtainStyledAttributes(R.styleable.xxxx/*要获取的属性*/)
 
 ===================
 //resource创建
+createActivityContext(ActivityThread mainThread,LoadedApk packageInfo, ActivityInfo activityInfo....){
+- String[] splitDirs = packageInfo.getSplitResDirs()
+- ClassLoader classLoader = packageInfo.getClassLoader()
+- ContextImpl context = new ContextImpl(null, mainThread, packageInfo, activityInfo.splitName)
+- context.setResources(resourcesManager.createBaseActivityResources(activityToken,...)-->mResources = r
+- resourcesManager.createBaseActivityResources(activityToken){
+	- updateResourcesForActivity
+	- getOrCreateResources(activityToken, key, classLoader){
+		- 
+		- createResourcesImpl{
+			- DisplayMetrics dm = getDisplayMetrics(key.mDisplayId, daj)
+			- ResourcesImpl impl = new ResourcesImpl(assets, dm, config, daj)
+			}
+		}
+	}
+- context.mDisplay = resourcesManager.getAdjustedDisplay()
+}@ContextImpl.java
+
 ContextImpl{
 - mResourcesManager = ResourcesManager.getInstance()
 - compatInfo = packageInfo.getCompatibilityInfo()

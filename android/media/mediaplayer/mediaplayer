@@ -1,0 +1,8 @@
+/*
+ 实现MediaPlayerInterface
+*/
+
+MediaPlayerInterface : public MediaPlayerBase
+
+
+frameworks/av/media/libmediaplayerservice/include/MediaPlayerInterface.h

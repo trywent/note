@@ -124,3 +124,13 @@ template <class 形参名，class 形参名，......> 返回类型 函数名(参
 "abdc" 一个字符串
 'abcd' 字符字面量.一个4byte数值,填充了abcd
 
+
+virtual void print() const = 0;
+（1）=0说明它是纯虚函数
+（2）const表明不能修改其数据成员
+
+ 
+//virtual xxxx const =0
+const修饰，通俗的理解就是在这个函数内不能修改类的成员变量，除非那个成员变量是   mutable   的   
+=0表示这个成员函数是纯虚函数(理解函数指针为0)
+

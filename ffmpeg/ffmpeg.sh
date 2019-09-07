@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 NDK_HOME=/home/bsp/Android/ndk-r20
-SYSROOTINCLUDE=/home/bsp/Android/ndk-r20/sysroot
 PREFIX=android-build
 HOST_PLATFORM=linux-x86_64
 PLATFORM=24
@@ -10,6 +9,7 @@ PLATFORM_64=24
 CONFIG_LOG_PATH=${PREFIX}/log
 COMMON_OPTIONS=
 CONFIGURATION=
+ANDROID_OPTIONS=
 
 build(){
     APP_ABI=$1
@@ -34,8 +34,9 @@ build(){
         ARCH="arm"
         CPU="armv7-a"
         MARCH="armv7-a"
-        TOOLCHAINS="$NDK_HOME/toolchains/arm-linux-androideabi-4.9/prebuilt/$HOST_PLATFORM"
+	TOOLCHAINS="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_PLATFORM"
         CROSS_PREFIX="$TOOLCHAINS/bin/arm-linux-androideabi-"
+	CC="$TOOLCHAINS/bin/armv7a-linux-androideabi$PLATFORM-clang"
         SYSROOT="$NDK_HOME/platforms/android-$PLATFORM/arch-arm"
         EXTRA_CFLAGS="-march=$MARCH"
         EXTRA_CFLAGS="$EXTRA_CFLAGS -mfloat-abi=softfp -mfpu=vfpv3-d16"
@@ -50,8 +51,9 @@ build(){
         ARCH="aarch64"
         CPU="armv8-a"
         MARCH="armv8-a"
-        TOOLCHAINS="$NDK_HOME/toolchains/aarch64-linux-android-4.9/prebuilt/$HOST_PLATFORM"
+	TOOLCHAINS="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_PLATFORM"
         CROSS_PREFIX="$TOOLCHAINS/bin/aarch64-linux-android-"
+	CC="$TOOLCHAINS/bin/aarch64-linux-android$PLATFORM-clang"
         SYSROOT="$NDK_HOME/platforms/android-$PLATFORM_64/arch-arm64"
         EXTRA_CFLAGS="-march=$MARCH"
         EXTRA_CFLAGS="$EXTRA_CFLAGS -I$NDK_HOME/sysroot/usr/include/aarch64-linux-android"
@@ -80,16 +82,25 @@ build(){
         CPU="x86_64"
         MARCH="x86-64"
         TOOLCHAINS="$NDK_HOME/toolchains/llvm/prebuilt/$HOST_PLATFORM"
-        CROSS_PREFIX="$TOOLCHAINS/bin/x86_64-linux-android$PLATFORM_64-"
+        CROSS_PREFIX="$TOOLCHAINS/bin/x86_64-linux-android-"
+	CC="$TOOLCHAINS/bin/x86_64-linux-android$PLATFORM_64-clang"
 	STRIP="$TOOLCHAINS/bin/x86_64-linux-android-strip"
         SYSROOT="$NDK_HOME/platforms/android-$PLATFORM_64/arch-x86_64"
+	SYSROOTINCLUDE="$NDK_HOME/sysroot"
         EXTRA_CFLAGS="-march=$MARCH"
         EXTRA_CFLAGS="$EXTRA_CFLAGS -mtune=intel -msse4.2 -mpopcnt -m64"
-        EXTRA_CFLAGS="$EXTRA_CFLAGS -I$SYSROOTINCLUDE/usr/include"
-        #EXTRA_CFLAGS="$EXTRA_CFLAGS -isysroot $SYSROOTINCLUDE/user/include"
+        EXTRA_CFLAGS="$EXTRA_CFLAGS -I$SYSROOTINCLUDE/usr/include"        
         EXTRA_LDFLAGS="-lc -lm -ldl -llog"
         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -Wl,-rpath-link=$SYSROOT/usr/lib64 -L$SYSROOT/usr/lib64"
         EXTRA_OPTIONS="--disable-asm"
+    ;;
+    ubuntu )
+        EXTRA_CFLAGS="$EXTRA_CFLAGS -mtune=intel -msse4.2 -mpopcnt -m64"
+        EXTRA_CFLAGS="$EXTRA_CFLAGS -I/usr/include"
+	EXTRA_LDFLAGS="-lc -lm -ldl"
+        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -Wl,-rpath-link=/usr/lib -L/usr/lib"
+	EXTRA_OPTIONS="--disable-asm"
+	ANDROID_OPTIONS=""
     ;;
     esac
     
@@ -97,7 +108,7 @@ build(){
     make clean
 
     echo "-------- > Start build configuration"
-    CONFIGURATION="$COMMON_OPTIONS"
+    CONFIGURATION="$COMMON_OPTIONS $ANDROID_OPTIONS"
     CONFIGURATION="$CONFIGURATION --logfile=$CONFIG_LOG_PATH/config_$APP_ABI.log"
     CONFIGURATION="$CONFIGURATION --prefix=$PREFIX"
     CONFIGURATION="$CONFIGURATION --libdir=$PREFIX/libs/$APP_ABI"
@@ -106,9 +117,9 @@ build(){
     CONFIGURATION="$CONFIGURATION --arch=$ARCH"
     CONFIGURATION="$CONFIGURATION --cpu=$CPU"
     CONFIGURATION="$CONFIGURATION --cross-prefix=$CROSS_PREFIX"
-    CONFIGURATION="$CONFIGURATION --strip=$STRIP"
-    #CONFIGURATION="$CONFIGURATION --sysroot=$SYSROOT"
-    #CONFIGURATION="$CONFIGURATION --sysinclude=$SYSROOTINCLUDE"
+    CONFIGURATION="$CONFIGURATION --cc=$CC"
+#    CONFIGURATION="$CONFIGURATION --sysroot=$SYSROOT"
+#    CONFIGURATION="$CONFIGURATION --sysinclude=$SYSROOTINCLUDE"
     CONFIGURATION="$CONFIGURATION --extra-ldexeflags=-pie"
     CONFIGURATION="$CONFIGURATION $EXTRA_OPTIONS"
 
@@ -128,9 +139,8 @@ build(){
 
 build_all(){
 
-    COMMON_OPTIONS="$COMMON_OPTIONS --target-os=android"
-    COMMON_OPTIONS="$COMMON_OPTIONS --disable-static"
-    COMMON_OPTIONS="$COMMON_OPTIONS --enable-shared"
+    COMMON_OPTIONS="$COMMON_OPTIONS --enable-static"
+    COMMON_OPTIONS="$COMMON_OPTIONS --disable-shared"
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-protocols"
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-cross-compile"
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-optimizations"
@@ -144,8 +154,6 @@ build_all(){
     COMMON_OPTIONS="$COMMON_OPTIONS --disable-symver"
     COMMON_OPTIONS="$COMMON_OPTIONS --disable-network"
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-pthreads"
-    COMMON_OPTIONS="$COMMON_OPTIONS --enable-mediacodec"
-    COMMON_OPTIONS="$COMMON_OPTIONS --enable-jni"
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-zlib"
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-pic"
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-avresample"
@@ -157,6 +165,10 @@ build_all(){
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-decoder=opus"
     COMMON_OPTIONS="$COMMON_OPTIONS --enable-decoder=flac"
 
+    ANDROID_OPTIONS="--target-os=android"
+    ANDROID_OPTIONS="$ANDROID_OPTIONS --enable-mediacodec"
+    ANDROID_OPTIONS="$ANDROID_OPTIONS --enable-jni"
+
     echo "COMMON_OPTIONS=$COMMON_OPTIONS"
     echo "PREFIX=$PREFIX"
     echo "CONFIG_LOG_PATH=$CONFIG_LOG_PATH"
@@ -166,9 +178,10 @@ build_all(){
 #    build $app_abi
 #     build "armeabi"
 #     build "armeabi-v7a"
-#     build "arm64-v8a"
+    build "arm64-v8a"
 #     build "x86"
-     build "x86_64"
+#     build "x86_64"
+#     build "ubuntu"
 }
 
 echo "-------- Start --------"

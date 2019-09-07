@@ -1,7 +1,6 @@
 /***********************
   系统加载定义的权限
-  应用安装时请求权限
-  应用运行时检查权限
+  应用请求权限
 
 */
 
@@ -98,6 +97,9 @@ AppOpsService.java
 
 /*
  权限请求
+ android.content.pm.PermissionInfo.PROTECTION_NORMAL  在manifest中申请并分配
+ android.content.pm.PermissionInfo.PROTECTION_DANGEROUS，在manifest中申请，但是并没有分配
+
 */
 //安装权限(intall)
 parsePackage{
@@ -107,17 +109,21 @@ parsePackage{
 
 
 //运行时权限(runtime)
-requestPermissions{//请求权限
+requestPermissions(String[] permissions, int requestCode){//请求权限
 - intent = getPackageManager().buildRequestPermissionsIntent
+  //弹框
 - startActivityForResult(intent)-->GrantPermissionsActivity
 }@Activty.java
 
 onCreate{
-- mViewHandler = GrantPermissionsViewHandlerImpl(this).setResultListener(this) //实际UI
+ //实际UI。
+- mViewHandler = GrantPermissionsViewHandlerImpl(this).setResultListener(this) 
 - setContentView(mViewHandler.createView())//设置请求窗口
 - showNextPermissionGroupGrantRequest
 }@GrantPermissionsActivity.java
 
+
+//分配权限
 onClick-->mResultListener.onPermissionGrantResult@GrantPermissionsViewHandlerImpl.java-->
 onPermissionGrantResult-->groupState.mGroup.grantRuntimePermissions@GrantPermissionsActivity.java
 grantSignaturePermission@PackageManagerService.java
@@ -136,7 +142,7 @@ frameworks/native/libs/binder/PermissionCache.cpp
 frameworks/base/core/java/android/app/AppOpsManager.java
 frameworks/base/services/core/java/com/android/server/AppOpsService.java
 ===============
-//用用状态权限
+//应用状态权限
 //判断权限
 hasPermission@UsageStatsService.java
 

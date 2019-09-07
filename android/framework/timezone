@@ -18,3 +18,19 @@ frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
 libcore/luni/src/main/java/java/util/TimeZone.java
 libcore/luni/src/main/java/org/apache/harmony/luni/internal/util/TimezoneGetter.java
 libcore/luni/src/main/java/java/util/SimpleTimeZone.java
+
+
+//sprd手机网络设置时区
+revertToNitzTimeZone{
+- if (mSavedTimeZone != null) {
+	- setAndBroadcastNetworkSetTimeZone
+	}
+  //通过手机网络获取信息
+- updateTimezoneByNetworkCountryCode
+}@ServiceStateTracker.java
+
+
+
+frameworks/opt/telephony/src/java/com/android/internal/telephony/ServiceStateTracker.java
+
+

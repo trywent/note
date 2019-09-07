@@ -1,4 +1,4 @@
-/*
+/****************************
  USBService
 */
 startOtherServices-->mSystemServiceManager.startService(USB_SERVICE_CLASS)@SystemServer.java
@@ -34,7 +34,9 @@ systemReady{
 }@UsbService.java
 
 frameworks/base/services/usb/java/com/android/server/usb/UsbService.java
-/*主设备
+frameworks/base/services/usb/java/com/android/server/usb/UsbProfileGroupSettingsManager.java
+/****************************
+  主设备
   hostManager
 
 */
@@ -78,12 +80,22 @@ usb_device_added(const char *devname, void* client_data) {
 - env->CallVoidMethod(thiz, method_endUsbDeviceAdded)-->endUsbDeviceAdded@UsbHostManager.java
 }@com_android_server_UsbHostManager.cpp
 
-
+endUsbDeviceAdded{
+- mNewInterface.setEndpoints
+- mNewConfiguration.setInterfaces
+- mNewDevice.setConfigurations
+  //设备处理
+- ComponentName usbDeviceConnectionHandler = getUsbDeviceConnectionHandler()
+- if (usbDeviceConnectionHandler == null) {
+	- getCurrentUserSettings().deviceAttached(mNewDevice)-->deviceAttached@UsbProfileGroupSettingsManager.java
+	}
+}@UsbHostManager.java
 
 frameworks/base/services/usb/java/com/android/server/usb/UsbHostManager.java
 frameworks/base/services/core/jni/com_android_server_UsbHostManager.cpp
 system/core/libusbhost/usbhost.c
-/*从设备
+/****************************
+ 从设备
  deviceMananger (Accessory附件)
  
 */

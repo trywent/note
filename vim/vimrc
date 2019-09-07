@@ -51,11 +51,15 @@ filetype plugin indent on    " required
 "
 " see :h vundle for more details or wiki for FAQ
 " Put your non-Plugin stuff after this line
+
 " 设置nerdtree{
 autocmd vimenter * NERDTree
-let NERDTreeMouseMode=2
-let g:nerdtree_tabs_open_on_console_startup=1
+let NERDTreeMouseMode=2 "单击打开目录，双击打开文件
+let g:nerdtree_tabs_open_on_console_startup=1 "进入nerdtree时打开tab
 " }
 " 设置文件编码
 set fileencodings=utf-8,gb2312,gbk,gb18030
+" 打开鼠标
 set mouse=a
+" 源码文件自动替换tab
+autocmd FileType c,cpp,cc,java setlocal softtabstop=2 shiftwidth=2 tabstop=4 expandtab 
