@@ -1,44 +1,6 @@
-//display
-(SystemServer)new DisplayManagerService(wmHandler){
-- DisplayManagerHandler
-- DisplayAdapterListener //监听器
-- sendEmptyMessage(MSG_REGISTER_DEFAULT_DISPLAY_ADAPTER)-->registerDefaultDisplayAdapter
-	->registerDisplayAdapterLocked(new LocalDisplayAdapter(mDisplayAdapterListener)){
-		- mDisplayAdapters.add()
-		- 注册，registerLocked
-		}
-}@DisplayManagerService.java
-
-
-
-
-sendEmptyMessage(MSG_REGISTER_DEFAULT_DISPLAY_ADAPTER)-->
-registerLocked-->tryConnectDisplayLocked{
-- 创建，new LocalDisplayDevice
-- sendDisplayDeviceEventLocked(DISPLAY_DEVICE_EVENT_ADDED)-->()DisplayAdapterListener.
-	onDisplayDeviceEvent-->handleDisplayDeviceAdded-->handleDisplayDeviceAddedLocked{
-		- mDisplayDevices.add
-		}
-}@LocalDisplayAdapter.java
-
-
-frameworks/base/services/java/com/android/server/display/LocalDisplayAdapter.java
-frameworks/base/services/java/com/android/server/display/DisplayManagerService.java
-
-===============
-//设置应用屏幕大小
-computeScreenConfigurationLocked{
-- (获取屏幕宽高)getNonDecorDisplayWidth/Height@PhoneWindowManager.java
-- 创建displayInfo，displayContent.getDisplayInfo{
-	- 设置屏幕宽高logicalWidth
-	- 设置应用宽高appWidth
-	}
-- setDisplayInfoOverrideFromWindowManager@DisplayManagerService.java-->
-	setDisplayInfoOverrideFromWindowManagerLocked-->设置mOverrideDisplayInfo@LogicDisplay.java
-}@WindowManagerService.java
-
-
-
+/*
+ 获取display信息
+*/
 //通过resource获取分辨率
 getResources-->mResource@ContextImpl.java-->getDisplayMetrics-->mResourcesImpl.getDisplayMetrics()@Resource.java
 
@@ -49,7 +11,20 @@ getDefaultDisplay@WindowManagerImpl.java-->mContext.getDisplay()-->getDisplay-->
 @ContextImpl.java-->getAdjustedDisplay@ResourceManager.java
 
 //最终调用到getAdjustedDisplay
-getAdjustedDisplay@ResourceManager.java
+getAdjustedDisplay{
+- DisplayManagerGlobal dm = DisplayManagerGlobal.getInstance(){
+	  //只创建一个实例
+	- IBinder b = ServiceManager.getService(Context.DISPLAY_SERVICE)
+	- sInstance = new DisplayManagerGlobal(IDisplayManager.Stub.asInterface(b))
+	}
+- dm.getCompatibleDisplay(displayId, resources){
+	- DisplayInfo displayInfo = getDisplayInfo(displayId){
+		- info = mDm.getDisplayInfo(displayId) //从服务端获取displayInfo
+		- registerCallbackIfNeededLocked	
+		}
+	- return new Display(this, displayId, displayInfo, daj)
+	}@DisplayManangerGlobal.java
+}@ResourceManager.java
 
 //获取display android6.1
 getWindowManager(dm.getDisplay)@ContextImpl.java-->getDisplay-->getOrCreateDisplayLocked

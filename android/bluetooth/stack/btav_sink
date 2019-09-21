@@ -177,7 +177,11 @@ btif_a2dp_sink_enqueue_buf(BT_HDR* p_pkt){
 
 btif_a2dp_sink_avk_handle_timer{
 - BT_HDR* p_msg = (BT_HDR*)fixed_queue_try_dequeue(btif_a2dp_sink_cb.rx_audio_queue)
-- btif_a2dp_sink_handle_inc_media(p_msg)-->btif_a2dp_sink_cb.decoder_interface->decode_packet(p_msg)
+- btif_a2dp_sink_handle_inc_media(p_msg){
+	-  OI_CODEC_SBC_DecodeFrame(&btif_a2dp_sink_context, (const OI_BYTE**)&sbc_start_frame..)
+	  //写入数据
+	- BtifAvrcpAudioTrackWriteData(btif_a2dp_sink_cb.audio_track, (void*)btif_a2dp_sink_pcm_data,..)
+	}
 }@btif_a2dp_sink.cc
 
 //设置焦点

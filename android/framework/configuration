@@ -143,8 +143,6 @@ mBaseDisplayHeight = mCurDisplayHeight = mAppDisplayHeight = mInitialDisplayHeig
 
 rotationForOrientationLw(返回正确方位)
 
-onConfigurationChanged@Activity.java
-
 
 
 更新屏幕配置：

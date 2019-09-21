@@ -1,0 +1,240 @@
+/******************************
+资源的获取接口
+theme
+TypedArry
+resource
+
+resource ID是一个32位数.格式为:PPTTNNNN. PP资源包; TT资源类型; NNNN资源名. 应用中PP值为0x7f
+*/
+
+系统私有资源需要添加res/valus/symbols.xml
+  <!--fyt add-->
+  <java-symbol type="drawable" name="fytbt_up1" />
+  <java-symbol type="drawable" name="fytbt_down1" />
+  <java-symbol type="drawable" name="fytbt_up2" />
+  <java-symbol type="drawable" name="fytbt_down2" />
+  <java-symbol type="layout" name="fyt_button" />
+  <java-symbol type="id" name="fytWinbt" />
+===================
+//theme
+
+theme.obtainStyledAttributes(R.styleable.xxxx/*要获取的属性*/)
+//应用更新配置configuration
+updateConfigurationLocked(Configuration values){
+- mSystemThread.applyConfigurationToResources
+- 遍历mLruProcesses{//遍历最近进程,更新资源
+- ProcessRecord app = mLruProcesses.get(i)
+- app.thread.scheduleConfigurationChanged(Configuration)-->
+	handleConfigurationChanged@ActivityThread.java--applyConfigurationToResourcesLocked(config)
+	}
+- mWindowManager.setNewConfiguration //更新窗口配置
+}@ActivityManagerService.java
+
+applyConfigurationToResourcesLocked{
+- Resources.updateSystemConfiguration
+- 遍历mActiveResources{
+	- Resources r = mActiveResources.valueAt(i).get()
+	- r.updateConfiguration-->updateConfiguration-->mAssets.setConfiguration
+	}@Resource.java
+}ResourcesManager.java
+
+
+//获取值
+getDimensionPixelSize-->getValue-->mAssets.getResourceValue@Resource.java
+
+//drawable
+getDrawable-->getResources().getDrawable(id, getTheme())@Context.java-->getDrawable{
+- impl.getValue(id, value, true) //获取value
+- mResourcesImpl.loadDrawalbe-->loadDrawalbe(id,value)@ResourcesImpl.java
+}@Resources.java
+
+
+//查找对应id的View：
+findViewById-->getWindow().findViewById(id)@Activity.java-->findViewById-->
+getDecorView().findViewById@Window.java-->mDecor.findViewById-->DecorView.findViewById
+@PhoneWindow.java-->findViewById-->findViewTraversal(id匹配说明查找到)@View.java-->
+(是ViewGroup容器)findViewTraversal-->v.findViewById(找到对应id的View)@ViewGroup.java-->findViewById
+-->findViewTraversal(return this)@View.java
+
+//typedArray 通过Resources获取
+Resources.obtainStyledAttributes(AttributeSet, int[], int, int)
+Resources.obtainAttributes(AttributeSet, int[])
+
+/******************************
+  android6.1  esource创建
+  
+*/
+createActivityContext(ActivityThread mainThread,LoadedApk packageInfo, ActivityInfo activityInfo....){
+- String[] splitDirs = packageInfo.getSplitResDirs()
+- ClassLoader classLoader = packageInfo.getClassLoader()
+- ContextImpl context = new ContextImpl(null, mainThread, packageInfo, activityInfo.splitName)
+- context.setResources(resourcesManager.createBaseActivityResources(activityToken,...)-->mResources = r
+- resourcesManager.createBaseActivityResources(activityToken){
+	- updateResourcesForActivity
+	- getOrCreateResources(activityToken, key, classLoader){
+		- 
+		- createResourcesImpl{
+			- DisplayMetrics dm = getDisplayMetrics(key.mDisplayId, daj)
+			- ResourcesImpl impl = new ResourcesImpl(assets, dm, config, daj)
+			}
+		}
+	}
+- context.mDisplay = resourcesManager.getAdjustedDisplay()
+}@ContextImpl.java
+
+ContextImpl{
+- mResourcesManager = ResourcesManager.getInstance()
+- compatInfo = packageInfo.getCompatibilityInfo()
+- resources = packageInfo.getResources(mainThread)-->getResources@LoadedApk.java
+	-->mainThread.getTopLevelResources@ActivityThread.java-->mResourcesManager.getTopLevelResources
+- mContentResolver = new ApplicationContentResolver
+}@ContextImpl.java
+
+
+getTopLevelResource(resDir,overlayDirs,libDir){
+- assets = new AssetManager
+- assets.addAssetPath(resDir)//设置资源路径
+- dm = getDisplayMetricsLocked(DEFAULT_DISPLAY){
+- new Resources(assets,DisplayMetrics,config){
+	- mAssets = assets
+	- updateConfiguration(config, DisplayMetrics){
+		- mAssets.setConfiguration(orientation,width, height,smallestScreenWidthDp)//设置资源的配置
+		}
+	}@Resource.java
+}@ResourcesManager.java
+
+/******************************
+  android8.1  resource创建
+  
+*/
+performLaunchActivity-->createBaseContextForActivity-->ContextImpl.createActivityContext(this, r.packageInfo...)
+@ActivityThread.java-->createActivityContext(ActivityThread mainThread,LoadedApk packageInfo, ActivityInfo activityInfo){
+- String[] splitDirs = packageInfo.getSplitResDirs()
+- ClassLoader classLoader = packageInfo.getClassLoader()
+- ContextImpl context = new ContextImpl(null, mainThread, packageInfo, activityInfo.splitName...)
+  //创建resource
+- ResourcesManager resourcesManager = ResourcesManager.getInstance()
+- resourcesManager.createBaseActivityResources(activityToken, packageInfo.getResDir(), splitDirs...){
+	- ResourcesKey key = new ResourcesKey(resDir,splitResDirs,overlayDirs...)
+	- getOrCreateActivityResourcesStructLocked(activityToken){
+		- ActivityResources activityResources = new ActivityResources()
+		- mActivityResourceReferences.put(activityToken, activityResources)
+		}
+	- updateResourcesForActivity
+	- getOrCreateResources(activityToken, key, classLoader){
+		- ResourcesImpl resourcesImpl = createResourcesImpl(key){
+			- AssetManager assets = createAssetManager(key)
+			- ResourcesImpl impl = new ResourcesImpl(assets, dm, config, daj)
+			}
+		- if (activityToken != null) {
+			- resources = getOrCreateResourcesForActivityLocked(activityToken, classLoader,resourcesImpl...){
+				- Resources resources = new Resources(classLoader)
+				- resources.setImpl(impl)
+				- return resources
+				}
+		  }else{
+			- resources = getOrCreateResourcesLocked(classLoader, resourcesImpl, key.mCompatInfo)
+			}
+		- return resources
+		}
+	}@ResourceMananger.java
+  //设置context中resource
+- context.setResources
+}@ContextImpl.java
+
+
+//获取resource,若已经创建则从ActivityResources获取
+getTopLevelResources-->mResourcesManager.getResources@ActivityThread.java-->getResources{
+- ResourcesKey key = new ResourcesKey(resDir,splitResDirs,overlayDirs...)
+- getOrCreateResources(activityToken, key, classLoader){
+	- if (activityToken != null) {
+		- ActivityResources activityResources = getOrCreateActivityResourcesStructLocked(activityToken)
+		- ResourcesImpl resourcesImpl = findResourcesImplForKeyLocked(key)
+		- getOrCreateResourcesForActivityLocked(activityToken, classLoader,resourcesImpl...)
+		}
+	}
+}@ResourcesManager.java
+
+
+
+
+/******************************
+  AssertManager
+*/
+createAssetManager(@NonNull final ResourcesKey key) {
+- AssetManager assets = new AssetManager(){
+	- init(false) //应用资源
+	- ensureSystemAssets-->init(true)//系统资源
+	}
+- assets.addAssetPath(key.mResDir)
+  //加入key.mLibDirs apk结尾的包
+- assets.addAssetPathAsSharedLibrary(libDir)
+}@ResourceManager.java
+
+//初始化
+init@AssetManager.java-->android_content_AssetManager_init{
+- am = new AssetManager()
+- am->addDefaultAssets()-->addDefaultAssets{//加入系统默认资源
+	- addAssetPath("framework/framework-res.apk")-->mAssetPaths.add
+	}
+- env->SetLongField(clazz, gAssetManagerOffsets.mObject,am)
+}@android_util_AssetManager.cpp
+
+//设置config
+setConfiguration@AssetManager.java-->android_content_AssetManager_setConfiguration@android_util_AssetManager.cpp
+setConfiguration(config, locale8){
+- mConfig = config
+- setLocaleLocked(locale)
+}@AssetManager.cpp
+
+
+//加入资源路径
+addAssetPath-->addAssetPathInternal-->addAssetPathNative@AssetManager.java
+android_content_AssetManager_addAssetPath@android_util_AssetManager.cpp-->
+addAssetPath{
+
+}@AssetManager.cpp
+
+
+//获取资源
+getValue(int id, TypedValue outValue, boolean resolveRefs)@Resouces.java-->
+getValue(@AnyRes int id, TypedValue outValue, boolean resolveRefs)@ResourceImpl.java-->
+mAssets.getResourceValue(id, 0, outValue, resolveRefs)-->getResourceValue{
+- int block = loadResourceValue(resId, (short) densityDpi, outValue, resolveRefs)
+- outValue.changingConfigurations = ActivityInfo.activityInfoConfigNativeToJava(outValue.changingConfigurations)
+  //若资源类型是字符串，则根据id从mStringBlocks缓存获取字符串
+- if (outValue.type == TypedValue.TYPE_STRING)
+	- outValue.string = mStringBlocks[block].get(outValue.data)
+}@AssetManager.java
+
+
+loadResourceValue@AssetManager.java-->android_content_AssetManager_loadResourceValue(jint ident,jshort density, jobject outValue){
+- AssetManager* am = assetManagerForJavaObject(env, clazz)
+- ResTable& res= am->getResources(true)-->getResTable{
+	- loadFileNameCacheLocked
+	- mResources = new ResTable()
+	- 遍历资源路径mAssetPaths，appendPathToResTable(mAssetPaths.itemAt(i))
+	}
+- res.getResource(ident, &value, density,&config)
+  //解析值
+- res.resolveReference(&value, block, &ref, &typeSpecFlags, &config)
+}android_util_AssetManager.cpp
+
+
+
+frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/core/java/android/app/ResourcesManager.java
+frameworks/base/core/java/android/app/LoadedApk.java
+frameworks/base/core/java/android/hardware/display/DisplayManagerGlobal.java
+frameworks/base/core/java/android/content/res/Resources.java
+frameworks/base/core/java/android/content/res/ResourcesImpl.java
+frameworks/base/core/java/android/content/res/AssetManager.java
+frameworks/base/core/jni/android_util_AssetManager.cpp
+frameworks/base/libs/androidfw/AssetManager.cpp
+frameworks/base/libs/androidfw/ResourceTypes.cpp
+
+
+
+
+
+

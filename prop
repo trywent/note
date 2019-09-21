@@ -39,3 +39,6 @@ qemu.hw.mainkeys=0
 #statusBar NaviBar高度
 sys.lsec.status_bar_height=140
 sys.lsec.navi_bar_height=140
+
+#亿联6.1
+sys.fyt.ec_version=6

@@ -9,31 +9,19 @@
 窗口宽高比默认改为0.DEFAULT_PRE_O_MAX_ASPECT_RATIO=1.86@PackageParser.java
 
 */
- 
-WindowContainer{
-- WindowList<E> mChildren = new WindowList<E>() //child
-- mOverrideConfiguration          //当前容器的配置,每个容器的大小可能不一样
-- mFullConfiguration
-- mMergedOverrideConfiguration
-- addChild(child){
-	- mChildren.add
-	- child.setParent-->onParentSet
-	}
-- onConfigurationChanged{
-	- mFullConfiguration.setTo
-	- 遍历child,更新child.onConfigurationChanged
-	}
-- onOverrideConfigurationChanged {//更新配置,包括所有child都会更新
-	- onConfigurationChanged
-	- onMergedOverrideConfigurationChanged	
-	}
-- onMergedOverrideConfigurationChanged{
-	- mMergedOverrideConfiguration
-	- 遍历child,更新child.mMergedOverrideConfiguration
-	}
-}@WindowContainer.java
 
-/*
+
+DisplayContent,TaskStack,Task,AppWindowToken extends WindowContainer{}
+DisplayContent {//容器结构
+- TaskStack{
+	- Task{
+		-AppWindowToken{
+		}
+	}
+}
+}
+
+0/*======
  RootWindowContainer
  
  创建DisplayContent并加入RootWindowContainer
@@ -58,8 +46,7 @@ createDisplayContent(){
 
 
 frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
-====== 1
-/**********************
+1/*======
   displayContent初始化.加入到RootWindowContainer中
   displayContent包含4种Container
 	mAboveAppWindowsContainers
@@ -179,14 +166,12 @@ performDisplayOverrideConfigUpdate@ActivityManagerService.java-->setNewDisplayOv
 -->setDisplayOverrideConfigurationIfNeeded@RootWindowContainer.java-->displayContent.onOverrideConfigurationChanged
 
 
-====== 2
-/*
+2/*======
   TaskStack
   - 栈大小信息
 */
 StackWindowController(int stackId, StackWindowListener listener, boolean onTop, Rect outBounds)-->
-StackWindowController(int stackId, StackWindowListener listener, boolean onTop, Rect outBounds, WindowManagerService service)
-{
+StackWindowController(int stackId, StackWindowListener listener, boolean onTop, Rect outBounds, WindowManagerService service){
 - DisplayContent dc = mRoot.getDisplayContent(displayId) //mRoot为WindowManagerService
 - TaskStack stack = dc.addStackToDisplay(stackId){
 	- TaskStack stack = getStackById(stackId)
@@ -206,7 +191,11 @@ StackWindowController(int stackId, StackWindowListener listener, boolean onTop, 
 	}@DisplayContent.java
 - stack.setController(this) //设置controler ,container
 - getRawBounds(outBounds){
-	- 从mContainer 获取窗口大小 //从TaskStack获取
+	- if (mContainer.getRawFullscreen()) {//是全屏
+		- outBounds.setEmpty()
+	  }else{
+		- mContainer.getRawBounds(outBounds)-->out.set(mBounds)
+		}
 	}
 }@StackWindowController.java
 
@@ -218,10 +207,10 @@ setBounds(Rect stackBounds, SparseArray<Configuration> configs){
 - task.resizeLocked
 }@TaskStack.java
 
-//ActivityManager中TaskRecord,更新configuration
+//ActivityManager中TaskRecord,根据大小更新configuration
 computeOverrideConfiguration@TaskRecord.java-->
 adjustConfigurationForBounds(Rect bounds,Configuration config){
-- 
+- config.setAppBounds(!bounds.isEmpty() ? bounds : null)
 - config.screenWidthDp = width
 - config.screenHeightDp = height
 - config.smallestScreenWidthDp = getSmallestWidthForTaskBounds()
@@ -229,15 +218,17 @@ adjustConfigurationForBounds(Rect bounds,Configuration config){
 
 
 
-====== 3
-/*
+3/*======
   Task
 */
 TaskWindowContainerController(int taskId, TaskWindowContainerListener listener,StackWindowController stackController,  Rect bounds){
 - TaskStack stack = stackController.mContainer
 - Task task = createTask-->new Task(this,bounds){
 	- setController(controller)//设置controler ,container
-	- setBounds
+	- setBounds(bounds, overrideConfig){
+		- mBounds.set(bounds)
+		- onOverrideConfigurationChanged(mFillsParent ? Configuration.EMPTY : overrideConfig)
+		}
 	}@Task.java
 - stack.addTask(task)-->addChild
 }@TaskWindowContainerController.java
@@ -259,7 +250,7 @@ onParentSet{
 - forceWindowsScaleable
 }@Task.java
 
-//大小
+//调整大小
 resize-->mContainer.resizeLocked@TaskWindowContainerController.java-->
 resizeLocked(Rect bounds, Configuration overrideConfig){
 - int boundsChanged = setBounds(Rect bounds, Configuration overrideConfig){
@@ -279,37 +270,36 @@ getBounds{
 }@Task.java
 
 
-====== 4 
-/*
+4/*======
  AppWindowToken extends WindowToken
- ActivityManager端创建windowToken加入到displayContent.mTokenMap中,会传入ActivityRocord.appToken.
- 应用进程加入实际窗口时addWindow会传入同一个appToken...
- 
- 这样应用WindowState和关联AppWindowToken起来.可以由服务管理
  
 */
 
-AppWindowContainerController(token/*ActivityRecord.appToken*/){
+AppWindowContainerController(TaskWindowContainerController taskController,IApplicationToken token, 
+	AppWindowContainerListener listener, int index,.....Configuration overrideConfig, Rect bounds){
 - mToken = token
-- AppWindowToken atoken = createAppWindow(token,task.getDisplayContent())-->new AppWindowToken{
-	- super()-->WindowToken(WindowManagerService service, IBinder _token){
-		- token = _token
-		- onDisplayChanged(dc)-->dc.reParentWindowToken(this) //加入到DisplayContent
-		}@WindowToken.java
-	- this{
-		- mInputApplicationHandle = new InputApplicationHandle(this)
-		- mAppAnimator = new AppWindowAnimator(this, service)
-		- onOverrideConfigurationChanged
-		- mBounds.set(bounds)
-		}
-	- setController(controller)//设置controler ,container
-	}@AppWindowToken.java
+- AppWindowToken atoken = createAppWindow(WindowManagerService service, IApplicationToken token,boolean voiceInteraction,...bounds)-->
+	new AppWindowToken()
 - task.addChild(atoken) //加入到task
 }@AppWindowContainerController.java
 
+AppWindowToken(WindowManagerService service, IApplicationToken token, boolean voiceInteraction, DisplayContent dc...bounds) extends WindowToken{
+- super()-->WindowToken(WindowManagerService service, IBinder _token){
+	- token = _token
+	- onDisplayChanged(dc)-->dc.reParentWindowToken(this) //加入到DisplayContent
+	}@WindowToken.java
+- this{
+	- mInputApplicationHandle = new InputApplicationHandle(this)
+	- mAppAnimator = new AppWindowAnimator(this, service)
+	- if (overrideConfig != null)
+		- onOverrideConfigurationChanged
+	- mBounds.set(bounds)
+	}
+- setController(controller)//设置controler ,container
+}@AppWindowToken.java
 
 //加入窗口WindowState
-addWindow(Session session,IWindow Client,WindowManager.LayoutParams attrs){
+viewRootImpl.java-->addWindow(Session session,IWindow Client,WindowManager.LayoutParams attrs){
 - WindowToken token = displayContent.getWindowToken(attrs.token)
 - AppWindowToken atoken = token.asAppWindowToken()
 - WindowState win = new WindowState(this, session, client, token){
@@ -319,7 +309,7 @@ addWindow(Session session,IWindow Client,WindowManager.LayoutParams attrs){
 }@WindowManagerService.java
 
 
-
+//改变大小
 setBounds-->updateAdjustedBounds
 onOverrideConfigurationChanged-->onConfigurationChanged@WindowContainer.java
 
@@ -334,6 +324,73 @@ setAnimation
 stepAnimationLocked(long currentTime) {
 - 
 
+}
+/**********************
+ WindowContainer
+	- mOverrideConfiguration
+	- mFullConfiguration
+	- mMergedOverrideConfiguration
+
+*/
+WindowContainer{
+- WindowList<E> mChildren = new WindowList<E>() //child
+- mOverrideConfiguration          //当前容器的配置,每个容器的大小可能不一样
+- mFullConfiguration
+- mMergedOverrideConfiguration
+- addChild(child){
+	- mChildren.add
+	- child.setParent-->onParentSet
+	}
+- onConfigurationChanged{
+	- mFullConfiguration.setTo
+	- 遍历child,更新child.onConfigurationChanged
+	}
+- onOverrideConfigurationChanged {//更新配置,包括所有child都会更新
+	- onConfigurationChanged
+	- onMergedOverrideConfigurationChanged	
+	}
+- onMergedOverrideConfigurationChanged{
+	- mMergedOverrideConfiguration
+	- 遍历child,更新child.mMergedOverrideConfiguration
+	}
+}@WindowContainer.java
+
+//创建后加入到父容器，时调用
+addChild-->
+setParent(WindowContainer parent){
+- onConfigurationChanged(mParent.mFullConfiguration)
+- onMergedOverrideConfigurationChanged{
+	- mMergedOverrideConfiguration.setTo(mParent.getMergedOverrideConfiguration())
+	- mMergedOverrideConfiguration.updateFrom(mOverrideConfiguration)
+	}
+}@WindowContainer.java
+
+//RootWindowContainer发起设置configuration
+setGlobalConfigurationIfNeeded-->onConfigurationChanged-->super.onConfigurationChanged@RootWindowContainer.java-->
+onConfigurationChanged(Configuration newParentConfig) {
+- mFullConfiguration.setTo(newParentConfig)
+- mFullConfiguration.updateFrom(mOverrideConfiguration)
+  //更新child
+- child.onConfigurationChanged(mFullConfiguration)
+}@WindowContainer.java
+
+//override 
+//task setBounds
+//
+onOverrideConfigurationChanged(Configuration overrideConfiguration) {
+- mOverrideConfiguration.setTo(overrideConfiguration)
+  //更新configuration
+- onConfigurationChanged(mParent != null ? mParent.getConfiguration() : EMPTY)
+- onMergedOverrideConfigurationChanged()
+- mParent.onDescendantOverrideConfigurationChanged()
+}
+
+//
+onMergedOverrideConfigurationChanged{
+- mMergedOverrideConfiguration.setTo(mParent.getMergedOverrideConfiguration())
+- mMergedOverrideConfiguration.updateFrom(mOverrideConfiguration)
+  //child
+- mMergedOverrideConfiguration.setTo(mOverrideConfiguration)
 }
 
 frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java

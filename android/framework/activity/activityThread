@@ -186,7 +186,14 @@ handleResumeActivity-->Looper.myQueue().addIdleHandler(new Idler())
  configuration
 */
 scheduleActivityConfigurationChanged(overrideConfig)-->sendMessage(H.ACTIVITY_CONFIGURATION_CHANGED)
--->handleActivityConfigurationChanged-->performConfigurationChanged(activity,configuration){
+-->handleActivityConfigurationChanged-->performConfigurationChangedForActivity-->
+-->performActivityConfigurationChanged(Activity activity,Configuration newConfig, Configuration amOverrideConfig){
+  //计算configuration
+- Configuration contextThemeWrapperOverrideConfig = activity.getOverrideConfiguration()
+- Configuration finalOverrideConfig = createNewConfigAndUpdateIfNotNull(amOverrideConfig, contextThemeWrapperOverrideConfig)
+  //更新资源配置
+- mResourcesManager.updateResourcesForActivity(activityToken, finalOverrideConfig,displayId...)
+  //更新activity配置
 - activity.onConfigurationChanged(config){
 	- mWindow.onConfigurationChanged
 	- mActionBar.onConfigurationChanged
@@ -198,6 +205,13 @@ updateConfigurationLocked-->app.thread.scheduleConfigurationChanged(configuratio
 scheduleConfigurationChanged-->sendMessage(H.CONFIGURATION_CHANGED-->handleConfigurationChanged
 -->applyConfigurationToResourcesLocked(更新mResConfiguration)@ActivityThread.java
 updateConfiguration-->updateConfiguration@Resources.java
+
+//进程绑定应用时更新configuration
+bindApplication-->sendMessage(H.BIND_APPLICATION, data)-->handleBindApplication{
+- 
+- mResourcesManager.applyConfigurationToResourcesLocked(data.config, data.compatInfo)
+}@ActivityThread.java
+
 
 /*
  service

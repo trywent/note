@@ -1,4 +1,4 @@
-/*
+/****************************
  display信息
 */
 mDisplayManagerService = mSystemServiceManager.startService(DisplayManagerService.class)@SystemServer.java-->s
@@ -16,11 +16,14 @@ startService@SystemServer.java-->onStart(){
 - publishLocalService(DisplayManagerInternal.class, new LocalService())
 }@DisplayManagerService.java
 
-//消息处理
+//displsy设备消息处理
 DisplayManagerHandler.handleMessage(Message msg){
 - MSG_REGISTER_DEFAULT_DISPLAY_ADAPTERS:
 	registerDefaultDisplayAdapters{
-	- registerDisplayAdapterLocked(new LocalDisplayAdapter(mHandler, mDisplayAdapterListener))
+	- registerDisplayAdapterLocked(new LocalDisplayAdapter(mHandler, mDisplayAdapterListener)){
+		- mDisplayAdapters.add(adapter)
+		- adapter.registerLocked()
+		}
 	}
 - MSG_REGISTER_ADDITIONAL_DISPLAY_ADAPTERS:
 	registerAdditionalDisplayAdapters{
@@ -31,12 +34,40 @@ DisplayManagerHandler.handleMessage(Message msg){
         deliverDisplayEvent(msg.arg1, msg.arg2)
 }@DisplayManagerService.java
 
+//创建displayAdatper
+LocalDisplayAdapter(DisplayManagerService.SyncRoot syncRoot,Context context, Handler handler, Listener listener)
+@LocalDisplayAdapter.java-->DisplayAdapter(Context context, Handler handler, Listener listener, String name){
+- mHandler = handler
+- mListener = listener
+}@DisplayAdapter.java
+
+registerDisplayAdapterLocked@DisplayManagerService.java-->registerLocked{
+- super.registerLocked()
+  //监听热拔插
+- mHotplugReceiver = new HotplugDisplayEventReceiver(getHandler().getLooper())
+  //遍历获取默认屏幕，hdmi屏幕信息BUILT_IN_DISPLAY_IDS_TO_SCAN
+- tryConnectDisplayLocked(builtInDisplayId){
+	- IBinder displayToken = SurfaceControl.getBuiltInDisplay(builtInDisplayId)
+	- SurfaceControl.PhysicalDisplayInfo[] configs = SurfaceControl.getDisplayConfigs(displayToken)
+	- int activeConfig = SurfaceControl.getActiveConfig(displayToken)
+	- int activeColorMode = SurfaceControl.getActiveColorMode(displayToken)
+	- int[] colorModes = SurfaceControl.getDisplayColorModes(displayToken)
+	  //创建display
+	- LocalDisplayDevice device = new LocalDisplayDevice(displayToken, builtInDisplayId,configs, activeConfig)
+	- mDevices.put(builtInDisplayId, device)
+	- sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_ADDED){
+		- mHandler.post(new Runnable() {public void run() { mListener.onDisplayDeviceEvent(device, event)}})	
+		}
+	}@LocalDisplayAdapter.java
+}@DisplayAdapter.java
+
 //display添加
-mDisplayAdapterListener-->
+sendDisplayDeviceEventLocked@LocalDisplayAdapter.java-->
 DisplayAdapterListener.onDisplayDeviceEvent{
 - DisplayAdapter.DISPLAY_DEVICE_EVENT_ADDED{
 	- handleDisplayDeviceAdded(device)-->handleDisplayDeviceAddedLocked(DisplayDevice device){
 		- DisplayDeviceInfo info = device.getDisplayDeviceInfoLocked()
+		- mDisplayDevices.add(device)
 		- LogicalDisplay display = addLogicalDisplayLocked(device)
 		- Runnable work = updateDisplayStateLocked(device)
 		}
@@ -49,16 +80,25 @@ DisplayAdapterListener.onDisplayDeviceEvent{
 //display初始化
 addLogicalDisplayLocked(DisplayDevice device){
 - DisplayDeviceInfo deviceInfo = device.getDisplayDeviceInfoLocked()
-- LogicalDisplay display = new LogicalDisplay(displayId, layerStack, device)
+  //创建logic设备
+- LogicalDisplay display = new LogicalDisplay(displayId, layerStack, device){
+	- mDisplayId = displayId
+	- mPrimaryDisplayDevice = primaryDisplayDevice
+	}
+  //更新display信息。大小
+- display.updateLocked(mDisplayDevices)
 - configureColorModeLocked(display, device)
  //保存
 - mLogicalDisplays.put(displayId, display)
+- sendDisplayEventLocked(displayId, DisplayManagerGlobal.EVENT_DISPLAY_ADDED)
 }@DisplayManagerService.java
 
 //设置LogicalDisplay的override信息
 setDisplayInfoOverrideFromWindowManager-->setDisplayInfoOverrideFromWindowManagerInternal@DisplayManagerService.java
 -->setDisplayInfoOverrideFromWindowManagerLocked@LogicalDisplay.java
-/*
+
+
+/****************************
  DisplayManager接口
 
 */
@@ -84,7 +124,19 @@ getDisplay(int displayId)-->getOrCreateDisplayLocked(displayId, false /*assumeVa
 - mDisplays.put(displayId, display)
 }@DisplayManager.java
 
-/*
+
+getDisplayInfo(int displayId)-->getDisplayInfoInternal(displayId, callingUid){
+- LogicalDisplay display = mLogicalDisplays.get(displayId)
+- DisplayInfo info = display.getDisplayInfoLocked(){
+	- mInfo = new DisplayInfo()
+	- mInfo.copyFrom(mBaseDisplayInfo)
+	- if(mOverrideDisplayInfo!=null)
+	- return mInfo
+	}
+- return inof
+}@DisplayManangerService.java
+
+/****************************
  设置输入事件窗口大小方位
  
 */
@@ -148,3 +200,5 @@ frameworks/base/services/core/java/com/android/server/display/DisplayDevice.java
 frameworks/base/services/core/java/com/android/server/display/LogicalDisplay.java
 frameworks/base/core/java/android/hardware/display/DisplayManager.java
 frameworks/base/core/java/android/hardware/display/DisplayManagerGlobal.java
+frameworks/base/services/core/java/com/android/server/display/LocalDisplayAdapter.java
+frameworks/base/services/core/java/com/android/server/display/DisplayAdapter.java
