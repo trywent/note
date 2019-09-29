@@ -1,4 +1,21 @@
-/* 扫描 device manager
+/******************
+ android 6.0
+*/
+btif_dm_start_discovery(void){
+- BTA_DmBleScanFilterSetup(BTA_DM_BLE_SCAN_COND_DELETE, 0, &adv_filt_param,bte_scan_filt_param_cfg_evt)
+- BTA_DmSearch(&inq_params, services, bte_search_devices_evt)
+}@btif_dm.c
+
+
+
+
+btm_sec_connected
+
+
+bte_search_devices_evt
+btif_transfer_context(btif_dm_search_devices_evt , (UINT16) event)-->btif_dm_search_devices_evt@btif_dm.c
+/******************
+ android 8.1
 */
 startDiscovery@Bluetooth.c-->btif_dm_start_discovery{
 - BTA_DmBleScanFilterSetup(BTA_DM_BLE_SCAN_COND_DELETE)
@@ -108,6 +125,9 @@ btif_dm_pin_req_evt
 
 //获取信息
 btif_storage_get_adapter_property-->cfg2prop
+
+
+
 
 
 bta/dm/bta_dm_api.c

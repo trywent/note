@@ -1,0 +1,21 @@
+/*
+ 9832
+*/
+btu_init_core@btu_init.c-->
+sdp_init (void){
+- sdp_cb.reg_info.pL2CA_ConnectInd_Cb = sdp_connect_ind
+- sdp_cb.reg_info.pL2CA_ConnectCfm_Cb = sdp_connect_cfm
+- sdp_cb.reg_info.pL2CA_ConfigInd_Cb  = sdp_config_ind
+- sdp_cb.reg_info.pL2CA_ConfigCfm_Cb  = sdp_config_cfm
+- L2CA_Register(SDP_PSM, &sdp_cb.reg_info)
+}@sdp_main.c
+
+sdp_connect_cfm(){
+
+}
+
+
+
+
+
+system/bt/stack/sdp/sdp_main.c

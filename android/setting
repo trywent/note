@@ -142,6 +142,10 @@ frameworks/base/core/java/com/android/internal/app/LocalePickerWithRegion.java
 
 /*
 恢复出厂设置:reset
+ 
+写命令到misc BCB(bootloader command block)
+
+还可以写命令到/cache/recovery/command
 */
 
 mFinalClickListener{
@@ -156,11 +160,12 @@ mFinalClickListener{
 MasterClearReceiver.onReceive@MasterClearReceiver.java-->RecoverySystem.rebootWipeUserData
 -->rebootWipeUserData-->bootCommand(写入命令重启)@RecoverySystem.java
 
+
 packages/apps/Settings/src/com/android/settings/MasterClearConfirm.java
 frameworks/base/core/java/com/android/internal/os/storage/ExternalStorageFormatter.java
 frameworks/base/services/java/com/android/server/MasterClearReceiver.java
 frameworks/base/core/java/android/os/RecoverySystem.java
-
+frameworks/base/services/core/java/com/android/server/RecoverySystemService.java
 
 
 /*

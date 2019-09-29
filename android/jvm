@@ -1,0 +1,7 @@
+/*
+ android使用openjdk
+ 源码位置libcore/ojluni/src/main
+*/
+
+
+libcore/ojluni/src/main/native/UnixFileSystem_md.c

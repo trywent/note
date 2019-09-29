@@ -172,18 +172,39 @@ build/tools/releasetools/ota_from_target_files
 build/tools/releasetools/edify_generator.py
 
 
-=====================
-//recovery 更新
+
+/************************
+ 系统启动过程更新recovery
+
+ 编译ota包时，会生成install-recovery.sh
+*/ 
 service flash_recovery /system/bin/install-recovery.sh
     class main
     oneshot
 @system/core/rootdir/init.rc
 
-install-recovery.sh-->applypatch -c/*检查文件是否最新*/-->applypatch -b /system/etc/recovery-resource.dat
+//执行
+if ! applypatch -c EMMC:/dev/block/platform/soc/soc.ap-ahb/c0c00000.sdio/by-name/recovery:18952192:cc405ec36e90acf31b38992337af7839afd3fcf3; then
+  applypatch -b /system/etc/recovery-resource.dat EMMC:/dev/block/platform/soc/soc.ap-ahb/c0c00000.sdio/by-name/boot:13993984:19d0bcb278cd717b0aa00163f60ae439b746d04b EMMC:/dev/block/platform/soc/soc.ap-ahb/c0c00000.sdio/by-name/recovery cc405ec36e90acf31b38992337af7839afd3fcf3 18952192 19d0bcb278cd717b0aa00163f60ae439b746d04b:/system/recovery-from-boot.p && log -t recovery "Installing new recovery image: succeeded" || log -t recovery "Installing new recovery image: failed"
 
 
 
+main@applypatch_main.cpp-->applypatch_modes{
+- ShowLicenses //-l
+  //先检测
+- CheckMode{    //-c
+	- applypatch_check(argv[2], sha1)
+	}
+  //修改recovery
+- patchMode{
+	- 
+	}
+}@applypatch_modes.cpp
 
+
+bootable/recovery/applypatch/applypatch_main.cpp
+bootable/recovery/applypatch/applypatch_modes.cpp
+bootable/recovery/applypatch/applypatch.cpp
 
 /***************
  lsec recovery

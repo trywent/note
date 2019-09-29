@@ -1,0 +1,63 @@
+/*
+ 连接上层和HCI:从上层发送数据到HCI。 从HCI接收数据
+ 
+
+*/
+
+/**********************
+ android 6.0
+*/
+//接收HCI数据
+btu_hcif_command_complete_evt{
+- BT_HDR *event = osi_calloc(sizeof(BT_HDR) + sizeof(command_complete_hack_t))
+- command_complete_hack_t *hack = (command_complete_hack_t *)&event->data[0]
+- hack->callback = btu_hcif_command_complete_evt_on_task
+  //事件类型
+- event->event = BTU_POST_TO_TASK_NO_GOOD_HORRIBLE_HACK
+- fixed_queue_enqueue(btu_hci_msg_queue, event)
+}@btu_hcif.c
+
+
+btu_task_start_up-->fixed_queue_register_dequeue(btu_hci_msg_queue,btu_hci_msg_ready)-->btu_hci_msg_ready-->
+btu_hci_msg_process(BT_HDR *p_msg){
+- switch (p_msg->event & BT_EVT_MASK)
+- BTU_POST_TO_TASK_NO_GOOD_HORRIBLE_HACK:{
+	- ((post_to_task_hack_t *)(&p_msg->data[0]))->callback(p_msg)-->btu_hcif_command_complete_evt_on_task@btu_hcif.c
+	}
+- BT_EVT_TO_BTU_HCI_EVT:{
+	- btu_hcif_process_event@btu_hcif.c
+	}
+}@btu_task.c
+
+
+
+btu_hcif_process_event (UNUSED_ATTR UINT8 controller_id, BT_HDR *p_msg){
+- HCI_CONNECTION_COMP_EVT :btu_hcif_connection_comp_evt{//连接完成
+	- btm_sec_connected (bda, handle, status, enc_mode)
+	- l2c_link_hci_conn_comp (status, handle, bda)
+	}
+}@btu_hcif.c
+
+//hci命令状态处理
+btu_hcif_command_status_evt_on_task(BT_HDR *event)-->
+btu_hcif_hdl_command_status(UINT16 opcode, UINT8 status, UINT8 *p_cmd,void *p_vsc_status_cback){
+- switch (opcode)
+- HCI_HOLD_MODE:
+
+- default:if (status != HCI_SUCCESS){
+	- 
+	- HCI_CREATE_CONNECTION{
+		- tm_sec_connected (bd_addr, HCI_INVALID_HANDLE, status, 0){
+			- btm_acl_resubmit_page
+			}
+		- l2c_link_hci_conn_comp (status, HCI_INVALID_HANDLE, bd_addr)//上报连接结果
+		}
+	}
+}
+
+
+bt/stack/btu/btu_hcif.c
+/******************
+ android 8.1
+*/
+

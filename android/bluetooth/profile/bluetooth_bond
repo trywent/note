@@ -2,6 +2,9 @@
 settingslib提供蓝牙访问的接口。蓝牙信息通过LocalBluetoothManager获取
 frameworks/base/packages/SettingsLib/src/com/android/settingslib
 
+
+
+BluetoothBondStateMachine: Bond address is:04:79:70:92:BB:14
 */
 //加入扫描的设备
 DeviceFoundHandler(BluetoothDevice.ACTION_FOUND){

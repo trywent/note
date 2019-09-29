@@ -65,9 +65,9 @@ userActivityInternal{
 - 需要更新，updatePowerStateLocked
 }
 
-_______________________________
-睡眠状态处理(DIRTY_WAKEFULNESS)：
-
+/*
+ 睡眠状态处理(DIRTY_WAKEFULNESS)：
+*/
 触摸事件唤醒：
 NativeInputManager::interceptMotionBeforeQueueing-->ativeInputManager::handleInterceptActions{
 }@com_android_server_input_InputManagerService.cpp
@@ -79,15 +79,15 @@ NativeInputManager::interceptKeyBeforeQueueing-->NativeInputManager::handleInter
 - 唤醒，android_server_PowerManagerService_wakeUp
 }@com_android_server_input_InputManagerService.cpp
 
-由pwr键进入休眠：
+//由pwr键进入休眠：
 android_server_PowerManagerService_goToSleep@com_android_server_power_PowerManagerService.cpp-->
 goToSleepFromNative-->goToSleepInternal@PowerManagerService.java
 
-由pwr键唤醒：
+//由pwr键唤醒：
 android_server_PowerManagerService_wakeUp@com_android_server_power_PowerManagerService.cpp-->
 wakeUpFromNative-->wakeUpInternal{@PowerManagerService.java
 
-休眠：
+//休眠：
 goToSleep-->goToSleepInternal{
 - 设置状态值，goToSleepNoUpdateLocked{
 		- 发送睡眠通知，
@@ -108,7 +108,7 @@ wakeUpInternal{
 
 
 ---------------------------------
-更新状态:(更新屏幕状态，决定是否进入休眠)
+//更新状态:(更新屏幕状态，决定是否进入休眠)
 updatePowerStateLocked{
 //第零阶段
 - 充电状态发生变化，updateIsPoweredLocked{
@@ -324,27 +324,89 @@ request_suspend{
 
 
 system/core/charger/charger.c
-==============================
-kernel端：
-pm_suspend-->enter_state-->suspend_devices_and_enter@suspend.c-->
-dpm_suspend_start-->dpm_suspend@main.c
+
+/*
+ 重启
+
+*/
+reboot(boolean confirm, String reason, boolean wait)-->
+shutdownOrRebootInternal(final @HaltMode int haltMode, final boolean confirm, final String reason, boolean wait){
+- ShutdownThread.rebootSafeMode{
+	- mReboot = true
+	- mRebootSafeMode = true
+	- shutdownInner(context, confirm)
+	}
+- ShutdownThread.reboot{
+	- mReboot = true
+	- mReason = reason
+	- shutdownInner(context, confirm)
+	}
+- ShutdownThread.shutdown{
+	- mReboot = false
+	- shutdownInner(context, confirm)
+	}
+}@PowerManagerService.java
+
+shutdownInner(final Context context, boolean confirm) {
+- 
+- if (confirm) {//弹出对话框
+	- 
+  }else{ //直接关机/重启
+	- beginShutdownSequence(context){
+		- sInstance.mContext = context
+		- sInstance.mPowerManager = (PowerManager)context.getSystemService(Context.POWER_SERVICE)
+		  //获取锁，不进入休眠
+		- sInstance.mCpuWakeLock.acquire()		
+		  //保持亮屏
+		- sInstance.mScreenWakeLock.acquire()
+		- sInstance.start()
+		}
+  }
+}@ShutdownThread.java
+
+sInstance.start()--run{
+  //关机广播
+- Intent intent = new Intent(Intent.ACTION_SHUTDOWN)
+- mContext.sendOrderedBroadcastAsUser(intent,UserHandle.ALL, null, br, mHandler...)
+  //关闭activityManager
+- IActivityManager am = IActivityManager.Stub.asInterface(ServiceManager.checkService("activity"))
+- am.shutdown(MAX_BROADCAST_TIME)
+  //关闭packagemanager
+- PackageManagerService pm = (PackageManagerService)ServiceManager.getService("package")
+- pm.shutdown()
+  //关闭radio
+- shutdownRadios(MAX_RADIO_WAIT_TIME)
+  //卸载存储设备。等待卸载完成才关机/重启 10*1000超时
+- IStorageShutdownObserver observer = new IStorageShutdownObserver.Stub()
+- IStorageManager storageManager = IStorageManager.Stub.asInterface(ServiceManager.checkService("mount"))
+- storageManager.shutdown(observer)
+
+  //
+- rebootOrShutdown(mContext, mReboot, mReason){
+	- if(reboot){
+		- PowerManagerService.lowLevelReboot(reason)-->SystemProperties.set("sys.powerctl", "reboot," + reason)
+   	  }else if(SHUTDOWN_VIBRATE_MS > 0){
+		- Vibrator vibrator = new SystemVibrator(context)
+		- vibrator.vibrate(SHUTDOWN_VIBRATE_MS)
+	  }
+	- PowerManagerService.lowLevelShutdown(reason)-->SystemProperties.set("sys.powerctl", "shutdown," + reason)
+	}
+}@ShutdownThread.java
+
+//init中处理关机/重启
+property_changed(const std::string& name, const std::string& value) {
+- if (name == "sys.powerctl") {
+	- shutdown_command = value
+	- do_shutdown = true
+	}
+}@init.cpp
 
 
-
-drivers/base/power/main.c
-kernel/power/suspend.c
-==============================
-state_store >> pm_suspend >> enter_state >> suspend_prepare >> suspend_devices_and_enter >> dpm_suspend_start >> dpm_suspend >> device_suspend >> __device_suspend ---> suspend_enter (called by suspend_device_and enter after __device_suspend is completed)
-
-The above sequence is present in both Linux and Android.
-
-Files: suspend.c, wakelock.c, main.c (drivers/base/power).
-
-Note: All the SoC specific suspend callbacks like enter, valid, begin are present in pm.c present in arch/arm/< folder.
-
-
-
-==============================
+frameworks/base/services/core/java/com/android/server/power/PowerManagerService.java
+frameworks/base/services/core/java/com/android/server/power/ShutdownThread.java
+/*
+ 背光
+*/
 initialize-->DisplayPowerState(mLights.getLight(LightsService.LIGHT_ID_BACKLIGHT))
 @DisplayPowerController.java
 

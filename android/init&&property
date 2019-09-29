@@ -27,7 +27,7 @@ main@init.c-->init_parse_config_file@init_parser.c-->parse_config@init_parser.c-
    -->keyword_info[kw].func-->KEYWORD-->keywords.h
 ==>parse_import(将要包含的文件加入到import_list链表)
 --------------------------
-将操作加入到操作队列：
+//将操作加入到操作队列：
 queue_builtin_action(func,name){
 //将要执行的操作链接到action_list
 - 构建action，和command
@@ -197,7 +197,7 @@ do_mount_all{
 system/core/init/builtins.c
 system/core/fs_mgr/fs_mgr.c
 
-/*
+/******************************
  android 8.1
 */
 AddSingleLineParser@uevent.cpp-->line_callbacks_@init_parser.cpp//line分析函数
@@ -205,12 +205,26 @@ AddSingleLineParser@uevent.cpp-->line_callbacks_@init_parser.cpp//line分析函�
 main{
   //监听子进程状态(service)
 - signal_handler_init
- //
-- parser.AddSectionParser("service",ServiceManager) //设置字符分析函数
-- parser.AddSectionParser("on",ActionManager)
+  //属性
+- property_load_boot_defaults
+- start_property_service()
+   //解析init.rc
+- ActionManager& am = ActionManager::GetInstance()
+- ServiceManager& sm = ServiceManager::GetInstance()
+- Parser& parser = Parser::GetInstance()
+- parser.AddSectionParser("service",sm) //设置字符分析函数
+- parser.AddSectionParser("on",am)
 - parser.AddSectionParser("import",Parser)
 - parser.ParseConfig("/init.rc")@init.cpp-->ParseConfig-->ParseData
-
+  //处理action
+- am.QueueEventTrigger("early-init")
+- 
+  //循环处理
+- while (true) {
+	  //处理关机/重启
+	- HandlePowerctlMessage(shutdown_command)
+	- am.ExecuteOneCommand()
+	}
 }@init.cpp
 
 
@@ -243,8 +257,27 @@ ReapAnyOutstandingChildren-->ServiceManager::ReapOneProcess(){
 }@service.cpp
 
 
+
+//重启流程
+HandlePowerctlMessage(const std::string& command) {
+- std::vector<std::string> cmd_params = android::base::Split(command, ",")
+- if (cmd_params[0] == "shutdown") {
+  	- cmd = ANDROID_RB_POWEROFF
+  }else if(cmd_params[0] == "reboot") {
+	- cmd = ANDROID_RB_RESTART2
+  }else if (command == "thermal-shutdown") {
+	- cmd = ANDROID_RB_THERMOFF	
+  }
+- ActionManager::GetInstance().QueueEventTrigger("shutdown")
+- auto shutdown_handler = [cmd, command, reboot_target,run_fsck](const std::vector<std::string>&) {
+        DoReboot(cmd, command, reboot_target, run_fsck);
+    }
+- ActionManager::GetInstance().QueueBuiltinAction(shutdown_handler, "shutdown_done")
+}@reboot.cpp
+
 system/core/init/init.cpp
 system/core/init/signal_handler.cpp
 system/core/init/init_parser.cpp
 system/core/init/ueventd.cpp
 system/core/init/service.cpp
+system/core/init/reboot.cpp

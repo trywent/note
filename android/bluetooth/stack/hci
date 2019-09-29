@@ -9,6 +9,9 @@ HCI ACL Data Packet： host发给controller或者相反。主要是L2CAP发送�
 HCI Synchronous Data Packet：用来传输语音（SCO）数据的。注意一般都会通过PCM接口来传输SCO数据
 
 
+/************************
+ android6.0
+*/
 //HCI初始化
 bte_main_enable-->module_start_up(get_module(HCI_MODULE))@bte_main.c-->
 hci_module.start_up-->hci_module_start_up{
@@ -57,6 +60,74 @@ transmit_command(p_buf/*命令*/,btu_hcif_command_status_evt/*回调*/,btu_hcif_
 }@hci_layer.c
 
 
+//收到命令和事件数据,回调hci_layer_get_interface中传入的函数
+complete_callback-->btu_hcif_command_complete_evt{
+//创建event加入队列
+- BT_HDR *event = osi_calloc(sizeof(BT_HDR)...)
+- fixed_queue_enqueue(btu_hci_msg_queue, event)-->btu_hci_msg_queue
+}@btu_hcif.cc
+
+//收到sco数据
+sco_data_received-->packet_fragmenter->reassemble_and_dispatch@hci_layer.cc-->
+reassemble_and_dispatch{
+- MSG_HC_TO_STACK_HCI_ACL,{
+	- callbacks->reassembled-->callbacks->reassembled@hci_layer.cc
+	}
+- 其它事件,callbacks->reassembled
+}@packet_fragmenter.cc
+
+dispatch_reassembled{
+- 
+}@hci_layer.cc
+
+//执行btu_hci_msg_queue中任务
+btu_hci_msg_queue-->btu_hci_msg_ready-->btu_hci_msg_process{
+- BT_EVT_TO_BTU_HCI_ACL:l2c_rcv_acl_data@l2c_csm.c
+- BT_EVT_TO_BTU_HCI_EVT:btu_hcif_process_event@btu_hcif.c
+
+}@btu_task.c
+
+/************************
+ android 8.1　
+　通过hidl通信
+*/
+hci_module_start_up(void) {
+- thread = thread_new("hci_thread")
+- packet_fragmenter->init(&packet_fragmenter_callbacks)
+- thread_post(thread, message_loop_run, NULL)-->message_loop_run(UNUSED_ATTR void* context){
+	- message_loop_->task_runner()->PostTask(FROM_HERE,base::Bind(&hci_initialize))
+	- run_loop_->Run()
+	}
+}
+//vendor初始化
+hci_initialize{
+- android::sp<IBluetoothHci> btHci = IBluetoothHci::getService()
+- android::sp<IBluetoothHciCallbacks> callbacks = new BluetoothHciCallbacks()
+　 //获取回调接口
+- btHci->initialize(callbacks)
+}@hci_layer_android.cc
+
+
+
+/*
+ 发送到HCI
+*/
+hci_transmit(BT_HDR* packet){
+- MSG_STACK_TO_HC_HCI_CMD:btHci->sendHciCommand(data)
+- MSG_STACK_TO_HC_HCI_ACL:btHci->sendAclData(data)
+- MSG_STACK_TO_HC_HCI_SCO:btHci->sendScoData(data)
+}@hci_layer_android.cc
+
+/*
+ 从HCI接收
+*/
+class BluetoothHciCallbacks : public IBluetoothHciCallbacks {
+- initializationComplete
+- hciEventReceived
+- aclDataReceived
+- scoDataReceived
+}@hci_layer_android.cc
+
 //收到回复
 monitor_socket{
 - read(fd, buf, buf_size)//读取数据
@@ -72,7 +143,6 @@ monitor_socket{
 - HCI_PACKET_TYPE_EVENT:
         packet->event = MSG_HC_TO_STACK_HCI_EVT
         hci_event_received(FROM_HERE, packet)
-}
 
 //收到命令和事件数据,回调hci_layer_get_interface中传入的函数
 hci_event_received-->filter_incoming_event(packet){
@@ -81,7 +151,7 @@ hci_event_received-->filter_incoming_event(packet){
 - HCI_COMMAND_COMPLETE_EVT{
 	- STREAM_TO_UINT16(opcode, stream)//获取操作码
 	- wait_entry = get_waiting_command(opecode) //从commands_pending_response获取等待结果的命令
-	- wait_entry->complete_callback-->btu_hcif_command_complete_evt-->do_in_hci_thread@btu_hcif.cc
+	- wait_entry->complete_callback-->btu_hcif_command_complete_evt--> do_in_hci_thread@btu_hcif.cc
 	}
 - HCI_COMMAND_STATUS_EVT{
 	- wait_entry = get_waiting_command(opecode)
@@ -108,42 +178,6 @@ btu_hci_msg_queue-->btu_hci_msg_ready-->btu_hci_msg_process{
 - BT_EVT_TO_BTU_HCI_EVT:btu_hcif_process_event@btu_hcif.c
 
 }@btu_task.c
-
-/*
- android 8.1　
-　通过hidl通信
-*/
-hci_module_start_up(void) {
-- thread = thread_new("hci_thread")
-- packet_fragmenter->init(&packet_fragmenter_callbacks)
-- thread_post(thread, message_loop_run, NULL)-->message_loop_run(UNUSED_ATTR void* context){
-	- message_loop_->task_runner()->PostTask(FROM_HERE,base::Bind(&hci_initialize))
-	- run_loop_->Run()
-	}
-}
-//vendor初始化
-hci_initialize{
-- android::sp<IBluetoothHci> btHci = IBluetoothHci::getService()
-- android::sp<IBluetoothHciCallbacks> callbacks = new BluetoothHciCallbacks()
-　 //获取回调接口
-- btHci->initialize(callbacks)
-}@hci_layer_android.cc
-
-//发送到HCI
-hci_transmit(BT_HDR* packet){
-- MSG_STACK_TO_HC_HCI_CMD:btHci->sendHciCommand(data)
-- MSG_STACK_TO_HC_HCI_ACL:btHci->sendAclData(data)
-- MSG_STACK_TO_HC_HCI_SCO:btHci->sendScoData(data)
-}@hci_layer_android.cc
-
-//从HCI接收
-class BluetoothHciCallbacks : public IBluetoothHciCallbacks {
-- initializationComplete
-- hciEventReceived
-- aclDataReceived
-- scoDataReceived
-}@hci_layer_android.cc
-
 
 //服务
 

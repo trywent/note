@@ -42,3 +42,8 @@ sys.lsec.navi_bar_height=140
 
 #亿联6.1
 sys.fyt.ec_version=6
+
+#debug
+setprop sys.fyt.debug.set debugoon
+#打开root
+setprop sys.fyt.setparama lsecadbdebug9 

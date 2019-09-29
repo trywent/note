@@ -1,33 +1,75 @@
-//
+/**********************
+ 9832
+ PSM(Protocol/Service Multiplexer) 协议/服务复用
+
+ 好像avdt gatt hid都是建立在l2ca之上。这些协议通过l2ca接口建立连接
+
+*/
+
+//不同protocol注册
+btu_init_core@btu_init.c-->sdp_init@sdp_main.c-->
+L2CA_Register(UINT16 psm, tL2CAP_APPL_INFO *p_cb_info){
+- tL2C_RCB *p_rcb =l2cu_allocate_rcb (vpsm){
+	  //从pool中查找可用的rcb (MAX_L2CAP_CLIENTS 最多15个)
+	- tL2C_RCB    *p_rcb = &l2cb.rcb_pool[0]
+	- if (!p_rcb->in_use)
+		- p_rcb->in_use = TRUE
+		- return (p_rcb)
+	}
+- p_rcb->api      = *p_cb_info
+- p_rcb->real_psm = psm
+}@l2c_api.c
+
+L2CA_Deregister (UINT16 psm)
+
+
+//请求连接(不同的protocol有不同的psm)
+L2CA_ConnectReq (UINT16 psm, BD_ADDR p_bd_addr)-->L2CA_ErtmConnectReq (psm, p_bd_addr, NULL){
+  //psm 回调
+- tL2C_RCB* p_rcb = l2cu_find_rcb_by_psm (psm)
+  //获取 link control block 回调接口。不存在时则创建
+- tL2C_LCB* p_lcb = l2cu_find_lcb_by_bd_addr (p_bd_addr, BT_TRANSPORT_BR_EDR) ==NULL{
+	- p_lcb = l2cu_allocate_lcb (p_bd_addr, FALSE, BT_TRANSPORT_BR_EDR)
+	  //连接
+	- l2cu_create_conn(p_lcb, BT_TRANSPORT_BR_EDR)
+	}
+- l2c_csm_execute (p_ccb, L2CEVT_L2CA_CONNECT_REQ, NULL)
+}@l2c_api.c
+
+
+//回复连接
+L2CA_ConnectRsp (BD_ADDR p_bd_addr, UINT8 id, UINT16 lcid, UINT16 result, UINT16 status)-->
+L2CA_ErtmConnectRsp (BD_ADDR p_bd_addr, UINT8 id, UINT16 lcid, UINT16 result,UINT16 status, tL2CAP_ERTM_INFO *p_ertm_info){
+  //获取 link control block 回调接口
+- tL2C_LCB* p_lcb = l2cu_find_lcb_by_bd_addr (p_bd_addr, BT_TRANSPORT_BR_EDR)
+  //获取 channel control block 回调接口
+- tL2C_CCB*p_ccb = l2cu_find_ccb_by_cid (p_lcb, lcid)
+  //状态机
+- l2c_csm_execute (p_ccb, L2CEVT_L2CA_CONNECT_RSP...)
+}@l2c_api.c
 
 
 
 
-
-//=============9832
-l2cu_release_ccb-->l2cu_no_dynamic_ccbs-->btu_start_timer@l2c_utils.c
-
-
-//将任务加入队列btu_general_alarm_queue
-btu_start_timer(&p_lcb->timer_entry, BTU_TTYPE_L2CAP_LINK)@l2c_utils.c-->alarm_set(alarm,btu_general_alarm_cb)
--->btu_general_alarm_cb-->fixed_queue_enqueue(btu_general_alarm_queue, p_tle)@btu_task.c
-
-
-//btu中队列处理btu_general_alarm_queue，处理函数btu_general_alarm_ready
-fixed_queue_register_dequeue(btu_general_alarm_queue,btu_general_alarm_ready)-->btu_general_alarm_ready
-btu_general_alarm_process(IMER_LIST_ENT *p_tle){
-- BTU_TTYPE_L2CAP_LINK:
-- BTU_TTYPE_L2CAP_CHNL:
-- BTU_TTYPE_L2CAP_HOLD:
-- BTU_TTYPE_L2CAP_INFO:
-- BTU_TTYPE_L2CAP_FCR_ACK:
-	l2c_process_timeout
-- BTU_TTYPE_SDP
-}
+/*
+ 状态机 sm
+*/
+l2c_csm_execute (tL2C_CCB *p_ccb, UINT16 event, void *p_data){
+  //chanel control block 状态
+- switch (p_ccb->chnl_state)
+- CST_CLOSED://channel关闭
+	- l2c_csm_closed(p_ccb, event, p_data)
+- CST_ORIG_W4_SEC_COMP://Originator waits security clearence 发起者
+	- l2c_csm_orig_w4_sec_comp
+- CST_TERM_W4_SEC_COMP://Acceptor waits security clearence 接受者
+	- l2c_csm_term_w4_sec_comp
+- CST_W4_L2CAP_CONNECT_RSP:// Waiting for peer conenct response
+	- l2c_csm_w4_l2cap_connect_rsp
+- CST_W4_L2CA_CONNECT_RSP://Waiting for upper layer connect rsp
+	- l2c_csm_w4_l2ca_connect_rsp
+}@l2c_csm.c
 
 
-
-l2c_process_timeout(BTU_TTYPE_L2CAP_LINK)-->l2c_process_timeout
 
 
 l2cu_send_peer_disc_req@l2c_utils.c-->
@@ -37,8 +79,8 @@ l2c_rcv_acl_data-->process_l2cap_cmd(L2CAP_CMD_DISC_REQ)@l2c_main.c-->
 l2c_csm_execute(L2CEVT_L2CAP_DISCONNECT_REQ)-->l2c_csm_open(L2CEVT_L2CAP_DISCONNECT_REQ)
 -->Disconnect_Ind_Cb@l2c_csm.c
 
-
-l2c_link_hci_conn_comp-->l2c_process_held_packets(FALSE)-->l2c_rcv_acl_data@l2c_link.c
+//连接完成
+l2c_link_hci_conn_comp-->l2c_csm_execute (p_ccb, L2CEVT_LP_CONNECT_CFM_NEG, &ci)@l2c_link.c
 
 
 l2c_process_timeout(BTU_TTYPE_L2CAP_HOLD)-->l2c_process_held_packets(TRUE)@l2c_main.c
@@ -49,6 +91,8 @@ l2c_link_check_send_pkts@l2c_link.c-->
 l2cu_get_next_buffer_to_send-->l2cu_get_next_channel_in_rr@l2c_utils.c
 
 //断开连接
+
+
 l2c_link_timeout
 
 BTM_SecBondCancel-->btm_sec_send_hci_disconnect
@@ -56,7 +100,14 @@ BTM_SecBondCancel-->btm_sec_send_hci_disconnect
 
 btm_sec_auth_complete
 
-//资料
+
+btu_hcif_process_event(HCI_DISCONNECTION_COMP_EVT)-->btu_hcif_disconnection_comp_evt
+
+
+//获取断开原因
+btm_get_acl_disc_reason_code
+
+//传输数据
 l2c_data_write-->l2c_csm_execute-->l2c_scm_open-->l2c_link_check_send_pkts-->
 l2c_link_send_to_lower-->bte_main_hci_send-->transmit_buf
 

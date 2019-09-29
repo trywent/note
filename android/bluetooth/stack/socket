@@ -1,0 +1,6 @@
+/*
+ android6.0
+*/
+
+
+get_profile_interface(BT_PROFILE_SOCKETS_ID)-->btif_sock_get_interface
