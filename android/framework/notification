@@ -1,18 +1,47 @@
-//
+/**
+ notification
+*/
+NotificationManager notificationManager = getSystemService(NotificationManager.class)
 
+//channel
+NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance)
+notificationManager.createNotificationChannel(channel);
+
+//notification
 Notification noti = new Notification.Builder(mContext)
          .setContentTitle("New mail from " + sender.toString())
          .setContentText(subject)
          .setSmallIcon(R.drawable.new_mail)
-         .setLargeIcon(aBitmap)
+	 .setChannelId(String channelId)
          .build();
 
+notificationManager.notify(notificationId, noti)
 
 setFullScreenIntent(PendingIntent intent, boolean highPriority)//启动一个activity
 
+
+
+/*
+ notificationMananagerServicve
+
+*/
 notify-->service.enqueueNotificationWithTag@NotificationManager.java
-notifyPosted-->listener.onNotificationPosted@NotificationManagerService.java-->
-onNotificationPosted-->addNotification@BaseStatusBar.java
+-->enqueueNotificationInternal(final String pkg,... int id, final Notification notification){
+  //获取channel信息
+- String channelId = notification.getChannelId()
+- NotificationChannel channel = mRankingHelper.getNotificationChannel(pkg,notificationUid, channelId)
+  //创建NotificationRecord
+- StatusBarNotification n = new StatusBarNotification(notificationUid, callingPid, notification)
+- NotificationRecord r = new NotificationRecord(getContext(), n, channel)
+- mHandler.post(new EnqueueNotificationRunnable(userId, r))
+}@NotificationManagerService.java
+
+EnqueueNotificationRunnable.run-->
+PostNotificationRunnable.run{
+- 
+ //震动，声音，通知灯
+- buzzBeepBlinkLocked(r)
+}@NotificationManagerService.java
 
 
 

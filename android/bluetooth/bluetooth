@@ -30,7 +30,7 @@
 //通信的层次结构：
 physical channel--> physical link--> logical transport-->logical link --> L2CAP channel
 
-/* 
+/*****************************
  BaseBand
  
  physical link
@@ -68,7 +68,7 @@ ACCESS CODE |HEADER |PAYLOAD
 3         4     1     1     1    8
 LT_ADDR |TYPE |FLOW |ARQN |SEQN |HEC
 
-/* 
+/*****************************
  LMP 用于基带和物理层的控制协议
  
  logical link

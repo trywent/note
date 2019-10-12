@@ -38,8 +38,9 @@ resetDefaultImeLocked{
 frameworks/base/services/java/com/android/server/InputMethodManagerService.java
 frameworks/base/core/java/com/android/internal/inputmethod/InputMethodUtils.java
 
-======================
-输入框弹出输入法：
+/******************************
+ 输入框弹出输入法
+*/
 onTouchEvent(触摸事件)-->viewClicked-->imm.viewClicked@TextView.java-->viewClicked@
 InputMethodManager.java-->viewClicked-->checkFocus-->checkFocusNoStartInput(检测输入法是否已经启动)
 --startInputInner@InputMethodManager.java-->onCreateInputConnection@TextView.java--mService.startInput

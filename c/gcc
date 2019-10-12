@@ -2,10 +2,22 @@
  gcc -v 版本
  gcc -h 帮助
 */
+
+//编译生成预处理文件
+gcc -E foo.c
+
 configure --enable-checking=release --enable-languages=c,c++ --disable-multilib  --prefix=install/dir
 
 
-//
+
+
+
+
+
+
+/**************
+ 编译连接库文件
+*/
 静态库(不能直接执行，经过链接后可以)：编译时将库嵌入到代码中，不用加载。编译后代码两增大。
 动态库(能够被加载到内存，供其他程序执行)：代码运行时打开加载库。运行速度较慢
 

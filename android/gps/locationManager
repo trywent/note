@@ -19,11 +19,28 @@ android_location_GpsLocationProvider_start@com_android_server_location_GpsLocati
 另个打开gps流程：
 requestLocationUpdatesLocked-->requestSingleShotFix-->ProviderHandler.handleMessage-->handleRequestSingleShot-->startNavigating@GpsLocationProvider.java-->native_start-->
 android_location_GpsLocationProvider_start@com_android_server_location_GpsLocationProvider.cpp
--->start-->mstar_gps_start-->gps_state_start@MstarGps.c
-_____________________
-//provider:
 
-加入不同类型的provider：
+
+//发送命令。清除aid数据
+sendExtraCommand(String command, Bundle extras) {
+- "delete_aiding_data".equals(command): deleteAidingData(extras){
+	- flags = GPS_DELETE_ALL
+	- native_delete_aiding_data(flags)
+	}
+- "force_time_injection".equals(command): requestUtcTime()
+- "force_xtra_injection".equals(command): xtraDownloadRequest()
+}@GnssLocationProvider.java
+
+
+/*
+ provider
+
+ gnss
+ network
+
+*/
+
+//加入不同类型的provider：
 _loadProvidersLocked-->addProvider(加入gpsProvider)-->addProvider(加入passiveProvider)--
 mEnabledProviders.add(加入passiveProvider)--addProvider(加入mNetworkLocationProvider)@
 LocationManagerService.java
@@ -34,7 +51,7 @@ addProvider{//加入到容器
 }
 
 
-关闭打开provider：
+//关闭打开provider：
 updateProvidersLocked-->(获取provider的状态)isAllowedBySettingsLocked--updateProviderListenersLocked{
 - 获取该provider记录mRecordsByProvider.get
 - 获取改record中的接收者，并通知他们provider的状态更新。
@@ -48,7 +65,7 @@ updateProviderListenersLocked-->p.enable@LocationManagerService.java-->enable-->
 sendMessage(ENABLE)-->handleMessage-->handleEnable-->native_init@GpsLocationProvider.java
 
 
-provider初始化：
+//provider初始化：
  static { class_init_native(); }-->class_init_native@GpsLocationProvider.java-->
 android_location_GpsLocationProvider_class_init_native{
 - 初始化本地方法
@@ -61,7 +78,23 @@ android_location_GpsLocationProvider_class_init_native{
 handleEnable-->native_init@GpsLocationProvider.java-->android_location_GpsLocationProvider_init
 -->(设置HAL层回调函数)sGpsInterface->init(&sGpsCallbacks)
 
-关闭provider：
+//android8.0
+android_location_GnssLocationProvider_class_init_native{
+ //初始化java回调函数
+- method_reportLocation
+- method_reportStatus
+ // 获取hal接口
+- gnssHal = IGnssExt::getService()
+- gnssXtra = gnssHal->getExtensionXtra()
+- gnssRil = gnssHal->getExtensionAGnssRilExt()
+- gnssAgnss = gnssHal->getExtensionAGnss()
+- gnssNavigationMessage = gnssHal->getExtensionGnssNavigationMessage()
+- gnssNi = gnssHal->getExtensionGnssNi()
+- gnssGeofencing = gnssHal->getExtensionGnssGeofencing()
+}@com_android_server_location_GnssLocationProvider.cpp
+
+
+//关闭provider：
 updateProviderListenersLocked-->p.disable@LocationManagerService.java-->disable-->
 sendMessage(ENABLE,0)-->handleMessage-->handleDisable-->stopNavigating-->native_stop
 @GpsLocationProvider.java-->android_location_GpsLocationProvider_stop-->sGpsInterface->stop()
@@ -88,78 +121,11 @@ jb/frameworks/base/services/java/com/android/server/LocationManagerService.java
 jb/frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
 frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 
-/***********************
-  gps hal
+
+/**********************
+ 定位信息上报
 
 */
-struct hw_module_t HAL_MODULE_INFO_SYM = {
-  .tag = HARDWARE_MODULE_TAG,
-  .id            = GPS_HARDWARE_MODULE_ID,
-  .methods       = &gps_module_methods{
-		     - .open = open_gps(struct hw_module_t* module,struct hw_device_t** device){
-			- struct gps_device_t *dev = malloc
-			- dev->get_gps_interface = get_gps_interface //返回hw_device_t 获取接口
-			- _gps_state->init = 0 //Struct GpsState
-			- device = dev
-		}
-	}
-}
-
-static const GpsInterface  GpsInterface = {
-  .size  = sizeof(GpsInterface),
-  .init  = gps_init,
-  .start = gps_start,
-  .stop  = 
-  .cleanup = 
-  .inject_time =
-  .inject_location = 
-  .delete_aiding_data =
-  .set_position_mode = 
-  .get_extension =
-};
-
-//设置回调接口,用于通知上层
-gps_init(GpsCallbacks* callbacks){
-- GpsState*  s = _gps_state
-- s->callbacks = *callbacks
-- load_conf
-- gps_state_init(state){
-	- state->fd //设置gps数据fd
-	- socketpair( AF_LOCAL, SOCK_STREAM, 0, state->control )//创建socketPair用于.系统gps服务和,gps线程通信
-	- state->thread = state->callbacks.create_thread_cb( "gps_state_thread", gps_state_thread) //创建读取nmea线程
-	}
-}@gps.c
-
-gps_start{
-- write( s->control[0], &cmd, 1 ) //开始
-- s->callbacks.create_thread_cb("supl_thread", supl_thread) //创建supl线程
-}@gps.c
-
-
-//读取解析nmea
-gps_state_thread{
-- NmeaReader  reader[1]
-- nmea_reader_init( reader )
- //监听gps数据(从gps模块),gps命令(从gps服务)
-- epoll_fd   = epoll_create(2)
-  epoll_register( epoll_fd, state->fd )
-  epoll_register( epoll_fd, state->control[1] )
-- 循环读取数据
-{
-- epoll_wait( epoll_fd, events)
-- control_fd{//控制命令
-	- CMD_START:{
-		- nmea_reader_set_nmea_callback(nmea_cb)
-		- nmea_reader_set_callback(location_cb)
-		}
-	- CMD_STOP:
-	}
-- gps_fd{//数据
-	- nmea_reader_addc
-	}
- }
-}
-
 //status回调：
 nmea_reader_parse-->gps_state->callbacks.location_cb@MstarGps.c-->
 location_callback-->method_reportLocation@com_android_server_location_GpsLocationProvider.cpp
@@ -167,38 +133,18 @@ location_callback-->method_reportLocation@com_android_server_location_GpsLocatio
 reportStatus(onGpsStarted，onGpsStopped启动，停止)，reportSvStatus(onSvStatusChanged)
 --> listener.mListener.onxxxx()@GpsLocationProvider.java
 
-处理Nmea回调：
+//处理Nmea回调：
 onNmeaReceived-->sendMessage-->
 mGpsHandler.handleMessage@GpsStatusListenerTransport@LocationManager.java-->
 mNmeaListener.onNmeaReceived@LocationManager.java
 
-LocationListener回调:
+//LocationListener回调:
 GnssCallback::gnssLocationCb@com_android_server_location_GpsLocationProvider.cpp-->
 reportLocation@GnssLocationProvider.java-->
 LocationWorkerHandler(MSG_LOCATION_CHANGED)-->handleLocationChangedLocked(从记录UpdateRecord获取监听器)
 -->receiver.callLocationChangedLocked(callLocationChangedLocked,callStatusChangedLocked)
 -->mListener.onLocationChanged@LocationManagerService.java
 
-
-SettingsObserver-->updateProvidersLocked(更新状态)-->updateProviderListenersLocked-->
-record.mReceiver.callProviderEnabledLocked-->mListener.onProviderEnabled
-(或disable)
-____________________
-jni和底层处理：
-class_init_native-->android_location_GpsLocationProvider_class_init_native(设置回调函数)-->
-hw_get_module(获取模块)--module->methods->open(获取设备)--sGpsInterface@jni->get_extension
--->mstar_gps_get_extension(获取接口)@MstarGps.c--(初始化各种接口)
-
-设置回调函数：
-native_init-->android_location_GpsLocationProvider_init--> sGpsInterface->init(&sGpsCallbacks)@jni-->
-mstar_gps_init(设置回调函数)-->gps_state_init(初始化，打开串口..。开始接收消息)@MstarGps.c
-
-
-回调：
-native_init@GpsLocationProvider.java-->android_location_GpsLocationProvider_init-->
-sGpsInterface->init@com_android_server_location_GpsLocationProvider.cpp-->
-mstar_gps_init-->gps_state_init-->gps_state_thread(循环等待命令，gps消息串)-->
-nmea_reader_addc(读取串口消息)-->nmea_reader_parse(根据消息调用回调函数callbacks)@MstarGps.c
 
 /***********************
  应用使用位置服务：
@@ -276,8 +222,12 @@ getLastKnownLocation-->_getLastKnownLocationLocked-->mLastKnownLocation.get
 网络地址：
 LocationProviderProxy-->reconnect
 
-=================
-获取卫星：
+
+
+/*
+ 获取卫星
+
+*/
 
 获取状态：GpsStatus.Listener-->onGpsStatusChanged@GpsStatus.java
 

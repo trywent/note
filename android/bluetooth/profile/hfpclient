@@ -1,6 +1,7 @@
 /* client
 
-
+  连接profile需要取消扫描。扫描时也需要取消连接(但是不能立即停止，需要等连接结束)
+  
 */
 static{ classInitNative}//设置jni回调函数
 {

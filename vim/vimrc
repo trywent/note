@@ -63,3 +63,10 @@ set fileencodings=utf-8,gb2312,gbk,gb18030
 set mouse=a
 " 源码文件自动替换tab
 autocmd FileType c,cpp,cc,java setlocal softtabstop=2 shiftwidth=2 tabstop=4 expandtab 
+
+" 显示行号
+set nu
+
+" 设置系统拷贝
+map <C-c> "+y
+map <C-v> "+p

@@ -1,0 +1,101 @@
+/***********************
+  gps hal
+
+*/
+struct hw_module_t HAL_MODULE_INFO_SYM = {
+  .tag = HARDWARE_MODULE_TAG,
+  .id            = GPS_HARDWARE_MODULE_ID,
+  .methods       = &gps_module_methods{
+		     - .open = open_gps(struct hw_module_t* module,struct hw_device_t** device){
+			- struct gps_device_t *dev = malloc
+			- dev->get_gps_interface = get_gps_interface //返回hw_device_t 获取接口
+			- _gps_state->init = 0 //Struct GpsState
+			- device = dev
+		}
+	}
+}
+
+static const GpsInterface  GpsInterface = {
+  .size  = sizeof(GpsInterface),
+  .init  = gps_init,
+  .start = gps_start,
+  .stop  = 
+  .cleanup = 
+  .inject_time =
+  .inject_location = 
+  .delete_aiding_data =
+  .set_position_mode = 
+  .get_extension =
+};
+
+//设置回调接口,用于通知上层
+zkw_gps_init(GpsCallbacks* callbacks){
+- GpsState*  s = _gps_state
+- s->callbacks = *callbacks
+- load_conf
+- gps_state_init(state){
+	- strcpy(state->device,tty_name) //拷贝串口名字 /dev/ttyGNSS
+	- state->fd = open(state->device,O_RDWR)//设置gps数据fd
+	- socketpair( AF_LOCAL, SOCK_STREAM, 0, state->control )//创建socketPair用于.系统gps服务和,gps线程通信
+	- state->thread = state->callbacks.create_thread_cb( "gps_state_thread", gps_state_thread) //创建读取nmea线程
+	}
+}@gps.c
+
+
+
+zkw_gps_start-->gps_state_start{
+- cmd = CMD_START
+- write( s->control[0], &cmd, 1 ) //开始
+- s->callbacks.create_thread_cb("supl_thread", supl_thread,_gps_state) //创建supl线程
+}@gps.c
+
+
+//读取解析nmea
+gps_state_thread{
+- NmeaReader  reader[1]
+- nmea_reader_init( reader )
+ //监听gps数据(从gps模块),gps命令(从gps服务)
+- epoll_fd   = epoll_create(2)
+  epoll_register( epoll_fd, state->fd )
+  epoll_register( epoll_fd, state->control[1] )
+- 循环读取数据
+{
+- epoll_wait( epoll_fd, events)
+- control_fd{//控制命令
+	- CMD_START:{
+		- nmea_reader_set_nmea_callback(nmea_cb)
+		- nmea_reader_set_callback(location_cb)
+		}
+	- CMD_STOP:
+	}
+- gps_fd{//数据
+	- nmea_reader_addc
+	}
+ }
+}
+
+/****************************
+ agps supl
+*/
+
+zkw_supl_thread(void *arg) {
+  //GpsState
+- GpsState *s = (GpsState *)arg;
+- int fd = s->fd;
+  //创建supl
+- supl_ctx_new(&supl_ctx);
+- agpsRilCallbacks->request_refloc(AGPS_RIL_REQUEST_REFLOC_CELLID)
+- agpsRilCallbacks->request_setid(AGPS_RIL_REQUEST_SETID_MSISDN)
+  //下载卫星数据
+- supl_get_assist(&supl_ctx, supl_host, supl_port, &assist)
+- supl_close(&supl_ctx)
+  //将数据打包buff，并写入串口
+- buff = (unsigned char *)calloc(1, 8192)
+- len = supl2cas_aid(&assist, buff)
+- write(fd, buff, len)
+}
+
+
+
+
+

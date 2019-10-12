@@ -50,28 +50,69 @@ btif_dm_search_devices_evt{
 - BTA_DM_INQ_RES_EVT-->device_found_cb
 }
 
-//setScanMode
-setScanMode-->mAdapterProperties.setScanMode-->setAdapterPropertyNative-->
-sBluetoothInterface->set_adapter_property@com_android_bluetooth_btservice_AdapterService.cpp
--->set_adapter_property@bluetooth.cc-->btif_set_adapter_property{
-//BT_PROPERTY_BDNAME
-- BTA_DmSetDeviceName-->bta_sys_sendmsg-->bta_dm_reg[0]-->bta_dm_sm_execute@bta_dm_api.cc
-  -->bta_dm_action-->bta_dm_set_dev_name@bta_dm_main.cc
-//BT_PROPERTY_ADAPTER_SCAN_MODE
-- BTA_DmSetVisibility
-}@btif_core.cc
-
-tif_set_adapter_property-->execute_storage_request(BTIF_CORE_STORAGE_ADAPTER_WRITE)
-btif_storage_set_adapter_property(property)-->prop2cfg-->btif_config_set_str@btif_storage.cc
-
-
-/* set NAME蓝牙名称
+/*
+   设置扫描模式 setScanMode 
+   设置蓝牙名称 setName
 
 */
+setScanMode(/*20,21,23*/)@AdapterService.java-->setScanMode(/*0,1,2*/)-->setAdapterPropertyNative(BT_PROPERTY_ADAPTER_SCAN_MODE)
+@AdapterProperties.java-->sBluetoothInterface->set_adapter_property@com_android_bluetooth_btservice_AdapterService.cpp
+-->set_adapter_property@bluetooth.cc-->btif_set_adapter_property@btif_core.c
+
+setName@@AdapterService.java-->setName-->mService.setAdapterPropertyNative(BT_PROPERTY_BDNAME)@AdapterProperties.java
+-->sBluetoothInterface->set_adapter_property@com_android_bluetooth_btservice_AdapterService.cpp
+-->set_adapter_property@bluetooth.cc-->btif_set_adapter_property@btif_core.c
+
+//设置属性
+btif_set_adapter_property(const bt_property_t *property){
+- BT_PROPERTY_BDNAME{
+	- BTA_DmSetDeviceName-->bta_sys_sendmsg-->bta_dm_reg[0]-->bta_dm_sm_execute@bta_dm_api.cc
+  		-->bta_dm_action-->bta_dm_set_dev_name@bta_dm_main.cc
+	}
+- BT_PROPERTY_ADAPTER_SCAN_MODE{
+	- disc_mode
+	- conn_mode
+	- BTA_DmSetVisibility(disc_mode, conn_mode, BTA_DM_IGNORE, BTA_DM_IGNORE){
+		- tBTA_DM_API_SET_VISIBILITY    *p_msg
+		- p_msg->hdr.event = BTA_DM_API_SET_VISIBILITY_EVT
+		- p_msg->disc_mode,p_msg->conn_mode//设置disc_mode,conn_mode
+		- bta_sys_sendmsg(p_msg)
+		}
+	- storage_req_id = BTIF_CORE_STORAGE_ADAPTER_WRITE
+	}
+- BT_PROPERTY_ADAPTER_DISCOVERY_TIMEOUT{
+	- storage_req_id = BTIF_CORE_STORAGE_ADAPTER_WRITE
+	}
+  //保存设置值到数据库
+- btif_transfer_context(execute_storage_request,storage_req_id, (char*)&req,)-->
+	tif_set_adapter_property-->execute_storage_request(BTIF_CORE_STORAGE_ADAPTER_WRITE)-->
+	btif_storage_set_adapter_property(property)-->prop2cfg-->btif_config_set_str@btif_storage.cc
+}@btif_core.c
+
+//保存set NAME蓝牙名称
 btif_set_adapter_property-->execute_storage_request(BTIF_CORE_STORAGE_ADAPTER_WRITE)
 btif_storage_set_adapter_property(property/*BT_PROPERTY_BDNAME*/)-->prop2cfg-->btif_config_set_str@btif_storage.cc
 
 btif_get_default_local_name//获取默认蓝牙名
+
+//设置扫描模式
+BTA_DmSetVisibility(disc_mode, conn_mode, BTA_DM_IGNORE, BTA_DM_IGNORE)@bta_dm_api.c-->bta_dm_sm_execute-->
+bta_dm_action.bta_dm_set_visibility@bta_dm_main.c-->
+bta_dm_set_visibility{
+- 
+- BTM_SetDiscoverability(p_data->set_visibility.disc_mode)-->
+	BTM_SetDiscoverability (UINT16 inq_mode, UINT16 window, UINT16 interval){
+	- btsnd_hcic_write_scan_enable (scan_mode)
+	}@btm_inq.c
+- BTM_SetConnectability(p_data->set_visibility.conn_mode)-->
+	BTM_SetConnectability(UINT16 page_mode, UINT16 window, UINT16 interval){
+	- btsnd_hcic_write_scan_enable (scan_mode)
+	}@btm_inq.c
+  //配对模式
+- BTM_SetPairableMode((BOOLEAN)(!(bta_dm_cb.disable_pair_mode)),bta_dm_cb.conn_paired_only)
+}bta_dm_act.c
+
+
 
 /* bond配对
 
@@ -121,6 +162,12 @@ btif_dm_upstreams_evt{
 }btif_dm.c
 
 btif_dm_pin_req_evt
+
+//状态变化
+bond_state_changed
+
+//连接结果
+btm_sec_connected@btm_sec.c
 
 
 //获取信息

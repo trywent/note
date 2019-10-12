@@ -1,0 +1,36 @@
+/*
+ gps
+*/
+
+$(call inherit-product-if-exists, vendor/sprd/modules/gps/GreenEye2/device-sprd-gps.mk)
+@device/sprd/isharkl2/sp9853i_1h10/sp9853i_1h10_common.mk
+
+GpsInterface  _GpsInterface = {
+    size:                       sizeof(GpsInterface), 
+    init: 			gps_init,
+    start:			gps_start,
+    stop:			gps_stop,
+    cleanup:			gps_cleanup,
+    inject_time:		gps_inject_time,
+    inject_location:		gps_inject_location,
+    delete_aiding_data:		gps_delete_aiding_data,
+    set_position_mode:		gps_set_position_mode,
+    get_extension: 		gps_get_extension,
+}@gps.c
+
+
+
+//获取agps接口
+gps_get_extension{
+- gnss_lcsinit(){
+	- 
+	}@lcs_agps.c
+- 
+}@agps.c
+
+
+
+
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/agps.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/common/src/lcs_agps.c
