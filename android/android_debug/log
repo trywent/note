@@ -1,4 +1,18 @@
 /***********************
+ Log
+*/
+w/e/i/d(String tag, Throwable tr)@Log.java
+
+isLoggable(String tag, int level)@Log.java-->__android_log_is_loggable@android_util_Log.cpp
+-->__android_log_level@log_is_loggable.c
+
+
+
+
+frameworks/base/core/java/android/util/Log.java
+frameworks/base/core/jni/android_util_Log.cpp
+system/core/liblog/log_is_loggable.c
+/***********************
  daemon
 */
 service logd /system/bin/logd
@@ -32,6 +46,7 @@ system/core/logd/main.cpp
 
 (MAIN)LOG.I,D,E@Log.java-->println_native(LOG_ID_MAIN)-->android_util_Log_println_native@android_util_Log.cpp
 -->__android_log_buf_write
+
 
 //c  #include "utils/Log.h"@libutils
 ALOGV-->__ALOGV-->ALOG-->LOG_PRI-->android_printLog@log_main.h-->

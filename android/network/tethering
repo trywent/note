@@ -1,0 +1,40 @@
+/*
+ 通过设备的USB, BT, and WiFi 当做网关共享网络
+
+*/
+Tethering(INetworkManagementService nmService,INetworkStatsService statsService, INetworkPolicyManager policyManager){
+- 
+}@Tethering.java
+
+
+
+
+startTethering(int type, ResultReceiver receiver, boolean showProvisioningUi){
+  //没有provision
+- enableTetheringInternal(type, true, receiver){
+	- ConnectivityManager.TETHERING_WIFI{
+		- setWifiTethering(enable){
+			- WifiManager mgr = getWifiManager()
+			- enable && mgr.startSoftAp() //打开
+			- !enable && mgr.stopSoftAp() //关闭
+			}
+		- sendTetherResult(receiver, result)
+		}
+	- ConnectivityManager.TETHERING_USB{
+
+		}
+	- ConnectivityManager.TETHERING_BLUETOOTH{
+		- 	
+		}
+	}
+  //provision UI
+- runUiTetherProvisioningAndEnable(type, receiver)
+  //
+- runSilentTetherProvisioningAndEnable(type, receiver)
+}@Tethering.java
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/connectivity/Tethering.java

@@ -1,4 +1,6 @@
-////SVG(Scalable Vector Graphics)矢量图格式...坐标原点左上角开始
+/*
+ SVG(Scalable Vector Graphics)矢量图格式...坐标原点左上角开始
+*/
 M：move to 移动绘制点，作用相当于把画笔落在哪一点。
 L：line to 直线，就是一条直线，注意，只是直线，直线是没有宽度的，所以你什么也看不到。
 
@@ -40,7 +42,6 @@ x y终点位置
 </vector>
 
 //vector
-
     android:name 定义该drawable的名字
     android:width 定义该 drawable 的内部(intrinsic)宽度,支持所有 Android 系统支持的尺寸，通常使用 dp
     android:height 定义该 drawable 的内部(intrinsic)高度,支持所有 Android 系统支持的尺寸，通常使用 dp
@@ -68,8 +69,6 @@ x y终点位置
     android:strokeMiterLimit 设置斜角的上限，Sets the Miter limit for a stroked path.
 
 //group
-
-
     android:name 定义 group 的名字
     android:rotation 定义该 group 的路径旋转多少度，这样图片就被旋转了，注意写数字的时候别晕了。
     android:pivotX 定义缩放和旋转该 group 时候的 X 参考点。该值相对于 vector 的 viewport 值来指定的。

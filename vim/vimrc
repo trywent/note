@@ -53,20 +53,31 @@ filetype plugin indent on    " required
 " Put your non-Plugin stuff after this line
 
 " 设置nerdtree{
-autocmd vimenter * NERDTree
-let NERDTreeMouseMode=2 "单击打开目录，双击打开文件
-let g:nerdtree_tabs_open_on_console_startup=1 "进入nerdtree时打开tab
+" autocmd vimenter * NERDTree
+let NERDTreeMouseMode=2
+"let g:nerdtree_tabs_open_on_console_startup=1
+map f <plug>NERDTreeTabsToggle<CR>
 " }
+
+
 " 设置文件编码
 set fileencodings=utf-8,gb2312,gbk,gb18030
-" 打开鼠标
 set mouse=a
-" 源码文件自动替换tab
-autocmd FileType c,cpp,cc,java setlocal softtabstop=2 shiftwidth=2 tabstop=4 expandtab 
 
-" 显示行号
+" 源码文件自动替换tab
+autocmd FileType c,cpp,cc,java setlocal softtabstop=4 shiftwidth=4 tabstop=4 expandtab 
+
+" 行号
 set nu
 
 " 设置系统拷贝
 map <C-c> "+y
 map <C-v> "+p
+" 配色
+colorscheme desert
+
+
+" session
+autocmd VimLeave * NERDTreeClose
+autocmd VimLeave * if this_session != "" | exe "mksession! ".this_session
+

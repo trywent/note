@@ -1,0 +1,58 @@
+/*
+ ConnectivityService
+
+    <string-array translatable="false" name="networkAttributes">
+        <item>"wifi,1,1,1,-1,true"</item>
+        <item>"mobile,0,0,0,-1,true"</item>
+        <item>"mobile_mms,2,0,2,60000,true"</item>
+        <item>"mobile_supl,3,0,2,60000,true"</item>
+        <item>"mobile_dun,4,0,2,60000,true"</item>
+        <item>"mobile_hipri,5,0,3,60000,true"</item>
+        <item>"mobile_fota,10,0,2,60000,true"</item>
+        <item>"mobile_ims,11,0,2,60000,true"</item>
+        <item>"mobile_cbs,12,0,2,60000,true"</item>
+        <item>"wifi_p2p,13,1,0,-1,true"</item>
+        <item>"mobile_ia,14,0,2,-1,true"</item>
+        <item>"mobile_emergency,15,0,2,-1,true"</item>
+    </string-array>
+*/
+ConnectivityService(Context context, INetworkManagementService netManager,
+            INetworkStatsService statsService, INetworkPolicyManager policyManager){
+- mHandlerThread = new HandlerThread("ConnectivityServiceThread")
+- mHandler = new InternalHandler(mHandlerThread.getLooper()
+- mTrackerHandler = new NetworkStateTrackerHandler(mHandlerThread.getLooper())
+  //手机网络
+- mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE)
+- mPolicyManager.registerListener(mPolicyListener)
+  //获取网络类型，并
+-  String[] naStrings = context.getResources().getStringArray(com.android.internal.R.array.networkAttributes)
+- for (String naString : naStrings) {
+	- NetworkConfig n = new NetworkConfig(naString)
+	- mNetConfigs[n.type] = n
+	}
+- mTethering = makeTethering()
+  //
+- mMultinetworkPolicyTracker = createMultinetworkPolicyTracker(mContext, mHandler...)
+- mMultinetworkPolicyTracker.start()
+}@ConnectivityService.java
+
+
+//设置飞行模式
+setAirplaneMode(boolean enable) {
+- Settings.Global.putInt(cr, Settings.Global.AIRPLANE_MODE_ON, encodeBool(enable))
+  //通知到wifiserviceImpl
+- Intent intent = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED)
+- intent.putExtra("state", enable)
+- mContext.sendBroadcastAsUser(intent, UserHandle.ALL)
+}@ConnectivityService.java
+
+
+//设置wifi ap
+{
+
+}@ConnectivityService.java
+
+
+
+frameworks/base/core/java/android/net/ConnectivityManager.java
+frameworks/base/services/core/java/com/android/server/ConnectivityService.java

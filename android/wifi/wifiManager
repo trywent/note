@@ -17,9 +17,20 @@ startService{
 //获取manager
 WifiManager = Context.getSystemService(Context.WIFI_SERVICE)@ContextImpl.java
 
+//wifiService
+WifiServiceImpl(new WifiInjector(context),new WifiAsyncChannel(TAG)){
+- mWifiInjector = wifiInjector
+- mWifiStateMachine = mWifiInjector.getWifiStateMachine()
+- mWifiController = mWifiInjector.getWifiController()
+}@WifiServiceImpl.java
+
+//启动过程打开wifi
+onBootPhase-->mImpl.checkAndStartWifi@WifiService.java-->checkAndStartWifi@WifiServiceImpl.java
 
 
-WifiInjector{//注入器
+//injector
+WifiInjector{
+- mSettingsStore = mWifiInjector.getWifiSettingsStore() //wifi配置
  //threads
 - mWifiServiceHandlerThread = new HandlerThread("WifiService")
 - mWifiServiceHandlerThread = new HandlerThread("WifiStateMachine")
@@ -37,21 +48,32 @@ WifiInjector{//注入器
 
  //mWifiStateMachine,controller
 - mWifiStateMachine = new WifiStateMachine(mWifiNative)
-- mWifiController = new WifiController
+- mWifiController = new WifiController(mContext, mWifiStateMachine, mSettingsStore...)
 }@WifiInjector.java
 
-
+isWifiToggleEnabled@
 
 enableSupplicant-->mWificondControl.enableSupplicant@WifiNative.java//启动supplicant
 
 
-
-
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiService.java
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiServiceImpl.java
+frameworks/base/wifi/java/android/net/wifi/WifiManager.java
 /************************
   wifiController.控制接口管理wifi状态,wifi热点
+
 */
-WifiController{
+WifiController(Context context, WifiStateMachine wsm, WifiSettingsStore wss...){
+- mWifiStateMachine = wsm
+- mSettingsStore = wss
+  //状态机
 - addState(mDefaultState)
+	addState(mApStaDisabledState, mDefaultState)
+	addState(mStaEnabledState, mDefaultState)
+		addState(mDeviceActiveState, mStaEnabledState)
+		addState(mDeviceInactiveState, mStaEnabledState)
+
+- setInitialState(mApStaDisabledState)
 }
 
 
@@ -60,14 +82,25 @@ StaEnabledState{//wifi打开
 - 
 }
 
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiController.java
 /************************
   wifi状态wifiStateMachine
 */
 
-WifiStateMachine(Looper){
--
-- addState(mDefaultState)//初始state 
--
+WifiStateMachine(mContext, mFrameworkFacade,wifiStateMachineLooper,this, mBackupManagerProxy, mCountryCode, mWifiNative)@WifiInjector.java
+WifiStateMachine(Context context, FrameworkFacade facade, Looper looper, WifiInjector wifiInjector,
+  BackupManagerProxy backupManagerProxy, WifiCountryCode countryCode, WifiNative wifiNative){
+- mWifiInjector = wifiInjector
+- mWifiNative = wifiNative
+- mWifiStateTracker = wifiInjector.getWifiStateTracker()
+- mWifiMonitor = mWifiInjector.getWifiMonitor()
+- mWifiInfo = new WifiInfo()
+  //state
+- addState(mDefaultState) 
+	addState(mInitialState, mDefaultState)
+	addState(mSupplicantStartingState, mDefaultState)
+- setInitialState(mInitialState)
+- start()
 }@WifiStateMachine.java
 
 
@@ -91,6 +124,10 @@ SoftApState{//AP热点状态
 	- mSoftApManager = mWifiInjector.makeSoftApManager
 	}
 }
+
+
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiStateMachine.java
+
 /************************
   wifiConControl
 */
@@ -105,13 +142,7 @@ setupDriverForClientMode{
 }
 
 enableSupplicant-->mWificondControl.enableSupplicant@WifiNative.java
-
 frameworks/base/services/core/java/com/android/server/SystemServiceManager.java
-frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiService.java
-frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiServiceImpl.java
-frameworks/base/wifi/java/android/net/wifi/WifiManager.java
-frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiController.java
-frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiStateMachine.java
 frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiInjector.java
 frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNative.java
 frameworks/opt/net/wifi/service/java/com/android/server/wifi/SupplicantStaIfaceHal.java
@@ -121,6 +152,7 @@ frameworks/opt/net/wifi/service/java/com/android/server/wifi/WificondControl.jav
 
 /************************
   wifiAPI
+
 */
 //打开wifi(启动过程打开)
 run-->wifi.checkAndStartWifi()@SystemServer.java-->checkAndStartWifi-->setWifiEnabled@WifiService.java
@@ -128,8 +160,8 @@ run-->wifi.checkAndStartWifi()@SystemServer.java-->checkAndStartWifi-->setWifiEn
 -->setWifiEnabled-->mWifiController.sendMessage(CMD_WIFI_TOGGLED)
 sendEnableMessage-->WifiHandler--setWifiEnabledBlocking-->mWifiStateTracker.loadDriver@WifiService.java
  
+//打开wifi热点
 
-setWifiEnabledState@WifiService.java设置wifi状态并广播
 
 //获取MAC地址
 mWifiInfo.setMacAddress(mWifiNative.getMacAddress())-->getMacAddress

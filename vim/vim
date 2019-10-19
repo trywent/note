@@ -3,6 +3,8 @@
  apt-get install vim vim-scripts vim-doc
 
  vimtutor 打开手册
+
+ leader(前缀键)一般为/
 */
 
 

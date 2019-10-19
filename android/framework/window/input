@@ -1,10 +1,10 @@
-//
+//读取事件的channle
 InputChannel[] openInputChannelPair@InputChannel.java//打开inputChannel
 new WindowInputEventReceiver(mInputChannel)//应用读取inputchannel
 registerInputChannel(InputChannel inputChannel,InputWindowHandle inputWindowHandle)//注册inputchannel到inputManagerService
 -->nativeRegisterInputChannel@InputManagerService.java
 
-//
+//windowManager中更新输入窗口
 createInputConsumer(name,inputChannel){
 - new InputConsumerImpl(mService, name, inputChannel){
 	- InputChannel[] channels = InputChannel.openInputChannelPair(name)

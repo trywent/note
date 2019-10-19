@@ -2,7 +2,9 @@
  打开文件
 */
 :e filepath
-:find filename
+:find filename  //查找并打开文件
+:Ex directory   //展开文件选择要打开的文件 
+
 //标签中打开文件
 :tabe <filepath> //在tab中打开新文件
 :tabn 		//切换窗口
@@ -13,7 +15,7 @@
 :sp <filepath>. //横分打开文件
 :vs <filepath>  //竖分打开文件
 :sf filename
-Ctrl+W j/k//切换窗口
+Ctrl+W h/j/k/l //左，上，下，右切换窗口
 
 //窗口最大最小化
 ctrl+super+上
@@ -71,6 +73,29 @@ inoremap ( ()<ESC>i
 inoremap [ []<ESC>i
 inoremap { {}<ESC>i
 inoremap < <><ESC>i
+
+
+/*****************************
+ session
+
+ 创建session时需要关闭nerdtree
+*/
+//打开
+vim -S ~/mysession.vim
+//创建session
+:mks(ession) mysession.vim
+
+//加载
+source mysession.vim
+
+//设置session路径
+:cd  需要保存的位置                  "切换到相应目录
+:set sessionoptions-=curdir        "在session option中去掉curdir
+:set sessionoptions+=sesdir        "在session option中加入sesdir
+:mks .....
+
+//自动保存
+au VimLeave * if this_session != "" | exe "mksession! ".this_session
 
 /*****************************
 sudo apt install csope

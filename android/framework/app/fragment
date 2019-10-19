@@ -1,18 +1,15 @@
 /*
  fragment
+
+ 通常加入到一个activity中。但有自己的生命周期，能够存放到activity的back stack通过返回键能够恢复
 */
 
-通常加入到一个activity中。但有自己的生命周期，能够存放到activity的back stack通过返回键能够恢复。
-
-_______________________
-加入用户界面：
+//加入用户界面：
 fragment通常作为activity的一部分使用，并提供自己的布局。fragment提供布局需要实现onCreateView()回调函数，并
 返回View。
 
-可以从xml中获取布局。
 
 //将fragment加入一个activity
-
 有两种方法：
 *在activity的layout文件中声明fragment
  系统在创建activity的layout时，将xml中声明的fragment实例化，并调用它的onCreateView函数。然后将返回的
@@ -26,7 +23,6 @@ fragment通常作为activity的一部分使用，并提供自己的布局。frag
  管理fragment
 */
 通过getFragmentManager()获取FragmentManager来进行fragment的管理。
-可以用来
 -获取activity中的fragment。通过findFragmentById()(有UI)或 findFragmentByTag()（无UI）
 -通过popBackStack()将fragment从back stack中出栈。
 -addOnBackStackChangedListener()，注册back stack改变的监听器。
@@ -35,33 +31,60 @@ addFragment-->makeActive-->mActive.add@FragmentManager.java
 
 
 
+
 /*FragmentTransaction
  还可以通过FragmentTransaction,进行fragment的增加移除等操作。
+
 */
-执行FragmentTransaction提供的操作add(),remove(),和replace()，最后要调用commit()
+FragmentManagerImpl extends FragmentManager implements LayoutInflater.Factory2@FragmentManager.java
+BackStackRecord extends FragmentTransaction implements FragmentManager.BackStackEntry@BackStackRecord.java
+
+//执行FragmentTransaction提供的操作add(),remove(),和replace()，最后要调用commit()
+1. FragmentTransaction = beginTransaction-->return new BackStackRecord(this)@FragmentManager.java
+2. FragmentTransaction.add 
+   FragmentTransaction.remove
+   FragmentTransaction.replace @BackStackRecord.java
+3. FragmentTransaction.commit@FragmentManager.java
+
+//加入view
+execPendingActions-->removeRedundantOperationsAndExecute-->executeOpsTogether-->addAddedFragments
+-->moveToState@FragmentManager.java-->addView@ViewGroup.java
 
 
- //加入view
-  at android.view.ViewGroup.addViewInner(ViewGroup.java:4994)
-  at android.view.ViewGroup.addView(ViewGroup.java:4785)
-  at android.view.ViewGroup.addView(ViewGroup.java:4725)
-  at android.view.ViewGroup.addView(ViewGroup.java:4698)
-  at android.app.FragmentManagerImpl.moveToState(FragmentManager.java:1284)
-  at android.app.FragmentManagerImpl.addAddedFragments(FragmentManager.java:2422)
-  at android.app.FragmentManagerImpl.executeOpsTogether(FragmentManager.java:2190)
-  at android.app.FragmentManagerImpl.removeRedundantOperationsAndExecute(FragmentManager.java:2146)
-  at android.app.FragmentManagerImpl.execPendingActions(FragmentManager.java:2047)
-  at android.app.FragmentManagerImpl$1.run(FragmentManager.java:719)
+//替换
+getFragmentManager().beginTransaction().replace@StatusBar.java-->FragmentManagerImpl.beginTransaction().replace
+@FragmentManager.java-->BackStackRecord.replace-->replace(containerViewId, fragment)-->
+doAddOp-->addOp(new Op(opcmd, fragment))-->mOps.add(op)@BackStackRecord.java
+
+commit-->commitInternal-->mManager.enqueueAction(this, allowStateLoss)@BackStackRecord.java-->
+enqueueAction{
+- mPendingActions.add(action)
+- scheduleCommit-->mHost.getHandler().post(mExecCommit)-->mExecCommit.run-->
+	execPendingActions@FragmentHostManager.java//systemui进程中执行
+}@FragmentManager.java
+
+
 
 //fragment与activity交互
 虽然fragment是一个独立于activity的对象。但fragment的实例是与包含它的activity绑定的。
-
 fragment可以通过getActivity()函数获取activity。
-
 同样，activity可以通过FragmentManager,使用findFragmentById()或findFragmentByTag()获取fragment
 
+/*
+ FragmentController
+*/
+FragmentController(FragmentHostCallback<?> callbacks){
+- FragmentHostCallback<?> mHost
+}@FragmentController.java
 
-==================================
-:
 
+FragmentHostCallback<E> extends FragmentContainer(Activity activity, Context context, Handler handler) {
+- Activity mActivity
+- FragmentManagerImpl mFragmentManager = new FragmentManagerImpl()
+}@FragmentHostCallback.java
 
+frameworks/base/core/java/android/app/FragmentManager.java
+frameworks/base/core/java/android/app/FragmentTransaction.java
+frameworks/base/core/java/android/app/BackStackRecord.java
+frameworks/base/core/java/android/app/FragmentHostCallback.java
+frameworks/base/core/java/android/app/FragmentController.java
