@@ -57,6 +57,23 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
 
 
 
+/*
+ input事件
+*/
+
+//触摸事件
+processPointerEvent@ViewRootImpl.java-->
+dispatchTouchEvent{
+- intercepted = onInterceptTouchEvent
+- dispatchTransformedTouchEvent(ev, canceled....){
+	- if (child == null) {
+                handled = super.dispatchTouchEvent(event);
+          } else {
+                handled = child.dispatchTouchEvent(event);
+          }
+	}
+}@ViewGroup.java
+
 
 
 frameworks/base/core/java/android/view/ViewGroup.java

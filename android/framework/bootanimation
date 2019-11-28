@@ -12,7 +12,7 @@ p 0 0 part0   //c(显示完这部分complete)/p(部分)类型 重复次数 睡�
 
 system/core/include/private/android_filesystem_config.h
 ===========================
-开始动画：
+//开始动画：
 readyToRun-->startBootAnim-->(开始动画服务)property_set("ctl.start", "bootanim")@SurfaceFlinger.cpp
 
 service bootanim /system/bin/bootanimation@init.rc-->main(开始新进程，运行BootAnimation)
@@ -29,7 +29,7 @@ _threadLoop{
 }@Threads.cpp
 
 
-关闭动画：
+//关闭动画：
 threadLoop-->android/movie(检查mExitPending退出循环)-->checkExit(查看"service.bootanim.exit")
 -->requestExit(设置mExitPending = true)@BootAnimation.cpp
 
@@ -37,8 +37,13 @@ fameworks/base/cmds/bootanimation/bootanimation_main.cpp
 frameworks/base/cmds/bootanimation/BootAnimation.cpp
 system/core/libutils/Threads.cpp
 
-警告画面：
-关闭动画后，打开屏幕触摸才有效
+//动画结束：BOOT_FINISHED = IBinder::FIRST_CALL_TRANSACTION
+performEnableScreen-->surfaceFlinger.transact(IBinder.FIRST_CALL_TRANSACTION,data, null, 0)
+@WindowManagerService.java-->BnSurfaceComposer::onTransact(BOOT_FINISHED)@ISurfaceComposer.cpp-->
+bootFinished-->property_set("service.bootanim.exit", "1")@SurfaceFlinger.cpp
+
+frameworks/native/libs/gui/ISurfaceComposer.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 
 ===========================
 H.handleMessage(WINDOW_FREEZE_TIMEOUT)

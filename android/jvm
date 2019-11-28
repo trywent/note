@@ -3,5 +3,47 @@
  源码位置libcore/ojluni/src/main
 */
 
+//虚拟机启动
+AndroidRuntime::start-->startVm@AndroidRuntime.cc-->
+JNI_CreateJavaVM(pJavaVM, pEnv, &initArgs){
+- Runtime::Create(options, ignore_unrecognized)
+ //初始化类加载器
+- android::InitializeNativeLoader()-->g_namespaces->Initialize()-->Initialize{
+	- root_dir = android_root_env != nullptr ? android_root_env : "/system"
+	- public_native_libraries_system_config = root_dir + kPublicNativeLibrariesSystemConfigPathFromRoot //"/etc/public.libraries.txt"
+	- llndk_native_libraries_system_config = root_dir + kLlndkNativeLibrariesSystemConfigPathFromRoot //"/etc/llndk.libraries.txt"
+	- vndksp_native_libraries_system_config = root_dir + kVndkspNativeLibrariesSystemConfigPathFromRoot //"/etc/vndksp.libraries.txt"
+	}@native_loader.cpp
+- Runtime* runtime = Runtime::Current()
+- bool started = runtime->Start()
+}@java_vm_ext.cc
 
+frameworks/base/core/jni/AndroidRuntime.cpp
+art/runtime/java_vm_ext.cc
+system/core/libnativeloader/native_loader.cpp
 libcore/ojluni/src/main/native/UnixFileSystem_md.c
+/*
+ 类加载器
+
+ libcore/ojluni/src //java源码
+*/
+虚拟机中最上级的加载器"bootstrap class loader"
+
+
+java.lang.Object
+ ↳ java.lang.ClassLoader
+    ↳ dalvik.system.BaseDexClassLoader 
+
+DexClassLoader:
+- A class loader that loads classes from .jar and .apk files containing a classes.dex entry. 
+  This can be used to execute code not installed as part of an application
+
+InMemoryDexClassLoader:
+- A ClassLoader implementation that loads classes from a buffer containing a DEX file
+
+PathClassLoader:
+- android系统用于加载系统和应用的类加载器 
+
+
+libcore/dalvik/src/main/java/dalvik/system/BaseDexClassLoader.java
+libcore/dalvik/src/main/java/dalvik/system/DexClassLoader.java

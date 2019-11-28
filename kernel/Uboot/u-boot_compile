@@ -1,0 +1,123 @@
+/*****************
+ uboot
+ 
+ RomBoot --> SPL --> u-boot --> Linux kernel --> file system --> start application
+
+*/
+//配置文件位置
+configs/xxxx_defconfig
+include/configs/xxxx.h
+
+
+//Building the uboot Software:
+设置交叉编译工具：
+$ CROSS_COMPILE=ppc_4xx-
+$ export CROSS_COMPILE
+export KBUILD_OUTPUT=/tmp/build //输出目录
+make NAME_config                //配置
+make all
+
+
+两种方法改变编译所在的位置:
+1. Add O= to the make command line invocations:
+
+	make O=/tmp/build distclean
+	make O=/tmp/build NAME_config
+	make O=/tmp/build all
+
+2. Set environment variable BUILD_DIR to point to the desired location:
+
+	export BUILD_DIR=/tmp/build
+	make distclean
+	make NAME_config
+	make all
+
+//移植到新开发板上：
+1.  Add a new configuration option for your board to the toplevel
+    "boards.cfg" file, using the existing entries as examples.
+    Follow the instructions there to keep the boards in order.
+2.  Create a new directory to hold your board specific code. Add any
+    files you need. In your board directory, you will need at least
+    the "Makefile", a "<board>.c", "flash.c" and "u-boot.lds".
+3.  Create a new configuration file "include/configs/<board>.h" for
+    your board
+3.  If you're porting U-Boot to a new CPU, then also create a new
+    directory to hold your CPU specific code. Add any files you need.
+4.  Run "make <board>_config" with your new name.
+5.  Type "make", and you should get a working "u-boot.srec" file
+    to be installed on your target system.
+6.  Debug and solve any problems that might arise.
+    [Of course, this last step is much harder than it sounds.]
+
+//命令：help列出支持的命令
+环境变量：printenv，setenv，saveenv
+
+//uboot可以用来启动两种格式的镜像：
+FIT(Flattened Image Tree)：
+允许镜像有多个组成部分(多个kernel，ramdisk)
+参考doc/uImage.FIT
+
+老格式：
+在二进制码前加了一个头,用来说明二进制码的一些信息(目标系统，cpu，crc32等)
+
+/*
+ uboot启动命令：uboot在RAM中运行代码。
+*/
+
+1.将映像从媒体(以太网，USB，flash)中读入到RAM
+2.跳入到RAM中映像的第一条命令
+
+//从以太网：
+# tftpboot <loadAddress>下载到RAM的地址 <bootfilename>下载的文件
+
+TFTP传输在serverip地址(服务器)和ipaddr地址(目标)之间。服务器运行TFTP服务，还有一个启动文件供下载
+
+//从USB：
+USB必须是FAT文件系统
+# usb reset
+# fatload usb <dev>[:partition]（从usb哪个分区） <loadAddress>（写入到RAM地址） <bootfilename>
+
+//从flash：
+从flash启动，不依赖外部硬件
+NOR flash
+# cp.[b/w/l] <sourceAddress> <loadAddress> <count>
+
+NAND flash
+# nand read <loadAddress> <sourceAddress> <count>
+
+//从RAM启动：
+WinCE：# go <loadAddress>
+Linux：# bootm <loadAddress>
+
+//使用nvram(非易失内存，EEPROM或flash)：
+保存IP地址网关，分区表等信息。一般这些信息会有备份一旦损毁可以恢复。恢复可以通过命令intvram
+
+--------------------------------------
+当执行intvram时只是改变内存中的变量。在执行命令saveenv或者intnvram时U-Boot将改变写入到nvram中。
+命令格式：
+intnvram help|print <params>|printall|repair|reset|save|set <params>
+
+
+--------------------------------------
+输出，修改，保存分区表通过命令mtdparts
+
+/* 
+ 固件更新命令：
+*/
+boot loader，kernel其他保存在flash中的数据组成固件。可以通过flash命令修改这些固件。
+一般通过三步来修改：
+1.将固件读入到内存
+2.擦除flash中数据
+3.将内存中数据写入到flash中
+--------------------------------------
+用RAM中数据更新flash：
+先通过网络或USB将数据传送到RAM。
+NOR flash：
+#erase address +size
+#cp.[b|w|l] sourceAddress targetAddress count
+
+NAND flash：
+#nand erase address size
+#nand write sourceAddress targetAddress count
+
+

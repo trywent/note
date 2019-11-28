@@ -23,6 +23,9 @@ ro.build.fytinputmethod=
 #type 2 brlinkd
 sys.fyt.bluetooth_type=1
 
+#obd
+sys.fyt.systemobd=true
+
 #px3蓝牙配置(gocsdk5)
 ro.fyt.bluetooth_type=1
 
@@ -47,3 +50,5 @@ sys.fyt.ec_version=6
 setprop sys.fyt.debug.set debugoon
 #打开root
 setprop sys.fyt.setparama lsecadbdebug9 
+
+

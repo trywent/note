@@ -13,14 +13,13 @@ startOtherServices@SystemServer.java-->WindowManagerService.main(mSystemContext)
 getSystemService("WindowManager")-->WindowManagerImpl@WindowManagerImpl.java-->
 static sDefaultWindowManager@WindowManagerGlobal.java
 
-_____________
-//计算config
-computeNewConfiguration-->computeNewConfigurationLocked-->
-computeScreenConfigurationLocked@WindowManagerService.java
 
-//更新config到activityManager
-startOtherServices@SystemServer.java-->displayReady-->mActivityManager.updateConfiguration
-@WindowManagerService.java-->updateConfiguration(null)@ActivityManagerService.java
+
+//启动完成打开显示
+performEnableScreen{
+- 
+}@WindowManagerService.java
+
 
 
 

@@ -1,3 +1,6 @@
+/*
+
+*/
 preference设置的值可以保存到SharedPreferences，也可从SharedPreferences读取设置值
 
 ___________________________________

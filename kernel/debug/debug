@@ -1,0 +1,47 @@
+//调试stack trace：
+
+objdump 将库文件中的函数输出地址
+addr2line 将地址转换为库中的函数
+
+
+
+addr2line -e vmlinux ffffffc000744068
+
+kernel panic
+
+px3/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-objdump
+
+
+_____________________________
+http://elinux.org/Kernel_Debugging_Tips
+
+编译单个文件：
+make pathto/file.o
+
+生成预处理后的文件：
+make pathto/file.i
+
+生成汇编文件：
+make pathto/file.s
+
+
+//打印栈
+
+dump_stack()
+
+
+
+
+//ftrace
+trace_printk()
+tracing_on/tracing_off 控制跟踪信息的记录
+
+
+@/sys/kernel/debug/tracing
+echo 1 > /sys/kernel/debug/tracing/tracing_on
+echo function > current_tracer
+echo 0 > /sys/kernel/debug/tracing/tracing_on
+
+
+adb shell cat /sys/kernel/debug/tracing/trace > trace.txt
+

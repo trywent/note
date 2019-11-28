@@ -1,9 +1,17 @@
 /*
  gps
-*/
 
 $(call inherit-product-if-exists, vendor/sprd/modules/gps/GreenEye2/device-sprd-gps.mk)
 @device/sprd/isharkl2/sp9853i_1h10/sp9853i_1h10_common.mk
+*/
+struct hw_module_t HAL_MODULE_INFO_SYM = {
+    .tag = HARDWARE_MODULE_TAG,
+    .version_major = 1,
+    .version_minor = 0,
+    .id = GPS_HARDWARE_MODULE_ID,
+    .methods = &hw_module_methods,
+}@gps.c
+
 
 GpsInterface  _GpsInterface = {
     size:                       sizeof(GpsInterface), 
@@ -18,7 +26,287 @@ GpsInterface  _GpsInterface = {
     get_extension: 		gps_get_extension,
 }@gps.c
 
+//打开gps,获取gps接口
+hw_module_methods.open-->open_gps(const struct hw_module_t* module, char const* name,struct hw_device_t** device){
+- struct gps_device_t *gps_device = malloc(sizeof(struct gps_device_t))
+- gps_device->common.module     = (struct hw_module_t*)module
+- gps_device->get_gps_interface = gps_get_hardware_interface-->&_GpsInterface
+  //返回设备
+- *device = (struct hw_device_t*)gps_device
+}@gps.c
 
+
+//初始化
+Gnss::setCallback-->mGnssIface->init(&sGnssCb)-->gps_init(GpsCallbacks* callbacks){
+- GpsState*  s = _gps_state;
+　//设置信号处理函数
+-　signal(SIGPIPE, sig_handler_pipe)
+- if(!s->first){
+	- s->callbacks = *callbacks
+	  //读取配置信息
+	- gps_config(s)
+	- gps_state_init(s)
+  }else{
+	- 
+	
+  }
+  //模块上电。打开硬件串口"/dev/ttyS3"
+- gps_setPowerState(DEVICE_SLEEP)
+- gps_hardware_open{
+	- GpsState *s = _gps_state
+	- openSerialPort(s->serialName){
+		- s->fd = open(pSerialName, O_RDWR | O_NOCTTY)
+		}
+	}@gps_hardware.c
+- s->init =  1
+- s->supldata = SUPL_NET_RELEASE
+}@gps.c
+
+
+gps_state_init( GpsState*  state ){
+- state->first       =  1
+  //state->control 创建socketpair,用于控制通信。gps_daemon(control[1]) 
+- socketpair( AF_LOCAL, SOCK_STREAM, 0, state->control )
+- CreateEvent(&(state->threadsync), "threadsync")
+- state->callbacks.set_capabilities_cb(state->m_capabilities)
+  //创建线程
+-　state->lte_thread = state->callbacks.create_thread_cb( "lte",SoonerFix_PredictThread, state)
+- state->thread = state->callbacks.create_thread_cb( "libgps", gps_read_thread, state )
+- state->daemon_thread = state->callbacks.create_thread_cb( "libgps_daemon", gps_daemon_thread, state )
+- state->gnss_data_thread = state->callbacks.create_thread_cb( "libgps_data",gnss_dataproc_thread, state )
+}@gps.c
+
+//读取配置文件
+gps_config(s){
+  //配置文件不存在，拷贝配置文件CONFIG_XML_PATH
+- setup_file(CONFIG_TYPE){
+	- SUPL_TYPE{
+		- etc_path = state->supl_path
+		- setup_path = SUPL_XML_PATH		
+		}
+	- CONFIG_TYPE{
+		- etc_path = CONFIG_ETC_PATH
+		- setup_path = CONFIG_XML_PATH
+		}
+	  //将vendor下配置文件写到data
+	- fp = fopen(etc_path,"rb")
+	- fread(buf,xmlstat.st_size,1,fp)
+	- xmlfp = fopen(setup_path,"wb+")
+	- fwrite(buf,xmlstat.st_size,1,xmlfp)
+	}
+  //agps配置文件
+- config_xml_ctrl(GET_XML, "SUPL-PATH", pState->supl_path, CONFIG_TYPE)
+- setup_file(SUPL_TYPE)
+- get_xml_value("SERVER-ADDRESS", tmp_server)
+  //
+- config_xml_ctrl(GET_XML,"NOKIA-EE",value,CONFIG_TYPE)
+  //从配置中获取串口名
+- config_xml_ctrl(GET_XML,"UART-NAME",pState->serialName,CONFIG_TYPE)
+}@gps.c
+
+//开始
+gps_start(){
+- gstate.status = GPS_STATUS_ENGINE_ON
+- s->callbacks.status_cb(&gstate)
+  //发送命令
+- gps_state_start(s){
+	- char cmd = CMD_START
+	- write( s->control[0], &cmd, 1 )
+	}
+}@gps.c
+
+//停止
+gps_stop(void){
+  //发送停止命令
+- gps_state_stop(s){
+	- char  cmd = CMD_STOP
+	- write( s->control[0], &cmd, 1)
+	}
+  //通知上层
+- gstate.status = GPS_STATUS_ENGINE_OFF
+- s->callbacks.status_cb(&gstate)
+}@gps.c
+
+
+
+/*
+ gps处理命令
+*/
+state->callbacks.create_thread_cb( "libgps_daemon", gps_daemon_thread, state )-->
+gps_daemon_thread( void*  arg ){
+- GpsState*  s = (GpsState*)arg
+- int   control_fd = s->control[1]
+- epoll_fd = epoll_create(5)
+- epoll_register( epoll_fd, control_fd )
+  //等待数据
+- epoll_wait( epoll_fd, events, 5, -1 )
+- read(fd, &cmd_buf[i], 1 )
+- cmd = cmd_buf[i-1]
+- if(cmd == CMD_START&& (!s->started)){
+	- gps_wakeupDevice(s)
+	- gps_sendData(SET_OUTTYPE,NULL)
+	- gps_sendData(SET_CMCC_MODE, NULL)
+	  //
+	- config_xml_ctrl(GET_XML,"REALEPH-ENABLE",log_string,CONFIG_TYPE)
+	  //模式配置
+	- config_xml_ctrl(GET_XML,"CP-MODE",log_string,CONFIG_TYPE)
+	- s->cpmode =  //GPS_BDS/GPS_GLONASS
+	- gps_sendData(SET_CPMODE,NULL)
+  }
+- if(cmd == CMD_STOP){
+
+  }
+- if(cmd == CMD_CLEAN){
+
+  }
+- if (cmd == CMD_QUIT){ //退出
+	- goto threaddone
+  }
+- epoll_deregister(epoll_fd, control_fd)
+}@gps_daemon.c
+
+
+//从串口发送数据
+gps_sendData(int flag,const char *pBuf ){
+-
+- gps_adingData(&Pak){
+	- GNSS_EncodeOnePacket(packet, s->writeBuffer, SERIAL_WRITE_BUFFER_MAX)
+	- gps_writeSerialData(s,len){
+		- write(s->fd,s->writeBuffer,len) //
+		}
+	}
+}@gps_hardware.c
+
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps_comm.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps_daemon.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps_hardware.c
+/*
+ 读取串口数据
+
+ pGPSState->fd 用于从模块串口传输数据
+*/
+gps_read_thread{
+- thread_status = thread_run
+- nmea_reader_init( s->NmeaReader )
+- nmea_reader_set_callback(s->NmeaReader,&s->callbacks)
+- GNSS_InitParsePacket(&gGPSStream)
+- WaitEvent(&(s->threadsync), EVENT_WAIT_FOREVER)
+- while(1){
+	- 
+	- gps_serialPortRead(s)
+ }
+}@gps.c
+
+gps_serialPortRead(GpsState *pGPSState){
+- GpsState *s = _gps_state
+- readLen = read( pGPSState->fd, pGPSState->readBuffer, SERIAL_READ_BUFFER_MAX-1)
+- GNSS_ParseOnePacket(&gGPSStream, pGPSState->readBuffer,readLen){
+	- switch(pStream->state){
+		- GNSS_RECV_SEARCH_FLAG:GNSS_searchFlag(pStream, pInput, remainLen, &processedLen)
+		- GNSS_RECV_COLLECT_HEAD:GNSS_CollectHeader(pStream,pInput,remainLen,&processedLen)
+		- GNSS_RECV_DATA:GNSS_CollectData(pStream, pInput, remainLen,&processedLen)
+		}
+	}@gnss_libgps_api.c
+}@gps_hardware.c
+
+
+GNSS_CollectData(TGNSS_DataProcessor_t* pStream, unsigned char* pData, unsigned short Len, unsigned short* pProcessedLen){
+- gps_dispatch(&pStream->cmdData){
+	- 
+	- switch(pPacket->type){
+		- GNSS_LIBGPS_SET_PARA_TYPE:gps_getParaData(pPacket)
+		  //收到nmea数据
+		- GNSS_LIBGPS_NMEA_TYPE:nmea_parse_cp(pPacket->buff,pPacket->length)
+		}
+	}@gps_comm.c
+- 
+}@gnss_libgps_api.c
+
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps_hardware.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gnss_libgps_api.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps_comm.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/nmeaenc.c
+/*****************
+ daemon
+ 接受设置gps模式等命令
+*/
+
+main(void){
+- gnss_signals{
+	- SIGNAL(SIGTERM,act, gnss_signals_handler);
+	- SIGNAL(SIGPIPE,act,gnss_signals_handler)
+	}
+- gnss_socket_init(&g_gnss_server){
+	- pgnssserver_t *pmanager = g_gnss_server
+	- pmanager->client_fds[i] = -1
+	- pmanager->listen_fd = socket_local_server(GNSS_LCS_SOCKET_NAME, ANDROID_SOCKET_NAMESPACE_ABSTRACT, SOCK_STREAM) //"GNSS_LCS_SERVER"
+	}
+- pthread_create(&client_id, NULL, gnss_listen_thread, (void*)(&g_gnss_server))-->gnss_listen_thread
+- pthread_create(&gnsshandle_id, NULL, gnss_server_handle, (void*)(&g_gnss_server))-->gnss_server_handle
+}@gnssdaemon.c
+
+//服务端，等待连接，建立连接
+gnss_listen_thread(void *arg){
+- pgnssserver_t *pgnss_server = (pgnssserver_t *)arg
+  //等待连接
+- select(pgnss_server->listen_fd + 1, &read_fds)  
+- fd = accept(pgnss_server->listen_fd, &addr, &alen)//建立连接
+- gnss_update_fd(pgnss_server,fd){//设置连接的client的socket fd
+	- pgnssclient->client_fds[i] = fd
+	}
+}@gnssdaemon.c
+
+//服务端读取数据，处理数据
+gnss_server_handle(void *arg){
+- pgnssserver_t *pgnssshandle = (pgnssserver_t *)arg
+  //监听已经连接的client socket
+- result = select(fdmax + 1, &readset, NULL, NULL, &timeout)
+  //遍历读取client数据
+- for(i = 0; i < GNSS_LCS_CLIENT_NUM; i++){
+	- int tmpfd = pgnssshandle->client_fds[i]
+	- len = read(tmpfd,buffer,GNSS_SOCKET_BUFFER_SIZE)
+	- gnss_lcs_handle(tmpfd, buffer,len)
+	}
+}@gnssdaemon.c
+
+gnss_lcs_handle(int fd,unsigned char* pData, int len){
+- flag = *pTmp++
+- if('$' == flag)
+	- sgps_lcs_handle(fd,pData,len)
+- switch(flag)
+	- GNSS_CONTROL_NOTIFIED_INITED_TYPE
+	- GNSS_CONTROL_GET_WIFI_TYPE
+	- GNSS_CONTROL_GET_ANGRYGPS_AGPSMODE
+}@gnssdaemon.c
+
+
+//daemon client
+//读取服务端命令
+state->callbacks.create_thread_cb( "lcs_client",gnssdaemon_client_thread, state )-->
+gnssdaemon_client_thread(void *arg) {
+- GpsState*  s = (GpsState*)arg
+- s->socet_client = get_socket_fd(GNSS_LCS_SOCKET_NAME,&rcv_timeout) //"GNSS_LCS_SERVER"
+  //连接到服务端
+- gnss_send2Daemon(s,GNSS_CONTROL_NOTIFIED_INITED_TYPE,&flag,1)-->
+	gnss_send2Daemon(GpsState* pState,char type,void* pData, unsigned short len){
+	- write(pState->socet_client,data,sendLen)
+	}
+- while(1){
+	  //读取服务端数据
+	- len = read(s->socet_client,buff,sizeof(buff))
+	  //处理服务端命令
+	- gnss_getCommond(s,buff,len)
+	}
+}@gnssdaemon_client.c
+
+
+
+sp9853/vendor/sprd/modules/gps/GreenEye2/gnssdeamon/gnssdaemon.c
+sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gnssdaemon_client.c
+/*****************
+  agps
+*/
 
 //获取agps接口
 gps_get_extension{
@@ -28,9 +316,7 @@ gps_get_extension{
 - 
 }@agps.c
 
-
-
-
-sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/gps.c
 sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/gps_lib/src/agps.c
 sp9853/vendor/sprd/modules/gps/GreenEye2/ge2_libgps/common/src/lcs_agps.c
+
+

@@ -23,8 +23,6 @@ Activity:  <activity android:theme="@android:style/xxx">
 <style name="Theme.DeviceDefault.Light.DarkActionBar" parent="Theme.Material.Light.DarkActionBar"> //当前系统默认
 
 
-
-
 //R.styleable 数据结构..定义属性名及属性拥有的成员  attrs.xml
 <declare-styleable name="xxxxx">//styleable中变量名.可通过R.styleable.xxxx获取
         <attr name="yyyy" /> //属性名字

@@ -1,4 +1,4 @@
-/*
+/*******************
  usb host
 */
 //host驱动注册:
@@ -14,7 +14,10 @@ arch_initcall(usbdev_init_devices){
 - platform_device_register(&device_usb20_host) //"usb20_host"
 }@usbdev_rk30.c
 
-/* 
+
+
+
+/*******************
  otg设备初始化：创建otg设备dwc_otg_device_t * dwc_otg_device
  
  otg可以设置为主，从
@@ -67,7 +70,8 @@ dwc_otg_hcd_init(struct device *dev){
 
 //从设备初始化
 dwc_otg_pcd_init(struct device *dev){
-- 
+- dwc_otg_pcd_t *pcd = kmalloc( sizeof(dwc_otg_pcd_t), GFP_KERNEL)
+- s_pcd = pcd
 }@dwc_otg_pcd.c
 
 kernel/drivers/usb/dwc_otg/dwc_otg_pcd.c
@@ -112,11 +116,17 @@ dwc_otg_common_irq{
 
 
 
+//断开
+cil_hcd_disconnect@dwc_otg_cil.h-->
+hcd_cil_callbacks.disconnect-->dwc_otg_hcd_disconnect_cb@dwc_ogt_hcd.c
+
+
 
 kernel/drivers/usb/dwc_otg/usbdev_rk30.c
 kernel/drivers/usb/dwc_otg/dwc_otg_hcd.c
 kernel/drivers/usb/dwc_otg/dwc_otg_driver.c
 kernel/drivers/usb/dwc_otg/dwc_otg_cil.c
+kernel/drivers/usb/dwc_otg_310/dwc_otg_cil.h
 ===============
 //sleep
 usb_suspend_both-->usb_suspend_device-->udriver->suspend(@driver.c-->usb_generic_driver.suspend-->

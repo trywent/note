@@ -1,4 +1,6 @@
-//
+/*
+ 
+*/
 Configuration{
 - fontScale
 - mcc  //Mobile Country Code 移动设备国家代码 460mcc6mnc 中国(460)联通(6)
@@ -37,3 +39,13 @@ adjustConfigurationForBounds{
 frameworks/base/core/java/android/content/res/Configuration.java
 frameworks/base/services/core/java/com/android/server/wm/StackWindowController.java
 frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
+
+
+/*
+ activity 更新配置configuration
+*/
+createWindowContainer-->
+updateOverrideConfigurationFromLaunchBounds-->updateOverrideConfiguration@TaskRecord.java
+
+frameworks/base/services/core/java/com/android/server/am/ConfigurationContainer.java
+

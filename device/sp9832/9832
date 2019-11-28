@@ -3,9 +3,14 @@
 dd if=/sdcard/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot
 dd if=/storage/USB0/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot
 
-arm-eabi-gcc -Os   -fno-common -ffixed-r8 -msoft-float   -mno-unaligned-access -D__KERNEL__ -DCONFIG_SYS_TEXT_BASE=0x50005000 -DCONFIG_SYS_NAND_U_BOOT_SIZE= -DCONFIG_SPL_LOAD_LEN= -I/disk3/sprd/fyt6025/idh.code/out/target/product/sp9832a_fyt6025/obj/chipram/include2 -I/disk3/sprd/fyt6025/idh.code/out/target/product/sp9832a_fyt6025/obj/chipram/include -I/disk3/sprd/fyt6025/idh.code/chipram/include -fno-builtin -ffreestanding -nostdinc -isystem /disk3/sprd/fyt6025/idh.code/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/bin/../lib/gcc/arm-eabi/4.8/include -pipe  -DCONFIG_ARM -D__ARM__ -marm  -mabi=aapcs-linux -mno-thumb-interwork  -march=armv7-a -Wall -Wstrict-prototypes -fno-stack-protector -DFDL_CHG_SP9630FPGA -DFDL_CHG_PIKELFPGA -DFDL_CHG_SPX35L64FPGA -DFDL_CHG_SP9820FPGA -DCONFIG_PRELOADER -g -D CONFIG_FDL1 -D CONFIG_FRMCHECK -I /disk3/sprd/fyt6025/idh.code/out/target/product/sp9832a_fyt6025/obj/chipram/include/asm/arch -mlittle-endian -DCONFIG_NAND_SPL -c -o /disk3/sprd/fyt6025/idh.code/out/target/product/sp9832a_fyt6025/obj/chipram/nand_spl/board/spreadtrum/sc9630/spl_start.o /disk3/sprd/fyt6025/idh.code/chipram/nand_spl/board/spreadtrum/sc9630/spl_start.S
+
+dd if=/storage/USB0/u-boot.bin of=/dev/block/mmcblk0boot1
 
 
+
+
+
+//Ubuntu16编译报错
 
 diff --git a/idh.code/chipram/Makefile b/idh.code/chipram/Makefile
 index 86365c5..ec27a59 100644

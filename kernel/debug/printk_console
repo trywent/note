@@ -1,0 +1,214 @@
+/*******************
+ kernel printk
+*/
+
+/*
+ console消息输出优先级
+*/
+cat /proc/sys/kernel/printk
+4      4       1       7
+
+所得到的信息是$Linux_SRC/include/linux/printk.h中定义的宏：
+#define console_loglevel (console_printk[0])         //控制台日志级别：优先级高于该值的消息将被打印至控制台
+#define default_message_loglevel (console_printk[1]) //缺省的消息日志级别：将用该优先级来打印没有设置优先级的消息
+#define minimum_console_loglevel (console_printk[2]) //最低的控制台日志级别：控制台日志级别可被设置的最小值（最高优先级）
+#define default_console_loglevel (console_printk[3]) //缺省的控制台日志级别：控制台日志级别的缺省值
+
+//改变控制台输出级别：
+echo $level > /proc/sys/kernel/printk
+
+在uboot启动命令中加入日志级别。loglevel=
+
+#define KERN_EMERG "<0>" /* system is unusable*/
+#define KERN_ALERT "<1>" /* action must be taken immediately*/
+#define KERN_CRIT "<2>" /* critical conditions*/
+#define KERN_ERR "<3>" /* error conditions*/
+#define KERN_WARNING "<4>" /* warning conditions*/
+#define KERN_NOTICE "<5>" /* normal but significant condition*/
+#define KERN_INFO "<6>" /* informational*/
+#define KERN_DEBUG "<7>" /* debug-level messages*/
+/*
+ printk
+
+ 数据保存到cont.buf
+*/
+
+static struct cont {
+	char buf[LOG_LINE_MAX];         // 1024 - PREFIX_MAX(32)
+	size_t len;			/* length == 0 means unused buffer */
+	size_t cons;			/* bytes written to console */
+	struct task_struct *owner;	/* task of first print*/
+	u64 ts_nsec;			/* time of first print */
+	u8 level;			/* log level of first message */
+	u8 facility;			/* log level of first message */
+	enum log_flags flags;		/* prefix, newline flags */
+	bool flushed:1;			/* buffer sealed and committed */
+	int cpu;
+} cont;
+
+//printk
+printk(const char *fmt, ...)-->vprintk_emit(0, -1, NULL, 0, fmt, args)-->
+vprintk_emit(int facility, int level,const char *dict, size_t dictlen,const char *fmt, va_list args){
+- local_irq_save(flags);
+- int this_cpu = smp_processor_id()
+ //获取要打印的字符串
+- text_len = vscnprintf(text, sizeof(textbuf), fmt, args)
+- if (text_len && text[text_len-1] == '\n') {
+	- lflags |= LOG_NEWLINE //newline
+	}
+ //去除输出串中loglevel。获取level
+- if (facility == 0) {
+	- int kern_level = printk_get_level(text)             //需要kern_level-'0'
+	- const char *end_of_header = printk_skip_level(text) //保存需要输出的字符串
+	}
+- if (!(lflags & LOG_NEWLINE)) {
+	  //将字符保存到buffer。
+	- cont_add(facility, level, text, text_len){
+		- 
+		- memcpy(cont.buf + cont.len, text, len)
+		}
+  }else{
+	- if (cont.len && cont.owner == current) {
+		- cont_add(facility, level, text, text_len)
+		- cont_flush(LOG_NEWLINE)
+		}
+	}
+  //将buffer中数据写到串口
+- if (console_trylock_for_printk(this_cpu))
+		console_unlock()
+  //
+- local_irq_restore(flags);
+}@printk.c
+
+输出buffer：
+call_console_drivers-->_call_console_drivers{
+- 若消息的级别值小于控制台默认值(console_loglevel),则输出log。__call_console_drivers-->con->write
+	
+}
+
+
+
+
+kernel/kernel/printk/printk.c
+kernel/include/linux/printk.h
+
+
+/*
+ console
+
+ 平台串口驱动注册时，会注册console。每个端口都会注册
+
+*/
+int console_printk[4] = {
+	DEFAULT_CONSOLE_LOGLEVEL,	/* console_loglevel */
+	DEFAULT_MESSAGE_LOGLEVEL,	/* default_message_loglevel */
+	MINIMUM_CONSOLE_LOGLEVEL,	/* minimum_console_loglevel */
+	DEFAULT_CONSOLE_LOGLEVEL,	/* default_console_loglevel */
+}@printk.c
+
+static struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES]
+
+//cmdline中设置console,串口号
+__setup("console=", console_setup)-->console_setup(char* str){
+- strncpy(buf, str, sizeof(buf) - 1)
+- options = strchr(str, ',') //参数
+- __add_preferred_console(buf, idx, options, brl_options){
+	- struct console_cmdline *c
+	  //查找是否已经注册
+	- for (i = 0; i < MAX_CMDLINECONSOLES && console_cmdline[i].name[0]; i++){
+		- if (strcmp(console_cmdline[i].name, name) == 0 && console_cmdline[i].index == idx)
+			- selected_console = i
+		}
+	  //没有注册，加入到console_cmdline
+	- selected_console = i
+	- c = &console_cmdline[i]
+	- strlcpy(c->name, name, sizeof(c->name)) //设置名字
+	- c->index = idx
+	}
+}@printk.c
+
+//注册console。
+register_console(struct console *newcon){
+ //查看是否已经注册CON_BOOT boot_console
+- if (console_drivers && newcon->flags & CON_BOOT) {
+	- for_each_console(bcon) {
+ 		- if (!(bcon->flags & CON_BOOT)) return
+		}
+	}
+- newcon->early_setup()
+  //匹配到cmdline中选择的console
+- preferred_console = selected_console
+- for (i = 0; i < MAX_CMDLINECONSOLES && console_cmdline[i].name[0];i++) {
+	- strcmp(console_cmdline[i].name, newcon->name) //名字是否匹配
+	- newcon->setup(newcon, console_cmdline[i].options)
+	}
+  //
+- console_lock()
+- console_drivers = newcon
+  //printk的buffer。kernel启动后正常使用的
+- if (newcon->flags & CON_PRINTBUFFER) {
+	- exclusive_console = newcon
+	} 
+- console_unlock()
+- console_sysfs_notify() 
+}@printk.c
+
+//将buffer中字符写入到串口
+console_unlock{
+- console_cont_flush(text, sizeof(text)) 
+- for (;;) {
+	- 
+	- call_console_drivers(level, text, len)
+	}
+}@printk.c
+
+
+//写到串口
+call_console_drivers{
+
+}@printk.c
+
+
+kernel/include/linux/console.h
+
+/*
+ earlyconsole
+
+*/
+early_param("earlycon", name ## _setup_earlycon)@serial_core.h
+int __init setup_earlycon(char *buf, const char *match,int (*setup)(struct earlycon_device *, const char *)){
+- struct uart_port *port = &early_console_dev.port
+- parse_options(&early_console_dev, buf)
+- register_console(early_console_dev.con)
+}@earylycon.c
+
+
+early_param("earlyprintk", setup_early_printk)-->setup_early_printk{
+- early_console = &early_console_dev{
+	- .name =		"earlycon",
+	- .write =	early_console_write-->printch
+	}
+- register_console(&early_console_dev)
+}@early_printk.c
+
+kernel/arch/arm/kernel/early_printk.c
+kernel/include/linux/serial_core.h
+kernel/drivers/tty/serial/earlycon.c
+
+/*******************
+ android层log
+ 
+ log写到/dev/kmsg中由kernel串口输出
+*/
+
+//最终写到kmsg
+init_klog_write(int level, const char* fmt, ...)-->init_klog_vwrite@log.cpp-->
+klog_writev-->writev(klog_fd/*/dev/kmsg*/, iov, iov_count)@klog.c
+
+
+
+
+system/core/init/log.cpp
+system/core/libcutils/klog.c
+
+

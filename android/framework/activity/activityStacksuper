@@ -14,15 +14,9 @@
 
  当启动应用时，需要等待启动应用显示才能隐藏上一个应用。也就是等待idle时处理mStoppingActivities,mFinishingActivities.
 */
-processStoppingActivitiesLocked(ActivityRecord idleActivity){
-- allResumedActivitiesVisible
-  //遍历mStoppingActivities
-- ActivityRecord s = mStoppingActivities.get
-- removeTimeoutsForActivityLocked(idleActivity)
-- scheduleIdleTimeoutLocked(idleActivity)
-}@ActivityStackSupervisor.java
 
-//从应用端回调
+
+//从应用端回调执行IDLE
 activityIdle(IBinder token, Configuration config, boolean stopProfiling)-->
 mStackSupervisor.activityIdleInternalLocked(false,false, config)@ActivityManagerService.java
 //ActivityService调用pause后,进入idle超时
@@ -48,7 +42,14 @@ activityIdleInternalLocked(IBinder token,boolean fromTimeout,boolean processPaus
 - resumeFocusedStackTopActivityLocked
 }ActivityStackSupervisor.java
 
-
+//获取正在stop的Activity
+processStoppingActivitiesLocked(ActivityRecord idleActivity){
+- allResumedActivitiesVisible
+  //遍历mStoppingActivities
+- ActivityRecord s = mStoppingActivities.get
+- removeTimeoutsForActivityLocked(idleActivity)
+- scheduleIdleTimeoutLocked(idleActivity)
+}@ActivityStackSupervisor.java
 
 /*******
  stack管理

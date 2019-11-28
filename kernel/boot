@@ -1,0 +1,71 @@
+/***********************
+  boot
+
+*/
+start_kernel{
+- setup_arch(&command_line)
+- setup_command_line(command_line)
+- mm_init
+
+
+- rcu_init
+- console_init
+  //最后初始化其它，执行/init
+- rest_init(void){
+	- kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND)
+	- numa_default_policy()
+	- kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES)
+	}
+}@main.c
+
+arch_initcall(customize_machine)-->machine_desc->init_machine@setup.c
+
+
+
+//kernel_init
+kernel_init{
+- kernel_init_freeable(){
+	- 
+	}
+- free_initmem
+  //尝试执行用户空间init
+- run_init_process(ramdisk_execute_command)
+- run_init_process(execute_command)
+- run_init_process("/sbin/init")
+}@main.c
+
+
+__setup(str, fn)-->__setup_param(str, unique_id, fn, early)@init.h
+
+
+kernel/include/linux/init.h
+kernel/init/main.c
+kernel/arch/arm/kernel/setup.c
+kernel/arch/arm/mm/mmu.c
+
+/***********************
+ 
+ kernel获取uboot传递的参数
+*/
+
+
+
+//ATAG
+
+arch/arm/kernel/atags.h
+arch/arm/kernel/atags_parse.c
+
+/***********************
+  restart
+
+*/
+
+kernel_restart@sys.c-->machine_restart@process.c
+
+
+emergency_restart@sys.c-->machine_emergency_restart@emergency-restart.h
+-->machine_restart@process.c
+
+
+arch/arm/kernel/process.c
+include/asm-generic/emergency-restart.h

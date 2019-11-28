@@ -1,5 +1,5 @@
 /**********************
- PIP
+ systemui PIP
 */
 start{
 - mPipManager = com.android.systemui.pip.phone.PipManager.getInstance()

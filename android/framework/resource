@@ -6,18 +6,6 @@ resource
 
 resource ID是一个32位数.格式为:PPTTNNNN. PP资源包; TT资源类型; NNNN资源名. 应用中PP值为0x7f
 */
-
-系统私有资源需要添加res/valus/symbols.xml
-  <!--fyt add-->
-  <java-symbol type="drawable" name="fytbt_up1" />
-  <java-symbol type="drawable" name="fytbt_down1" />
-  <java-symbol type="drawable" name="fytbt_up2" />
-  <java-symbol type="drawable" name="fytbt_down2" />
-  <java-symbol type="layout" name="fyt_button" />
-  <java-symbol type="id" name="fytWinbt" />
-===================
-//theme
-
 theme.obtainStyledAttributes(R.styleable.xxxx/*要获取的属性*/)
 //应用更新配置configuration
 updateConfigurationLocked(Configuration values){
@@ -61,7 +49,7 @@ Resources.obtainStyledAttributes(AttributeSet, int[], int, int)
 Resources.obtainAttributes(AttributeSet, int[])
 
 /******************************
-  android6.1  esource创建
+  android6.1  resource创建
   
 */
 createActivityContext(ActivityThread mainThread,LoadedApk packageInfo, ActivityInfo activityInfo....){
@@ -232,6 +220,18 @@ frameworks/base/core/java/android/content/res/AssetManager.java
 frameworks/base/core/jni/android_util_AssetManager.cpp
 frameworks/base/libs/androidfw/AssetManager.cpp
 frameworks/base/libs/androidfw/ResourceTypes.cpp
+
+/****************
+ 加入资源到系统
+
+*/
+
+//私有资源
+1. 使用MakeJavaSymbols.sec生成
+2. 直接加入到framework/base/core/res/res/values/symbols.xml
+
+//公共资源
+
 
 
 

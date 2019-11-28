@@ -1,5 +1,13 @@
 /*
+  gatekeeper
 
 */
+service gatekeeperd /system/bin/gatekeeperd /data/misc/gatekeeper@gatekeeperd.rc
+-->main(){
+- android::sp<android::IServiceManager> sm = android::defaultServiceManager()
+- android::sp<android::GateKeeperProxy> proxy = new android::GateKeeperProxy()
+- sm->addService(android::String16("android.service.gatekeeper.IGateKeeperService"), proxy)
+}@gatekeeperd.cpp
 
-
+system/core/gatekeeperd/gatekeeperd.cpp
+system/gatekeeper/gatekeeper.cpp

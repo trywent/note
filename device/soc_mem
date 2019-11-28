@@ -1,0 +1,62 @@
+/*
+ sp9832
+
+ 地址空间： 0x0000_0000-0xFFFF_FFFF (4G)
+ 内存地址空间： 0x8000_0000-0xF000_0000
+*/
+
+
+/*
+ sp9853
+
+ 地址空间： 0x0_0000_0000-0x4_3FFF_FFFF
+ 内存地址空间： 0x0_0000_0000~0x0_BFFF_FFFF DDR bank0 non-interleave (3GB)
+*/
+
+
+/*
+ sp7731
+ 地址空间： 0x0000_0000-0xFFFF_FFFF (4G)
+ 内存地址空间： 0x8000_0000-0xFFFF_FFFF (2G)
+*/
+#define BOOTIMG_ADR     0x90000000
+#define DT_ADR          0x85400000
+#define KERNEL_ADR      0x80008000
+#define VLX_TAG_ADDR    0x82000100
+#define RAMDISK_ADR     0x85500000
+@sp7731e_1h10.h
+
+/*
+ sofia
+
+ 内存地址空间：  (2G)
+*/
+
+
+/*
+ px3
+ 地址空间： 0x0000_0000-0xE000_0000
+ 内存地址空间： 0x6000_0000-0xE000_0000 (2G)
+*/
+
+
+/*
+ px5
+
+ 地址空间： 0x0000_0000-0xFFFF_0000
+ 内存地址空间： 0x0000_0000-0xF000_0000 (4G-16M)
+*/
+#define CONFIG_RAM_PHY_START		0x00000000
+#define CONFIG_RAM_PHY_SIZE		SZ_128M
+#define CONFIG_RAM_PHY_END		(CONFIG_RAM_PHY_START + CONFIG_RAM_PHY_SIZE)
+@rk33plat.h
+
+
+#define CONFIG_KERNEL_LOAD_ADDR 	(CONFIG_RAM_PHY_START + SZ_32M)		 /* 32M offset rk kernel load address */
+#define CONFIG_RKNAND_API_ADDR		(CONFIG_RAM_PHY_START + SZ_32M + SZ_16M) /* 48M offset *//* rk nand api function code address */
+#define CONFIG_LMB_RESERVE_SIZE		(SZ_32M + SZ_16M + SZ_8M)	 	 /* 56M offset *//* rk uboot reserve size */
+#define CONFIG_RK_MAX_DRAM_BANKS	8 					 /* rk ddr max banks *//* rk ddr information */
+#define CONFIG_RKDDR_PARAM_ADDR		(CONFIG_RAM_PHY_START + SZ_32M)		 /* rk ddr banks address and size */
+#define CONFIG_RKTRUST_PARAM_ADDR	(CONFIG_RAM_PHY_START + SZ_32M + SZ_2M)  /* rk trust os banks address and size */
+#define CONFIG_RKHDMI_PARAM_ADDR	CONFIG_RAM_PHY_END			 /* rk hdmi device information buffer (start: 128M - size: 8K) */
+

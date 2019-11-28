@@ -2,6 +2,7 @@
  android编译
  source build/envsetup.sh
  lunch xxx
+ make -j8 > build_log.txt 2>&1
 
 */
 
@@ -68,7 +69,9 @@ files: prebuilt \
         $(modules_to_install) \
         $(modules_to_check) \
         $(INSTALLED_ANDROID_INFO_TXT_TARGET)
-//编译system:
+/*
+ 编译system:
+*/
 @build/core/Makefile
 INSTALLED_SYSTEMIMAGE := $(PRODUCT_OUT)/system.img
 $(INSTALLED_SYSTEMIMAGE): $(BUILT_SYSTEMIMAGE) $(RECOVERY_FROM_BOOT_PATCH) | $(ACP)
@@ -91,7 +94,9 @@ INTERNAL_SYSTEMIMAGE_FILES := $(filter $(TARGET_OUT)/%, \
     $(ALL_DEFAULT_INSTALLED_MODULES)\
     $(ALL_PDK_FUSION_FILES))
 
-//recovery:
+/*
+ recovery:
+*/
 @build/core/Makefile
 droidcore: INSTALLED_RECOVERYIMAGE_TARGET
 $(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKIMAGE) $(MINIGZIP) \
@@ -123,21 +128,62 @@ PRODUCT_DEFAULT_DEV_CERTIFICATE := \
 
 
 如果定义使用PRODUCT_EXTRA_RECOVERY_KEYS，会将该密钥的位置写入OTA升级包的/META/misc_info.txt文件中。
-//ramdisk.img:(root目录TARGET_ROOT_OUT)
+/* 
+ ramdisk.img:(root目录TARGET_ROOT_OUT)
+*/
 BUILT_RAMDISK_TARGET := $(PRODUCT_OUT)/ramdisk.img
 
 
 
 @@build/core/Makefile
 
-//boot.img:bootimage
+/*
+ boot.img:bootimage
+*/
 INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel
 INSTALLED_RAMDISK_TARGET := $(BUILT_RAMDISK_TARGET):=$(PRODUCT_OUT)/ramdisk.img
 
 INSTALLED_BOOTIMAGE_TARGET := $(PRODUCT_OUT)/boot.img
 bootimage:$(INSTALLED_BOOTIMAGE_TARGET)
 boot.img:kernel ramdisk.img
-//userdata:
+
+
+//kernel编译 sprd
+{
+TARGET_PREBUILT_KERNEL :=  $(KERNEL_OUT)/arch/$(TARGET_KERNEL_ARCH)/boot/Image
+
+$(TARGET_PREBUILT_KERNEL) : $(KERNEL_OUT) $(USER_CONFIG)
+	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) headers_install
+	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) -j${JOBS}
+	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) modules
+	@-mkdir -p $(KERNEL_MODULES_OUT)
+	@-find $(TARGET_OUT_INTERMEDIATES) -name *.ko | xargs -I{} cp {} $(KERNEL_MODULES_OUT)
+}@device/sprd/pike2/common/AndroidKernel.mk
+
+
+//编译out目录下 kernel 和dtb.img
+{
+// Compile Linux Kernel 
+ifneq ($(strip $(TARGET_NO_KERNEL)),true)
+-include device/sprd/pike2/common/AndroidKernel.mk
+file := $(PRODUCT_OUT)/kernel
+#ALL_PREBUILT += $(file)
+$(file) : $(TARGET_PREBUILT_KERNEL) | $(ACP) $(transform-prebuilt-to-target)
+endif 
+// End of Kernel
+
+// Compile dtb
+ifeq ($(strip $(BOARD_KERNEL_SEPARATED_DT)),true)
+include device/sprd/pike2/common/generate_dt_image.mk
+endif 
+// End of dtb
+}@AndroidBoard.mk
+
+
+/*
+ userdata:
+
+*/
 
 INSTALLED_USERDATAIMAGE_TARGET := $(BUILT_USERDATAIMAGE_TARGET)
 

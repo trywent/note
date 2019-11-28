@@ -5,6 +5,54 @@
  创建/config/usb_gadget/g1
  mkdir /config/usb_gadget/g1@init.usb.rc
 */
+
+
+/*
+ android4.4
+*/
+static struct device_attribute *android_usb_attributes[] = {
+	&dev_attr_idVendor,
+	&dev_attr_idProduct,
+	&dev_attr_bcdDevice,
+	&dev_attr_bDeviceClass,
+	&dev_attr_bDeviceSubClass,
+	&dev_attr_bDeviceProtocol,
+	&dev_attr_iManufacturer,
+	&dev_attr_iProduct,
+	&dev_attr_iSerial,
+	&dev_attr_functions,
+	&dev_attr_enable,
+	&dev_attr_state,
+	NULL
+}
+
+//
+module_init(init)-->init{
+- android_class = class_create(THIS_MODULE, "android_usb")
+- struct android_dev *dev = kzalloc(sizeof(*dev), GFP_KERNEL)
+- dev->functions = supported_functions
+- INIT_WORK(&dev->work, android_work)
+- android_create_device(dev){
+	- struct device_attribute **attrs = android_usb_attributes
+	- dev->dev = device_create(android_class, NULL,MKDEV(0, 0), NULL, "android0")
+	- while ((attr = *attrs++)) 
+		- device_create_file(dev->dev, attr)
+	}
+- usb_composite_probe(&android_usb_driver, android_bind)
+}@android.c
+
+
+
+
+
+
+kernel/drivers/usb/gadget/android.c
+
+/*
+
+ android8.0
+
+*/
 static struct configfs_group_operations gadgets_ops = {
 	.make_group     = &gadgets_make,
 	.drop_item      = &gadgets_drop,
@@ -31,7 +79,7 @@ module_init(gadget_cfs_init)-->gadget_cfs_init{
 - configfs_register_subsystem(&gadget_subsys)
   //sysfs
 - class_create(THIS_MODULE, "android_usb")
-}
+}@configfs.cs
 
 //创建/config/usb_gadeget,创建sys/class/android0
 mkdir "/config/usb_gadget/g1"@init.usb.rc-->gadgets_ops-->make_group-->

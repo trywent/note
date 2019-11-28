@@ -1,3 +1,8 @@
+/*
+
+  dumpsys activity service com.android.systemui
+*/
+
 //SystemUI启动:
 ServerThread.run-->ActivityManagerService.self().systemReady-->startSystemUi-->
 context.startServiceAsUser("com.android.systemui.SystemUIService",UserHandle.SYSTEM)@SystemServer.java
@@ -45,7 +50,13 @@ startServicesIfNeeded-->startServicesIfNeeded(SERVICES){
 */
 Dependency.start{
 - mProviders.put(TIME_TICK_HANDLER)
-- mProviders.put(RotationLockController.class,new RotationLockControllerImpl(mContext) //旋转设置
+  //蓝牙
+- mProviders.put(BluetoothController.class, () ->new BluetoothControllerImpl(mContext, getDependency(BG_LOOPER)))
+  //位置
+- mProviders.put(LocationController.class, () ->new LocationControllerImpl(mContext, getDependency(BG_LOOPER)))
+- mProviders.put(RotationLockController.class, () ->new RotationLockControllerImpl(mContext))
+  //网络
+- mProviders.put(NetworkController.class, () ->new NetworkControllerImpl(mContext, getDependency(BG_LOOPER),)
 - mProviders.put(ConfigurationController.class, () ->new ConfigurationControllerImpl(mContext))
 - mProviders.put(FragmentService.class, () ->new FragmentService(mContext))
 }@Dependency.java
@@ -74,37 +85,6 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueu
 
 */
 
-//整体布局
-com.android.systemui.statusbar.phone.StatusBarWindowView{
-- FrameLayout "@+id/status_bar_container"
-- include layout="@layout/status_bar_expanded"-->
-	com.android.systemui.statusbar.phone.NotificationPanelView android:id="@+id/notification_panel" {
-	- include layout="@layout/keyguard_status_view"
-	- com.android.systemui.statusbar.phone.NotificationsQuickSettingsContainer{
-		- FrameLayout "@+id/qs_frame
-		- com.android.systemui.statusbar.stack.NotificationStackScrollLayout
-		}
-	- include layout="@layout/keyguard_bottom_area
-	}@status_bar_expanded.xml
-- com.android.systemui.statusbar.ScrimView android:id="@+id/scrim_in_front
-}@super_status_bar.xml
-
-//status_bar布局,宽高
-com.android.systemui.statusbar.phone.PhoneStatusBarView android:id="@+id/status_bar"{
-- ImageView android:id="@+id/notification_lights_out"
-- LinearLayout android:id="@+id/status_bar_contents"{
-	- com.android.systemui.statusbar.AlphaOptimizedFrameLayout android:id="@+id/notification_icon_area"
-	- com.android.keyguard.AlphaOptimizedLinearLayout android:id="@+id/system_icon_area"{
-		- include layout="@layout/system_icons"-->{
-			- com.android.keyguard.AlphaOptimizedLinearLayout android:id="@+id/statusIcons"
-			- include layout="@layout/signal_cluster_view"
-		  }@system_icons.xml	  
-		- com.android.systemui.statusbar.policy.Clock android:id="@+id/clock"
-		}
-	}
-}@status_bar.xml
-
-
 SystemBars.start-->createStatusBarFromConfig(config_statusBarComponent/*获取bar名StatusBar*/){
 - mStatusBar.mComponents = mComponents
 //启动
@@ -116,9 +96,16 @@ SystemBars.start-->createStatusBarFromConfig(config_statusBarComponent/*获取ba
   //创建窗口并加入
 - createAndAddWindows-->addStatusBarWindow{
 	- makeStatusBarView()
+ 	  //窗口管理器
+	- StatusBarWindowManager mStatusBarWindowManager = Dependency.get(StatusBarWindowManager.class)-->
+		StatusBarWindowManager{
+		- mWindowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE)
+		- mActivityManager = ActivityManager.getService()
+		}@StatusBarWindowManager.java
+	  //加入窗口
 	- mStatusBarWindowManager.add(mStatusBarWindow, getStatusBarHeight())
 	}
-- mIconPolicy = new PhoneStatusBarPolicy
+- mIconPolicy = new PhoneStatusBarPolicy(mContext, mIconController)
 }@StatusBar.java
 
 }@SystemBars.java
@@ -126,7 +113,9 @@ SystemBars.start-->createStatusBarFromConfig(config_statusBarComponent/*获取ba
 
 //创建statusBar,NaviBar 创建view
 makeStatusBarView{
+  //整个窗口
 - inflateStatusBarWindow-->mStatusBarWindow = View.inflate(R.layout.super_status_bar)
+  //下拉面板
 - mNotificationPanel = (NotificationPanelView) mStatusBarWindow.findViewById(R.id.notification_panel)
   //获取FragmentHostManager
 - FragmentHostManager = FragmentHostManager.get(mStatusBarWindow)-->Dependency.get(FragmentService.class).getFragmentHostManager(view)
@@ -147,11 +136,47 @@ makeStatusBarView{
 	 
  //设置statusBarFragment为CollapsedStatusBarFragment 折叠的statusBar(正常状态)
 - FragmentHostManager.get(mStatusBarWindow).addTagListener().getFragmentManager().replace(new CollapsedStatusBarFragment)
+  //
+- mIconController = Dependency.get(StatusBarIconController.class)
+  //状态条管理
+- mHeadsUpManager = new HeadsUpManager(context, mStatusBarWindow, mGroupManager)
+- mHeadsUpManager.addListener(mNotificationPanel)
+- mNotificationPanel.setHeadsUpManager(mHeadsUpManager)
+  //
 - StatusBarIconControllerImpl.addIconGroup(new IconManager((ViewGroup))
-- mStatusBarWindow.findViewById(R.id.qs_frame) //快速设置view
-- createNavigationBar-->NavigationBarFragment.create//创建导航条
+  //快速设置view ，替换R.id.qs_frame为qsFragment
+- mStatusBarWindow.findViewById(R.id.qs_frame)
+- qsFragment = new QSFragment()
+- FragmentHostManager fragmentHostManager = FragmentHostManager.get(container)
+- ExtensionFragmentListener.attachExtensonToFragment(container, QS.TAG, R.id.qs_frame,
+                    Dependency.get(ExtensionController.class).newExtension(QS.class)
+                            .withPlugin(QS.class)
+                            .withFeature( PackageManager.FEATURE_AUTOMOTIVE, () -> new CarQSFragment())
+                            .withDefault(() -> qsFragment)
+                            .build())
+- fragmentHostManager.addTagListener(QS.TAG, (tag, f) -> {
+	- QS qs = (QS) f
+        - if (qs instanceof QSFragment) {
+        	- ((QSFragment) qs).setHost(qsh)
+        	- mQSPanel = ((QSFragment) qs).getQsPanel()
+                - mFooter = ((QSFragment) qs).getFooter()
+                }
+            })
+  //创建导航条
+- createNavigationBar-->NavigationBarFragment.create
 }@StatusBar.java
 
+//加入CollapsedStatusBarFragment后的监听器
+FragmentListener(tag, fragment) -> {
+- CollapsedStatusBarFragment statusBarFragment = (CollapsedStatusBarFragment) fragment
+- statusBarFragment.initNotificationIconArea(mNotificationIconAreaController)
+- mStatusBarView = (PhoneStatusBarView) fragment.getView()
+- mStatusBarView.setBar(this)
+  //设置通知面板
+- mStatusBarView.setPanel(mNotificationPanel)
+- mStatusBarView.setScrimController(mScrimController)
+- mStatusBarView.setBouncerShowing(mBouncerShowing)
+}@StatusBar.java
 
 /*替换view中status_bar_container为CollapsedStatusBarFragment
   systemUI中使用FragmentHostManager@FragmentService管理fragment
@@ -172,18 +197,6 @@ FragmentHostManager.get(mStatusBarWindow)-->Dependency.get(FragmentService.class
 - return state.getFragmentHostManager-->mFragmentHostManager //返回FragmentHostManager
 }@FragmentService.java
 
-//设置statusBar
-onCreateView(LayoutInflater inflater, @Nullable ViewGroup container)-->
-inflater.inflate(R.layout.status_bar, container, false)@CollapsedStatusBarFragment.java
-
-//CollapsedStatusBarFragment创建后
-onViewCreated(View view, @Nullable Bundle savedInstanceState){
-- PhoneStatusBarView mStatusBar = (PhoneStatusBarView) view
-- mSystemIconArea
-- mSignalClusterView = mStatusBar.findViewById(R.id.signal_cluster)//信号图标SignalClusterView
-}@CollapsedStatusBarFragment.java
-
-
 
 
 可以通StatusBarManagerService过设置statusBar：
@@ -195,31 +208,78 @@ setIcon@StatusBarManager.java-->setIcon@StatusBarManagerService.java-->
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBar.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/CollapsedStatusBarFragment.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarWindowManager.java
 =======================
 /*
  NavigationBar
+ 
+ NavigationBarFragment{//navigation_bar_frame
+	- NavigationBarView{ //navigation_bar
+		- NavigationBarInflaterView //navigation_inflater
+		}
+	}
+ 布局"left;back,home,recent;right"
 */
+com.android.systemui.statusbar.phone.NavigationBarFrame android:id="@+id/navigation_bar_frame" @navigation_bar_window.xml
+
+com.android.systemui.statusbar.phone.NavigationBarView{
+- com.android.systemui.statusbar.phone.NavigationBarInflaterView android:id="@+id/navigation_inflater"
+}@navigation_bar.xml
+
+
+createNavigationBar() {
+-  mNavigationBarView = NavigationBarFragment.create(mContext, (tag, fragment) -> {
+	- mNavigationBar = (NavigationBarFragment) fragment
+	- mNavigationBar.setLightBarController(mLightBarController)
+	- mNavigationBar.setCurrentSysuiVisibility(mSystemUiVisibility)	
+	}
+}@StatusBar.java
+
 NavigationBarFragment.create{ //创建导航条
 - WindowManager.LayoutParams lp = new WindowManager.LayoutParams //布局参数
 - View navigationBarView = inflate(R.layout.navigation_bar_window)//导航条view
 - context.getSystemService(WindowManager.class).addView(navigationBarView, lp) //加入view
+  //替换为navigation_bar_frame
+- NavigationBarFragment fragment = new NavigationBarFragment()
+- fragmentHost.getFragmentManager().beginTransaction().replace(R.id.navigation_bar_frame, fragment, TAG).commit()
 }@NavigationBarFragment.java
 
 //navigation_bar_window对应NavigationBarFragment
 onCreateView{
 - inflater.inflate(R.layout.navigation_bar)
-}@NavigationBarFragment
+}@NavigationBarFragment.java
 
 
+//navigation_bar inflater.inflate(R.layout.navigation_bar)@NavigationBarFragment.java
+NavigationBarView(Context context, AttributeSet attrs) {
+
+}@NavigationBarView.java
+
+onFinishInflate() {
+- mNavigationInflaterView = (NavigationBarInflaterView) findViewById(R.id.navigation_inflater)
+- mNavigationInflaterView.setButtonDispatchers(mButtonDispatchers)
+}@NavigationBarView.java
+
+//navigation_inflater  NavigationBarInflaterView
 onFinishInflate{
+  //加载0,90度的布局
 - inflateChildren{
-	- mRot0 = (FrameLayout) mLayoutInflater.inflate(R.layout.navigation_layout)
+	- FrameLayout mRot0 = (FrameLayout) mLayoutInflater.inflate(R.layout.navigation_layout)
 	- addView(mRot0)
+	- FrameLayout mRot90 = (FrameLayout) mLayoutInflater.inflate(R.layout.navigation_layout_rot90, this)
+	- addView(mRot90)
 	}
-- inflateLayout(getDefaultLayout())-->inflateButtons{
+- inflateLayout(getDefaultLayout()"left;back,home,recent;right")-->inflateButtons{
 	- createView
 	- parent.addView(v)
 	}
+}@NavigationBarInflaterView.java
+
+createView(String buttonSpec, ViewGroup parent, LayoutInflater inflater) {
+- 
+- HOME.equals(button):inflater.inflate(R.layout.home, parent, false)
+- BACK.equals(button):inflater.inflate(R.layout.back, parent, false)
+- RECENT.equals(button):inflater.inflate(R.layout.recent_apps, parent, false)
 }@NavigationBarInflaterView.java
 
 
@@ -240,7 +300,54 @@ InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
 
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarInflaterView.java
-=======================
+
+/*
+  状态条颜色变化
+
+*/
+DarkIconDispatcherImpl(Context context) {
+- mLightModeIconColorSingleTone = context.getColor(R.color.light_mode_icon_color_single_tone)
+  //变化器？
+- mTransitionsController = new LightBarTransitionsController(context,this::setIconTintInternal){
+	- mApplier = applier = setIconTintInternal
+	- SysUiServiceProvider.getComponent(context, CommandQueue.class).addCallbacks(this)
+	}@LightBarTransitionsController.java
+}@DarkIconDispatcherImpl.java
+
+//加入状态接收器
+addDarkReceiver(DarkReceiver receiver){
+- mReceivers.put(receiver, receiver)
+- receiver.onDarkChanged(mTintArea, mDarkIntensity, mIconTint)
+}@DarkIconDispatcherImpl.java
+
+
+//颜色变化
+setSystemUiVisibility@StatusBar.java-->mLightBarController.onSystemUiVisibilityChanged(fullscreenStackVis, dockedStackVis...)
+-->onSystemUiVisibilityChanged(int fullscreenStackVis, int dockedStackVis,int mask, Rect fullscreenStackBounds, 
+	Rect dockedStackBounds, boolean sbModeChanged, int statusBarMode){
+- mFullscreenLight = isLight(newFullscreen, statusBarMode,View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR)
+- mDockedLight = isLight(newDocked, statusBarMode, View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR)
+- updateStatus(fullscreenStackBounds, dockedStackBounds){
+	  //设置DarkIconDispatcherImpl
+	- mStatusBarIconController.setIconsDarkArea-->setIconsDarkArea@DarkIconDispatcherImpl.java
+	- mStatusBarIconController.getTransitionsController().setIconsDark{
+		- setIconTintInternal(dark ? 1.0f : 0.0f){
+			- mApplier.applyDarkIntensity(darkIntensity)-->setIconTintInternal@DarkIconDispatcherImpl.java
+			}
+		- animateIconTint
+		}@LightBarTransitionsController.java
+	}
+- 
+}@LightBarController.java
+
+
+setIconTintInternal{
+- 
+}@DarkIconDispatcherImpl.java
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/LightBarController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/DarkIconDispatcherImpl.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/LightBarTransitionsController.java
 /*
  Divider
 */
@@ -281,6 +388,7 @@ onTouch(View v, MotionEvent event) {
 frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/Divider.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/DividerWindowManager.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/DividerView.java
+
 =======================
 /*
  Recents：
@@ -394,90 +502,6 @@ setRotationLock{
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/RotationLockControllerImpl.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/qs/tiles/RotationLockTile.java
 frameworks/base/core/java/com/android/internal/view/RotationPolicy.java
-=======================
-/* 
- 信号图标
-*/
-onFinishInflate{
-//初始化并设置所有图标的view
-- mWifiSignalSpacer
-- mMobileSignalGroup
-}@SignalClusterView.java
-
-//将view关联到controler
-setSubs-->inflatePhoneState{
-- new PhoneState{
-	- inflate(R.layout.mobile_signal_group)
-	- setViews //设置mMobileGroup中所有图标
-	}
-- mMobileSignalGroup.addView(state.mMobileGroup) //将mMobileGroup加入到mMobileSignalGroup
-- mPhoneStates.add(state)
-- apply{
-	- mVpn.setVisibility
-	- mWifiGroup.setVisibility
-	- 遍历mPhoneStates，PhoneState.apply //设置电话图标
-	- mNoSimsCombo.setVisibility
-	}
-}
-//移动信号控制器
-NetworkControllerImpl{
-- mCallbackHandler = new CallbackHandler()
-- mSubscriptionManager = SubscriptionManager.from-->getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) //创建SubscriptionManager
-- mWifiSignalController = new WifiSignalController
-- mEthernetSignalController = new EthernetSignalController
-- mReceiverHandler.post-->mRegisterListeners.run-->registerListeners{
-	- mobileSignalController.registerListener
-	- mContext.registerReceiver(mReceiverHandler)//监听所有的网络状态
-	- updateMobileControllers
-	}
-}@NetworkControllerImpl.java
-
-//sim卡状态变化或者DEMO消息
-updateMobileControllers-->doUpdateMobileControllers-->setCurrentSubscriptions{
-- new MobileSignalController
-- controller.registerListener-->mPhone.listen(mPhoneStateListener)//注册phone监听器
-- mCallbackHandler.setSubs(subscriptions) //将view关联到controler
-}@NetworkControllerImpl.java
-
-
-//view加入到控制器
-onAttachedToWindow-->mNetworkController.addCallback(this)@SignalClusterView.java-->
-addCallback-->mCallbackHandler.setListening@NetworkControllerImpl-->handleMessage(MSG_ADD_REMOVE_SIGNAL)
--->mSignalCallbacks.add@CallbackHandler.java
-
-
-//更新信号
-MobilePhoneStateListener.onSignalStrengthsChanged/updateTelephony-->updateTelephony{
-- 更新mCurrentState{
-	- connected
-	- level
-	- iconGroup
-	- dataConnected
-	}
-- notifyListenersIfNecessary(r/*判断状态是否发生变化*/)-->notifyListeners(mCallbackHandle)@SignalController.java-->
-	notifyListeners{
-	- new IconState()//创建icon状态
-	- callback.setMobileDataIndicators-->setMobileDataIndicators-->signalCluster.setMobileDataIndicators@CallbackHandler.java
-		-->setMobileDataIndicators-->apply@SignalClusterView.java
-	}
-
-}@MobileSignalController.java
-
-
-
-
-
-
-
-//DEMO加入mobile
-BroadcastReceiver.onReceive(ACTION_DEMO)-->dispatchDemoCommand@StatusBar.java-->
-dispatchDemoCommand(COMMAND_NETWORK)-->addSignalController@NetworkControllerImpl.java-->
-new MobileSignalController{
-- new MobilePhoneStateListener
-- mapIconSets-->mNetworkToIconLookup(FOUR_G)
-- mObserver = new ContentObserver{onChange-->updateTelephony}
-}@MobileSignalController.java
-
 
 
 =======================

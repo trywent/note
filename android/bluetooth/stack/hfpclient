@@ -95,6 +95,11 @@ handle_call_action(const RawAddress* bd_addr,bthf_client_call_action_t action,in
 	}
 }@btif_hf_client.cc
 
+//查询电量
+bta_hf_client_send_at_cmer-->bta_hf_client_send_at@btif_hf_client.cc
+
+
+
 
 /*
  hfp发送at命令
@@ -106,7 +111,8 @@ BTA_HfClientSendAT(uint16_t handle, tBTA_HF_CLIENT_AT_CMD_TYPE at,uint32_t val1,
 - p_buf->uint32_val1 = val1
 - p_buf->hdr.layer_specific = handle
   //发送事件，切换到bta上下文
-- bta_sys_sendmsg(p_buf)
+- bta_sys_sendmsg(p_buf)-->(BTA_ID_HS)-->bta_hf_client_reg-->bta_hf_client_hdl_event
+	-->bta_hf_client_action.bta_hf_client_send_at_cmdbta_hf_client_main.cc
 }@bta_hf_client_api.cc
 
 bta_hf_client_send_at_cmd((tBTA_HF_CLIENT_DATA* p_data)){

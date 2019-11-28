@@ -49,14 +49,6 @@ start time 2：56
 三种状态：
 committed，modified，staged
 _____________________
-获得git仓库：
--自己新建
-git init          //初始化
-git add filename  //加入文件 ,添加所有文件(add .)
-git commit -m “”
-
-git remote add origin xxx@example.com:2227/git //加入远程仓库
-git push origin master//提交到远程
 
 -拷贝已有的仓库
 git clone git:地址  mProject
@@ -204,12 +196,15 @@ ______________________________
 git补丁：
 git format-patch -n <sha> //生成从<sha>开始的n个提交的补丁
 
-git diff > xx.patch
+git diff old_commit new_commit dir > xx.patch   //生成new 和 old之间的dir文件夹的补丁
 
 git apply xx.patch
 
+git apply -p2 xx
+
 git apply --whiteSpace=fix xx.patch
 
+patch -p1 <xx.patch //git apply 不行就用patch 
 ______________________________
 mstar代码
 119.145.230.212 

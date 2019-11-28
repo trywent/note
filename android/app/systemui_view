@@ -1,0 +1,605 @@
+/*
+
+ StatusBarWindowView{
+	- PhoneStatusBarView {   //statusbar
+		- CollapsedStatusBarFragment{
+			- mSystemIconArea{
+				- system_icons{
+					- statusIcons
+					- signal_cluster_view
+					- battery
+					}
+				- Clock		
+			}
+		}
+	  }	
+	- NotificationPanelView //快速设置
+ }
+
+ statusBar中图标{
+	- notification_icon_area  //通知
+	- statusIcons             //耳机，蓝牙
+	- SignalClusterView       //wifi,数据信号，sim卡，以太网
+	}
+*/
+//整体布局 StatusBarWindowView
+com.android.systemui.statusbar.phone.StatusBarWindowView{
+  //statusBar，替换为CollapsedStatusBarFragment
+- FrameLayout "@+id/status_bar_container" 
+  //展开的快速设置，和通知UI
+- include layout="@layout/status_bar_expanded"	
+- com.android.systemui.statusbar.ScrimView android:id="@+id/scrim_in_front
+}@super_status_bar.xml
+
+  //状态条布局,宽高 PhoneStatusBarView
+com.android.systemui.statusbar.phone.PhoneStatusBarView android:id="@+id/status_bar"{
+- ImageView android:id="@+id/notification_lights_out"
+- LinearLayout android:id="@+id/status_bar_contents"{
+	- com.android.systemui.statusbar.AlphaOptimizedFrameLayout android:id="@+id/notification_icon_area"
+	- com.android.keyguard.AlphaOptimizedLinearLayout android:id="@+id/system_icon_area"{
+		- include layout="@layout/system_icons"-->{
+			- com.android.keyguard.AlphaOptimizedLinearLayout android:id="@+id/statusIcons"
+			- include layout="@layout/signal_cluster_view"
+			- com.android.systemui.BatteryMeterView android:id="@+id/battery"
+		  }@system_icons.xml	  
+		- com.android.systemui.statusbar.policy.Clock android:id="@+id/clock"
+		}
+	}
+}@status_bar.xml
+
+ //通知和快速设置面板 NotificationPanelView
+com.android.systemui.statusbar.phone.NotificationPanelView android:id="@+id/notification_panel" {
+- include layout="@layout/keyguard_status_view"
+- com.android.systemui.statusbar.phone.NotificationsQuickSettingsContainer{
+	- FrameLayout "@+id/qs_frame
+	- com.android.systemui.statusbar.stack.NotificationStackScrollLayout
+	}
+- include layout="@layout/keyguard_bottom_area
+}@status_bar_expanded.xml
+
+  //SignalClusterView
+signal_cluster_view{
+- ImageView android:id="@+id/vpn"
+- FrameLayout android:id="@+id/ethernet_combo"
+- FrameLayout{
+	- ImageView android:id="@+id/wifi_in"
+	- ImageView android:id="@+id/wifi_out"
+	}
+- FrameLayout android:id="@+id/wifi_combo"{
+	- com.android.systemui.statusbar.AlphaOptimizedImageView android:id="@+id/wifi_signal"
+	- com.android.systemui.statusbar.AlphaOptimizedImageView android:id="@+id/wifi_signal_dark"
+	- ImageView android:id="@+id/wifi_inout"
+	}
+- View android:id="@+id/wifi_signal_spacer"
+  //viewStub只在调用的时候生成视图
+- ViewStub android:id="@+id/connected_device_signals_stub"
+- LinearLayout android:id="@+id/mobile_signal_group"
+- FrameLayout android:id="@+id/no_sims_combo"
+- ImageView android:id="@+id/airplane"
+}@signal_cluster_view.xml
+
+//创建窗口，窗口中view
+makeStatusBarView{
+  //窗口
+- inflateStatusBarWindow-->mStatusBarWindow = View.inflate(R.layout.super_status_bar)
+  //下拉面板
+- mNotificationPanel = (NotificationPanelView) mStatusBarWindow.findViewById(R.id.notification_panel)
+  //状态条
+- FragmentHostManager.getFragmentManager().beginTransaction().replace(R.id.status_bar_container,CollapsedStatusBarFragment)
+}@StatusBar.java
+
+FragmentHostManager.getFragmentManager().beginTransaction().replace
+(R.id.status_bar_container,CollapsedStatusBarFragment)@StatuBar.java-->CollapsedStatusBarFragment-->
+onCreateView(LayoutInflater inflater, @Nullable ViewGroup container)-->
+inflater.inflate(R.layout.status_bar, container, false)@CollapsedStatusBarFragment.java
+
+//CollapsedStatusBarFragment PhoneStatusBarView
+onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,Bundle savedInstanceState)-->
+inflater.inflate(R.layout.status_bar, container, false)@CollapsedStatusBarFragment.java
+
+onViewCreated(View view, @Nullable Bundle savedInstanceState){
+- PhoneStatusBarView mStatusBar = (PhoneStatusBarView) view
+  //状态图标
+- DarkIconManager mDarkIconManager = new DarkIconManager(view.findViewById(R.id.statusIcons))
+- Dependency.get(StatusBarIconController.class).addIconGroup(mDarkIconManager)
+  //
+- LinearLayout mSystemIconArea = mStatusBar.findViewById(R.id.system_icon_area)
+  //信号图标SignalClusterView
+- mSignalClusterView = mStatusBar.findViewById(R.id.signal_cluster)
+- Dependency.get(DarkIconDispatcher.class).addDarkReceiver(mSignalClusterView)//颜色变化
+}
+
+//电池
+onFinishInflate{
+- mBattery = findViewById(R.id.battery)
+}@PhoneStatusBarView
+
+
+//触摸事件
+dispatchTouchEvent(MotionEvent ev) {
+- boolean isDown = ev.getActionMasked() == MotionEvent.ACTION_DOWN
+- boolean isCancel = ev.getActionMasked() == MotionEvent.ACTION_CANCEL
+- if (isDown && mNotificationPanel.isFullyCollapsed()) {
+	- mNotificationPanel.startExpandLatencyTracking()
+  }
+- mFalsingManager.onTouchEvent(ev, getWidth(), getHeight())
+- super.dispatchTouchEvent(ev)
+}@StatusBarWindowView.java
+
+onInterceptTouchEvent(MotionEvent ev){
+- if (mNotificationPanel.isFullyExpanded()&& mStackScrollLayout.getVisibility() == View.VISIBLE...){
+	- intercept = mDragDownHelper.onInterceptTouchEvent(ev)
+	}
+- if (intercept) {
+	- mStackScrollLayout.onInterceptTouchEvent(cancellation)
+	- mNotificationPanel.onInterceptTouchEvent(cancellation)
+	}
+}@StatusBarWindowView.java
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarPolicy.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkControllerImpl.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/CollapsedStatusBarFragment.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/SignalClusterView.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/CallbackHandler.java
+/*******************************
+ SignalClusterView 信号图标更新。图标颜色有两种黑色，白色
+
+ */
+SignalClusterView(Context context, AttributeSet attrs, int defStyle) {
+- mNetworkController = Dependency.get(NetworkController.class)
+- mSecurityController = Dependency.get(SecurityController.class)
+  //图标缩放大小
+- res.getValue(R.dimen.status_bar_icon_scale_factor, typedValue, true)
+- mIconScaleFactor = typedValue.getFloat()
+  //动态显示？
+- updateActivityEnabled{
+	- mActivityEnabled = mContext.getResources().getBoolean(R.bool.config_showActivity)
+	}
+}@SignalClusterView.java
+
+//解析xml结束。初始化并设置所有图标的view
+onFinishInflate{
+- mVpn            = findViewById(R.id.vpn)
+- mEthernetGroup  = findViewById(R.id.ethernet_combo)
+- mWifiGroup      = findViewById(R.id.wifi_combo)
+- mWifi           = findViewById(R.id.wifi_signal)
+- mAirplane       = findViewById(R.id.airplane)
+}@SignalClusterView.java
+
+//view加入到控制器。控制器更新信号状态。回调更新view
+onAttachedToWindow{
+- apply()
+  //图标颜色
+- applyIconTint(){
+	- setTint(mVpn, DarkIconDispatcher.getTint(mTintArea, mVpn, mIconTint))
+	- applyDarkIntensity(DarkIconDispatcher.getDarkIntensity(mTintArea, mWifi, mDarkIntensity),
+                mWifi, mWifiDark)
+	}
+  //网络信号
+- mNetworkController.addCallback(this)-->cb.setSubs(mCurrentSubscriptions)@NetworkControllerImpl.java-->inflatePhoneState
+- mSecurityController.addCallback(this)
+}@SignalClusterView.java
+
+//将view关联到controler
+setSubs-->inflatePhoneState{
+- new PhoneState{
+	- inflate(R.layout.mobile_signal_group)
+	- setViews //设置mMobileGroup中所有图标
+	}
+- mMobileSignalGroup.addView(state.mMobileGroup) //将mMobileGroup加入到mMobileSignalGroup
+- mPhoneStates.add(state)
+}@SignalClusterView.java
+
+//更新wifi
+setWifiIndicators(boolean enabled, IconState statusIcon, IconState qsIcon...){
+- mWifiVisible = statusIcon.visible && !mBlockWifi
+  //wifi信号强度
+- mWifiStrengthId = statusIcon.icon
+- mWifiDescription = statusIcon.contentDescription
+- mWifiIn = activityIn && mActivityEnabled && mWifiVisible
+- apply()
+}@SignalClusterView.java
+
+//更新数据信号
+setMobileDataIndicators(IconState statusIcon, IconState qsIcon, int statusType,
+            int qsType, boolean activityIn, boolean activityOut){
+- PhoneState state = getState(subId)
+- state.mMobileVisible = statusIcon.visible && !mBlockMobile
+  //强度
+- state.mMobileStrengthId = statusIcon.icon
+- apply()
+}@SignalClusterView.java
+
+//更新显示
+apply{
+  //vpn
+- if (mVpnVisible) {
+	- setIconForView(mVpn, mVpnIconId)
+	- mVpn.setVisibility(View.VISIBLE)
+  }else{
+	- mVpn.setVisibility(View.GONE)
+  }
+  //以太网
+- if (mEthernetVisible) {
+	- setIconForView(mEthernet, mEthernetIconId)
+	- setIconForView(mEthernetDark, mEthernetIconId)
+  }else{
+	- EthernetGroup.setVisibility(View.GONE)
+  }
+  //wifi
+- if (mWifiVisible) {
+	- setIconForView(mWifi, mWifiStrengthId) //强度
+	- setIconForView(mWifiDark, mWifiStrengthId)
+	- mWifiGroup.setVisibility(View.VISIBLE)
+  }else{
+	- mWifiGroup.setVisibility(View.GONE)
+  }
+  //设置电话图标
+- 遍历mPhoneStates，PhoneState.apply 
+  //sim卡
+- if (mNoSimsVisible) {
+}@SignalClusterView.java
+
+
+//颜色变化
+onDarkChanged(Rect tintArea, float darkIntensity, int tint){
+- mIconTint = tint
+- applyIconTint()
+}@SignalClusterView.java
+
+
+/*
+ 信号状态，控制
+
+ view加入回调到controller。当状态更新时controller通知view更新视图
+
+*/
+start-->Dependency.get(NetworkController)@StatusBar.java-->
+NetworkControllerImpl(Context context, ConnectivityManager connectivityManager,TelephonyManager telephonyManager, 
+	WifiManager wifiManager,SubscriptionManager subManager, Config config, Looper bgLooper,CallbackHandler callbackHandler){
+- mReceiverHandler = new Handler(bgLooper)
+- mCallbackHandler = callbackHandler = new CallbackHandler()
+- mPhone = telephonyManager
+- mWifiManager = wifiManager
+  //控制器
+- mDataUsageController = dataUsageController
+- mWifiSignalController = new WifiSignalController(mContext, mHasMobileDataFeature,mCallbackHandler)
+- mEthernetSignalController = new EthernetSignalController(mContext, mCallbackHandler, this)
+  //注册广播监听状态。
+- mReceiverHandler.post(mRegisterListeners)-->registerListeners{
+	- IntentFilter filter = new IntentFilter()
+	- filter.addAction(WifiManager.RSSI_CHANGED_ACTION)
+	- filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
+	- mContext.registerReceiver(this, filter, null, mReceiverHandler)
+	- updateMobileControllers
+	}
+}@NetworkControllerImpl@.java
+
+//接收的到广播。信号状态
+onReceive(Context context, Intent intent) {
+- CONNECTIVITY_ACTION{
+	- updateConnectivity
+	}
+- 
+}@NetworkControllerImpl@.java
+
+
+//加入回调。SignalClusterView
+addCallback(SignalCallback cb){
+- cb.setSubs(mCurrentSubscriptions)
+- mWifiSignalController.notifyListeners(cb)
+- mEthernetSignalController.notifyListeners(cb)
+- mCallbackHandler.setListening(cb, true)
+}@NetworkControllerImpl.java
+
+//更新wifi图标状态
+setWifiIndicators{
+- for(SignalCallback callback : mSignalCallbacks)
+	- callback.setWifiIndicators(enabled, statusIcon, qsIcon, activityIn...)-->setWifiIndicators@SignalClusterView.java
+}@CallbackHandler.java
+
+/*
+ mobile
+
+*/
+
+//更新信号
+MobilePhoneStateListener.onSignalStrengthsChanged/updateTelephony-->updateTelephony{
+- 更新mCurrentState{
+	- connected
+	- level
+	- iconGroup
+	- dataConnected
+	}
+- notifyListenersIfNecessary(r/*判断状态是否发生变化*/)-->notifyListeners(mCallbackHandle)@SignalController.java-->
+	notifyListeners{
+	- new IconState()//创建icon状态
+	- callback.setMobileDataIndicators-->setMobileDataIndicators-->signalCluster.setMobileDataIndicators@CallbackHandler.java
+		-->setMobileDataIndicators-->apply@SignalClusterView.java
+	}
+
+}@MobileSignalController.java
+
+
+
+//DEMO加入mobile
+BroadcastReceiver.onReceive(ACTION_DEMO)-->dispatchDemoCommand@StatusBar.java-->
+dispatchDemoCommand(COMMAND_NETWORK)-->addSignalController@NetworkControllerImpl.java-->
+new MobileSignalController{
+- new MobilePhoneStateListener
+- mapIconSets-->mNetworkToIconLookup(FOUR_G)
+- mObserver = new ContentObserver{onChange-->updateTelephony}
+}@MobileSignalController.java
+
+/*
+ wifi
+
+*/
+
+//callbackHandler为
+WifiSignalController(Context context, boolean hasMobileData, CallbackHandler callbackHandler, NetworkControllerImpl networkController){
+- super("WifiSignalController", context, NetworkCapabilities.TRANSPORT_WIFI,callbackHandler, networkController){
+	- mNetworkController = networkController
+	- mCallbackHandler = callbackHandler
+	}@SignalController.java
+- mWifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE)
+- mWifiTracker = new WifiStatusTracker(mWifiManager)
+  //图标资源
+- mCurrentState.iconGroup = mLastState.iconGroup = new IconGroup(
+                "Wi-Fi Icons",
+                WifiIcons.WIFI_SIGNAL_STRENGTH,
+                WifiIcons.QS_WIFI_SIGNAL_STRENGTH,
+	}
+}@WifiSignalController.java
+
+//状态更新
+handleBroadcast(Intent intent) {
+- mWifiTracker.handleBroadcast(intent)
+- mCurrentState.enabled = mWifiTracker.enabled
+- mCurrentState.connected = mWifiTracker.connected
+- notifyListenersIfNecessary
+}@WifiSignalController.java
+
+//图标更新
+notifyListenersIfNecessary-->notifyListeners-->notifyListeners(mCallbackHandler)@SignalController.java-->
+notifyListeners(SignalCallback callback){
+  //获取当前状态
+- IconState statusIcon = new IconState(wifiVisible, getCurrentIconId(), contentDescription)
+- IconState qsIcon = new IconState(mCurrentState.connected, getQsCurrentIconId())
+  //更新
+- callback.setWifiIndicators(mCurrentState.enabled, statusIcon, qsIcon)-->setWifiIndicators@
+}@WifiSignalController.java
+
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/WifiSignalController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/policy/WifiIcons.java
+
+/* 
+ sim卡
+*/
+updateMobileControllers-->doUpdateMobileControllers-->setCurrentSubscriptions{
+- new MobileSignalController
+- controller.registerListener-->mPhone.listen(mPhoneStateListener)//注册phone监听器
+- mCallbackHandler.setSubs(subscriptions) //将view关联到controler
+}@NetworkControllerImpl.java
+
+/*******************************
+  statusIcons{
+	- StatusBarIconView 蓝牙，耳机，位置图标
+	}
+*/
+<string-array name="config_statusBarIcons">
+        rotate        
+        headset        
+        data_saver        
+        managed_profile        
+        ime        
+        sync_failing        
+        sync_active        
+        cast        
+        hotspot        
+        location        
+        bluetooth        
+        nfc        
+        tty        
+        speakerphone        
+        zen        
+        mute        
+        volume        
+        vpn        
+        ethernet        
+        wifi        
+        mobile        
+        airplane        
+        cdma_eri        
+        data_connection        
+        phone_evdo_signal        
+        phone_signal        
+        battery        
+        alarm_clock        
+        secure        
+        clock        
+</string-array>
+@frameworks/base/core/res/values/config.xml
+
+//创建statusIcons图标view
+onViewCreated{
+- mDarkIconManager = new DarkIconManager(view.findViewById(R.id.statusIcons)){
+	- super(linearLayout)-->IconManager{
+		- ViewGroup mGroup = group
+		- mIconSize = mContext.getResources().getDimensionPixelSize(com.android.internal.R.dimen.status_bar_icon_size)
+		}
+	- mIconHPadding = mContext.getResources().getDimensionPixelSize
+	- mDarkIconDispatcher = Dependency.get(DarkIconDispatcher.class)
+	}@StatusBarIconController.java
+  //加入图标view到控制器
+- Dependency.get(StatusBarIconController.class).addIconGroup(mDarkIconManager)
+}@CollapsedStatusBarFragment.java
+
+//图标控制器。根据状态更新图标。
+StatusBarIconControllerImpl{
+- super(context.getResources().getStringArray(com.android.internal.R.array.config_statusBarIcons)){
+	  //遍历配置加入定义的图标。蓝牙，位置，耳机...
+	- mSlots.add(slots[i]
+	- mIcons.add(null)
+	}@StatusBarIconList.java
+- Dependency.get(ConfigurationController.class).addCallback(this)
+- SysUiServiceProvider.getComponent(context, CommandQueue.class).addCallbacks(this)
+}@StatusBarIconControllerImpl.java
+
+
+addIconGroup(IconManager mDarkIconManager){
+- mIconGroups.add(group)
+  //将控制器中定义的图标加入到GoupView中。还没有创建实际的图片
+- for (int i = 0; i < mIcons.size(); i++) {
+	- StatusBarIcon icon = mIcons.get(i)
+	- String slot = mSlots.get(i)
+	- group.onIconAdded(getViewIndex(getSlotIndex(slot)), slot, blocked, icon){
+		- StatusBarIconView v = addIcon(index, slot, blocked, icon){
+			- StatusBarIconView view = onCreateStatusBarIconView(slot, blocked)
+			- view.set(icon)
+			- mGroup.addView(view, index, onCreateLayoutParams())
+			}@StatusBarIconController.java
+		  //颜色变化
+		- mDarkIconDispatcher.addDarkReceiver(v)
+		}@StatusBarIconController.java
+	}
+}@StatusBarIconControllerImpl.java
+
+  //设置图标。图标实际创建处
+PhoneStatusBarPolicy@PhoneStatusBarPolicy.java-->setIcon{
+- index = getSlotIndex(slot)
+- StatusBarIcon icon = getIcon(index)
+- icon = new StatusBarIcon(UserHandle.SYSTEM, mContext.getPackageName(),Icon.createWithResource(mContext, resourceId))
+- setIcon(slot, icon){
+	- addSystemIcon(index, icon){//新加入
+		- mIconGroups.forEach(l -> l.onIconAdded(viewIndex, slot, blocked, icon))	
+		}
+	- handleSet(index, icon){ //更新group
+		- mIconGroups.forEach(l -> l.onSetIcon(viewIndex, icon))	
+		}
+	}
+}@StatusBarIconControllerImpl.java
+
+//状态控制器。获取所有状态信息
+start@StatusBar.java-->
+PhoneStatusBarPolicy(Context context, StatusBarIconController iconController){
+- mIconController = iconController
+- mHotspot = Dependency.get(HotspotController.class)
+- mBluetooth = Dependency.get(BluetoothController.class)
+  //监听系统广播。获取状态
+- IntentFilter filter = new IntentFilter()
+- filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
+- filter.addAction(AudioManager.ACTION_HEADSET_PLUG)
+- mContext.registerReceiver(mIntentReceiver, filter, null, mHandler)
+  //加入图标到图标控制器。StatusBarIconControllerImpl
+- updateBluetooth
+- mIconController.setIcon(mSlotAlarmClock, R.drawable.stat_sys_alarm, null)
+- mIconController.setIcon(mSlotZen, R.drawable.stat_sys_zen_important, null)
+- mIconController.setIcon(mSlotVolume, R.drawable.stat_sys_ringer_vibrate, null)
+  //
+- mBluetooth.addCallback(this)
+- mProvisionedController.addCallback(this)
+}@PhoneStatusBarPolicy.java
+
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconList.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconController.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconControllerImpl.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarPolicy.java
+/*
+ bluetooth
+*/
+
+
+/*
+ headset
+
+*/
+
+/*
+ location
+
+*/
+
+
+/*******************************
+  快速设置面板
+
+*/
+NotificationPanelView android:id="@+id/notification_panel"{
+- FrameLayout android:id="@+id/qs_frame"-->QsFrame {
+	- com.android.systemui.qs.QSPanel android:id="@+id/quick_settings_panel"
+	  //头部和可展开的部分
+	- include layout="@layout/quick_status_bar_expanded_header"{
+		- include layout="@layout/quick_status_bar_header_system_icons"{
+			- com.android.systemui.BatteryMeterView android:id="@+id/battery"
+			- com.android.systemui.statusbar.policy.Clock android:id="@+id/clock"
+			}
+		  //
+		- com.android.systemui.qs.QuickQSPanel android:id="@+id/quick_qs_panel"
+		}@quick_status_bar_expanded_header.xml
+	  //通知面板底部
+	- include layout="@layout/qs_footer_impl"{
+		- include android:id="@+id/date_time_alarm_group"
+		- com.android.systemui.statusbar.AlphaOptimizedImageView android:id="@android:id/edit
+		}@qs_footer_impl.xml
+	- include android:id="@+id/qs_detail" layout="@layout/qs_detail"
+	- include android:id="@+id/qs_customize" layout="@layout/qs_customize_panel
+	}@qs_panel.xml
+}@status_bar_expanded.xml
+
+//view
+onFinishInflate() {
+  //头部
+- mKeyguardStatusBar = findViewById(R.id.keyguard_header)
+- mKeyguardStatusView = findViewById(R.id.keyguard_status_view)
+  //底部
+- mKeyguardBottomArea = findViewById(R.id.keyguard_bottom_area)
+- initBottomArea(){
+	- 
+	}
+
+- mQsFrame = findViewById(R.id.qs_frame)
+}@NotificationPanelView.java
+
+//快速设置界面
+onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState){
+- inflater =inflater.cloneInContext(new ContextThemeWrapper(getContext(), R.style.qs_theme))
+- inflater.inflate(R.layout.qs_panel, container, false)
+}@QSFragment.java
+
+onViewCreated(View view, @Nullable Bundle savedInstanceState) {
+- mQSPanel = view.findViewById(R.id.quick_settings_panel)
+- mQSDetail = view.findViewById(R.id.qs_detail)
+- mHeader = view.findViewById(R.id.header)
+- mFooter = view.findViewById(R.id.qs_footer)
+}@!QSFragment.java
+
+
+
+
+//触摸状态条事件处理流程
+onTouchEvent(MotionEvent event)-->super.onTouchEvent(event)@PhoneStatusBarView.java
+onTouchEvent(MotionEvent event)-->mPanel.onTouchEvent(event)@PanelBar.java
+onTouchEvent(MotionEvent event) {
+- initDownStates(event)
+- mHeadsUpTouchHelper.onTouchEvent(event)
+  //快速设置
+- handleQsTouch{
+	- 
+ 	}
+- if (event.getActionMasked() == MotionEvent.ACTION_DOWN && isFullyCollapsed()) {
+	- updateVerticalPanelPosition(event.getX())
+	}
+}@NotificationPanelView.java
+
+
+
+
+
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/DragDownHelper.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PanelBar.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java

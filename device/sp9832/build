@@ -1,0 +1,14 @@
+/*
+
+*/
+
+./lsecbuild.sh -d > ~/build8541 2>&1
+
+//ubuntu16 unsupported reloc
+ln -s /usr/bin/ld.gold prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.15-4.8/x86_64-linux/bin/ld
+
+
+//ubuntu16 chipram  asm被编译C
+$(CC) $(CFLAGS) -mlittle-endian -DCONFIG_NAND_SPL -c -o $@ $<
+
+$(CC) $(AFLAGS) -mlittle-endian -DCONFIG_NAND_SPL -c -o $@ $<

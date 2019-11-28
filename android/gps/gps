@@ -21,10 +21,7 @@ usedInFix 最近定位中被使用
 2）warm(温启动)：有历书信息，大致的位置和时间可知，没有星历信息。这种情况发生在本次定位距离上次超过两个小时时。
 3）hot(热启动)：有星历信息，大致的时间和位置可知，通常比温启动的时间和位置信息精确。这种情况发生在本次定位与上次定位的时间间隔小于两个小时
 
-//A-GPS
-两种模式:
-Mobile Station Assisted (MSA) //mobile service provider..设备使用服务器计算的位置?
-Mobile Station Based (MSB) //A-GPS server..设备从服务器获取卫星信息
+
 
 //NMEA格式
 $ <发送器标示,数据类型> {,<数值>} *<校验和> <CR><LF>
@@ -38,6 +35,8 @@ VTG //对地速度与航向
 ZDA //时间与日期
 GRS //卫星残差
 TXT //文本传送
+
+
 /***********************
  AGPS（Assisted GPS，A-GPS，网络辅助GPS）
  从网络中下载当前地区可用定位卫星信息.节约全频段扫描时间
@@ -45,9 +44,23 @@ TXT //文本传送
  AGPS是在以往通过卫星接受定位信号的同时结合移动运营的GSM或者CDMA网络机站的定位信息
 */
 
+//A-GPS
+两种模式:
+Mobile Station Assisted (MSA) //mobile service provider..设备使用服务器计算的位置?
+Mobile Station Based (MSB) //A-GPS server..设备从服务器获取卫星信息
+
 //supl
 static supl_ctx_t supl_ctx
 supl_thread{
 - supl_ctx_new(supl_ctx)
 }
 
+
+
+
+/***********************
+ localization service;LCS
+
+ 移动定位业务(LBS，Location Based Service):通过电信移动运营商的网络(如GSM、CDMA)，
+ 采用CAID、GPS、GPSOne等定位技术，结合GIS地理信息系统，为用户提供基于位置查询的一种增值业务
+*/

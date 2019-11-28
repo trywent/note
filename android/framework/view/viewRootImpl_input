@@ -159,7 +159,13 @@ ViewPostImeInputStage.onProcess{
 	}
   //其它事件
 - final int source = q.mEvent.getSource()
-- SOURCE_CLASS_POINTER:processPointerEvent(q)
+  //触摸
+- SOURCE_CLASS_POINTER:processPointerEvent(q){
+	- mView.dispatchPointerEvent(event){
+		- dispatchTouchEvent
+		- dispatchGenericMotionEvent
+		}
+	}
 - SOURCE_CLASS_TRACKBALL:processTrackballEvent
 - motion:processGenericMotionEvent
 }

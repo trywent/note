@@ -1,3 +1,7 @@
+/*
+
+*/
+
 LayoutInflater inflater = getLayoutInflater();
 View layout = inflater.inflate(R.layout.custom_toast,
                                (ViewGroup) findViewById(R.id.toast_layout_root));

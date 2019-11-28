@@ -1,4 +1,22 @@
-特殊变量：
+/*
+ shell
+*/
+//文件头部!/bin/bash
+
+
+//参数getopts 其中冒号标示带参数
+while getopts "xx:xx" arg
+do
+    case $arg in
+	x)dosomething
+	;;
+    esac
+done
+
+
+OPTARG //参数后面所带的参数 （冒号x:）
+
+//特殊变量：
 $0：当前脚本的文件名
 $num：num为从1开始的数字，$1是第一个参数，$2是第二个参数，${10}是第十个参数
 $#：传入脚本的参数的个数

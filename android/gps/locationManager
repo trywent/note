@@ -78,22 +78,6 @@ android_location_GpsLocationProvider_class_init_native{
 handleEnable-->native_init@GpsLocationProvider.java-->android_location_GpsLocationProvider_init
 -->(设置HAL层回调函数)sGpsInterface->init(&sGpsCallbacks)
 
-//android8.0
-android_location_GnssLocationProvider_class_init_native{
- //初始化java回调函数
-- method_reportLocation
-- method_reportStatus
- // 获取hal接口
-- gnssHal = IGnssExt::getService()
-- gnssXtra = gnssHal->getExtensionXtra()
-- gnssRil = gnssHal->getExtensionAGnssRilExt()
-- gnssAgnss = gnssHal->getExtensionAGnss()
-- gnssNavigationMessage = gnssHal->getExtensionGnssNavigationMessage()
-- gnssNi = gnssHal->getExtensionGnssNi()
-- gnssGeofencing = gnssHal->getExtensionGnssGeofencing()
-}@com_android_server_location_GnssLocationProvider.cpp
-
-
 //关闭provider：
 updateProviderListenersLocked-->p.disable@LocationManagerService.java-->disable-->
 sendMessage(ENABLE,0)-->handleMessage-->handleDisable-->stopNavigating-->native_stop
@@ -121,6 +105,43 @@ jb/frameworks/base/services/java/com/android/server/LocationManagerService.java
 jb/frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
 frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 
+/**********************
+ android8.0 
+
+ gnss　provider
+*/
+
+//创建
+static class_init_native@GnssLocationProvider.java
+android_location_GnssLocationProvider_class_init_native{
+ //初始化java回调函数
+- method_reportLocation
+- method_reportStatus
+ // 获取hal接口
+- gnssHal = IGnssExt::getService()
+- gnssXtra = gnssHal->getExtensionXtra()
+- gnssRil = gnssHal->getExtensionAGnssRilExt()
+- gnssAgnss = gnssHal->getExtensionAGnss()
+- gnssNavigationMessage = gnssHal->getExtensionGnssNavigationMessage()
+- gnssNi = gnssHal->getExtensionGnssNi()
+- gnssGeofencing = gnssHal->getExtensionGnssGeofencing()
+}@com_android_server_location_GnssLocationProvider.cpp
+
+//初始化
+GnssLocationProvider-->native_init@GnssLocationProvider.java-->
+android_location_GnssLocationProvider_init(JNIEnv* env, jobject obj) {
+- sp<IGnssCallback> gnssCbIface = new GnssCallback()
+- GnssHal->setCallback(gnssCbIface)-->Gnss::setCallback@Gnss.cpp
+}@com_android_server_location_GnssLocationProvider.cpp
+
+//开始
+startNavigating-->native_start@GnssLocationProvider.java-->
+android_location_GnssLocationProvider_start-->gnssHal->start()
+
+
+
+frameworks/base/services/core/java/com/android/server/location/GnssLocationProvider.java
+frameworks/base/services/core/jni/com_android_server_location_GnssLocationProvider.cpp
 
 /**********************
  定位信息上报

@@ -1,4 +1,19 @@
-//
+/*
+ activity
+*/
+
+enum ActivityState {
+        INITIALIZING,
+        RESUMED,
+        PAUSING,
+        PAUSED,
+        STOPPING,
+        STOPPED,
+        FINISHING,
+        DESTROYING,
+        DESTROYED
+    }
+
 ActivityRecord(ActivityManagerService _service, Intent _intent,ActivityInfo aInfo,) {
 - ActivityManagerService service = _service;
 - IApplicationToken.Stub  appToken = new Token(this);

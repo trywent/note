@@ -1,0 +1,108 @@
+/******************************
+theme
+*/
+style: 应用到view上的。一些属性的集合font color, font size, background color, and much more
+theme: 应用到应用，activity,view结构上的style
+
+style使用：
+<TextView
+    style="@style/GreenText"
+    ... />
+
+theme使用：
+<manifest ... >
+    <application android:theme="@style/Theme.AppCompat" ... >
+    </application>
+</manifest>
+
+//当设置多个风格层次后。属性起作用的优先级
+1 Applying character- or paragraph-level styling via text spans to TextView-derived classes
+2 Applying attributes programmatically
+3 Applying individual attributes directly to a View
+4 Applying a style to a View
+5 Default styling
+6 Applying a theme to a collection of Views, an activity, or your entire app
+7 Applying certain View-specific styling, such as setting a TextAppearance on a TextView
+
+//系统自带主题：
+API 1:
+    android:Theme 根主题
+    android:Theme.Black 背景黑色
+    android:Theme.Light 背景白色
+    android:Theme.Wallpaper 以桌面墙纸为背景
+    android:Theme.Translucent 透明背景
+    android:Theme.Panel 平板风格
+    android:Theme.Dialog 对话框风格
+API 11:
+    android:Theme.Holo Holo根主题
+    android:Theme.Holo.Black Holo黑主题
+    android:Theme.Holo.Light Holo白主题
+
+API 14:
+    Theme.DeviceDefault 设备默认根主题
+    Theme.DeviceDefault.Black 设备默认黑主题
+    Theme.DeviceDefault.Light 设备默认白主题
+API 21: (网上常说的 Android Material Design 就是要用这种主题)
+    Theme.Material Material根主题
+    Theme.Material.Light Material白主题
+
+
+    兼容包v7中带的主题：
+    Theme.AppCompat 兼容主题的根主题
+    Theme.AppCompat.Black 兼容主题的黑色主题
+    Theme.AppCompat.Light 兼容主题的白色主题
+
+
+//系统私有资源需要添加res/valus/symbols.xml
+  <!--fyt add-->
+  <java-symbol type="drawable" name="fytbt_up1" />
+  <java-symbol type="drawable" name="fytbt_down1" />
+  <java-symbol type="drawable" name="fytbt_up2" />
+  <java-symbol type="drawable" name="fytbt_down2" />
+  <java-symbol type="layout" name="fyt_button" />
+  <java-symbol type="id" name="fytWinbt" />
+===================
+//theme
+
+theme.obtainStyledAttributes(R.styleable.xxxx/*要获取的属性*/)
+//应用更新配置configuration
+updateConfigurationLocked(Configuration values){
+- mSystemThread.applyConfigurationToResources
+- 遍历mLruProcesses{//遍历最近进程,更新资源
+- ProcessRecord app = mLruProcesses.get(i)
+- app.thread.scheduleConfigurationChanged(Configuration)-->
+	handleConfigurationChanged@ActivityThread.java--applyConfigurationToResourcesLocked(config)
+	}
+- mWindowManager.setNewConfiguration //更新窗口配置
+}@ActivityManagerService.java
+
+applyConfigurationToResourcesLocked{
+- Resources.updateSystemConfiguration
+- 遍历mActiveResources{
+	- Resources r = mActiveResources.valueAt(i).get()
+	- r.updateConfiguration-->updateConfiguration-->mAssets.setConfiguration
+	}@Resource.java
+}ResourcesManager.java
+
+
+//获取值
+getDimensionPixelSize-->getValue-->mAssets.getResourceValue@Resource.java
+
+//drawable
+getDrawable-->getResources().getDrawable(id, getTheme())@Context.java-->getDrawable{
+- impl.getValue(id, value, true) //获取value
+- mResourcesImpl.loadDrawalbe-->loadDrawalbe(id,value)@ResourcesImpl.java
+}@Resources.java
+
+
+//查找对应id的View：
+findViewById-->getWindow().findViewById(id)@Activity.java-->findViewById-->
+getDecorView().findViewById@Window.java-->mDecor.findViewById-->DecorView.findViewById
+@PhoneWindow.java-->findViewById-->findViewTraversal(id匹配说明查找到)@View.java-->
+(是ViewGroup容器)findViewTraversal-->v.findViewById(找到对应id的View)@ViewGroup.java-->findViewById
+-->findViewTraversal(return this)@View.java
+
+//typedArray 通过Resources获取
+Resources.obtainStyledAttributes(AttributeSet, int[], int, int)
+Resources.obtainAttributes(AttributeSet, int[])
+

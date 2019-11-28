@@ -16,10 +16,18 @@ struct tty_port  //上层应用
 
 //注册驱动
 uart_register_driver(struct uart_driver){ 
-- 初始化驱动中的tty_driver normal，设置驱动名，波特率...
+  //分配串口空间
+- drv->state = kzalloc(sizeof(struct uart_state) * drv->nr, GFP_KERNEL)
+- struct tty_driver *normal = alloc_tty_driver(drv->nr)
+  //设置驱动名，波特率...
+- normal->driver_name	= drv->driver_name
+- normal->driver_state    = drv
 - tty_set_operations(normal, &uart_ops) //设置tty_driver的操作函数
-- 初始化uart_driver->state,{
-	- tty_port_init//驱动中支持的最大端口数
+  //初始化uart_driver->state 驱动中支持的最大端口数
+- for (i = 0; i < drv->nr; i++) {
+	- struct uart_state *state = drv->state + i
+	- struct tty_port *port = &state->port
+	- tty_port_init(port)
 	- uart_port->ops = uart_port_ops
 	}
 - 注册串口驱动，tty_register_driver{
@@ -39,6 +47,16 @@ uart_register_driver(struct uart_driver){
 //加入端口
 uart_add_one_port(struct uart_driver *drv, struct uart_port *uport){
 - uart_state->uart_port= uart_port
+  //配置
+- uart_configure_port(drv, state, uport){
+	- uart_report_port(drv, port)
+	- uart_change_pm(state, UART_PM_STATE_ON)
+	  //若配置console驱动，则注册console
+	- if (port->cons && !(port->cons->flags & CON_ENABLED))
+		- register_console(port->cons)
+	- 
+	}
+  //注册
 - tty_port_register_device_attr(struct tty_port,struct tty_driver){
 	- tty_port_link_device
 	- tty_register_device_attr{

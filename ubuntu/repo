@@ -12,22 +12,31 @@ repo upload[ project-list ]
 
 //查看差异
 repo diff [ project-list ]
+
 //下载特定的修改版本到本地
 repo download  target revision
 
 //创建新的branch分支
 repo start newbranchname --all//创建分支
 
+//查看可用分支
+cd .repo/manifests
+git branch -a | cut -d / -f 3
+
 //切换到分支
 repo init -b android-5.1.1_r1
 repo sync (not needed if your local copy is up to date)
 repo start android-5.1.1_r1 --all 
 
+//查看当前分支
+
 //删除已经merge 的 project
 repo prune [project list]
+
 //对每一个 project 运行 command 命令       
 repo foreach [ project-lists] -c command
 repo forall -c command，对所有项目执行一个command
+
 //查看状态
 repo status
 

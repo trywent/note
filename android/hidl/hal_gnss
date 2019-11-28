@@ -78,9 +78,46 @@ IGnss::getService{//stub==true则是获取本地服务
 }@GnssAll.cpp
 
 
-//HAL lib(原来的封装)
-new Gnss(device)-->Gnss::Gnss(gnssDevice)-->gnssDevice->get_gps_interface(GPS库接口mGnssIface)@Gnss.cpp//关联到库接口
+/*  最终调用的接口
+ HAL lib(获取gps.default.so中接口)
 
+
+*/
+GpsCallbacks Gnss::sGnssCb = {
+    .size = sizeof(GpsCallbacks),
+    .location_cb = locationCb,
+    .status_cb = statusCb,
+    .sv_status_cb = gpsSvStatusCb,
+    .nmea_cb = nmeaCb,
+    .set_capabilities_cb = setCapabilitiesCb,
+    .acquire_wakelock_cb = acquireWakelockCb,
+    .release_wakelock_cb = releaseWakelockCb,
+    .create_thread_cb = createThreadCb,
+    .request_utc_time_cb = requestUtcTimeCb,
+    .set_system_info_cb = setSystemInfoCb,
+    .gnss_sv_status_cb = gnssSvStatusCb,
+}
+
+//关联到库。获取库中接口
+HIDL_FETCH_IGnss{
+- hw_get_module(GPS_HARDWARE_MODULE_ID, (hw_module_t const**)&module)
+- hw_device_t* device
+- module->methods->open(module, GPS_HARDWARE_MODULE_ID, &device)
+- IGnss* iface = new Gnss(device)-->Gnss::Gnss(gnssDevice){
+	- mGnssIface = gnssDevice->get_gps_interface(GPS库接口mGnssIface)-->gps_get_hardware_interface-->_GpsInterface@gps
+	}	
+- return iface
+}@Gnss.cpp
+
+//开始
+Gnss::start()-->mGnssIface->start()@Gnss.cpp
+
+
+//设置回调。初始化接口
+Gnss::setCallback(const sp<IGnssCallback>& callback){
+- sGnssCbIface = callback
+- mGnssIface->init(&sGnssCb)
+}@Gnss.cpp
 
 //回调
 location_cb@xxxgps.c-->

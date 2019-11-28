@@ -1,0 +1,22 @@
+/*
+
+*/
+
+start_kernel-->mm_init{
+- page_ext_init_flatmem
+- mem_init
+- kmem_cache_init
+}@main.c
+
+
+setup_arch(char **cmdline_p){
+- 
+- arm_memblock_init{
+	- early_init_fdt_reserve_self
+	- early_init_fdt_scan_reserved_mem
+	}@init.c
+}@setup.c
+
+init/main.c
+arch/arm/kernel/setup.c
+arch/arm/mm/init.c

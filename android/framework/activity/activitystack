@@ -12,24 +12,28 @@ onStart - onStop   //可见
 onResume - onPause //用户可交互
 /* launch
 
-
+  启动过程中设置PAUSED状态
 */
 resumeTopActivityLocked@ActivityStack.java-->(进程没有启动)realStartActivityLocked-->
 scheduleLaunchActivity@ActivityStackSupervisor.java
 
-/* resume
+
+/* RESUMED
 
 
 */
 resumeTopActivityInnerLocked-->scheduleResumeActivity@ActivitStack.java
 
-/* pause
+
+
+/* PAUSING
   调用schedulePauseActivity,当app执行pause完成后,resumeTop
 
 */
 startPausingLocked(boolean userLeaving, boolean uiSleeping,ActivityRecord resuming, boolean pauseImmediately){
 - ActivityRecord prev = mResumedActivity //当前要执行pause的Activity
 - mPausingActivity = prev
+- prev.state = ActivityState.PAUSING //设置activityRecord状态为PAUSING
 - prev.app.thread.schedulePauseActivity-->ActivityManagerNative.getDefault().activityPaused //app执行pause
   //app执行pause完成返回
 - if pauseImmediately(boolean resumeNext){
@@ -38,14 +42,21 @@ startPausingLocked(boolean userLeaving, boolean uiSleeping,ActivityRecord resumi
   } else schedulePauseTimeout(prev)
 }@ActivityStack.java
 
-//Activity回调
+
+
+
+/* PAUSED
+
+*/
+//Activity执行完成PAUSE
 activityPaused(IBinder token)-->stack.activityPausedLocked(token)@ActivityManagerService.java-->
 activityPausedLocked(IBinder token){
 - ActivityRecord r = isInStackLocked(token)
 - mHandler.removeMessages(PAUSE_TIMEOUT_MSG, r)
 - if (mPausingActivity == r){
-	- completePauseLocked(true) //
+	- completePauseLocked(true)
   }else{
+	- r.state = ActivityState.PAUSED;
 	- finishCurrentActivityLocked
 	}
 - mStackSupervisor.ensureActivitiesVisibleLocked(null)
@@ -53,21 +64,51 @@ activityPausedLocked(IBinder token){
 
 completePauseLocked(boolean resumeNext){
 - ActivityRecord prev = mPausingActivity
+- prev.state = ActivityState.PAUSED //设置状态为PAUSED
 - if(prev.app!=null){
-	- 
-	- prev不可见加入到stopping，addToStopping
-	}
+	- mStackSupervisor.mActivitiesWaitingForVisibleActivity.remove(prev)
+	- if(prev.deferRelaunchUntilPaused){
+		-  prev.relaunchActivityLocked(false /* andResume */,...)
+	  }else if(wasStopping){
+		- prev.state = STOPPING
+	  }else if(!prev.visible || shouldSleepOrShutDownActivities()){
+	  	  //加入到STOPPING
+		- addToStopping
+	  }	
+   }
 - if(resumeNext){
 	- 
 	}
 }@ActivityStack.java
 
 
+//启动过程中设置初始状态为PAUSED
+realStartActivityLocked(ActivityRecord r, ProcessRecord app,boolean andResume, boolean checkConfig){
+- 
+- if (andResume && readyToResume()) {
+	- stack.minimalResumeActivityLocked(r)
+  }else{
+	- r.state = PAUSED
+  }
+}@ActivityStackSupervisor.java
 
-/* stoping
 
- 只有不可见的Activity才加入stoping
+relaunchActivityLocked(boolean andResume, boolean preserveWindow){
+- startFreezingScreenLocked(app, 0)
+- if(andResume){
+
+  }else{
+	- state = PAUSED
+  }
+}@ActiviyRecord.java
+
+/* STOPING
+
+   mStackSupervisor.mStoppingActivities 保存要stopping的activity
 */
+
+//将不可见的Activity才加入mStackSupervisor.mStoppingActivities。等idle时执行stop流程
+ensureActivitiesVisibleLocked-->
 makeInvisible(ActivityRecord r){
 - r.setVisible(false)
 - switch(r.state){
@@ -80,19 +121,51 @@ makeInvisible(ActivityRecord r){
 	}
 }@ActivityStack.java
 
+
+
+//设置STOPING状态，通知应用stop
 activityIdleInternalLocked@ActivityStackSupervisor.java-->
 stopActivityLocked{
-- scheduleStopActivity-->onStop
-}@ActivityRecord.java
-
-activityStopped-->r.activityStoppedLocked@ActivityManangerService.java-->
-activityStoppedLocked{
 - 
+- if (r.app != null && r.app.thread != null) {
+	- r.stopped = false
+	- r.state = STOPPING
+	- r.app.thread.scheduleStopActivity(r.appToken, r.visible, r.configChangeFlags)
+	- mHandler.sendMessageDelayed(STOP_TIMEOUT_MSG, STOP_TIMEOUT) //stop超时
+  }
+  //停止出错
+- r.stopped = true
+- r.state = STOPPED
+- destroyActivityLocked
+}@ActivityStack.java
+
+//结束activity
+finishCurrentActivityLocked(ActivityRecord r, int mode, boolean oomAdj) {
+- ActivityRecord next = mStackSupervisor.topRunningActivityLocked()
+- if (mode == FINISH_AFTER_VISIBLE && (r.visible || r.nowVisible)
+                && next != null && !next.nowVisible) {
+	- r.state = STOPPING
+	}
 }@ActivityStack.java
 
 
+/* STOPPED
 
-/* finish
+ 
+*/
+
+
+//Activity执行完成stop
+activityStopped(IBinder token, Bundle icicle..)@ActivityManangerService.java-->
+activityStoppedLocked(Bundle newIcicle, PersistableBundle newPersistentState,) {
+- if (!stopped) {
+	- stopped = true
+	- state = STOPPED
+	- mWindowContainerController.notifyAppStopped()
+	- 
+	}
+}@ActvityRecored.java
+/* FINISHING
 
 
 */
@@ -115,7 +188,20 @@ finishCurrentActivityLocked{
 }@ActivityStack.java
 
 
-/* configuration
+/*
+ DESTROYING
+
+*/
+
+
+/*
+ DESTROYED
+
+*/
+
+
+/**************************
+ configuration
  每个ActivityStack拥有一个mOverrideConfig,分屏时每个stack中的窗口都不一样
  将stack中的mOverrideConfig应用到栈中的每个应用
 */

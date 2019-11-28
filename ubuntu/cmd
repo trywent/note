@@ -142,6 +142,7 @@ find . -name "*~" -print0 | xargs -0 rm -rf
 归档过滤：
 tar  -zcvf /backup/filename.tgz PATH --exclude="./folder" --exclude="./.repo"
 
+tar  -zcvf xxx.tgz .git
 
 列出文件名:
 find . -name .svn -exec ls {} \;

@@ -3,8 +3,8 @@
 */
 w/e/i/d(String tag, Throwable tr)@Log.java
 
-isLoggable(String tag, int level)@Log.java-->__android_log_is_loggable@android_util_Log.cpp
--->__android_log_level@log_is_loggable.c
+isLoggable(String tag, int level)@Log.java-->isLoggable@android_util_Log.cpp
+-->__android_log_is_loggable-->__android_log_level@log_is_loggable.c
 
 
 

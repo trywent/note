@@ -1,13 +1,10 @@
-//bootable/recovery/recovery.cpp
+/*
+ recovery
+ /cache中文件与recovery传递数据.
+*/
 
-主系统通过/cache中文件与recovery传递数据.
 工厂复位(Factory reset):主系统写"--wipe_data"到 /cache/recovery/command。并重启
 
-OTA升级：主系统写"--update_package=/cache/some-filename.zip"。并重启进入recovery
-
-prompt_and_wait{
-
-}
 
 
 main{
@@ -30,37 +27,39 @@ main{
 - 擦除数据wipe_data
 }@recovery.cpp
 
-_____________________
-rk MISC:
-bootcmd:偏移0x4000
+/*
+ 文件系统挂载表：
+*/
+TARGET_RECOVERY_FSTAB := $(PLATCOMM)/emmc/recovery$(FSTAB_SUFFIX).fstab@BoardConfigEmmc.mk
 
-struct bootloader_message {
-    char command[32];   //命令 boot-recovery
-    char status[32];
-    char recovery[768]; //recovery的命令。recovery--wipe_all
-    char stage[32];
-    char reserved[224];
-};
-
-=====================
-文件系统挂载表：
 load_volume_table{
 - 若是emmc，fs_mgr_read_fstab("/etc/recovery.emmc.fstab")
 - 否则，fs_mgr_read_fstab("/etc/recovery.fstab")
 }@roots.cpp
 
 
+
+//install:
+install_package-->really_install_package{
+- load_keys{//加载/res/keys
+	- cert.key_type //类型KEY_TYPE_RSA
+	- cert.hash_len
+	} 
+- verify_file-->RSA_verify
+- try_update_binary{
+	- 查找升级包中升级文件，mzFindZipEntry("update-binary")
+	- 将文件解压到"/tmp/update_binary"
+	- 执行升级文件exec(update_binary,path/*包路径*/)
+	}
+}@install.cpp-->
+
+
+
+bootable/recovery/install.cpp
 bootable/recovery/roots.cpp
 
 
 
-
-
-将apk打包成镜像文件
-
-可能修改：
-//加入一个新的Volume到fstab中
-fs_mgr_add_entry@roots.cpp
 
 
 
@@ -127,49 +126,6 @@ bootable/recovery/default_device.cpp
 bootable/recovery/minui/graphics.c
 include/pixelflinger/pixelflinger.h
 system/core/libpixelflinger
-=====================
-RKUPDATE:
-sdtool_main-->install_rkimage
-
-=====================
-update:
-
-install_package-->really_install_package{
-- load_keys{//加载/res/keys
-	- cert.key_type //类型KEY_TYPE_RSA
-	- cert.hash_len
-	} 
-- verify_file-->RSA_verify
-- try_update_binary{
-	- 查找升级包中升级文件，mzFindZipEntry("update-binary")
-	- 将文件解压到"/tmp/update_binary"
-	- 执行升级文件exec(update_binary,path/*包路径*/)
-	}
-}@install.cpp-->
-
-
-bootable/recovery/install.cpp
-
-
-=====================
-ota：
-make otapackage-->ota_from_target_files BUILT_TARGET_FILES_PACKAGE(源文件) zip(目标)
-
-
-ota_from_target_files
---downgrade@Makefile
-
-build-recoveryimage-target@Makefile
-
-
-
-WriteFullOTAPackage@ota_from_target_files-->AssertOlderBuild-->
-script.AssertOlderBuild(ts, ts_text)@edify_generator.py
-
-
-build/core/Makefile
-build/tools/releasetools/ota_from_target_files
-build/tools/releasetools/edify_generator.py
 
 
 
@@ -207,6 +163,22 @@ bootable/recovery/applypatch/applypatch_modes.cpp
 bootable/recovery/applypatch/applypatch.cpp
 
 /***************
+ 设置权限
+
+*/
+
+SetMetadataFn{
+- bool recursive = (strcmp(name, "set_metadata_recursive") == 0)
+- if (recursive) {
+	- nftw(args[0], do_SetMetadataRecursive, 30, FTW_CHDIR | FTW_DEPTH | FTW_PHYS)
+  }else{
+	- ApplyParsedPerms(state, args[0], &sb, parsed)
+  }
+}@intall.c
+
+
+bootable/recovery/updater/install.c
+/***************
  lsec recovery
 */
 
@@ -218,5 +190,7 @@ sql_getupdate(&update_package){
 	}
 - findFileAndMountDevice("/lsec6523update")
 }
+
+
 
 

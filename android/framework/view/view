@@ -208,14 +208,7 @@ applyLegacyAnimation(ViewGroup parent, long drawingTime,Animation a){
 - parent.invalidate
 }@View.java
 
-/* 事件处理
 
-*/
-
-
-frameworks/base/core/java/android/view/View.java
-frameworks/base/core/java/android/view/WindowManagerImpl.java
-frameworks/base/core/java/android/view/ViewRootImpl.java
 
 /*
  应用的View.DecorView
@@ -229,6 +222,15 @@ dispatchKeyEvent(KeyEvent event){
 - mWindow.onKeyDown/mWindow.onKeyUp
 }@DecorView.java
 
+/* 事件处理
+
+*/
+//触摸事件
+processPointerEvent@ViewRootImpl.java-->
+dispatchTouchEvent{
+- 
+- onTouchEvent
+}@ViewGroup.java
 
 
 
