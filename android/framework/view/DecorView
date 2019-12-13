@@ -21,7 +21,8 @@ willYouTakeTheSurface@RootViewSurfaceTaker.java-->willYouTakeTheSurface{
 
 
 
-
+//阴影，立体效果
+elevation
 
 
 frameworks/base/core/java/com/android/internal/view/RootViewSurfaceTaker.java

@@ -43,6 +43,8 @@ PackageManagerService(Context context, Installer installer,
 - requestCopyPreoptedFiles //copy files
   //扫描应用
 - scanDirTracedLI
+  //应用安装
+- mInstallerService = new PackageInstallerService(context, this)
 }@PackageManagerService.java
 
 
@@ -116,9 +118,85 @@ ActivityIntentResolver.queryIntent(Intent intent, String resolvedType, int flags
 - super.queryIntent(intent, resolvedType)
 }
 
+//安装
+installPackageTracedLI-->installPackageLI(InstallArgs args, PackageInstalledInfo res){
+- final String installerPackageName = args.installerPackageName
+- final File tmpPackageFile = new File(args.getCodePath())
 
-frameworks/base/services/core/java/com/android/server/pm/PackageManagerService.java
-frameworks/base/services/core/java/com/android/server/IntentResolver.java
+  //
+- if (args.move != null) {
+
+  }else(!forwardLocked && !pkg.applicationInfo.isExternalAsec()){
+	- derivePackageAbi //解出库文件
+  }else if(pkg.applicationInfo.isExternalAsec()){
+
+  }
+  //
+- if (replace) {
+	- replacePackageLIF(pkg, parseFlags, scanFlags | SCAN_REPLACING, args.user,...)
+  }else{
+	- installNewPackageLIF(pkg, parseFlags, scanFlags | SCAN_DELETE_DATA_ON_FAILURES...)
+  }
+}@PackageManagerService.java
+
+/*
+ 安装应用前传输apk文件到packageManagerServices
+*/
+
+//PackageInstallerService
+PackageManagerService-->PackageInstallerService(Context context, PackageManagerService pm){
+- mInstallThread = new HandlerThread(TAG)
+- mInstallThread.start
+- mInstallHandler = new Handler(mInstallThread.getLooper())
+- mCallbacks = new Callbacks(mInstallThread.getLooper())
+-  mSessionsFile = new AtomicFile(new File(Environment.getDataSystemDirectory(), "install_sessions.xml"))
+- mSessionsDir = new File(Environment.getDataSystemDirectory(), "install_sessions")
+- mSessionsDir.mkdirs()
+}@PackageInstallerService.java
+
+//session
+createSession(SessionParams params, String installerPackageName, int userId)-->
+createSessionInternal(SessionParams params, String installerPackageName, int userId){
+- final int sessionId = allocateSessionIdLocked()
+- session = new PackageInstallerSession(mInternalCallback, mContext, mPm...){
+	- - mHandler = new Handler(looper, mHandlerCallback)
+	}@PackageInstallerSession.java
+- mSessions.put(sessionId, session)
+}@PackageInstallerService.java
 
 
-//mSettings.isEnabledAndMatchLPr
+//将apk文件写到一个中转区？
+ParcelFileDescriptor openWriteInternal(String name, long offsetBytes, long lengthBytes){
+- bridge = new FileBridge()
+- mBridges.add(bridge)
+- stageDir = resolveStageDirLocked()
+- target = new File(stageDir, name)
+- final FileDescriptor targetFd = Libcore.os.open(target.getAbsolutePath(),O_CREAT | O_WRONLY, 0644)
+- bridge.setTargetFile(targetFd)
+- return new ParcelFileDescriptor(bridge.getClientSocket())
+}@PackageInstallerSession.java
+
+//提交数据
+commit(@NonNull IntentSender statusReceiver, boolean forTransfer){
+- PackageInstallObserverAdapter adapter = new PackageInstallObserverAdapter(mContext, statusReceiver, sessionId...)
+- computeProgressLocked(true)
+- mHandler.obtainMessage(MSG_COMMIT).sendToTarget()-->mHandlerCallback.handleMessage()-->commitLocked
+}@PackageInstallerSession.java
+
+commitLocked{
+- needToAskForPermissionsLocked
+- computeProgressLocked
+  //解出库文件
+- extractNativeLibraries(mResolvedStageDir, params.abiOverride){
+	- final File libDir = new File(packageDir, NativeLibraryHelper.LIB_DIR_NAME)
+	- handle = NativeLibraryHelper.Handle.create(packageDir)
+	- NativeLibraryHelper.copyNativeBinariesWithOverride(handle, libDir,abiOverride)
+ 	}
+  //安装
+- mPm.installStage(mPackageName, stageDir, stageCid, localObserver,...)
+}@PackageInstallerSession.java
+
+frameworks/base/services/core/java/com/android/server/pm/PackageInstallerService.java
+frameworks/base/services/core/java/com/android/server/pm/PackageInstallerSession.java
+
+

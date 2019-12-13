@@ -1,4 +1,6 @@
-//videobuf层功能像用户空间和驱动之间的粘合剂。分配和处理存储视频帧的缓存。
+/*
+ videobuf层功能像用户空间和驱动之间的粘合剂。分配和处理存储视频帧的缓存。
+*/
 实现了POSIX（可移植操作系统接口）系统调用，read，write，poll。还有一些io相关的操作函数ioctl()，
 处理buffer的分配，queueing和dequeueing，流控制。
 

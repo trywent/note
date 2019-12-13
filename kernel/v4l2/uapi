@@ -1,0 +1,219 @@
+/**********************
+ V4L2 API
+*/
+通用流程
+1. 打开设备
+2. 设置设备属性，选择一个视频/音频输入设备，视频标准，图片亮度..
+3. 协商设置数据格式
+4. 获取输入/输出处理函数
+5. 循环处理输入/输出数据
+6. 关闭设备
+
+//打开设备dev/video0-n
+设备编号是随机(major 81,minor 0-255)。配置CONFIG_VIDEO_FIXED_MINOR_RANGES后，video,和radio的minor编号范围会固定
+
+
+#include <unistd.h>
+#include <sys/ioctl.h>
+
+
+/*
+  操作视频输入/输出设备 。一个设备有多个inputs,outputs
+
+*/
+struct v4l2_input input
+int index
+ioctl(fd, VIDIOC_G_INPUT, &index)
+input.index = index
+ioctl(fd, VIDIOC_ENUMINPUT, &input)
+index = 0
+ioctl(fd, VIDIOC_S_INPUT, &index)
+
+//VIDIOC_QUERYCAP 			     查询设备功能。open后必须的操作
+//VIDIOC_G_PRIORITY and VIDIOC_S_PRIORITY    应用程序获取优先级，设置优先级。（不让其它应用操作）
+//VIDIOC_G_INPUT and VIDIOC_G_OUTPUT  	     获取当前的input/output的编号
+//VIDIOC_ENUMINPUT and ioctl VIDIOC_ENUMOUTPUT  获取设备信息struct v4l2_input。设备的输入输出属性(设备类型，功能)
+//VIDIOC_S_INPUT and VIDIOC_S_OUTPUT  	     选择input/output
+
+
+struct v4l2_input {
+	__u32	     index;		/*  Which input */
+	__u8	     name[32];		/*  Label */
+	__u32	     type;		/*  Type of input */
+	__u32	     audioset;		/*  Associated audios (bitfield) */
+	__u32        tuner;             /*  enum v4l2_tuner_type */
+	v4l2_std_id  std;
+	__u32	     status;
+	__u32	     capabilities;
+	__u32	     reserved[3];
+};
+
+struct v4l2_output {
+	__u32	     index;		/*  Which output */
+	__u8	     name[32];		/*  Label */
+	__u32	     type;		/*  Type of output */
+	__u32	     audioset;		/*  Associated audios (bitfield) */
+	__u32	     modulator;         /*  Associated modulator */
+	v4l2_std_id  std;
+	__u32	     capabilities;
+	__u32	     reserved[3];
+};
+
+/* 
+  操作音频输入/输出设备
+
+*/
+struct v4l2_audio audio
+ioctl(fd, VIDIOC_G_AUDIO, &audio)
+audio.index = 0
+ioctl(fd, VIDIOC_S_AUDIO, &audio)
+
+VIDIOC_ENUMAUDIO and VIDIOC_ENUMAUDOUT     音频设备属性 (audio input/output是实际的连接设备)struct v4l2_audio audio
+VIDIOC_G_AUDIO and VIDIOC_G_AUDOUT         获取struct v4l2_audio audio
+VIDIOC_S_AUDIO and VIDIOC_S_AUDOUT	     设置audio设备
+
+/*
+  输入设备可有多个tuner。解调调频信号
+
+  输出设备可有多个modulator。调制信号
+*/
+
+VIDIOC_G_TUNER and VIDIOC_S_TUNER 	     获取tuner 调谐器. struct v4l2_tuner
+VIDIOC_G_MODULATOR and VIDIOC_S_MODULATOR  modulator 调制器(output)
+VIDIOC_G_FREQUENCY and VIDIOC_S_FREQUENCY  设置或获取（tuner/modulator）频率。struct v4l2_frequency
+
+/*
+ 支持的视屏格式标准
+ 
+ PAL-B/G/H/I, NTSC-M, SECAM-D/K
+*/
+
+VIDIOC_G_STD and VIDIOC_S_STD  当前视频使用的格式
+VIDIOC_ENUMSTD VIDIOC_SUBDEV_ENUMSTD  支持的视频格式
+v4l2_std_id std_id;
+struct v4l2_standard standard
+
+
+//Digital Video (DV) Timings
+VIDIOC_ENUM_DV_TIMINGS, VIDIOC_SUBDEV_ENUM_DV_TIMINGS 
+
+
+
+/*
+ User Controls
+*/
+V4L2_CID_BASE 			//First predefined ID, equal to V4L2_CID_BRIGHTNESS.
+V4L2_CID_USER_BASE 
+
+
+/*
+ Codec Control Reference
+ 编解码控制
+*/
+V4L2_CID_MPEG_CLASS (class) 		//The Codec class descriptor
+
+//MFC 5.1 MPEG Controls
+V4L2_CID_MPEG_MFC51_VIDEO_DECODER_H264_DISPLAY_DELAY_ENABLE (boolean)
+V4L2_CID_MPEG_MFC51_VIDEO_DECODER_H264_DISPLAY_DELAY (integer)
+
+
+
+/*
+ VPX Control Reference
+ 控制VPx video codec编码
+*/
+V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS (enum)
+
+
+/*
+ High Efficiency Video Coding (HEVC/H.265) Control Reference
+ h.265编解码控制
+*/
+V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP (integer)
+
+/*
+ Camera Control Reference
+ 控制镜片，sernsor
+*/
+V4L2_CID_CAMERA_CLASS (class)  //The Camera class descriptor 
+V4L2_CID_EXPOSURE_AUTO (enum)
+
+
+
+/*
+ Digital Video Control Reference
+ 控制VGA, DVI (Digital Visual Interface), HDMI ( HDMI ) and DisplayPort ( DP )。文件节点/dev/v4l-subdev*
+*/
+V4L2_CID_DV_CLASS (class) 	    //The Digital Video class descriptor.
+V4L2_CID_DV_TX_HOTPLUG (bitmask)
+
+/*
+ fm 控制接口
+*/
+//FM Transmitter Control Reference
+V4L2_CID_FM_TX_CLASS (class)        //The FM_TX class descriptor. 
+V4L2_CID_RDS_TX_DEVIATION (integer) //配置RDS信号频率
+V4L2_CID_RDS_TX_PI (integer) 	    //设置RDS Programme 标识
+V4L2_CID_RDS_TX_PTY (integer) 	    //设置RDS Programme类型
+V4L2_CID_RDS_TX_PS_NAME (string)
+
+
+//FM Receiver Control Reference
+V4L2_CID_FM_RX_CLASS (class)         //The FM_RX class descriptor
+V4L2_CID_RDS_RECEPTION (boolean)     //RDS开关Enables/disables 
+V4L2_CID_RDS_RX_PTY (integer)        //获取RDS Programme类型
+V4L2_CID_RDS_RX_PS_NAME (string)     //获取Programme Service name (PS_NAME).
+V4L2_CID_RDS_RX_RADIO_TEXT (string)  //获取Radio信息
+
+/*
+ LED flash (hardware strob)
+ 闪光灯
+*/
+V4L2_CID_FLASH_CLASS (class)         //The FLASH class descriptor.
+V4L2_CID_FLASH_LED_MODE (menu)
+
+
+/*
+ JPEG Control Reference
+ 图片编码控制
+*/
+V4L2_CID_JPEG_CLASS (class)
+
+/*
+ Image Source Control Reference
+ 图片捕获控制
+*/
+V4L2_CID_IMAGE_SOURCE_CLASS (class) The IMAGE_SOURCE class descriptor.
+V4L2_CID_VBLANK (integer)
+
+
+/*
+ Image Process Control Reference
+ 图片处理
+*/
+V4L2_CID_IMAGE_PROC_CLASS (class) 
+V4L2CIDLINKFREQ (integer menu
+
+/**********************
+  Input/Output
+*/
+两种方式：read/write.流数据(memory map)
+
+//read/write
+- 比较少使用这种方式，比交换指针效率低
+
+/*********************
+ VBI是Vertical Blanking Interval 场消隐期，也叫场逆程
+ VBI数据广播是计算机中各种格式的数据插入电视节目的场逆中，让这些数据随电视信号一块播出而形成的一种信息传送方式
+*/
+
+
+
+
+/**********************
+ Digital TV API
+
+ DVB - Digital Video Broadcasting
+
+*/
+

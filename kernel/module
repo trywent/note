@@ -1,2 +1,33 @@
+/*
+ 模块
+*/
+
+
+//编译
 make -C ~/kernel-2.6 M=`pwd` modules
 
+//加载
+insmod xxx.ko
+insmod xxx.ko param0=val param1="str"
+lsmod  
+rmmod  xxx
+
+
+
+//
+module_init(initfn)
+module_exit(exitfn)
+MODULE_INFO(tag, info)     	 __MODULE_INFO(tag, tag, info)
+MODULE_ALIAS(_alias)       	 MODULE_INFO(alias, _alias)
+MODULE_SOFTDEP(_softdep)   	 MODULE_INFO(softdep, _softdep)
+MODULE_LICENSE(_license)   	 MODULE_INFO(license, _license)
+MODULE_AUTHOR(_author)     	 MODULE_INFO(author, _author)
+MODULE_DESCRIPTION(_description) MODULE_INFO(description, _description)
+MODULE_VERSION(_version)         MODULE_INFO(version, _version)
+
+//参数
+module_param(name, type, perm)	module_param_named(name, name, type, perm)
+
+
+kernel/include/linux/module.h
+kernel/include/linux/moduleparam.h

@@ -1,0 +1,28 @@
+/*
+ 编译
+*/
+
+//编译模块的makefile
+export ARCH=arm
+exprot CROSS_COMPILE=arm-none-linux-gnueabi
+obj-m := Hello.o
+KDIR := (kernrl source code location)/home/path/to/kernel
+PWD := $(shell pwd)
+default:
+          $(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+clean:
+          $(MAKE) -C $(KDIR) SUBDIRS=$(PWD) clean
+
+//产生预处理文件
+make net/core/foo.i
+
+
+
+
+/*
+ 镜像格式
+ vmlinux、Image、zImage、bzImage、uImage、xipImage、bootpImage等.
+*/
+//vmlinux 实质是elf(Exexutable and Linkable Format)
+
+

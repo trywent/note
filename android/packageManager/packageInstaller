@@ -11,12 +11,41 @@ ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.ca
 ActivityManager: ->startActivity for ActivityRecord{9d15999 u0 com.android.packageinstaller/.PackageInstallerActivity t81} result:0
 
 */
+/*
+ android6.0
+*/
+onClick(mOk)-->startInstall(InstallAppProgress.class)@PackageInstallerActivity.java-->onCreate-->
+initView{
+- PackageManager pm = getPackageManager()
+- PackageInstallObserver observer = new PackageInstallObserver()
+  //apk已经安装
+- if("package".equals(mPackageURI.getScheme())){
+	- pm.installExistingPackage(mAppInfo.packageName)
+  }else{
+	- pm.installPackageWithVerificationAndEncryption(mPackageURI, observer, installFlags,...)
+	}
+}@InstallAppProgress.java
+
+
+packages/apps/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/InstallAppProgress.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+/*
+ andoid8.0
+*/
+onCreate@InstallStart.java-->onCreate@InstallStageing.java-->
 
 onCreate(Bundle icicle) {
 - mPm = getPackageManager()
 - mInstaller = mPm.getPackageInstaller()
-  //安装文件路径
-- packageUri = intent.getData()
+- if (PackageInstaller.ACTION_CONFIRM_PERMISSIONS.equals(intent.getAction())) {//确认权限
+	- packageUri = Uri.fromFile(new File(info.resolvedBaseCodePath))
+  }else{//安装
+	- packageUri = intent.getData() 
+  }
+- processPackageUri(packageUri)
+  //创建安装界面
+- bindUi(R.layout.install_confirm, false)
   //检查，初始化安装
 - checkIfAllowedAndInitiateInstall{
 	 //检查是否允许安装应用
@@ -52,6 +81,132 @@ initiateInstall{
 - String pkgName = mPkgInfo.packageName
   //根据包名获取应用信息。是否已经安装过
 - mAppInfo = mPm.getApplicationInfo(pkgName)
+- startInstallConfirm{
+	  //创建ui，设置监听器
+	- bindUi(R.layout.install_confirm_perm_update, true){
+		- setContentView(layout)
+		- mOk = (Button) findViewById(R.id.ok_button)
+		- mCancel = (Button)findViewById(R.id.cancel_button)
+       		- mOk.setOnClickListener(this)
+        	- mCancel.setOnClickListener(this)
+		}
+	- ((TextView) findViewById(R.id.install_confirm_question)).setText(R.string.install_confirm_question)
+	  //不显示权限
+	- if(!permVisible){
+		- bindUi(R.layout.install_confirm, true)
+		}
+	}
 }@PackageInstallerActivity.java
 
+//确认安装
+onClick(View v) {
+- v == mOk{
+	- startInstall(){
+		- Intent newIntent = new Intent()
+		- newIntent.setData(mPackageURI)
+		- newIntent.setClass(this, InstallInstalling.class)
+		- startActivity(newIntent)
+		}
+	}
+- v == mCancel{
+	- finish
+	}
+}@PackageInstallerActivity.java
+
+/*
+ installing
+*/
+
+//准备安装
+onCreate(@Nullable Bundle savedInstanceState) {
+- setContentView(R.layout.install_installing)
+  //已经存在
+- if ("package".equals(mPackageURI.getScheme())) {
+	- getPackageManager().installExistingPackage(appInfo.packageName)-->installExistingPackageAsUser--> mPM.installExistingPackageAsUser
+		@ApplicationPackageManager.java-->installExistingPackageAsUser@PackageManagerService.java
+  }else{
+	- final File sourceFile = new File(mPackageURI.getPath())
+	- PackageUtil.initSnippetForNewApp(this, PackageUtil.getAppSnippet(this, appInfo, sourceFile), R.id.app_snippet)
+	  //监听安装结果
+	- mInstallId = InstallEventReceiver.addObserver(this, EventResultPersister.GENERATE_NEW_ID
+	  //创建session
+	- mSessionId = getPackageManager().getPackageInstaller().createSession(params)
+	- mSessionCallback = new InstallSessionCallback()
+	}
+}@InstallInstalling.java
+
+//注册session回调
+onStart-->getPackageManager().getPackageInstaller().registerSessionCallback(mSessionCallback)@InstallInstalling.java
+
+//安装状态
+InstallEventReceiver.addObserver(this, EventResultPersister.GENERATE_NEW_ID)-->
+getReceiver(context).addObserver(id, observer){
+- sReceiver = getReceiver-->EventResultPersister(TemporaryFileManager.getInstallStateFile(context)){
+	- mResultsFile = new AtomicFile(resultFile) //安装状态文件 "install_results.xml"
+	- FileInputStream stream = mResultsFile.openRead()
+	- XmlPullParser parser = Xml.newPullParser()
+	- parser.setInput(stream, StandardCharsets.UTF_8.name())
+	- nextElement(parser)
+	}@EventResultPersister.java
+- sReceiver.addObserver-->addObserver@EventResultPersister.java
+}@InstallEventReceiver.java
+
+//安装
+onResume() {
+- PackageInstaller installer = getPackageManager().getPackageInstaller()
+- PackageInstaller.SessionInfo sessionInfo = installer.getSessionInfo(mSessionId)
+- mInstallingTask = new InstallingAsyncTask()
+- mInstallingTask.execute()-->doInBackground{
+	- PackageInstaller.Session session = getPackageManager().getPackageInstaller().openSession(mSessionId){
+		- new Session(mInstaller.openSession(sessionId))
+		}@PackageInstaller.java
+	- File file = new File(mPackageURI.getPath())
+	  //读取apk文件发送到PackageInstaller
+	- InputStream in = new FileInputStream(file)
+	- long sizeBytes = file.length()
+	- OutputStream out = session.openWrite("PackageInstaller", 0, sizeBytes)
+	- int numRead = in.read(buffer)
+	- out.write(buffer, 0, numRead)
+	}
+  //传输文件完成
+- mInstallingTask.onPostExecute{
+	- Intent broadcastIntent = new Intent(BROADCAST_ACTION)
+	- PendingIntent pendingIntent = PendingIntent.getBroadcast(InstallInstalling.this,mInstallId...)
+	- session.commit(pendingIntent.getIntentSender())
+	}
+}@InstallInstalling.java
+
+
+
+/*
+ PackageInstaller
+ 安装器通过这个接口执行安装
+
+*/
+getPackageManager().getPackageInstaller()@ApplicationPackageManager.java-->
+new PackageInstaller(mPM.getPackageInstaller(),mContext.getPackageName(), mContext.getUserId()){
+- mInstaller = installer
+- mInstallerPackageName = installerPackageName
+}@PackageInstaller.java
+
+//传输安装文件
+openWrite(@NonNull String name, long offsetBytes,long lengthBytes){
+- ParcelFileDescriptor clientSocket = mSession.openWrite(name, offsetBytes, lengthBytes)
+- return new FileBridge.FileBridgeOutputStream(clientSocket){
+	- mClientPfd = clientPfd
+	- mClient = clientPfd.getFileDescriptor()
+	}@FileBridge.java
+}@PackageInstaller.java
+
+//传输完成
+commit(@NonNull IntentSender statusReceiver)-->mSession.commit(statusReceiver, false)@PackageInstaller.java
+
+
 package/app/PackageInstaller/src/com/android/packageInstaller/PackageInstallerActivity.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/InstallInstalling.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/TemporaryFileManager.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/InstallEventReceiver.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/EventResultPersister.java
+frameworks/base/core/java/android/app/ApplicationPackageManager.java
+frameworks/base/core/java/android/content/pm/PackageInstaller.java
+frameworks/base/core/java/android/os/FileBridge.java

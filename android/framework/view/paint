@@ -1,0 +1,13 @@
+/*****************
+  paint
+*/
+
+
+/* paint mode
+  
+   src要绘制的图像，dst背景色被src合并
+*/
+
+
+
+frameworks/base/graphics/java/android/graphics/Paint.java

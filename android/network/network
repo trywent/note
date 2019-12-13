@@ -1,0 +1,29 @@
+/*
+ networkManager
+ dumpsys  network_management
+ dumpsys  netpolicy:
+ dumpsys  netstats:
+ dumpsys  network_scor
+*/
+
+networkManagement = NetworkManagementService.create(context)@SystemServer.java-->
+create(context, NETD_SERVICE_NAME){//"netd"
+- NetworkManagementService service = new NetworkManagementService(context, socket){
+	- mFgHandler = new Handler(FgThread.get().getLooper())
+	- mConnector = new NativeDaemonConnector(new NetdCallbackReceiver(), socket...)
+	  //事件处理线程
+	- mThread = new Thread(mConnector, NETD_TAG)
+	- mDaemonHandler = new Handler(FgThread.get().getLooper())
+	}
+- service.connectNativeNetdService()
+}@NetworkManagementService.java
+
+
+
+frameworks/base/services/core/java/com/android/server/NetworkManagementService.java
+//state
+NetworkStatsService.create(context, networkManagement)@SystemServer.java
+
+
+
+new NetworkPolicyManagerService(context,mActivityManagerService, networkStats, networkManagement)@SystemServer.java

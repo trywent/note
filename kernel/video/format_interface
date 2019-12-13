@@ -69,6 +69,7 @@ HDTV 标准是高品质视频信号标准，720p、1080i、1080p，但目前支�
 
 /***********************
  传输接口 摄像头到视频ic接口
+
 */
 //第一代CVBS(复合视频广播信号)英文全称(Composite Video Broadcast Signal):模拟YPbPr
 
@@ -89,12 +90,19 @@ HDTV 标准是高品质视频信号标准，720p、1080i、1080p，但目前支�
 //第五代是HDMI(High Definition Multimedia Interface):数字
 DVI升级版，传输视频&音频，带宽最大，最清晰，数字信号
 
+//模拟高清CVI、TVI、AHD
+HDCVI——High Definition Composite Video Interface，即高清复合视频接口
+HDTVI ，全称为 High Definition Transport Video Interface，即高清视频传输接口
+AHD(Analog High Definition)，即称之为模拟高清新定义
+
+
 
 
 /***********************
   视频ic到soc的接口。主要硬件接口
 */
-//itu-r bt.656
+
+//itu-r bt.656(CCIR656)
 定义了一个并行的硬件接口用来传送一路4:2:2的ycbcr的数字视频流。
 TU-R BT.601 16位数据传输；Y、U、V信号同时传输，是并行数据，行场同步单独输出。
 ITU-R BT.656 8/10位数据传输；不需要同步信号；串行数据传输；传输速率是601的2倍;
@@ -119,10 +127,7 @@ CSI/DSI的物理层（Phy Layer）由专门的WorkGroup负责制定，其目前�
 D-PHY采用1对源同步的差分时钟和1～4对差分数据线来进行数据传输。数据传输采用
 DDR方式，即在时钟的上下边沿都有数据传输
 
-//CVI、TVI、AHD模拟高清
-HDCVI——High Definition Composite Video Interface，即高清复合视频接口
-HDTVI ，全称为 High Definition Transport Video Interface，即高清视频传输接口
-AHD(Analog High Definition)，即称之为模拟高清新定义
+
 
 /***********************
  屏幕接口

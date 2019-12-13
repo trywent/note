@@ -15,7 +15,11 @@
         <item>"mobile_ia,14,0,2,-1,true"</item>
         <item>"mobile_emergency,15,0,2,-1,true"</item>
     </string-array>
+
+
+  dumpsys connectivity
 */
+connectivity = new ConnectivityService(context, networkManagement, networkStats, networkPolicy)@SystemServer.java-->
 ConnectivityService(Context context, INetworkManagementService netManager,
             INetworkStatsService statsService, INetworkPolicyManager policyManager){
 - mHandlerThread = new HandlerThread("ConnectivityServiceThread")
@@ -24,15 +28,19 @@ ConnectivityService(Context context, INetworkManagementService netManager,
   //手机网络
 - mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE)
 - mPolicyManager.registerListener(mPolicyListener)
-  //获取网络类型，并
+  //获取网络config,类型，
 -  String[] naStrings = context.getResources().getStringArray(com.android.internal.R.array.networkAttributes)
 - for (String naString : naStrings) {
 	- NetworkConfig n = new NetworkConfig(naString)
+	- mLegacyTypeTracker.addSupportedType(n.type)
 	- mNetConfigs[n.type] = n
 	}
 - mTethering = makeTethering()
-  //
-- mMultinetworkPolicyTracker = createMultinetworkPolicyTracker(mContext, mHandler...)
+  //网络状态跟踪器(主要处理wifi网络异常，切换网络)
+- mMultinetworkPolicyTracker = createMultinetworkPolicyTracker(mContext, mHandler...)-->
+	MultinetworkPolicyTracker(Context ctx, Handler handler, Runnable avoidBadWifiCallback){
+	- 
+	}
 - mMultinetworkPolicyTracker.start()
 }@ConnectivityService.java
 
@@ -53,6 +61,20 @@ setAirplaneMode(boolean enable) {
 }@ConnectivityService.java
 
 
+/*
+ 进程绑定到指定网络
+
+*/
+bindProcessToNetwork(Network network)-->setProcessDefaultNetwork(Network network){
+- NetworkUtils.bindProcessToNetwork(netId)
+- Proxy.setHttpProxySystemProperty(getInstance().getDefaultProxy())
+- InetAddress.clearDnsCache()
+- NetworkEventDispatcher.getInstance().onNetworkConfigurationChanged()
+}@ConnectivityService.java
+
+
 
 frameworks/base/core/java/android/net/ConnectivityManager.java
 frameworks/base/services/core/java/com/android/server/ConnectivityService.java
+frameworks/base/services/net/java/android/net/util/MultinetworkPolicyTracker.java
+frameworks/base/core/java/android/net/NetworkUtils.java

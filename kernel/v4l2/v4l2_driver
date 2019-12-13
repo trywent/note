@@ -1,4 +1,7 @@
-//======================================
+/*
+
+ kernel v4l2
+*/
 video_device:包含设备信息，设备操作函数（v4l2_file_operations，release,）
 注册相关：video_register_device，video_unregister_device
 
@@ -33,7 +36,7 @@ int (*vidioc_s_output)   (struct file *file, void *fh, unsigned int i);
 ——————————————————————————————————————
 颜色格式：
 象素可由颜色数组组成。图像的存储有两种方式 1）所有相同的单色存放在一起(一个象素的R) 2）以象素为单位存放
-编码：RGB，YUV只有红，蓝，透明度
+编码：RGB，YUV只有红，蓝，亮度
 v4l2中描述颜色结构struct v4l2_pix_format
 
 ——————————————————————————————————————

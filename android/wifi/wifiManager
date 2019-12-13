@@ -2,6 +2,7 @@
   wifiManager
 
   sprd /data/misc/wifi/wifimac.txt
+  dumpsys wifi
 */
 mSystemServiceManager.startService("com.android.server.wifi.WifiService")@SystemServer.java-->
 startService{

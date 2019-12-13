@@ -1,15 +1,7 @@
-//DVB - Digital Video Broadcasting 数字视频广播
-//VBI - Vertical Blanking Interval 场消隐期(利用视频的场消隐期发送文字信息)
-//Structure of a driver
----------------------
-
-driver{
-- v4l2_device//一个设备结构，用来存放设备状态
-- v4l2_subdev//初始化子设备的命令和方法
-- video_device //创建V4L2设备节点，并维护设备数据/dev/videoX, /dev/vbiX and /dev/radioX
-- Filehandle-specific structs//文件操作结构，包含每个文件操作的数据
-- videobuf//视频缓冲处理
-}
+/*
+DVB - Digital Video Broadcasting 数字视频广播
+VBI - Vertical Blanking Interval 场消隐期(利用视频的场消隐期发送文字信息)
+*/
 结构:
     device instances                //v4l2_device
       |
@@ -20,8 +12,95 @@ driver{
 	  \-filehandle instances
 
 
+- v4l2_device  //设备结构，用来存放设备状态
+- v4l2_subdev  //初始化子设备的命令和方法
+- video_device //创建V4L2设备节点，并维护设备数据/dev/videoX, /dev/vbiX and /dev/radioX
+- Filehandle-specific structs//文件操作结构，包含每个文件操作的数据
+- videobuf     //视频缓冲处理
 
-//=================struct v4l2_device
+//v4l2 framework功能
+1
+2
+
+
+/*
+ video_device 真正的设备节点通过video_device创建
+
+*/
+动态创建：
+struct video_device *vdev = video_device_alloc();
+vdev->release = video_device_release; //必须设置,最后一个使用者退出时调用
+
+struct video_device{
+- struct device dev
+- struct cdev *cdev
+- struct v4l2_device *v4l2_dev: //设置为v4l2_device.
+- struct device *dev_parent://当v4l2_device为空时设置。如：多个PCI devices共用一个v4l2_device 
+- char name[32]: 设置为唯一标识.
+- const struct v4l2_file_operations fops: //设置为v4l2_file_operations.
+- const struct v4l2_ioctl_ops *ioctl_ops:// 建议使用v4l2_ioctl_ops，精简ioctl操作
+- struct v4l2_prio_state *prio: 权限管理指向一个v4l2_prio_state结构，用来实现VIDIOC_G/S_PRIORITY.可以实现自己的v4l2_prio_state
+- unsigned long flags: optional.
+- spinlock_t fh_lock: 设置NULL，或在执行v4l2_file_operations前设置为mutex_lock
+- v4l2_std_id tvnorms;		/* Supported tv norms 视频格式标准*/
+- struct mutex *lock;
+}
+
+若使用v4l2_ioctl_ops, 则需设置 v4l2_file_operations.unlocked_ioctl 为video_ioctl2。
+不要使用.ioctl(被废弃)。
+
+void v4l2_disable_ioctl(struct video_device *vdev, unsigned int cmd) //关闭某个ioctl
+
+//关联多媒体框架
+struct media_pad *pad = &my_vdev->pad;
+media_entity_init(&vdev->entity, 1, pad, 0)
+
+
+//v4l2_file_operations and locking
+若设备有长延时操作则实现自己的锁操作(如配置USB摄像的曝光)。
+使用videobuf时需传入相同的锁 
+在videobuf2中需实现wait_prepare和wait_finish用来unlock/lock.若使用了video_device 也必须
+在wait_prepare和wait_finish中实现unlock/lock.
+热插拔设备执行v4l2_device_disconnect前也需获取锁
+
+//video_device 注册
+video_register_device(vdev, VFL_TYPE_GRABBER, -1/*自动选择*/)-->__video_register_device{
+- name_base //根据类型设置名字,VFL_TYPE_GRABBER:video VFL_TYPE_VBI:vbi VFL_TYPE_RADIO:radio v4l-subdev swradio
+- minor_offset,minor_cnt //若是固定设备号,设置设备号范围
+- 设备号vdev->minor,编号vdev->num//查找并设置minor,若使用固定设备号每种设备都有固定范围
+//初始化字符设备
+- vdev->cdev = cdev_alloc
+- vdev->cdev->ops = &v4l2_fops
+- cdev_add(vdev->cdev, MKDEV(VIDEO_MAJOR, vdev->minor)
+//注册到sysfs
+- vdev->dev.class = &video_class
+- vdev->dev.devt = MKDEV(VIDEO_MAJOR, vdev->minor)
+- dev_set_name(&vdev->dev, "%s%d", name_base, vdev->num)
+- device_register(&vdev->dev)
+//注册到media
+- media_device_register_entity
+}
+
+//文件操作函数..最终调用到video_device->fops
+struct file_operations v4l2_fops = {
+- read-->vdev->fops->read
+- v4l2_write-->vdev->fops->write
+- v4l2_mmap-->vdev->fops->mmap
+- v4l2_ioctl-->vdev->fops->unlocked_ioctl
+}
+
+video_device_release()//注册失败,释放video_device struct。
+video_unregister_device(vdev)//注销
+media_entity_cleanup(&vdev->entity)//若初始了media entity在release中执行
+
+
+
+kernel/drivers/media/v4l2-core/v4l2-dev.c
+/*
+ struct v4l2_device
+
+*/
+
 注册：
 v4l2_device_register(struct device *dev, struct v4l2_device *v4l2_dev){
 - INIT_LIST_HEAD(&v4l2_dev->subdevs)
@@ -79,7 +158,10 @@ int iterate(void *p)
 }
 
 
-//=================struct v4l2_subdev(音视频编码解码)
+/* 
+ struct v4l2_subdev(音视频编码解码)
+
+*/
 v4l2_subdev通常关联有更底层的总线设备，若是i2c设备：
 v4l2_set_subdevdata() //关联i2c设备，保存i2c_client指针
 i2c_set_clientdata()/i2c_get_clientdata()//i2c设备关联v4l2_subdev
@@ -114,25 +196,14 @@ media_entity_cleanup(&sd->entity);//销毁sub-device时需清除media entity：
 
 
 
-//=================V4L2 sub-device userspace API
-v4l2_device_register_subdev时设置V4L2_SUBDEV_FL_HAS_DEVNODE标识.会创建/dev/v4l-subdevX
-用户空间通过该节点访问subdev.
-
-提供的接口是V4L2 API的子集：
-VIDIOC_QUERYCTRL
-VIDIOC_QUERYMENU
-VIDIOC_G_CTRL
-VIDIOC_S_CTRL
-VIDIOC_G_EXT_CTRLS
-VIDIOC_S_EXT_CTRLS
-VIDIOC_TRY_EXT_CTRLS
-VIDIOC_DQEVENT
-VIDIOC_SUBSCRIBE_EVENT
-VIDIOC_UNSUBSCRIBE_EVENT
-Private ioctls其他没有列出的操作会传递到core::ioctl
 
 
-//=================I2C sub-device drivers
+
+
+/*
+ I2C sub-device drivers
+
+*/
 i2c设备太常见,所以提供了一些帮助函数
 
 struct chipname_state {//一般将v4l2_subdev嵌入到struct
@@ -157,79 +228,12 @@ struct v4l2_subdev *sd = v4l2_i2c_new_subdev(v4l2_dev, adapter,
 v4l2_i2c_new_subdev_cfg
 v4l2_i2c_new_subdev_board
 
-//=================video_device
-/*真正的设备节点通过video_device创建
 
-video_device会关联
+
+/*
+ 打开debug,向下面属性文件写数据
 */
-动态创建：
-struct video_device *vdev = video_device_alloc();
-vdev->release = video_device_release; //必须设置,最后一个使用者退出时调用
 
-struct video_device{
-- struct device dev
-- struct cdev *cdev
-- struct v4l2_device *v4l2_dev: //设置为v4l2_device.
-- struct device *dev_parent://当v4l2_device为空时设置。如：多个PCI devices共用一个v4l2_device 
-- name: 设置为唯一标识.
-- const struct v4l2_file_operations fops: //设置为v4l2_file_operations.
-- const struct v4l2_ioctl_ops *ioctl_ops:// 建议使用v4l2_ioctl_ops，精简ioctl操作
-- fh_lock: 设置NULL，或在执行v4l2_file_operations前设置为mutex_lock
-- prio: 权限管理指向一个v4l2_prio_state结构，用来实现VIDIOC_G/S_PRIORITY.可以实现自己的v4l2_prio_state
-- flags: optional.
-}
-若使用v4l2_ioctl_ops, 则需设置 v4l2_file_operations.unlocked_ioctl 为video_ioctl2。
-不要使用.ioctl(被废弃)。
-
-void v4l2_disable_ioctl(struct video_device *vdev, unsigned int cmd) //关闭某个ioctl
-
-//关联多媒体框架
-struct media_pad *pad = &my_vdev->pad;
-media_entity_init(&vdev->entity, 1, pad, 0)
-
-
-//v4l2_file_operations and locking
-若设备有长延时操作则实现自己的锁操作(如配置USB摄像的曝光)。
-使用videobuf时需传入相同的锁 
-在videobuf2中需实现wait_prepare和wait_finish用来unlock/lock.若使用了video_device 也必须
-在wait_prepare和wait_finish中实现unlock/lock.
-热插拔设备执行v4l2_device_disconnect前也需获取锁
-
-//video_device 注册
-video_register_device(vdev, VFL_TYPE_GRABBER, -1/*自动选择*/)-->__video_register_device{
-- name_base //根据类型设置名字,VFL_TYPE_GRABBER:video VFL_TYPE_VBI:vbi VFL_TYPE_RADIO:radio v4l-subdev swradio
-- minor_offset,minor_cnt //若是固定设备号,设置设备号范围
-- 设备号vdev->minor,编号vdev->num//查找并设置minor,若使用固定设备号每种设备都有固定范围
-//初始化字符设备
-- vdev->cdev = cdev_alloc
-- vdev->cdev->ops = &v4l2_fops
-- cdev_add(vdev->cdev, MKDEV(VIDEO_MAJOR, vdev->minor)
-//注册到sysfs
-- vdev->dev.class = &video_class
-- vdev->dev.devt = MKDEV(VIDEO_MAJOR, vdev->minor)
-- dev_set_name(&vdev->dev, "%s%d", name_base, vdev->num)
-- device_register(&vdev->dev)
-//注册到media
-- media_device_register_entity
-}
-
-//文件操作函数..最终调用到video_device->fops
-struct file_operations v4l2_fops = {
-- read-->vdev->fops->read
-- v4l2_write-->vdev->fops->write
-- v4l2_mmap-->vdev->fops->mmap
-- v4l2_ioctl-->vdev->fops->unlocked_ioctl
-}
-
-video_device_release()//注册失败,释放video_device struct。
-video_unregister_device(vdev)//注销
-media_entity_cleanup(&vdev->entity)//若初始了media entity在release中执行
-
-
-
-kernel/drivers/media/v4l2-core/v4l2-dev.c
-
-//=================打开debug,向下面属性文件写数据
 /sys/class/video4linux/<devX>/dev_debug
 
 video_device helper functions
@@ -246,7 +250,10 @@ video buffer helper functions
 -----------------------------
 read(), mmap() and overlay() 
 
-//=================struct v4l2_fh(file handle)
+/*
+ struct v4l2_fh(file handle)
+
+*/
 调用v4l2_fh_init()，设置video_device->flags中V4L2_FL_USES_V4L2_FH位。
 file->private_data=v4l2_fh//在文件打开时设置
 
@@ -280,7 +287,10 @@ int v4l2_fh_release(struct file *filp)//从video_device移除v4l2_fh
 int v4l2_fh_is_singular(struct v4l2_fh *fh)//判断是否是唯一的v4l2_fh
 int v4l2_fh_is_singular_file(struct file *filp)
 
-//=================V4L2 events
+/* 
+ V4L2 events
+
+*/
 传递事件到用户空间，必须使用v4l2_fh
 
 merge() //将两个最老的事件合并

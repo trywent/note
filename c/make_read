@@ -1,38 +1,61 @@
+/***********************
+ makefile书写规则
+*/
+//规则：在makefile中说明如何，通过方法(命令)将依赖文件生成目标文件
+targets : prerequisites
+	recipe
+
+targets : prerequisites;recipe
+	recipe
+
+
+//targets 可以时多个文件名，或标签
+- 规则只有非文件目标时，执行该规则时目标总认为被更新
+//prerequisites 依赖文件
+- 
+//recipe 处理方法
+- 命令
+
+//第一个规则后所有的“TAB”开头的行，都交给系统shell处理
+
 /*
+ 特殊目标
+ 
+*/
+
+//通过.PHONY定义伪目标   .PHONY:clean
+- .PHONY:定义伪目标。执行伪目标规则时，规则的命令都会执行
+- 为目标phonya:phonyb，强制伪目标的执行顺序。
+//伪目标 clean
+并不是实际的目标文件。用来定义规则的命令
+
+
+
+//隐含规则
+1，根据目标，可以省略规则的命令，省略依赖  //xx.o 和xx.c 默认使用cc编译xx.c生成xx.o
+
+
+
+
+
+/***********************
+ makefile指示符：读取makefile执行的动作
 
 */
 
-规则：在makefile中说明何时，如何构建目标。
-targets : prerequisites
-	recipe
-...
-or like this:
-targets : prerequisites ; recipe
-	recipe
-
-目标：
-archive(member) //归档目标
-
-两种依赖：
-普通：两个特性
-1)处理顺序，对所有依赖处理完后才会处理目标.
-2)依赖关系，任何一个依赖比目标新的话，目标需要重构。
-
-order-only:通过(|)符号说明，在符号左边的是普通依赖，在右边的是order-only
-	targets : normal-prerequisites(可为空) | order-only-prerequisites
-只是用来在生成目标前，先进行一些操作(order-only-prerequisites定义的操作)而这些操作不会作为依赖，不会影响目标
-的构建()。
 
 
-@放在命令之前可以屏蔽输出
------------------------------------
-如果没有指明要执行的目标，则会查找第一个目标执行。伪目标必须显式的指明执行。
 
-目标也可以成为依赖，可以有伪目标像clean
+/***********************
+  变量
+*/
 
-cc -M 或 -MM(不输出标准头文件) 自动生成依赖关系：cc -M test.c  输出 test.o :test.c ...(依赖的头文件)
-___________________________________
-makefile中变量类似全局变量
+//定义变量
+object = afile bfile cfile
+
+//使用变量
+$(object)
+
 
 = 赋值方式能够产生递归。
 := 只能使用已经定义的变量的值(不会有嵌套发生，如：先后定义x,y。y能够使用x，x不能使用y)
@@ -55,19 +78,31 @@ target: variable = value
 获取变量值，使用格式$()是对变量的引用。没有括号，$x取得的是变量x的值
 
 
-自动变量只在，命令行有效(recipe)：
-$@ 目标文件(多目标时，引起规则命令执行的目标文件。如果是归档文件则是归档文件名)
-$% 目标文件(如果目标是archive(member)归档文件则是归档文件成员名)
+//自动变量只在，命令行有效(recipe)：
+$^ 依赖文件
 $< 第一个依赖文件
 $? 所有的比目标文件新的依赖文件
+$@ 目标文件(多目标时，引起规则命令执行的目标文件。如果是归档文件则是归档文件名)
+$% 目标文件(如果目标是archive(member)归档文件则是归档文件成员名)
 
------------------------------------
-特殊变量：
 
-MAKEFILE_LIST //包含已被make解析的makefile文件，最后一个文件是当前正在处理的文件
+/*
+ 特殊变量
 
-___________________________________
-条件判断：
+*/
+
+//MAKEFILE_LIST
+- 所有要处理的makeflie，都包含在MAKEFILE_LIST
+- MAKEFILE_LIST中最后一个字串是当前正在处理的makefile
+
+//.VARIABLES
+- 此变量之前所有的定义的全局变量
+
+/***********************
+ 条件判断
+
+*/
+
 <conditional-directive>
 <text-if-true>
 else
@@ -75,8 +110,10 @@ else
 endif
 
 <conditional-directive>：ifeq, ifneq, ifdef, ifndef
-___________________________________
-使用函数：
+
+/***********************
+ 使用函数
+*/
 $(<function> <arguments>)
 
 <arguments>是函数的参数，参数间以逗号“,”分隔，而函数名和参数之间以“空格”分隔
@@ -106,12 +143,27 @@ $(wildcard pattern ...) //返回pattern中存在的文件列表(空白符分隔)
 eval函数:
 可以用来构建动态的makefile结构(结合其他函数)，两次解析过程。
 一般函数何以处理字符串，返回字符串。而eval函数可以使makefile再次解析字符串(比如字符串有变量的定义赋值)
-___________________________________
-包含文件
+
+
+//包含文件
 include filename
 -include filename//若文件不存在不会报错
-___________________________________
-make:
+
+/***********************
+ makefile执行规则
+ 
+ make默认执行makefile中第一个规则
+*/
+make
+make -f makefilename1 makefilename2 ...
+make --file makefilename1 makefilename2 ...
+
+//环境变量MAKEFILE_LIST 类似所有makefile都需要的头文件，执行时都会包含进去
+1, MAKEFILES 定义的makefile中的规则不会当做最终目标
+2，找不到MAKEFILES 对应文件不会报错
+3，先读取MAKEFILES 中文件，再读取当前的makefile
+
+//make执行流程
 1、读入所有的 Makefile。		//第一阶段
 2、读入被 include 的其它 Makefile。
 3、初始化文件中的变量。
@@ -178,6 +230,7 @@ PROGRAMS    = server client
      
      .PHONY: all
      all: $(PROGRAMS)
+
      
      define PROGRAM_template =
       $(1): $$($(1)_OBJS) $$($(1)_LIBS:%=-l%)
@@ -191,6 +244,4 @@ PROGRAMS    = server client
      
      clean:
              rm -f $(ALL_OBJS) $(PROGRAMS)
-
-
 

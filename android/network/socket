@@ -1,0 +1,39 @@
+/*
+ 应用访问网络
+*/
+
+//client
+Socket socket = new Socket(ip, port)-->Socket(String host, int port)-->
+this(InetAddress.getAllByName(host), port, (SocketAddress) null, true)-->
+Socket(InetAddress[] addresses, int port, SocketAddress localAddr,boolean stream){
+- setImpl(){
+	- impl = new SocksSocketImpl()
+	- impl.setSocket(this)
+	}
+- InetSocketAddress address = new InetSocketAddress(addresses[i], port)
+- createImpl(stream)
+- bind(localAddr)
+- connect(address)
+}@Socket.java 
+
+OutputStream os = socket.getOutputStream()
+InputStream is = socket.getInputStream()
+
+
+
+libcore/ojluni/src/main/java/java/net/Socket.java
+//server
+ServerSocket(int port)
+Socket socket = ServerSocket.accept()
+InputStream is = socket.getInputStream()
+OutputStream os = socket.getOutputStream()
+
+
+
+
+libcore/ojluni/src/main/java/java/net/ServerSocket.java
+//TCP 面向连接、数据可靠，速度慢，有序的
+
+
+
+//UDP 不面向连接、数据不可靠、速度快、无序的

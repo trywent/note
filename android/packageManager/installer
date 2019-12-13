@@ -10,7 +10,7 @@ Installer(Context context) extends SystemService {
 onStart-->mInstaller.waitForConnection()@Installer.java-->waitForConnection-->execute("ping")@InstallerConnection.java
 
 //安装
-nstall(String uuid, String name, int uid, int gid, String seinfo)-->mInstaller.execute(builder.toString())@Installer.java
+install(String uuid, String name, int uid, int gid, String seinfo)-->mInstaller.execute(builder.toString())@Installer.java
 
 //dex2oat
 dexopt(String apkPath, int uid, boolean isPublic,String instructionSet, int dexoptNeeded)-->
@@ -44,8 +44,10 @@ execute(String cmd) {
 
 frameworks/base/services/core/java/com/android/server/pm/Installer.java
 frameworks/base/core/java/com/android/internal/os/InstallerConnection.java
-/*
 
+
+/*
+ installd服务执行安装
 */
 service installd /system/bin/installd
     class main
@@ -119,10 +121,7 @@ frameworks/base/services/core/java/com/android/server/pm/Installer.java
 /*
  installer服务
 */
-
-
 service installd /system/bin/installd@installd.rc
-
 
 main(const int argc __unused, char *argv[])-->
 android::installd::installd_main(argc, argv){
@@ -156,6 +155,9 @@ android::installd::installd_main(argc, argv){
 	}@InstalldNativeService.cpp
 - IPCThreadState::self()->joinThreadPool()
 }
+
+//安装应用
+
 
 
 frameworks/native/cmds/installd/installd.cpp

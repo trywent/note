@@ -524,8 +524,44 @@ attach-->new IWallpaperEngineWrapper@WallpaperService.stub-->executeMessage{
 	}
 }@WallpaperService.Engine.java
 
+/*
+ notification
+
+*/
+//注册
+-->mNotificationListener.registerAsSystemService(mContex,...)@StatusBar.java-->
+registerAsSystemService(Context context, ComponentName componentName, int currentUser){
+- super.registerAsSystemService(context, componentName, currentUser)
+- Dependency.get(PluginManager.class).addPluginListener(this, NotificationListenerController.class)
+}@NotificationListenerWithPlugins.java
+
+//监听器
+NotificationListenerWithPlugins mNotificationListener = new NotificationListenerWithPlugins(){
+  //连接到notification服务
+- onListenerConnected() {
+	- onPluginConnected()
+	- 
+ 	}
+  //接收到通知
+- onNotificationPosted(final StatusBarNotification sbn,final RankingMap rankingMap){
+	- 
+	}
+}@StatusBar.java
+
+//创建通知view
+addNotification(StatusBarNotification notification, RankingMap ranking){
+- String key = notification.getKey()
+- Entry shadeEntry = createNotificationViews(notification){
+
+	}
+- 
+}@StatusBar.java
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationListenerWithPlugins.java
+frameworks/base/packages/SystemUI/plugin/src/com/android/systemui/plugins/NotificationListenerController.java
+
 =======================
-android4.4:
+//android4.4:
 makeStatusBarView{
 - new NetworkController
 - mNetworkController.addSignalCluster(signalCluster)
@@ -541,8 +577,6 @@ updateDataNetType()//根据网络类型mDataNetType，更新信号图标
 
 onReceive(收到信号广播)-->refreshViews-->
 refreshSignalCluster-->(设置信号图标)cluster.setMobileDataIndicators@NetworkController.java
-
-
 
 
 

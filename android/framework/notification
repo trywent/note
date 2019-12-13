@@ -3,42 +3,105 @@
 */
 NotificationManager notificationManager = getSystemService(NotificationManager.class)
 
-//channel
+//channel一种类型的通知。通知的属性声音，呼吸灯，震动...等设置
 NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance)
 notificationManager.createNotificationChannel(channel);
 
-//notification
+//创建通知notification。字符，图标
 Notification noti = new Notification.Builder(mContext)
          .setContentTitle("New mail from " + sender.toString())
          .setContentText(subject)
          .setSmallIcon(R.drawable.new_mail)
 	 .setChannelId(String channelId)
+	 .setContent(RemoteViews views) //设置界面 
          .build();
-
+//发布通知
 notificationManager.notify(notificationId, noti)
 
 setFullScreenIntent(PendingIntent intent, boolean highPriority)//启动一个activity
 
 
-
+frameworks/base/core/java/android/app/Notification.java
+frameworks/base/core/java/android/app/NotificationChannel.java
 /*
  notificationMananagerServicve
 
 */
+onStart(){
+- SnoozeHelper snoozeHelper = new SnoozeHelper
+- init(Looper.myLooper(),
+                AppGlobals.getPackageManager(), getContext().getPackageManager(),
+                getLocalService(LightsManager.class),
+                new NotificationListeners(AppGlobals.getPackageManager()),
+                new NotificationAssistants(AppGlobals.getPackageManager())..)
+  //注册广播接收
+- IntentFilter filter = new IntentFilter()
+- filter.addAction(Intent.ACTION_SCREEN_ON)
+- getContext().registerReceiver(mIntentReceiver, filter)
+}@NotificationManagerService.java
+
+
+init(Looper looper, IPackageManager packageManager,PackageManager packageManagerClient,
+            LightsManager lightsManager, NotificationListeners notificationListeners...){
+- mAm = ActivityManager.getService()
+- mPackageManager = packageManager
+- mListeners = notificationListeners
+  //状态条
+- mStatusBar = getLocalService(StatusBarManagerInternal.class)
+- mStatusBar.setNotificationDelegate(mNotificationDelegate)
+}@NotificationManagerService.java
+
+//发布通知，创建通知，加入队列
 notify-->service.enqueueNotificationWithTag@NotificationManager.java
 -->enqueueNotificationInternal(final String pkg,... int id, final Notification notification){
+  //检查发送通知是否是调用者的包名
+- checkCallerIsSystemOrSameApp(pkg)
   //获取channel信息
 - String channelId = notification.getChannelId()
 - NotificationChannel channel = mRankingHelper.getNotificationChannel(pkg,notificationUid, channelId)
   //创建NotificationRecord
 - StatusBarNotification n = new StatusBarNotification(notificationUid, callingPid, notification)
-- NotificationRecord r = new NotificationRecord(getContext(), n, channel)
+- NotificationRecord r = new NotificationRecord(getContext(), n, channel){
+	- this.sbn = n
+	- mChannel = channel
+	- mSound = calculateSound()
+	- mVibration = calculateVibration()
+	- mAttributes = calculateAttributes()
+	}@NotificationRecord.java
+  //设置PendingIntents时限（省电）
+- if (notification.allPendingIntents != null) {
+	- am.setPendingIntentWhitelistDuration(pendingIntent.getTarget()
+	}
 - mHandler.post(new EnqueueNotificationRunnable(userId, r))
 }@NotificationManagerService.java
 
-EnqueueNotificationRunnable.run-->
+//将通知加入队列
+EnqueueNotificationRunnable.run{
+- handleGroupedNotificationLocked(r, old, callingUid, callingPid)
+- mEnqueuedNotifications.add(r)
+  //辅助模式(盲人？)
+- if(mAssistants.isEnabled(){
+	- mHandler.postDelayed(new PostNotificationRunnable(r.getKey()),DELAY_FOR_ASSISTANT_TIME)
+  }else{
+	- mHandler.post(new PostNotificationRunnable(r.getKey()))
+	}
+}NotificationManagerService.java
+
+
 PostNotificationRunnable.run{
-- 
+  //查找到对应key的NotificationRecord
+- final NotificationRecord enqueued = mEnqueuedNotifications.get(i)
+- NotificationRecord r = enqueued
+  //是否已经存在
+- NotificationRecord old = mNotificationsByKey.get(key)
+- final StatusBarNotification n = r.sbn
+- int index = indexOfNotificationLocked(n.getKey())
+- mNotificationsByKey.put(n.getKey(), r)
+- if (notification.getSmallIcon() != null) {
+	- mListeners.notifyPostedLocked(n, oldSbn)
+  }else{
+	- mListeners.notifyRemovedLocked
+  }
  //震动，声音，通知灯
 - buzzBeepBlinkLocked(r)
 }@NotificationManagerService.java
@@ -50,3 +113,5 @@ frameworks/base/core/java/android/app/Notification.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/BaseStatusBar.java
 frameworks/base/core/java/android/app/NotificationManager.java
 frameworks/base/services/core/java/com/android/server/notification/NotificationManagerService.java
+frameworks/base/core/java/android/service/notification/StatusBarNotification.java
+frameworks/base/services/core/java/com/android/server/notification/NotificationRecord.java

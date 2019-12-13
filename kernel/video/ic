@@ -31,10 +31,10 @@ ADV7482&TP2825开发:
 
 //cif
 
-px3:
+px3/px5:
+- Support CCIR656(PAL/NTSC) input
 - Support YCbCr422 input
 - Support Raw8/10/12 bit input
-- Support CCIR656(PAL/NTSC) input
 - Support JPEG input
 
 sofia:

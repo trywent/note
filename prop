@@ -1,3 +1,4 @@
+//┌ ┬ ┐├ ┼ ┤ └ ┴ ┘_ |
 ############系统配置
 #默认字体大小 1.0  1.15  1.30
 ro.build.fytfontsize=1.0
@@ -46,9 +47,15 @@ sys.lsec.navi_bar_height=140
 #亿联6.1
 sys.fyt.ec_version=6
 
-#debug
+#打开串口debug
 setprop sys.fyt.debug.set debugoon
+
 #打开root
 setprop sys.fyt.setparama lsecadbdebug9 
 
+#打开a2dpsrc
+persist.lsec.enable_a2dp=true
+
+#使用内置蓝牙obd
+sys.fyt.systemobd=true
 

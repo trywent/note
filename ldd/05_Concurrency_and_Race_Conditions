@@ -1,27 +1,200 @@
-//Completions:
+/**********************
+ 竞态处理
 
-Completions:告诉线程另一线程已经结束
+ 这几种锁的区别，是不是要结合中断来理解？中断不能睡眠
 
+*/
+
+/*
+ Semaphores and Mutexes 信号量和互斥。允许睡眠
+ pv操作，值为1时可以获取，获取后值减为0
+ 同一进程不能重复获取
+*/
+
+//semaphore. 
+<asm/semaphore.h>
+void sema_init(struct semaphore *sem, int val);
+DECLARE_MUTEX(name);       //帮助函数，声明一个semaphore值为1
+DECLARE_MUTEX_LOCKED(name);//声明一个semaphore，并直接获取。值为0
+void init_MUTEX(struct semaphore *sem);
+void init_MUTEX_LOCKED(struct semaphore *sem);
+
+void down(struct semaphore *sem);  	 	//获取信号量。等待足够时间，可能会睡眠
+int down_interruptible(struct semaphore *sem);  //允许被中断
+int down_trylock(struct semaphore *sem);	//不会睡眠。不管能不能获取到，立即返回结果
+void up(struct semaphore *sem);                 //释放信号量
+
+//Reader/Writer Semaphores 。可同时读，不可同时写
+<linux/rwsem.h>
+void init_rwsem(struct rw_semaphore *sem);
+void down_read(struct rw_semaphore *sem);        //获取信号，允许其它进程的读取
+int down_read_trylock(struct rw_semaphore *sem);
+void up_read(struct rw_semaphore *sem);
+
+void down_write(struct rw_semaphore *sem);       //获取信号量后，不允许其它进程读写
+int down_write_trylock(struct rw_semaphore *sem);
+void up_write(struct rw_semaphore *sem);
+void downgrade_write(struct rw_semaphore *sem);
+
+
+/*
+ Completions
+ 通知线程另一线程任务已经结束
+*/
 <linux/completion.h>
-创建：
-DECLARE_COMPLETION(my_completion);
-
-动态创建：
+DECLARE_COMPLETION(my_completion);	 //创建
 struct completion my_completion;
-/* ... */
-init_completion(&my_completion);
+init_completion(&my_completion); 	 //初始化
+void wait_for_completion(struct completion *c);//uninterruptible就是进程不可杀?不可杀进程
+void complete(struct completion *c);     //另一端的结束通知
+void complete_all(struct completion *c); //当多个进程在等待时complete唤醒一个进程，complete_all唤醒所有进程。
 
-等待completion：
-void wait_for_completion(struct completion *c);//uninterruptible等待，不可杀进程
-
-另一端的结束通知:
-void complete(struct completion *c);     
-void complete_all(struct completion *c);
-当多个进程在等待时complete唤醒一个进程，complete_all唤醒所有进程。
 
 completion的复用：
 若使用了complete_all，则必须重新初始化。可使用INIT_COMPLETION(struct completion c)快速初始化
 
 结束并退出接口：
 void complete_and_exit(struct completion *c, long retval);
+
+
+/*
+ spinlocks 关闭内核抢占(当前核不会执行其它进程)。取得锁后不能睡眠
+ 同一进程不能重复获取
+*/
+1 关闭内核抢占（进程调度）
+2 关闭当前cpu核的中断
+3 占有锁的时间越短越好
+
+
+<linux/spinlock.h>
+spinlock_t my_lock = SPIN_LOCK_UNLOCKED;
+void spin_lock_init(spinlock_t *lock);
+void spin_lock(spinlock_t *lock);
+void spin_lock_irqsave(spinlock_t *lock, unsigned long flags);//关闭当前cpu核的中断，保存中断状态
+void spin_lock_irq(spinlock_t *lock);			      //关闭当前cpu核的中断。spin_unlock_irq会重新开启中断。只有明确知道中断是开启状态才使用这个
+void spin_lock_bh(spinlock_t *lock)                           //仅关闭软中断
+void spin_unlock(spinlock_t *lock);	                      //释放锁
+void spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
+void spin_unlock_irq(spinlock_t *lock);
+void spin_unlock_bh(spinlock_t *lock);   
+
+//非阻塞的获取锁，不管成功失败会立即返回
+int spin_trylock(spinlock_t *lock);
+int spin_trylock_bh(spinlock_t *lock);
+
+
+//Reader/Writer Spinlocks 读写锁
+<linux/spinlock.h>
+rwlock_t my_rwlock = RW_LOCK_UNLOCKED; /* Static way */
+rwlock_t my_rwlock;
+rwlock_init(&my_rwlock); /* Dynamic way */
+
+void read_lock(rwlock_t *lock);
+void read_lock_irqsave(rwlock_t *lock, unsigned long flags);
+void read_lock_irq(rwlock_t *lock);
+void read_lock_bh(rwlock_t *lock);
+void read_unlock(rwlock_t *lock);
+void read_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
+void read_unlock_irq(rwlock_t *lock);
+void read_unlock_bh(rwlock_t *lock);
+
+void write_lock(rwlock_t *lock);
+void write_lock_irqsave(rwlock_t *lock, unsigned long flags);
+void write_lock_irq(rwlock_t *lock);
+void write_lock_bh(rwlock_t *lock);
+int write_trylock(rwlock_t *lock);
+void write_unlock(rwlock_t *lock);
+void write_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
+void write_unlock_irq(rwlock_t *lock);
+void writeunlockbh(rwlockt *lock);
+
+
+/*
+ 加锁的规则
+*/
+//Lock Ordering Rules 加锁的顺序
+需要获取多个锁时，要按照同一顺序获取锁。（防止进程死锁）
+
+//Fine Grained Versus Coarse Grained  (细颗粒与粗颗粒)
+
+
+//Atomic Variables 原子变量。变量值一般小于24位
+<asm/atomic.h>
+void atomic_set(atomic_t *v, int i); //设置初始值
+atomic_t v = ATOMIC_INIT(0);
+int atomic_read(atomic_t *v);
+void atomic_add(int i, atomic_t *v); //加减值i
+void atomic_sub(int i, atomic_t *v);
+
+void atomic_inc(atomic_t *v); //加减1
+void atomic_dec(atomic_t *v);
+
+int atomic_inc_and_test(atomic_t *v);       //执行增减操作后判断值是否为0。为0返回true,否则返回false
+int atomic_dec_and_test(atomic_t *v);
+int atomic_sub_andtest(int i, atomict *);
+int atomic_add_negative(int i, atomic_t *v); //加i后是否是负值
+
+int atomic_add_return(int i, atomic_t *v);   //执行加减操作后返回结果值
+int atomic_sub_return(int i, atomic_t *v);
+int atomic_inc_return(atomic_t *v);
+int atomicdecreturn(atomict *v);
+
+//Bit Operations  位操作
+<asm/bitops.h>
+void setbit(nr, void *addr);  //设置addr中nr位
+void clear_bit(nr, void *addr);
+void change_bit(nr, void *addr);
+int testbit(nr, void *addr);
+int test_and_set_bit(nr, void *addr); //返回设置前的值
+int test_and_clear_bit(nr, void *addr);
+int test_and_change_bit(nr, void *addr);
+
+
+/*
+ seqlocks 读操作很频繁。写操作很少很快。读取时只要检查是否可读，不行就重复检查
+*/
+<linux/seqlock.h>
+seqlock_t lock1 = SEQLOCK_UNLOCKED; //初始化1
+seqlock_t lock2;		    //初始化2
+seqlock_init(&lock2);
+
+
+//读操作
+do {
+  seq = read_seqbegin(&the_lock);
+  /* Do what you need to do */
+} while read_seqretry(&the_lock, seq);
+
+//中断中读
+unsigned int read_seqbegin_irqsave(seqlock_t *lock, unsigned long flags);
+int read_seqretry_irqrestore(seqlock_t *lock, unsigned int seq, unsigned long flags);
+
+//写操作
+void write_seqlock(seqlock_t *lock);
+void write_seqlock_irqsave(seqlock_t *lock, unsigned long flags)
+void write_seqlock_irq(seqlock_t *lock);
+void write_seqlock_bh(seqlock_t *lock);
+
+void write_sequnlock(seqlock_t *lock);
+void write_sequnlock_irqrestore(seqlock_t *lock, unsigned long flags)
+void write_sequnlock_irq(seqlock_t *lock);
+void write_sequnlock_bh(seqlock_t *lock);
+
+/*
+  Read-Copy-Update(RCU) 读拷贝时更新。数据通过一个指针访问。
+  当写操作时，拷贝一份所有的数据并执行更新。合适时候更新指针为新指针
+*/
+<linux/rcupdate.h>
+struct my_stuff *stuff;
+//读操作
+rcu_read_lock( );	  //会关闭kernel抢占（进程调度）
+stuff = find_the_stuff(args...);
+do_something_with(stuff); //必须原子操作
+rcu_read_unlock( );
+
+//写操作
+更新数据
+void call_rcu(struct rcu_head *head, void (*func)(void *arg), void *arg) //释放老指针指向的数据
+
+
 
