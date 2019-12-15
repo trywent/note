@@ -3,7 +3,61 @@
 
 */
 
+/*
+ Measuring time lapses and comparing times
+ 测量时间，比较时间
+ */
+<linux/param.h>
+ HZ 	    //时钟每秒中断的次数。用户空间通过/proc/interrupts 和/proc/uptime可以计算
+ 
+<linux/jiffies.h>
+ jiffies_64 //中断计数变量。初始值为0
+ jiffies    //程序访问的变量，jiffies_64的低有效位。原子快速的访问
+ u64 get_jiffies_64(void); //获取64位计数器的值
+int time_after(unsigned long a, unsigned long b);
+int time_before(unsigned long a, unsigned long b);
+int time_after_eq(unsigned long a, unsigned long b);
+int time_before_eq(unsigned long a, unsigned long b);
+ 
+ 
+#include <linux/time.h>
+unsigned long timespec_to_jiffies(struct timespec *value);
+void jiffies_to_timespec(unsigned long jiffies, struct timespec *value);
+unsigned long timeval_to_jiffies(struct timeval *value);
+void jiffies_to_timeval(unsigned long jiffies, struct timeval *value);
 
+//更精确的计时TSC (timestamp counter),，从cpu寄存器读取。cpu的时钟周期“machine-specific registers”
+<asm/msr.h>
+rdtsc(low32,high32);
+rdtscl(low32);
+rdtscll(var64);
+
+#include <linux/timex.h>
+cycles_t get_cycles(void);
+ 
+/*
+ Knowing the current time
+ 获取当前现实时间
+ */
+#include <linux/time.h>
+unsigned long mktime (unsigned int year, unsigned int mon,unsigned int day, unsigned int hour,
+		unsigned int min, unsigned int sec);
+
+#include <linux/time.h>
+void do_gettimeofday(struct timeval *tv);
+
+#include <linux/time.h>
+struct timespec current_kernel_time(void);
+/*
+ Delaying operation for a specified amount of time
+ 
+ 延迟一段时间后操作
+ */
+
+/*
+ Scheduling asynchronous functions to happen at a later time
+ 安排一个延后任务  
+*/
 
 //sleep:
 - 不要在原子执行中睡眠
