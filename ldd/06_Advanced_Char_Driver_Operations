@@ -1,12 +1,191 @@
-/**********************
- advanced
+/*
+ ioctl
+ 最开始时文件操作都是fctl。只有设备的操作才是ioctl，初始时只有tty一个设备，所以ioctl命令不对时返回错误值ENOTTY
+
+ 对于没有数据传输的设备，可以不实现ioctl。仅使用read,write来控制设备
+*/
+int ioctl(int fd, unsigned long cmd, ...); //用户空间接口
+int (*ioctl) (struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg); //内核中接口
+
+//构建ioctl命令参数（type|number|dirction|size）.ioctl-number.txt
+#include <linux/ioctl.h>
+type 		//magic number.排除ioctl-number.txt中已经使用的数
+number 		//命令编号8bits(_IOC_NRBITS)
+direction 	//数据传输方向(user空间角度)。_IOC_NONE,_IOC_READ,_IOC_READ,_IOC_READ|_IOC_WRITE
+size	  	//13/14bits(_IOC_SIZEBITS)。可以不使用，kernel不检查
+
+//使用宏参加构建
+<asm/ioctl.h>
+_IO(type,nr) 		//无参数命令
+_IOR(type,nr,datatype)  //从驱动读取命令
+_IOW(type,nr,datatype)  //往驱动写数据命令
+_IOWR(type,nr,datatype) //读写数据命令
+
+//结构命令
+_IOC_DIR(nr), _IOC_TYPE(nr), _IOC_NR(nr), and _IOC_SIZE(nr).
+
+
+//预定义的一些命令
+• 对所有文件起作用(regular, device, FIFO, or socket)
+• 对普通文件起作用
+• 对某个文件系统类型起作用 //chattr命令
+
+FIOCLEX 	//设置标记close-on-exec。会导致进程执行另一个程序时会关闭文件描述法
+FIONCLEX	//清除标记close-on-exec
+FIOASYNC	//
+FIOQSIZE	//文件大小
+FIONBIO		//
+
+//参数处理
+<asm/uaccess.h>
+int access_ok(int type/*VERIFY_READ ,VERIFY_WRITE*/, const void *addr, unsigned long size);//判断传入的地址是否不是kernel的地址
+
+<asm/uaccess.h>:
+put_user(datum, ptr)/__put_user(datum, ptr) //将数据传到用户空间。固定的数据类型大小1,2,...8 bytes。比copy_to_user快
+get_user(local, ptr)/__get_user(local, ptr) //将数据拷贝到内核空间。
+
+
+/* 
+ 操作权限
+*/
+//用户空间设置权限
+#include <sys/capability.h>
+int capget(cap_user_header_t hdrp, cap_user_data_t datap);	 
+int capset(cap_user_header_t hdrp, const cap_user_data_t datap);
+
+//一些权限的定义
+<linux/capability.h> 
+CAP_DAC_OVERRIDE
+CAP_NET_ADMIN		//网络管理员权限
+CAP_SYS_MODULE		//加载模块的权限
+CAP_SYS_RAWIO		//访问设备端口，usb
+CAP_SYS_ADMIN		//系统管理员权限
+CAP_SYS_TTY_CONFIG
+
+//kernel检查权限
+<linux/sched.h>
+int capable(int capability);
+
+/*
+ blocking IO 阻塞式读写
+
+ 当设备没有准备好时，先让操作进程进入睡眠，等准备好时再唤醒进程继续操作
 */
 
+//sleep 是进程的一种状态。标示进程不在cpu的调度队列，不会被执行。直到状态被改变
+- 不要在原子执行中睡眠
+- 睡眠唤醒后要检测执行需要的资源是否存在
+- 有其它进程能够唤醒睡眠的进程
 
 
+//通过一个队列(wait queue)睡眠进程
+<linux/wait.h>
+wait_queue_head_t //队列头结构
+DECLARE_WAIT_QUEUE_HEAD(name);  //创建wait queue
+wait_queue_head_t my_queue;    	//动态创建wait queue
+init_waitqueue_head(&my_queue);
+
+//进入睡眠：condition为true时停止睡眠。queue被唤醒时都会检测
+wait_event(wait_queue_head_t queue/*睡眠队列*/, condition) 	//不可中断睡眠
+wait_event_interruptible(queue, condition)  			//可被信号打断
+wait_event_timeout(queue, condition, timeout) 			//睡眠指定时间
+wait_event_interruptible_timeout(queue, condition, timeout)
+
+//唤醒队列上所有的进程：由另外一个进程执行，或者一个中断
+void wake_up(wait_queue_head_t *queue);
+void wake_up_interruptible(wait_queue_head_t *queue);
+
+/*
+ 阻塞和非阻塞操作
+*/
+read, write, open 只有这些文件操作受非阻塞标记影响
 
 
+/*
+ 睡眠的原理
+*/
+
+//将进程设置为睡眠
+1 设置进程状态，TASK_INTERRUPTIBLE，TASK_UNINTERRUPTIBLE //void set_current_state(int new_state);
+2 释放cpu						//if(!condition)schedule( ); 
+3 恢复进程状态，TASK_RUNNING 				//void set_current_state(int new_state);	
+
+				
+//手动睡眠流程
+1,//创建wait_queue_t
+DEFINE_WAIT(my_wait)
+或
+wait_queue_t my_wait;
+init_wait(&my_wait);
+2,//加入队列：queue队列，wait要设置的进程，state进程状态
+void prepare_to_wait(wait_queue_head_t *queue,wait_queue_t *wait,int state);
+3,//进入睡眠
+schedule()
+4,//唤醒后清除
+void finish_wait(wait_queue_head_t *queue, wait_queue_t *wait);
 
 
+//排他等待。设置排他标记，并放到队列末尾。唤醒时只唤醒一个这种类型的睡眠进程（其它非排他进程正常唤醒）
+void prepare_to_wait_exclusive(wait_queue_head_t *queue,wait_queue_t *wait,int state);
 
+/*
+ poll and select 判断文件描述符是否有数据可以读写
+ select - BSD Unix的方法
+ poll   - System V solution的方法
+ epoll  - poll的扩展，以支持上个文件描述符
+*/
+
+unsigned int (*poll) (struct file *filp, poll_table *wait);
+1 调用poll_wait判断是否有数据。否则进入睡眠
+2 返回状态值
+
+<linux/poll.h>
+void poll_wait (struct file *, wait_queue_head_t *, poll_table *);//功能实现还是通过驱动定义的wait_queue_head_t。有数据时被唤醒
+
+//驱动当前的数据状态值
+POLLIN
+POLLRDNORM
+POLLRDBAND
+POLLPRI
+POLLHUP
+POLLERR
+POLLOUT
+POLLWRNORM
+POLLWRBAND
+
+//提交buffer中要写到设备的数据
+int (*fsync) (struct file *file, struct dentry *dentry, int datasync);
+
+
+/*
+ 通过signal通知应用，文件描述符数据可用
+*/
+signal(SIGIO, &input_handler); 			//信号处理函数
+fcntl(STDIN_FILENO, F_SETOWN, getpid( ));	//设置F_SETOWN，文件描述符关联的进程号(用于信号通知)
+oflags = fcntl(STDIN_FILENO, F_GETFL);	\ 	//设置FASYNC，使能异步通知
+fcntl(STDIN_FILENO, F_SETFL, oflags | FASYNC);
+
+//signal通知kernel中的实现
+1. 当设置F_SETOWN后，filp->f_owner赋值为进程号
+2. 当设置F_SETFL将会打开 FASYNC,驱动的fasync将被调用
+3. 当数据可用时，所有注册通知的进程都被SIGIO信号通知
+
+<linux/fs.h>
+int fasync_helper(int fd, struct file *filp,int mode, struct fasync_struct **fa);//用于注册或者注销进程监听文件
+void kill_fasync(struct fasync_struct **fa, int sig, int band); 		 //用于发送signal给进程
+
+/*
+ Seeking
+*/
+
+//不支持seek的设备
+int nonseekable_open(struct inode *inode; struct file *filp);
+
+/*
+ 文件的访问控制
+*/
+1 一个设备文件只允许一个进程打开。（一个原子变量计数实现）
+2 一个设备文件值允许一个user打开，可以多进程打开
+3 阻塞式打开。当前不能打开时就等待
+4 克隆设备
 

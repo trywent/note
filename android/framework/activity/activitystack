@@ -10,39 +10,18 @@ mFinishingActivities     //将要结束的activity
 onCreate - onDestroy //完整生命周期
 onStart - onStop   //可见
 onResume - onPause //用户可交互
-/* launch
-
-  启动过程中设置PAUSED状态
-*/
-resumeTopActivityLocked@ActivityStack.java-->(进程没有启动)realStartActivityLocked-->
-scheduleLaunchActivity@ActivityStackSupervisor.java
 
 
-/* RESUMED
+/* INITIALIZING
 
 
 */
-resumeTopActivityInnerLocked-->scheduleResumeActivity@ActivitStack.java
-
-
-
-/* PAUSING
-  调用schedulePauseActivity,当app执行pause完成后,resumeTop
-
-*/
-startPausingLocked(boolean userLeaving, boolean uiSleeping,ActivityRecord resuming, boolean pauseImmediately){
-- ActivityRecord prev = mResumedActivity //当前要执行pause的Activity
-- mPausingActivity = prev
-- prev.state = ActivityState.PAUSING //设置activityRecord状态为PAUSING
-- prev.app.thread.schedulePauseActivity-->ActivityManagerNative.getDefault().activityPaused //app执行pause
-  //app执行pause完成返回
-- if pauseImmediately(boolean resumeNext){
-	- 
-	- ensureActivitiesVisibleLocked	
-  } else schedulePauseTimeout(prev)
-}@ActivityStack.java
-
-
+ActivityRecord(ActivityManagerService _service, Intent _intent,ActivityInfo aInfo,....) {
+- ActivityManagerService service = _service;
+- IApplicationToken.Stub  appToken = new Token(this);
+- info = aInfo;
+- state = INITIALIZING;
+}@ActivityRecord.java
 
 
 /* PAUSED
@@ -101,6 +80,42 @@ relaunchActivityLocked(boolean andResume, boolean preserveWindow){
 	- state = PAUSED
   }
 }@ActiviyRecord.java
+
+/* RESUMED
+
+
+*/
+
+resumeTopActivityInnerLocked-->
+setResumedActivityLocked(ActivityRecord r, String reason){
+- mResumedActivity = r
+- r.state = ActivityState.RESUMED
+}@ActivitStack.java
+
+
+//通知应用端
+resumeTopActivityInnerLocked-->scheduleResumeActivity@ActivitStack.java
+
+/* PAUSING
+  调用schedulePauseActivity,当app执行pause完成后,resumeTop
+
+*/
+startPausingLocked(boolean userLeaving, boolean uiSleeping,ActivityRecord resuming, boolean pauseImmediately){
+- ActivityRecord prev = mResumedActivity //当前要执行pause的Activity
+- mPausingActivity = prev
+- prev.state = ActivityState.PAUSING //设置activityRecord状态为PAUSING
+- prev.app.thread.schedulePauseActivity-->ActivityManagerNative.getDefault().activityPaused //app执行pause
+  //app执行pause完成返回
+- if pauseImmediately(boolean resumeNext){
+	- 
+	- ensureActivitiesVisibleLocked	
+  } else schedulePauseTimeout(prev)
+}@ActivityStack.java
+
+
+
+
+
 
 /* STOPING
 

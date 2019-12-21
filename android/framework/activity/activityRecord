@@ -14,10 +14,12 @@ enum ActivityState {
         DESTROYED
     }
 
-ActivityRecord(ActivityManagerService _service, Intent _intent,ActivityInfo aInfo,) {
+//INITIALIZING
+ActivityRecord(ActivityManagerService _service, Intent _intent,ActivityInfo aInfo,....) {
 - ActivityManagerService service = _service;
 - IApplicationToken.Stub  appToken = new Token(this);
 - info = aInfo;
+- state = INITIALIZING;
 }
 
 
@@ -32,8 +34,7 @@ windowsVisible{
 	}
 }
 
-______________________
-finishing:
+//finishing:
 makeFinishing{
 - finishing = true
 - 任务中的activity个数减1，task.numActivities--

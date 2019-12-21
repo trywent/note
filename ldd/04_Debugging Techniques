@@ -1,0 +1,51 @@
+/* 
+ printk 遇到换行时才会输出前面所有的字符
+
+*/
+<linux/kernel.h>
+printk(KERN_LEVEL "msg"); //默认的loglevel DEFAULT_MESSAGE_LOGLEVEL
+
+//0-7
+KERN_EMERG
+KERN_ALERT
+KERN_CRIT
+KERN_ERR
+KERN_WARNING
+KERN_NOTICE
+KERN_INFO
+KERN_DEBUG
+
+//默认的loglvel
+cat /proc/sys/kernel/printk  1 2 3 4
+1 the current loglevel
+2 the default level for messages that lack an explicit loglevel
+3 the minimum allowed loglevel
+4 boot-time default loglevel
+
+echo 7 > /proc/sys/kernel/printk  //修改当前loglevel
+
+
+//重定向控制台消息
+char bytes[2] = {11,0}; /* 11 is the TIOCLINUX cmd number */
+bytes[1] = num; /* the chosen console number */
+ioctl(STDIN_FILENO, TIOCLINUX, bytes)
+
+//系统log
+int syslog(int type, char *bufp, int len);//不会清空kernel中buffer
+cat /proc/kmsg				  //清空buffer
+
+
+//限制printk输出频率
+int printk_ratelimit(void);
+if (printk_ratelimit( ))
+printk(KERN_NOTICE "The printer is still on fire\n");
+
+/proc/sys/kernel/printk_ratelimit  	//修改拦截频率
+/proc/sys/kernel/printk_ratelimit_burst
+
+//打印设备号
+int print_dev_t(char *buffer, dev_t dev);
+char *format_dev_t(char *buffer, dev_t dev);
+
+
+//

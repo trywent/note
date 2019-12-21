@@ -1,4 +1,5 @@
-/* AdapterService
+/************************
+ AdapterService
 
 */
 
@@ -27,7 +28,7 @@ classInitNative{
 }@com_android_bluetooth_btservice_AdapterService.cpp
 
 
-//获取profile interface
+//获取profile jni对栈操作的接口 interface
 sBluetoothInterface->get_profile_interface@com_android_bluetooth_btservice_AdapterService.cpp
 -->bluetoothInterface.get_profile_interface-->
 get_profile_interface{
@@ -35,8 +36,7 @@ get_profile_interface{
 - btif_av_get_sink_interface-->bt_av_sink_interface@btif_av.cc
 }@blutooth.cc
 
-processMessage-->adapterService.processStart@AdapterState.java-->setProfileServiceState
--->(启动Config.PROFILE_SERVICES中所有服务)startService@AdapterService.java
+
 
 
 //打开蓝牙
@@ -45,14 +45,15 @@ enable(false)-->sendMessage(BLE_TURN_ON)@AdapterService.java
 //关闭
 disable-->sendMessage(BLE_TURN_OFF)@AdapterService.java
 
-//打开蓝牙
+//蓝牙已经打开
 BleOnProcessStart{
-- supportedProfileServices = Config.getSupportedProfiles //获取支持的profile
+  //获取支持的profile
+- supportedProfileServices = Config.getSupportedProfiles-->SUPPORTED_PROFILES 
 - mProfileServicesState.put(STATE_OFF)//初始化profile状态为STATE_OFF
 - mAdapterProperties.init(mRemoteDevices)
 - mJniCallbacks.init(mBondStateMachine,mRemoteDevices)
 - setGattProfileServiceState(STATE_ON)//遍历profile找到gatt启动,并设置状态STATE_ON
-}
+}@AdapterService.java
 
 //profileService通知profile状态,
 onStartCommand-->doStart-->notifyProfileServiceStateChanged@ProfileService.java
@@ -62,15 +63,14 @@ onStartCommand-->doStart-->notifyProfileServiceStateChanged@ProfileService.java
 - isBleTurningOff-->sendMessage(BLE_STOPPED) //GattService
 }@AdapterService.java
 
-/* 蓝牙当前属性AdapterProperties
-  profile 状态
-*/
+//蓝牙当前属性AdapterProperties   profile 状态
 STATE_DISCONNECTED  = 0
 STATE_CONNECTING    = 1
 STATE_CONNECTED     = 2
 STATE_DISCONNECTING = 3
 
-/* 蓝牙状态 AdapterState extends StateMachine 
+/************************
+ 蓝牙状态 AdapterState extends StateMachine 
  mOnState mBleOnState mOffState
 */
 make(AdapterService service, AdapterProperties adapterProperties) {
@@ -100,8 +100,6 @@ mOffState.processMessage{
 }@AdapterState.java
 
 
-
-
 PendingCommandState.processMessage{
 - BLE_START_TIMEOUT{//启动超时,切到关闭状态
 	- transitionTo(mOffState)
@@ -129,8 +127,9 @@ OnState.processMessage{
 BleOnState.processMessage{//ble
 - USER_TURN_ON{
  	//启动profile
-	- startCoreServices-->setProfileServiceState(STATE_ON)@AdapterService.java 
+	- adapterService.startCoreServices
 	}
+- USER_TURN_OFF
 }@AdapterState.java
 
 //通知
@@ -141,7 +140,11 @@ notifyAdapterStateChange-->adapterService.updateAdapterState(oldState, newState)
 }@AdapterService.java
 
 
-/*
+//状体处理消息
+processMessage-->adapterService.processStart@AdapterState.java-->setProfileServiceState
+-->(启动Config.PROFILE_SERVICES中所有服务)startService@AdapterService.java
+
+/************************
  各个profile启动
  a2dp 
  a2dpsink
@@ -149,6 +152,7 @@ notifyAdapterStateChange-->adapterService.updateAdapterState(oldState, newState)
  hfpclient
  pbap
 */
+BleOnState.processMessage(USER_TURN_ON)-->adapterService.startCoreServices()@AdpaterState.java-->
 startCoreServices{
   //获取支持的profile
 - Class[] supportedProfileServices = Config.getSupportedProfiles()

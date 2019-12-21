@@ -19,14 +19,24 @@ makeIDataSource(makeIDataSource(int fd, int64_t offset, int64_t length)){
 
 
 
-initFromDataSource@GenericSource.cpp-->MediaExtractor::Create@MediaExtractor.cpp
+initFromDataSource@GenericSource.cpp-->MediaExtractor::Create{ 
+-if (!property_get_bool("media.stagefright.extractremote", true)) {//本地服务
+	- CreateFromService(source, mime)
+ }else{//binder服务
+	- sp<IBinder> binder = defaultServiceManager()->getService(String16("media.extractor"))
+	- sp<IMediaExtractorService> mediaExService(interface_cast<IMediaExtractorService>(binder))
+	- sp<IMediaExtractor> ex = mediaExService->makeExtractor(source->asIDataSource(), mime)
+	}
+}@MediaExtractor.cpp
+
+
 makeExtractor(const sp<IDataSource> &remoteSource, const char *mime){
 - sp<DataSource> localSource = DataSource::CreateFromIDataSource(remoteSource)
   //根据类型创建对应的Extractor
 - sp<IMediaExtractor> ret = MediaExtractor::CreateFromService(localSource, mime)
 - registerMediaExtractor(ret, localSource, mime)
 - return ret
-}@@MediaExtractorService.cpp
+}@MediaExtractorService.cpp
 
 
 //创建服务端extractor
@@ -38,7 +48,12 @@ MediaExtractor::CreateFromService(localSource, mime){
 	- RegisterSniffer_l(SniffOgg)
 	}
  //获取mime	
-- sniff(source, &tmp, &confidence, &meta)
+- sniff(source, &tmp, &confidence, &meta){
+	 //遍历sniffer
+	- for (List<SnifferFunc>::iterator it = gSniffers.begin(){
+		- (*it)(source, &newMimeType, &newConfidence, &newMeta)
+		}
+	}
 - mime = tmp.string()
  //根据mime创建extractor
 - MediaExtractor *ret = NULL

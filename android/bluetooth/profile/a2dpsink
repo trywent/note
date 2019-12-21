@@ -15,13 +15,8 @@ a2dp{
 }
 
 
-
-
-
-
-
-
-
+start()@A2dpSinkService.java-->make-->new A2dpSinkStateMachine(svc, context)@A2dpSinkStateMachine.java
+A2dpSinkStateMachine@A2dpSinkStateMachine.java-->
 initNative{
 - getBluetoothInterface  //adapter service中初始化
 - sBluetoothA2dpInterface = btInf->get_profile_interface(BT_PROFILE_ADVANCED_AUDIO_SINK_ID)

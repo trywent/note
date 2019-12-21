@@ -1,7 +1,11 @@
+/*
+ 
+*/
+
 #include <linux/slab.h>
 void *kmalloc(size_t size, int flags);//物理地址连续的内存
-__________________
-标识参数：
+
+//标识参数：
 GFP_ATOMIC :使用在中断处理或其他不在进程上下文的程序中，不能睡眠
 GFP_KERNEL :在内核空间分配内存。是通常使用的标识，可能睡眠(内存不足)
 GFP_USER :在用户空间分配内存，可能睡眠
@@ -23,17 +27,15 @@ __GFP_NOFAIL
 __GFP_NORETRY :这些标识定义在内存分配困难时的操作。__GFP_REPEAT表明再尝试下，但还有可能失败
 		__GFP_NOFAIL表明不允许失败，必须分配。__GFP_NORETRY不能分配就算了。
 
-_____________________
-内存区域：
+//内存区域：
 linux中内存通常分为三个区DMA-capable memory, normal memory, and high memory.
-内存分配通常在normal memory。
-
-DMA-capable是外围设备能够直接访问的内存，通常所有的内存都是DMA-capable
-High memory是一种32位平台上使用大量内存的机制。
+normal memory 内存分配通常在
+DMA-capable   是外围设备能够直接访问的内存，通常所有的内存都是DMA-capable
+High memory   是一种32位平台上使用大量内存的机制。
 
 内存区的实现在mm/page_alloc.c，这些区域的初始化在平台相关的代码中进行，通常在mm/init.c。
-______________________
-大小参数：
+
+//大小参数：
 内核对内存的处理是以页为单位的。kmalloc与用户空间的malloc有很大不同，面向堆分配内存会在页边界花费很多。
 linux中创建一些有固定大小内存的内存池，来分配内存。内存分配会将有合适大小内存的内存池中的内存，分配给
 请求者。
@@ -41,10 +43,10 @@ linux中创建一些有固定大小内存的内存池，来分配内存。内存
 内核只会分配固定大小的内存，通常比请求的要大。kmalloc最小能分配的内存根据系统页大小，通常为32或64byte
 分配最大限度也根据系统而不同，如果要使驱动可移植，最大不超过128kB。要获取更多内存使用其他方法。
 
-_______________________
-Lookaside Caches:
-驱动可能需要重复分配大小相同的内存多次。内核提供机制为这些内存创建池(lookaside cache).
-
+/*
+  Lookaside Caches:
+  驱动可能需要重复分配大小相同的内存多次。内核提供机制为这些内存创建池(lookaside cache).
+*/
 使用kmem_cache_create创建缓存，返回kmem_cache_t类型:
 kmem_cache_t *kmem_cache_create(const char *name, size_t size,size_t offset,unsigned long flags,
 			void (*constructor)(void *, kmem_cache_t *,unsigned long flags),
@@ -71,10 +73,10 @@ void kmem_cache_free(kmem_cache_t *cache, const void *obj);
 int kmem_cache_destroy(kmem_cache_t *cache);
 内核会统计缓存的使用，统计信息在/proc/slabinfo.
 
-_________________________
-Memory Pools:
-是一个lookaside 缓存内存池。紧急时刻，内存分配必须成功使用。
-
+/*
+ Memory Pools:
+ 是一个lookaside 缓存内存池。紧急时刻，内存分配必须成功使用。
+*/
 内存池的类型是 mempool_t (defined in <linux/mempool.h>); 通过调用mempool_create创建:
 	mempool_t *mempool_create(int min_nr,mempool_alloc_t *alloc_fn,mempool_free_t *free_fn,
 			void *pool_data);
@@ -103,10 +105,10 @@ int mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask);
 void mempool_destroy(mempool_t *pool);
 调用该函数前必须释放所有的内存对象。
 
-========================
-get_free_page and Friends：
-当需要请求大量内存时，最好是请求页。
-
+/*
+ get_free_page and Friends：
+ 当需要请求大量内存时，最好是请求页。
+*/
 get_zeroed_page(unsigned int flags);//返回一个内容初始化为0的页指针
 __get_free_page(unsigned int flags);//同上，不会清除内容
 __get_free_pages(unsigned int flags, unsigned int order);//返回2为底order指数个页，3时返回8页。内容不会清零。

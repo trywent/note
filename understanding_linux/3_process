@@ -1,4 +1,6 @@
-//process
+/*******************
+ process
+*/
 原来的多线程程序，只是在用户空间表现出多线程。实际在内核上的调度还是一个进程(一旦有睡眠，其他线程都不能执行)。
 
 
@@ -128,17 +130,19 @@ if (curr->func(curr, TASK_INTERRUPTIBLE|TASK_UNINTERRUPTIBLE,
 break;
 }
 }
-_________________________
-//Process Switch (80x86有硬件切换进程功能 far jmp.不过linux使用软件切换)
+/*******************
+ Process Switch (80x86有硬件切换进程功能 far jmp.不过linux使用软件切换)
+ 
+*/
 切换进程需保存硬件上下文 //linux中在切换进程时保存到process->thread结构体中
 
 切换步骤：
 1 切换全局页表目录
 2 切换kernel mode stack和硬件上下文
 
-_________________________
-//Creating Processes
-
+/*******************
+  Creating Processes
+*/
 
 clone-->sys_clone
 fork-->clone
@@ -152,8 +156,9 @@ clone-->do_forck-->copy_process
 2，kernel线程访问的地址时高位地址
 
 
-____________________
-//destory process
+/*******************
+ destory process
+*/
 
 exit_group-->do_exit  //结束进程group
 _exit       //结束单个进程

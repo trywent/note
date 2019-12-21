@@ -1,9 +1,15 @@
-//Interrupts and Exceptions
+/*******************
+ Interrupts and Exceptions
+*/
+intel中中断：
+- 异步中断，硬件外设产生的中断（interrupt）
+- 同步中断，执行指令时出现的错误（exception）
+
 中断(interrupt):任意时间产生的中断
 - 可屏蔽中断。一般由I/O设备产生，被屏蔽的中断可不处理
 - 不可屏蔽中断。一般由硬件错误产生，由cpu识别
 
-//异常(exception):停止指令执行后产生
+异常(exception):停止指令执行后产生
 - Processor-detected exceptions。不恰当的指令执行
 	- Faults。可恢复的错误，eip保存了产生错误的指令的地址
 	- Traps。用于debug
@@ -14,13 +20,44 @@
 - 应用程序错误需要发送signal到程序
 - kernel中异常条件,kernel处理
 
-
-//硬件连接方式
-Programmable Interrupt Controller(PIC)
-
-Advanced Programmable Interrupt Controller (APIC)
-
+/*******************
+ 中断产生
+ Programmable Interrupt Controller(PIC)/Advanced Programmable Interrupt Controller (APIC)
+*/
+//硬件产生中断方式
 设备--->IRQ(interrupt request) line--->APIC/PIC--->cpu
 
+中断控制器:
+1.监听所有IRQ线，优先读取低编号
+2.监听到信号
+	- 将信号转换为相应的向量值
+	- 保存向量值到中断IO口，允许CPU读取
+	- 发送信号到cpu的INTR
+	- 等待CPU的读取信号，则清除INTR信号
+3.重复1
 
-//Interrupt Descriptor Table
+/*******************
+ Interrupt Descriptor Table
+ 用户模式可以通过int指令产生中断
+*/
+
+将interrupt和exception关联的对应的handler。每个描述符8byte
+三种描述符：
+task gate:
+ 不能被user mode访问。double fault异常处理描述符设置为该类型
+interrupt gate:
+- interrupt gate 不能通过user mode中断访问
+- system gate可以通过user mode中断访问.into bound int $0x80
+- system interrupt可以通过user mode中断访问.int3
+trap gate:
+ 不能被user mode访问。大部分linux exception handler设置为trap gate
+
+/*******************
+ hanlder
+ 
+ 中断处理时不允许进程切换。
+*/
+
+//嵌套中断处理。保存当前进程信息，不允许进程切换
+kernel保存当前执行信息到kernel mode stack--》执行handler --》恢复前一个执行流信息
+

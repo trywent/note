@@ -1,1 +1,10 @@
 //
+start() {
+- mAvrcp = Avrcp.make(this)
+- mStateMachine = A2dpStateMachine.make(this, this)
+- setA2dpService(this)
+}@A2dpService.java
+
+
+packages/apps/Bluetooth/src/com/android/bluetooth/a2dp/A2dpService.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_a2dp.cpp
