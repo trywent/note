@@ -1,0 +1,4 @@
+/*
+ Generic Attribute Profile (GATT) 建立在 Attribute Protocol (ATT)之上。(BLE的应用)
+ 定义了Attribute Protocol对数据传输和存储的操作流程和框架。
+*/

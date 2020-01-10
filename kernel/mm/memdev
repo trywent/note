@@ -1,0 +1,44 @@
+/*
+ 内存设备
+*/
+
+static const struct memdev {
+	const char *name;
+	umode_t mode;
+	const struct file_operations *fops;
+	struct backing_dev_info *dev_info;
+} devlist[] = {
+	 [1] = { "mem", 0, &mem_fops, &directly_mappable_cdev_bdi },
+	 [2] = { "kmem", 0, &kmem_fops, &directly_mappable_cdev_bdi },
+	 [3] = { "null", 0666, &null_fops, NULL },
+	 [4] = { "port", 0, &port_fops, NULL },
+	 [5] = { "zero", 0666, &zero_fops, &zero_bdi },
+	 [7] = { "full", 0666, &full_fops, NULL },
+	 [8] = { "random", 0666, &random_fops, NULL },
+	 [9] = { "urandom", 0666, &urandom_fops, NULL },
+	[11] = { "kmsg", 0644, &kmsg_fops, NULL },
+	[12] = { "oldmem", 0, &oldmem_fops, NULL },
+}
+
+//初始化设备
+chr_dev_init(void){
+- register_chrdev(MEM_MAJOR, "mem", &memory_fops)
+- mem_class = class_create(THIS_MODULE, "mem")
+- mem_class->devnode = mem_devnode
+  //遍历创建字符设备
+- for (minor = 1; minor < ARRAY_SIZE(devlist); minor++) {
+	- device_create(mem_class, NULL, MKDEV(MEM_MAJOR, minor),NULL, devlist[minor].name)
+	}
+- tty_init()
+}@mem.c
+
+//打开设备时，将操作函数替换为对应的设备
+memory_open(struct inode *inode, struct file *filp){
+- minor = iminor(inode)
+- const struct memdev *dev = &devlist[minor]
+- filp->f_op = dev->fops
+- dev->fops->open(inode, filp)
+}@mem.c
+
+
+kernel/drivers/char/mem.c

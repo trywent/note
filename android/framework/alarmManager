@@ -13,38 +13,40 @@ Alarm Manager 能够保持CPU是唤醒的状态，直到alarm receiver的onRecei
 Note:Alarm Manager 通常用作在将来某个时刻执行应用.更简单有效的延时操作(短时倒计时，超时)
 是使用hanlder
 
-通过方法Context.getSystemService(Context.ALARM_SERVICE)获取AlarmManager这个类。
+//服务开始
+onStart() {
+- mNativeData = init()-->android_server_AlarmManagerService_init{
+	- epollfd = epoll_create(fds.size())
+	- for (size_t i = 0; i < fds.size(); i++) {
+		- fds[i] = timerfd_create(android_alarm_to_clockid[i], 0)	
+		}
+	- AlarmImpl *ret = new AlarmImpl(fds, epollfd, wall_clock_rtc())
+	- epoll_ctl(epollfd, EPOLL_CTL_ADD, fds[i], &event)
+	}com_android_server_AlarmManagerService.cpp
+- setTimeZoneImpl(SystemProperties.get(TIMEZONE_PROPERTY))
+- publishBinderService(Context.ALARM_SERVICE, mService)
+}@AlarmManagerService.java
 
-================
-//设置的时间类型
-//ELAPSED_REALTIME  启动时间，不会唤醒
-//ELAPSED_REALTIME_WAKEUP  启动时间，会唤醒
-//RTC  实时时间
-//RTC_WAKEUP   实时时间，唤醒设备
-
-
-AlarmManagerService{
-- init
-- 开始监听alarm，mWaitThread.start();
-}
-
-
-
-
+//设置时间
+setCurrentTimeMillis@systemClock.java-->setTime-->setKernelTime(mNativeData, millis)@AlarmManagerService.java-->
+android_server_AlarmManagerService_setKernelTime(JNIEnv*, jobject, jlong nativeData, jlong millis){
+- AlarmImpl *impl = reinterpret_cast<AlarmImpl *>(nativeData)
+- impl->setTime(&tv)-->AlarmImpl::setTime(struct timeval *tv){
+	- settimeofday(tv, NULL)
+	  //设置rtc
+	- android::String8 rtc_dev = String8::format("/dev/rtc%d", rtc_id);
+	- fd = open(rtc_dev.string(), O_RDWR)
+	- gmtime_r(&tv->tv_sec, &tm)	 //获取utc时间
+	- ioctl(fd, RTC_SET_TIME, &rtc)
+	}
+}@android_os_SystemClock.cpp
 
 
 
-
-set/setRepeating/setWindow-->
-setImpl(int type, long triggerAtMillis, long windowMillis, long intervalMillis,
-            PendingIntent operation, WorkSource workSource){
-//typ 类型
-//triggerAtMillis 触发时间
-//windowMillis 触发窗口 WINDOW_HEURISTIC(启发式，灵活) WINDOW_EXACT(固定时间)
-//intervalMillis 间隔时间
-//PendingIntent  广播操作
-//workSource
-}-->mService.set{
+//设置定时器
+set(@AlarmType int type, long triggerAtMillis, PendingIntent operation)-->
+setImpl(int type, long triggerAtMillis, long windowMillis, long intervalMillis...)-->
+mService.set{
 - 转换rtc时间为启动时间，triggerElapsed
 - 计算最大延迟时间，maxElapsed
 - setImplLocked{
@@ -81,26 +83,13 @@ ResultReceiver{
 - 计数mBroadcastRefCount--
 }
 
-frameworks/base/services/java/com/android/server/AlarmManagerService.java
-frameworks/base/services/jni/com_android_server_AlarmManagerService.cpp
-===============
-android_server_AlarmManagerService_init{
-- init_alarm_driver{
-	- open("/dev/alarm")
-	- AlarmImplAlarmDriver
-	}
-- init_timerfd //定时器
-}
 
-
-frameworks/base/services/jni/com_android_server_AlarmManagerService.cpp
+frameworks/base/core/java/android/app/AlarmManager.java
+frameworks/base/core/java/android/os/SystemClock.java
+frameworks/base/services/core/java/com/android/server/AlarmManagerService.java
+frameworks/base/services/core/jni/com_android_server_AlarmManagerService.cpp
 
 
 
-=============
-alarm_set-->devalarm_start@alarm-dev.c-->alarm_start-->alarmtimer_enqueue@alarmtimer.c
 
-
-drivers/staging/android/alarm-dev.c
-kernel/time/alarmtimer.c
 

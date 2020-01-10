@@ -227,16 +227,16 @@ Long story short, git remote add all of your remotes individually… and then gi
 
 [remote "GitHub"]
     url = git@github.com:elliottcable/Paws.o.git
-    fetch = +refs/heads/*:refs/remotes/GitHub/*
+    fetch = +refs/heads/ *:refs/remotes/GitHub/ *
 [branch "Master"]
     remote = GitHub
     merge = refs/heads/Master
 [remote "Codaset"]
     url = git@codaset.com:elliottcable/paws-o.git
-    fetch = +refs/heads/*:refs/remotes/Codaset/*
+    fetch = +refs/heads/ *:refs/remotes/Codaset/ *
 [remote "Paws"]
     url = git@github.com:Paws/Paws.o.git
-    fetch = +refs/heads/*:refs/remotes/Paws/*
+    fetch = +refs/heads/ *:refs/remotes/Paws/ *
 … to create a merged‐remote for "Paws" and "Codaset", I can add the following after all of those:
 
 [remote "Origin"]

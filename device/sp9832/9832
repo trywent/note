@@ -3,15 +3,33 @@
 dd if=/sdcard/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot
 dd if=/storage/USB0/boot.img of=/dev/block/platform/sdio_emmc/by-name/boot
 
-
+dd if=/sdcard/u-boot.bin of=/dev/block/mmcblk0boot1
 dd if=/storage/USB0/u-boot.bin of=/dev/block/mmcblk0boot1
 
 
 
+echo device > /sys/devices/20200000.usb/host_dev
 
+//读取uart寄存器
+lookat -l 2 0x70100024
+
+0x70100024 | 0x0000054a
+0x70100024 | 0x000000e2
+
+//usb adb
+onReceive(Context context, Intent intent) {
+- orignal_support = SystemProperties.getBoolean("ro.usb.orignal.design",false)
+- if(orignal_support) return //使用原生设置
+- if (UsbManager.ACTION_USB_STATE.equals(action)) {
+	- 
+	}
+}@SprdUsbReceiver.java
+
+
+packages/apps/Settings/src/com/sprd/settings/SprdUsbReceiver.java
+packages/apps/Settings/src/com/sprd/settings/SprdUsbSettings.java
 
 //Ubuntu16编译报错
-
 diff --git a/idh.code/chipram/Makefile b/idh.code/chipram/Makefile
 index 86365c5..ec27a59 100644
 --- a/idh.code/chipram/Makefile

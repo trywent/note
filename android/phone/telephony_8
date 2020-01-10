@@ -1,0 +1,63 @@
+/*
+ TelephonyManager
+*/
+
+//监听phone状态
+isten(PhoneStateListener listener, int events){
+- ITelephonyRegistry registry = getTelephonyRegistry()
+- registry.listenForSubscriber(listener.mSubId, getOpPackageName(), listener.callback, events)
+}@TelephonyManager.java
+
+
+frameworks/base/telephony/java/android/telephony/TelephonyManager.java
+
+/*
+　telephony
+
+ 打印信息：dumpsys telephony.registry
+*/
+
+
+//telephony.registry 服务
+startOtherServices{
+- telephonyRegistry = new TelephonyRegistry(context){
+	- int numPhones = TelephonyManager.getDefault().getPhoneCount()
+	- mNumPhones = numPhones
+	- mConnectedApns = new ArrayList[numPhones]
+	- mCallState = new int[numPhones]
+	- mDataActivity = new int[numPhones]
+	}@TelephonyRegistry.java
+- ServiceManager.addService("telephony.registry", telephonyRegistry)
+}@SystemServer.java
+
+//listener
+listenForSubscriber(int subId, String pkgForDebug, IPhoneStateListener callback...)-->
+listen(String callingPackage, IPhoneStateListener callback, int events..){
+- Record r = new Record()
+- mRecords.add(r)
+- r.callback = callback
+}@TelephonyRegistry.java
+
+
+frameworks/base/services/core/java/com/android/server/TelephonyRegistry.java
+//
+ServiceStateTracker{- 
+- mCr = phone.getContext().getContentResolver()
+ //时间时区更新
+-　mCr.registerContentObserver(Settings.Global.getUriFor(Settings.Global.AUTO_TIME), true,mAutoTimeObserver)
+- mCr.registerContentObserver(Settings.Global.getUriFor(Settings.Global.AUTO_TIME_ZONE), true,mAutoTimeZoneObserver)
+}@ServiceStateTracker.java
+
+//自动更新时区
+ContentObserver.onChange-->revertToNitzTimeZone{
+- if (mSavedTimeZone != null) {
+	- setAndBroadcastNetworkSetTimeZone(mSavedTimeZone)
+  }else{
+	- updateTimezoneByNetworkCountryCode
+  }
+}@ServiceStateTracker.java
+
+frameworks/opt/telephony/src/java/com/android/internal/telephony/ServiceStateTracker.java
+
+
+

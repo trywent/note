@@ -1,0 +1,34 @@
+/*
+ "phone" 服务
+ com.android.phone
+*/
+
+onCreate() {
+- mPhoneGlobals = new PhoneGlobals(this)
+- mPhoneGlobals.onCreate()
+- mTelephonyGlobals = new TelephonyGlobals(this)
+- mTelephonyGlobals.onCreate()
+}@PhoneApp.java
+
+
+onCreate{
+- PhoneFactory.makeDefaultPhones(this)
+- mCM = CallManager.getInstance()
+- for (Phone phone : PhoneFactory.getPhones()) {
+	- mCM.registerPhone(phone)
+	}
+  //phone服务
+- phoneMgr = PhoneInterfaceManager.init(this, PhoneFactory.getDefaultPhone()){
+	- sInstance = new PhoneInterfaceManager(app, phone){
+		- mPhone = phone
+		- publish()
+		}
+	}@PhoneInterfaceManager
+}@PhoneGlobals.java
+
+
+
+
+packages/services/Telephony/src/com/android/phone/PhoneApp.java
+packages/services/Telephony/src/com/android/phone/PhoneGlobals.java
+packages/services/Telephony/src/com/android/phone/PhoneInterfaceManager.java

@@ -58,6 +58,10 @@ startOtherServices{
 //将服务注册到serviceManager（publish）
 publishBinderService-->ServiceManager.addService@SystemService.java
 
+
+//关闭非核心服务
+config.disable_noncore@SystemServer.java
+
 frameworks/base/cmds/system_server/system_main.cpp
 frameworks/base/cmds/system_server/library/system_init.cpp
 frameworks/base/services/java/com/android/server/SystemServer.java

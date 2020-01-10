@@ -1,3 +1,7 @@
+/*
+
+*/
+
 reference对象用来封装一个obj的引用。通过reference可以对那个obj进行访问。
 三种类型的reference，从高到底
  Soft references 用来实现内存紧张的缓存

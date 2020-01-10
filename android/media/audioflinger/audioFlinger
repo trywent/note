@@ -271,9 +271,18 @@ AudioFlinger::RecordThread::RecordBufferConverter::convert-->provider->getNextBu
 
 
 //回调设置参数
-setParameters-->thread->setParameters@AudioFlinger.cpp-->MixerThread::checkForNewParameters_l
-mOutput->stream->common.set_parameters@Threads.cpp-->out_set_parameters@audio_hw_hal.cpp-->
-setParameters@AudioHardware.cpp
+setParameters(const String8& keyValuePairssetParameters(audio_io_handle_t ioHandle, keyValuePairs)@AudioSystem.cpp-->
+setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs){
+  //设置全局参数
+- if (ioHandle == AUDIO_IO_HANDLE_NONE) {
+	- audio_hw_device_t *dev = mAudioHwDevs.valueAt(i)->hwDevice()
+	- dev->set_parameters(dev, keyValuePairs.string())-->adev_set_parameters@audio_hw.c//设置到hal
+	- return
+	}
+ //设置io中参数
+- thread->setParameters-->MixerThread::checkForNewParameters_l-->mOutput->stream->common.set_parameters@Threads.cpp
+	-->out_set_parameters@audio_hw_hal.cpp-->setParameters@AudioHardware.cpp
+}@AudioFlinger.cpp
 
 
 

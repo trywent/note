@@ -6,10 +6,10 @@
 
 */
 //两种蓝牙技术：
-- Basic Rate(BR)  //721.2kb/s
-	- Enhanced Data Rate (EDR) //2.1Mb/s
+- Basic Rate(BR)  			//721.2kb/s
+	- Enhanced Data Rate (EDR) 	//2.1Mb/s
 	- Alternate Media Access Control (MAC) and Physical (PHY) //(AMP)  54Mb/s
-- Low Energy(LE)
+- Low Energy(LE)			//GATT GAP
 
 //蓝牙系统一般有2部分：
 - host//通过HCI和controller交互

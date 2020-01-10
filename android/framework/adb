@@ -7,8 +7,11 @@ vim /etc/udev/rules.d/70-android.rules
 service udev restart
 */
 transport_socket_events@transport.c-->handle_packet@adb.c-->parse_banner@adb.c
-====================
+
+/*
 adb协议：
+*/
+
 消息头结构：
 struct message {
     unsigned command;       /* command identifier constant      */
@@ -27,8 +30,7 @@ WRITE    //发送数据。每次接收到READY后才发送消息
 CLOSE    //连接断开
 SYNC     //
 
-_______________________
-建立连接：
+//建立连接：
 发送CONNECT(version, maxdata, "system-identity-string")
 
 OPEN(local-id, 0, "destination") 告诉接收者local-id希望建立连接。（成功收到READY消息，否则CLOSE消息）
@@ -51,8 +53,10 @@ service.c启动响应命令的服务
 fdevent_set@fdevent.c
 
 system/core/adb/fdevent.c
-=================================
-adb启动：
+
+/*
+ adb启动：
+*/
 adbd@init.rc-->main-->adb_main@adb.c-->fdevent_loop-->fdevent_process(将事件加入队列)--(取出fdevent)
 fdevent_call_fdfunc-->fde->func@fdevent.c
 
@@ -65,8 +69,7 @@ main@adb.c-->usb_init-->adb_thread_create(&tid, usb_open_thread, h)-->usb_open_t
 
 system/core/adb/usb_linux_client.c
 system/core/adb/transport.c
-_________________________________
-注册事件：
+//注册事件：
 fdevent_create-->fdevent_install(初始化fde，并将它注册)-->fdevent_register(设置fd_table[fde->fd]=fde)
 
 
@@ -78,8 +81,7 @@ adb_main@adb.c-->init_transport_registration-->fdevent_install(监听执行trans
 
 system/core/adb/adb.c
 
----------------------------------
-adb root:
+//adb root:
 设置ro.debuggable=1后adb root可用
 
 设置root时restart_root_service@service.c
@@ -94,7 +96,7 @@ transport_registration_func-->transport_list.push_front(t)
 handle_host_request("devices")-->list_transports(遍历transport_list中设备)-->append_transport(填充信息)
  
 
-弹出调试允许对话框：
+//弹出调试允许对话框：
 setAdbEnabled-->UsbDebuggingHandler.handleMessage(MESSAGE_ADB_ENABLED)-->Thread.start
 run-->listenToSocket-->(接收到publick key)mHandler.obtainMessage(MESSAGE_ADB_CONFIRM)-->
 UsbDebuggingHandler.handleMessage(MESSAGE_ADB_CONFIRM)

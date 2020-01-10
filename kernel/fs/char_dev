@@ -91,8 +91,8 @@ static int chrdev_open(struct inode *inode, struct file *filp){
 
 
 /*
- 注册设备.major==0自动分配设备号...
-
+ 注册设备，只是获取设备号的范围.major==0自动分配设备号...
+ name不是/dev下的名字
 */
 register_chrdev(unsigned int major, const char *name,const struct file_operations *fops)@fs.c-->
 __register_chrdev

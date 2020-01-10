@@ -96,7 +96,7 @@ frameworks/base/services/core/jni/com_android_server_UsbHostManager.cpp
 system/core/libusbhost/usbhost.c
 /****************************
  从设备
- deviceMananger (Accessory附件)
+ deviceManager (Accessory附件)。设置从设备的功能function
  
 */
 UsbDeviceManager(Context context, UsbAlsaManager alsaManager){
@@ -106,24 +106,22 @@ UsbDeviceManager(Context context, UsbAlsaManager alsaManager){
 	- 读取配置com.android.internal.R.array.config_oemUsbModeOverride
 	- mOemModeMap.put
 	}
-- mHandler = new UsbHandler
+- mHandler = new UsbHandler(Looper looper) {
+  	  //监听adb开关设置
+	- mContentResolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ADB_ENABLED))
+	  //监听uevent
+	- mUEventObserver.startObserving(USB_STATE_MATCH)	//"DEVPATH=/devices/virtual/android_usb/android0"
+	- mUEventObserver.startObserving(ACCESSORY_START_MATCH)	//"DEVPATH=/devices/virtual/misc/usb_accessory"
+	}	
 }@UsbDeviceManager.java
 
-UsbHandler(Looper looper) {
-  //监听adb设置
-- mContentResolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ADB_ENABLED))
-  //监听uevent
-- mUEventObserver.startObserving(USB_STATE_MATCH)
-- mUEventObserver.startObserving(ACCESSORY_START_MATCH)
-}@UsbDeviceManager.java
 
-
-//进入accessory
+//进入accessory功能
 mUEventObserver.onUEvent{
 - mHandler.updateState(state)
 - startAccessoryMode{
 	- mAccessoryStrings = nativeGetAccessoryStrings()
-	- String functions //设置accessory
+	- String functions = UsbManager.USB_FUNCTION_ACCESSORY//设置accessory
 	- mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_ACCESSORY_MODE_ENTER_TIMEOUT)) //设置超时处理
 	- setCurrentFunctions(functions)//设置功能
 	}
@@ -131,11 +129,15 @@ mUEventObserver.onUEvent{
 
 //设置function
 setCurrentFunctions-->mHandler.sendMessage(MSG_SET_CURRENT_FUNCTIONS)-->UsbHandler.handleMessage-->
-setEnabledFunctions-->trySetEnabledFunctions{
+setEnabledFunctions(String functions, boolean forceRestart) {
+- 
+}@UsbDeviceManager.java
+
+trySetEnabledFunctions(String functions, boolean forceRestart){
 - functions = applyAdbFunction(functions)
   //设置属性,init.rc监听属性设置后设置usb功能
 - setUsbConfig-->SystemProperties.set(USB_CONFIG_PROPERTY, config)
-}
+}@UsbDeviceManager.java
 
 
 
@@ -157,6 +159,24 @@ UsbHandler.handleMessage{
 updateCurrentAccessory{
 - 
 }
+
+//打开adb调试
+AdbSettingsObserver.onChange-->mHandler.sendMessage(MSG_ENABLE_ADB, enable)-->handleMessage(MSG_ENABLE_ADB)-->
+setAdbEnabled(boolean enable) {
+- mAdbEnabled = enable;
+  //改变usb功能
+- String oldFunctions = getDefaultFunctions()
+- String newFunctions = applyAdbFunction(oldFunctions)-->applyAdbFunction(String functions){
+	- if (mAdbEnabled) {
+		- functions = UsbManager.addFunction(functions, UsbManager.USB_FUNCTION_ADB)
+	  }else{
+		- functions = UsbManager.removeFunction(functions, UsbManager.USB_FUNCTION_ADB)
+		}
+	}
+- SystemProperties.set(USB_PERSISTENT_CONFIG_PROPERTY,newFunctions)
+- setEnabledFunctions(mCurrentFunctions, true, mUsbDataUnlocked)
+- updateAdbNotification(false)
+}@UsbDeviceManager.java
 
 frameworks/base/services/usb/java/com/android/server/usb/UsbDeviceManager.java
 frameworks/base/services/core/jni/com_android_server_UsbDeviceManager.cpp

@@ -141,9 +141,9 @@ struct tvec_base {
 }
 
 /*
- tasklet
-通常在处理中断时使用(中断处理必须快速，其他工作可以放入tasklet中在将来某个时候执行)。
-运行在中断时间，运行在调度它们的cpu上，能够接收一个无符号长整形参数。
+ tasklet(软中断上下文，允许中断发生)
+ 通常在处理中断时使用(中断处理必须快速，其他工作可以放入tasklet中在将来某个时候执行)。
+ 运行在中断时间，运行在调度它们的cpu上，能够接收一个无符号长整形参数。
 */
 
 #include <linux/interrupt.h>
@@ -168,8 +168,10 @@ void tasklet_kill(struct tasklet_struct *t);
 
 
 /*
- workqueue
- 关键不同是tasklet快速，但必须是原子执行。workqueue延时较长，但不必原子。
+ workqueue 进程上下文(工作进程)
+ 不同于tasklet是:tasklet快速，但必须是原子执行。workqueue延时较长，但不必原子。
+
+ 不能和用户空间交互数据（不能访问其它进程的地址）
 */
 类似tasklet使工作在将来某个时刻执行。但有些不同：
 -tasklet运行在软中段上下文，原子执行的。workqueue运行在内核进程中，可以睡眠。

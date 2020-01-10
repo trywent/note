@@ -14,7 +14,7 @@
 //audioflinger
 - get_audio_flinger
 - setStreamVolume/getStreamVolume
-- setParameters/getParameters
+- setParameters/getParameters-->af->setParameters
 - getInputBufferSize
 
 //AudioFlingerClient

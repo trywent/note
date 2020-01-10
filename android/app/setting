@@ -392,8 +392,67 @@ onRadioButtonClicked@LocationMode.java-->setLocationMode(mode){
 }@LocationSettingsBase.java
 
 
-
-
 packages/apps/Settings/src/com/android/settings/location/LocationMode.java
 packages/apps/Settings/src/com/android/settings/location/LocationSettings.java
 packages/apps/Settings/src/com/android/settings/location/LocationSettingsBase.java
+/*
+ adb
+
+*/
+onCreate(Bundle icicle) {
+- addPreferencesFromResource(R.xml.development_prefs);
+- mEnableAdb = findAndInitSwitchPref(ENABLE_ADB); //adb调试开关
+}@DevelopmentSettings.java
+
+
+onPreferenceTreeClick(PreferenceScreen preferenceScreen, Preference preference) {
+- if (preference == mEnableAdb) {
+	- if (mEnableAdb.isChecked()) {
+		- if (mUsbShouldBeActivated) {//先判断usb是否已经激活
+			- mUsbEnableDialog = new AlertDialog.Builder()..setPositiveButton(android.R.string.yes, this) //设置事件监听器
+			- mUsbEnableDialog.setOnDismissListener(this)-->onDismiss(DialogInterface dialog)//选择
+		  else{//adb调试开关
+			- mAdbDialog = new AlertDialog.Builder(getActivity()).setPositiveButton(android.R.string.yes, this)
+			- mAdbDialog.setOnDismissListener(this)
+			}
+	  }else{
+		- Settings.Global.putInt(getActivity().getContentResolver(),Settings.Global.ADB_ENABLED, 0)	
+		}
+	}
+
+}@DevelopmentSettings.java
+
+//adb开关弹框确认
+onClick(DialogInterface dialog, int which) {
+- if (dialog == mAdbDialog) {//adb调试
+	- if(which == DialogInterface.BUTTON_POSITIVE){
+		- Settings.Global.putInt(getActivity().getContentResolver(),Settings.Global.ADB_ENABLED, 1)
+		- mVerifyAppsOverUsb.setEnabled(true)
+		- updateBugreportOptions
+		}
+	}
+- if (dialog == mEnableDialog) {
+	- 
+	}
+- if (dialog == mUsbEnableDialog) {
+	- if (which == DialogInterface.BUTTON_POSITIVE)  mEnableAdb.setChecked(false);
+	}
+}@DevelopmentSettings.java
+
+//adb开关弹框消失
+onDismiss(DialogInterface dialog) {
+- if (dialog == mAdbDialog) {
+
+	}
+- if (dialog == mEnableDialog) {
+
+	}
+- if (dialog == mUsbEnableDialog) {
+	- if (!mDialogClicked) mEnableAdb.setChecked(false)
+	- mUsbEnableDialog = null;
+	}
+}@DevelopmentSettings.java
+
+packages/apps/Settings/src/com/android/settings/DevelopmentSettings.java
+
+

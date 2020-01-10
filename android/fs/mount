@@ -2,4 +2,94 @@
  挂载文件系统
 */
 
+mount_all /fstab.${ro.hardware}@init.xxx.rc
 
+KEYWORD(mount_all,   COMMAND, 1, do_mount_all)@keywords.h
+
+mount_all-->do_mount_all("fstab.${ro.hardware")-->
+do_mount_all(int nargs, char **args){
+- expand_props(fstabfile, args[1], sizeof(fstabfile)//获取fstab文件
+- pid = fork()
+- if (pid > 0) {		//等待子进程执行挂载
+	- TEMP_FAILURE_RETRY(waitpid(pid, &status, 0))
+	- if (WIFEXITED(status))//获取挂载结果值
+		- ret = WEXITSTATUS(status)
+  }else if (pid == 0) {		//子进程执行挂载操作
+	- fs_mgr_read_fstab
+	- child_ret = fs_mgr_mount_all(fstab)
+	- fs_mgr_free_fstab(fstab)
+	- _exit(child_ret)	//返回挂载结果值
+  }
+  //处理挂载结果
+- if (ret == FS_MGR_MNTALL_DEV_NEEDS_ENCRYPTION) {
+
+  }else(ret == FS_MGR_MNTALL_DEV_MIGHT_BE_ENCRYPTED){
+
+  }else(ret == FS_MGR_MNTALL_DEV_NOT_ENCRYPTED){		//
+
+  }else(ret == FS_MGR_MNTALL_DEV_NEEDS_RECOVERY){		//需要进入recovery
+	- wipe_data_via_recovery
+  }else(ret == FS_MGR_MNTALL_DEV_DEFAULT_FILE_ENCRYPTED){	//默认的加密
+	- e4crypt_install_keyring()
+	- action_for_each_trigger("nonencrypted", action_add_queue_tail)
+  }else(ret == FS_MGR_MNTALL_DEV_NON_DEFAULT_FILE_ENCRYPTED){
+	- 
+  }else{
+
+  }
+}@builtins.c
+
+//读取fstab
+fs_mgr_read_fstab(const char *fstab_path){
+- const char *delim = " \t";
+- FILE *fstab_file = fopen(fstab_path, "r")	//打开文件fstab
+- struct fstab *fstab = calloc(1, sizeof(struct fstab))
+- fstab->num_entries = entries			//一行一个块设备
+- fstab->fstab_filename = strdup(fstab_path)
+- fstab->recs = calloc(fstab->num_entries, sizeof(struct fstab_rec))
+  //读取块设备配置
+- getline(&line, &alloc_len, fstab_file)
+- p = strtok_r(line, delim, &save_ptr)) 	//获取第一个空格前的字符串
+- fstab->recs[cnt].blk_device = strdup(p)	//设备路径
+- p = strtok_r(NULL, delim, &save_ptr))		//获取第二个空格前的字符串
+- fstab->recs[cnt].mount_point = strdup(p)	//挂载路径
+- p = strtok_r(NULL, delim, &save_ptr)) 	//获取第三个空格前的字符串
+- fstab->recs[cnt].fs_type = strdup(p)		//文件系统类型
+- p = strtok_r(NULL, delim, &save_ptr))		//获取第四个空格前的字符串
+- fstab->recs[cnt].flags = parse_flags		//挂载标识符
+- fstab->recs[cnt].fs_options
+- p = strtok_r(NULL, delim, &save_ptr)) 	//获取第五个空格前的字符串
+- fstab->recs[cnt].fs_mgr_flags = parse_flags	//fsmgr操作符
+  //关闭文件
+- fclose(fstab_file)
+- free(line)
+}@fs_mgr_fstab.c
+
+
+//挂载fstab中设备
+fs_mgr_mount_all(struct fstab *fstab){
+ //遍历fstab
+- if (fstab->recs[i].fs_mgr_flags & (MF_VOLDMANAGED | MF_RECOVERYONLY)) //跳过vold处理的块设备(voldmanaged=sdcard0),和
+	continue
+- translate_ext_labels(&fstab->recs[i]){//ext2,ext3,ext4 将设备文件名替换为实际名字mmcblk0p
+	- if (!strncmp(label, sb->s_volume_name, label_len)) {
+		- asprintf(&new_blk_device, "/dev/block/%s", ent->d_name)
+		- rec->blk_device = new_blk_device
+		}
+	}
+ //
+- mret = mount_with_alternatives(fstab, i, &last_idx_inspected, &attempted_idx)
+ //挂载成功
+- if (!mret) {
+	- int status = handle_encryptable(fstab, &fstab->recs[attempted_idx])//判断是否需要加密挂载
+	- 
+	- continue
+	}
+ //挂载失败
+- bool wiped = partition_wiped(fstab->recs[top_idx].blk_device)
+}@fs_mgr.c
+
+system/core/init/builtins.c
+system/core/init/keywords.h
+system/core/fs_mgr/fs_mgr_fstab.c
+system/core/fs_mgr/fs_mgr.c

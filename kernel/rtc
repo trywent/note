@@ -1,0 +1,48 @@
+/*
+ rtc
+*/
+ioctl(fd, RTC_SET_TIME, &rtc)
+
+alarm_set-->devalarm_start@alarm-dev.c-->alarm_start-->alarmtimer_enqueue@alarmtimer.c
+
+
+drivers/staging/android/alarm-dev.c
+kernel/time/alarmtimer.c
+
+
+/*
+ 上层获取的时间
+
+*/
+
+CLOCK_REALTIME 		//现实时间，会被时间设置影响（用户调整，NTP校准）
+CLOCK_REALTIME_COARSE 	//粗粒度的现实时间，能够快速获取
+CLOCK_MONOTONIC		//单调递增时间，不会被系统设置时间影响（用户设置）。但是被adjtime(3)和NTP校准影响
+CLOCK_MONOTONIC_COARSE 	//粗粒度单调递增时间
+CLOCK_MONOTONIC_RAW	//硬件中单调递增时间。没有被adjtime(3)和NTP影响
+CLOCK_BOOTTIME 		//和CLOCK_MONOTONIC一样，除了包括系统休眠的时间
+
+
+//系统启动时间，不包含睡眠时间
+uptimeMillis@SystemClock.java-->systemTime(SYSTEM_TIME_MONOTONIC)@SystemClock.cpp-->clock_gettime(CLOCK_MONOTONIC, &t)@time.h
+
+//系统启动时间，包含睡眠时间
+elapsedRealtime@SystemClock.java-->elapsedRealtimeNano()@SystemClock.cpp-->clock_gettime(CLOCK_BOOTTIME, &ts)@time//系统调用
+
+//当前时间
+currentTimeMicro@SystemClock.java-->android_os_SystemClock_currentTimeMicro@android_os_SystemClock.cpp-->
+gettimeofday(&tv, NULL)@<sys/time.h>//系统调用
+
+//当前时间
+currentTimeMillis()@System.java-->System_currentTimeMillis(JNIEnv* env, jclass unused)@System.c-->
+JVM_CurrentTimeMillis@OpenjdkJvm.cc-->gettimeofday(&tv, (struct timezone *) NULL)
+
+frameworks/base/core/java/android/os/SystemClock.java
+frameworks/base/core/jni/android_os_SystemClock.cpp
+system/core/libutils/SystemClock.cpp
+/system/core/libutils/Timers.cpp
+
+
+libcore/ojluni/src/main/java/java/lang/System.java
+libcore/ojluni/src/main/native/System.c
+art/runtime/openjdkjvm/OpenjdkJvm.cc

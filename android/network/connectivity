@@ -62,6 +62,19 @@ setAirplaneMode(boolean enable) {
 
 
 /*
+ 获取移动网络类型
+
+*/
+getNetworkInfo@onnectivityManager.java-->getNetworkInfo{
+- NetworkState state = getFilteredNetworkState(networkType, uid, false){
+	- final NetworkAgentInfo nai = mLegacyTypeTracker.getNetworkForType(networkType)
+	- NetworkState state = nai.getNetworkState()
+	}
+- return state.networkInfo
+}@ConnectivityService.java
+
+
+/*
  进程绑定到指定网络
 
 */

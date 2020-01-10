@@ -2,31 +2,48 @@
  init
 
 */
-分析文件init.rc-->将分析的结果，按顺序加入到执行队列-->
+main(int argc, char** argv){
+- return ueventd_main(argc, argv)	//uevent
+- return watchdogd_main(argc, argv)	//watchdog
+- is_first_stage = (argc == 1) || (strcmp(argv[1], "--second-stage") != 0)//是否是第一阶段
+- if (!is_first_stage) {		//执行第二阶段
+	- property_init()
+	- process_kernel_dt()
+	- process_kernel_cmdline()
+	}
+- selinux_initialize(is_first_stage)
+- if (is_first_stage) {
+	- restorecon("/init")
+	- char* path = argv[0]
+	- char* args[] = { path, const_cast<char*>("--second-stage"), nullptr }
+	- execv(path, args)		//执行init --second-stage 第二阶段
+	}
+  //监听子进程状态(service)
+- signal_handler_init
+  //属性
+- property_load_boot_defaults
+- start_property_service()
+   //解析init.rc
+- init_parse_config_file("/init.rc"){	//将分析的结果，按顺序加入到执行队列
+	- parse_service			//构建service结构，加入到service_list
+	- parse_action			//构建action，加入到action_list
+	- parse_import
+	}
+- queue_builtin_action(console_init_action, "console_init")
+- action_for_each_trigger("init", action_add_queue_tail)//将init对应action加入队列
+- while(true){
+	- execute_one_command
+	- restart_processes
+	}
+}@init.cpp
 
-SECTION:import，on和service是SECTION类型。处理init.rc中都是按每个SECTION来处理。
 
 队列：
-action_list  //所有的操作，都放入这个队列。条件满足是将该对类中的action放入action_queue
-action_queue //所有将被执行的操作
+action_list		//所有的操作，都放入这个队列。条件满足时将该对类中的action放入action_queue
+action_queue		//将被执行的操作
+queue_builtin_action	//执行传入的操作
 
-queue_builtin_action//执行传入的操作
 
-
-执行顺序，由action的加入顺序决定。
-on early-init
-    start ueventd
-
-//处理init.rc文件：
-main@init.c-->init_parse_config_file@init_parser.c-->parse_config@init_parser.c-->next_token@parser.c-->
-(处理SECTION)parse_line--parse_new_section==>(处理service，on，import)
-==>parse_service(构建service结构，加入到service_list)--parse_line_service(设置处理函数)@init_parser.c
-   parse_line_service(处理SECTION中每行。设置该service属性，设置，socket等) 	
-==>parse_action(构建action，加入到action_list)--parse_line_action(设置处理函数)@init_parser.c
-   parse_line_action(将命令加入到该action的command链表)-->list_add_tail-->kw_func(kw)(设置命令相应的函数)
-   -->keyword_info[kw].func-->KEYWORD-->keywords.h
-==>parse_import(将要包含的文件加入到import_list链表)
---------------------------
 //将操作加入到操作队列：
 queue_builtin_action(func,name){
 //将要执行的操作链接到action_list
@@ -36,13 +53,13 @@ queue_builtin_action(func,name){
 -
 }-->action_add_queue_tail(链接到action_queue)@init_parser.c
 
-将不同trigger(early_init,init,fs,postfs)的操作加入操作队列：
+//将不同trigger(early_init,init,fs,postfs)的操作加入操作队列：
 main@init.c-->action_for_each_trigger(name, action_add_queue_tail){
 - 遍历action_list中的action，将名字与trigger相同的action加入队列。action_add_queue_tail
 - 
 }-->action_add_queue_tail(链接到action_queue)@init_parser.c
 
-设置属性触发的操作：
+//设置属性触发的操作：
 queue_builtin_action(queue_property_triggers_action, "queue_property_triggers")-->
 queue_property_triggers_action@main.c-->queue_all_property_triggers(将符合条件操作加入队列)
 -->action_add_queue_tail@init_parser.c
@@ -59,17 +76,17 @@ main-->execute_one_command-->action_remove_queue_head(从action_queue队列获�
  服务
 */
 service的启动：
-
 on boot
     class_start core
     class_start main
-启动服务：
+
+//启动服务：
 (命令)class_start@init.rc-->do_class_start@builtins.c-->service_for_each_class@init_parser.c
 (查找service_list链表中名字与classname匹配的服务)-->(名字匹配)service_start_if_not_disabled
 @builtins.c-->service_start(设置环境变量，socket等)-->fork新进程，执行execve@init.c-->
 notify_service_state(系统属性中设置服务状态running)
 
-通过属性设置启动：
+//通过属性设置启动：
 property_set("ctl.start", xxx)-->property_set@property_service.c-->handle_property_set_fd
 @property_service.c-->handle_control_message-->(start)msg_start@init.c-->
 service_start-->fork--execve@@init.c--notify_service_state-->(设置系统属性init.svc.%s)
@@ -138,8 +155,9 @@ frameworks/base/core/jni/android_os_SystemProperties.cpp
 system/core/libcutils/properties.c
 bionic/libc/bionic/system_properties.c
 
-============================================
-创建设备节点：
+/* uevent
+ 创建设备节点
+*/
 init启动后，执行service ueventd /sbin/ueventd(init的符号链接，实际运行init)。
 main@init.c-->(是运行uevent)ueventd_main@ueventd.c-->device_init-->coldboot(冷启动，自动搜文件)
 -->do_coldboot-->handle_device_fd-->handle_device_event-->handle_generic_device_event ||
@@ -179,30 +197,43 @@ ______________________________________________
 initlog.rle的设置：
 main-->queue_builtin_action-->console_init_action@init.c-->load_565rle_image@logo.c
 
-
-
-systme文件权限：
+//systme文件权限：
 system/core/include/private/android_filesystem_config.h
 
+/* log
+ 标准输出文件
+*/
 
 
-============
-mount_all:
 
-do_mount_all{
-- fs_mgr_read_fstab
-- fs_mgr_mount_all
-}
+ERROR/NOTICE/INFO@log.h-->init_klog_write-->
+init_klog_vwrite@log.cpp-->klog_write(int level, const char* fmt, ...)-->
+klog_writev(int level, const struct iovec* iov, int iov_count){
+- klog_init{
+	- klog_fd = open("/dev/kmsg", O_WRONLY | O_CLOEXEC)
+	}
+- writev(klog_fd, iov, iov_count)
+}@klog.c
 
-system/core/init/builtins.c
-system/core/fs_mgr/fs_mgr.c
 
+system/core/init/log.cpp
+system/core/libcutils/klog.c
 /******************************
  android 8.1
 */
 AddSingleLineParser@uevent.cpp-->line_callbacks_@init_parser.cpp//line分析函数
 
-main{
+main(int argc, char** argv){
+- return ueventd_main(argc, argv)	//uevent
+- return watchdogd_main(argc, argv)	//watchdog
+- is_first_stage = (getenv("INIT_SECOND_STAGE") == nullptr)//是否是第一阶段
+- if (is_first_stage) {
+	- mount("sysfs", "/sys", "sysfs", 0, NULL)
+	- InitKernelLogging(argv)
+	- DoFirstStageMount
+	- SetInitAvbVersionInRecovery()
+	- selinux_initialize(true)
+	}
   //监听子进程状态(service)
 - signal_handler_init
   //属性
@@ -274,6 +305,14 @@ HandlePowerctlMessage(const std::string& command) {
     }
 - ActionManager::GetInstance().QueueBuiltinAction(shutdown_handler, "shutdown_done")
 }@reboot.cpp
+
+
+/*
+ 设置console
+
+*/
+
+
 
 system/core/init/init.cpp
 system/core/init/signal_handler.cpp

@@ -86,6 +86,49 @@ call_console_drivers-->_call_console_drivers{
 	
 }
 
+/*
+ kmsg
+ 设备文件在mem.c中创建
+*/
+
+const struct file_operations kmsg_fops = {
+	.open = devkmsg_open,
+	.read = devkmsg_read,
+	.aio_write = devkmsg_writev,
+	.llseek = devkmsg_llseek,
+	.poll = devkmsg_poll,
+	.release = devkmsg_release,
+}
+
+static int devkmsg_open(struct inode *inode, struct file *file){
+- struct devkmsg_user *user = kmalloc(sizeof(struct devkmsg_user), GFP_KERNEL)
+- user->idx = log_first_idx
+- user->seq = log_first_seq
+}@printk.c
+
+//读
+devkmsg_read(struct file *file, char __user *buf,size_t count, loff_t *ppos){
+- msg = log_from_idx(user->idx){	//根据当前用户的索引号，获取log_buf中数据位置
+	- struct log *msg = (struct log *)(log_buf + idx);
+	- return msg	
+	}
+- for (i = 0; i < msg->dict_len; i++) {	//将log_buf中数据拷贝到user->buf
+	- unsigned char c = log_dict(msg)[i]
+	- user->buf[len++] = c
+	}
+- copy_to_user(buf, user->buf, len)	//将数据拷贝到用户空间
+}@printk.c
+
+//写
+devkmsg_writev(struct kiocb *iocb, const struct iovec *iv, unsigned long count, loff_t pos){
+- char *buf = kmalloc(len+1, GFP_KERNEL)
+- char *line = buf
+- for (i = 0; i < count; i++) {				//将用户空间数拷贝到buf.line
+	- copy_from_user(line, iv[i].iov_base, iv[i].iov_len)
+	- line += iv[i].iov_len
+	}
+- printk_emit(facility, level, NULL, 0, "%s", line)	//输出到串口
+}@printk.c
 
 
 
@@ -94,7 +137,7 @@ kernel/include/linux/printk.h
 
 
 /*
- console
+ console 当做串口的别名？
 
  平台串口驱动注册时，会注册console。每个端口都会注册
 

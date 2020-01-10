@@ -48,4 +48,108 @@ int print_dev_t(char *buffer, dev_t dev);
 char *format_dev_t(char *buffer, dev_t dev);
 
 
-//
+/*
+ Debugging by Querying
+ 查询信息,通过/proc filesystem,ioctl,sysfs
+
+ proc最开始是为了显示运行的进程信息
+*/
+//创建proc下面文件。
+<linux/proc_fs.h>
+//这个函数中将数写到page返回到user space
+int (*read_proc)(char *page, char **start, off_t offset, int count,int *eof, void *data); 
+//创建节点。注意不要创建两个一样名字的节点
+struct proc_dir_entry *create_proc_read_entry(const char *name,mode_t mode, struct proc_dir_entry *base,read_proc_t *read_proc, void *data);
+//移除。移除时不管有没有进程在使用该节点
+remove_proc_entry(const char *name, struct proc_dir_entry *base /* parent dir */);
+
+
+
+/*
+ 创建能够传输大数据量的proc节点
+*/
+<linux/seq_file.h>
+int seq_open(struct file *, const struct seq_operations *);
+ssize_t seq_read(struct file *, char __user *, size_t, loff_t *);
+loff_t seq_lseek(struct file *, loff_t, int);
+int seq_release(struct inode *, struct file *);
+
+//创建函数用于遍历位置。start, next, stop, and show.
+void *start(struct seq_file *sfile, loff_t *pos);		//返回位置
+void *next(struct seq_file *sfile, void *v, loff_t *pos);	//v是start或者next返回的位置，pos为当前偏移值。返回当前读取的位置
+void stop(struct seq_file *sfile, void *v);			//
+int show(struct seq_file *sfile, void *v);			//将数据传到userspace
+
+int seq_printf(struct seq_file *sfile, const char *fmt, ...);   //将数据填充到struct seq_file
+int seq_putc(struct seq_file *sfile, char c);
+int seq_puts(struct seq_file *sfile, const char *s);
+int seq_escape(struct seq_file *m, const char *s, const char *esc);//打印出转义字符
+int seq_path(struct seq_file *sfile, struct vfsmount *m, struct dentry *dentry, char *esc);
+
+struct proc_dir_entry *create_proc_entry(const char *name,mode_t mode,struct proc_dir_entry *parent);
+//示例
+static struct seq_operations scull_seq_ops = {
+.start = scull_seq_start,
+.next = scull_seq_next,
+.stop = scull_seq_stop,
+.show = scull_seq_show
+};
+
+static int scull_proc_open(struct inode *inode, struct file *file){
+	return seq_open(file, &scull_seq_ops);
+}
+
+static struct file_operations scull_proc_ops = {
+.owner = THIS_MODULE,
+.open = scull_proc_open,
+.read = seq_read,
+.llseek = seq_lseek,
+.release = seq_release
+};
+
+entry = create_proc_entry("scullseq", 0, NULL);
+if (entry)
+	entry->proc_fops = &scull_proc_ops;
+//ioctl
+
+/*
+ Debugging by Watching
+*/
+
+//strace 检测用户空间程序的系统调用流程
+strace program/cmd
+
+//Oops Messages
+CONFIG_KALLSYMS //打开这个配置才有调用栈信息
+
+
+//System Hangs
+
+//magic SysRq key(alt+SysRq+按键).sysrq.txt
+s Performs an emergency synchronization of all disks.
+u Umount. Attempts to remount all disks in a read-only mode
+b Boot. Immediately reboots the system.
+
+echo 0 > /proc/sys/kernel/sysrq //关闭sysrq功能
+
+echo cmd > /proc/sysrq-trigger //触发系统请求
+
+
+/*
+ gdb
+
+ /proc/kcore  proc下面的文件都是内核生成的数据
+*/
+
+gdb /usr/src/linux/vmlinux /proc/kcore  //vmlinux是内核的镜像。kcore表示内核的可执行文件，代表整个内核内存空间
+
+
+//gdb 调试模块
+
+
+/*
+ User-Mode Linux (UML)
+ */
+
+
+

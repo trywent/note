@@ -58,8 +58,8 @@ void complete_and_exit(struct completion *c, long retval);
 
 
 /*
- spinlocks 关闭内核抢占(当前核不会执行其它进程)。取得锁后不能睡眠
- 同一进程不能重复获取
+ spinlocks 关闭内核抢占(当前核不会执行其它进程)。主要还是为了多核心设计？
+ 取得锁后不能睡眠,同一进程不能重复获取
 */
 1 关闭内核抢占（进程调度）
 2 关闭当前cpu核的中断

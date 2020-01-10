@@ -1,0 +1,106 @@
+/*
+ 访问硬件
+
+ 访问外设的寄存器。寄存器位于内存地址空间，或者io地址空间。（有的cpu只有一个地址空间）
+*/
+
+//I/O registers 
+有side effect(单边效应).地址中的内容可能被其它操作改变。如其它核，IO控制器
+//RAM 
+没有side effect。编译器和硬件上都可以优化访问。访问缓存内容或者改变访问顺序。
+	- 编译器优化，把数据保存缓存中，读取缓存
+	- 硬件优化指令的执行顺序
+
+
+#include <linux/compiler.h>
+# define barrier() __memory_barrier() //编译器将这语句之前的代码，所有缓存在cpu寄存器中的变量值写入内存中。读取时从内存中读取
+
+#include <asm-generic/barrier.h>
+void rmb(void);			      //关闭硬件优化
+void read_barrier_depends(void);
+void wmb(void);
+void mb(void);
+
+//示例
+writel(dev->registers.addr, io_destination_address);
+writel(dev->registers.size, io_size);
+writel(dev->registers.operation, DEV_READ);
+wmb( );
+writel(dev->registers.control, DEV_GO);
+
+
+/*
+ 使用I/O port。arm平台没有
+
+ /proc/ioports 端口分配信息
+*/
+
+//驱动操作端口
+#include <linux/ioport.h>
+struct resource *request_region(unsigned long first, unsigned long n,const char *name); //请求端口
+void release_region(unsigned long start, unsigned long n);				//释放端口
+
+<asm/io.h>
+unsigned inb(unsigned port);			//8bits
+void outb(unsigned char byte, unsigned port);
+unsigned inw(unsigned port);			//16bits
+void outw(unsigned short word, unsigned port);
+unsigned inl(unsigned port);			//32bits
+void outl(unsigned longword, unsigned port);
+
+inb_p, outb_p //暂停。cpu的时钟比总线传输快很多。
+//用户空间操作端口
+1 ioperm / iopl
+2 /dev/port
+
+
+//将I/O port映射为IO memory。使用ioread*函数访问
+void *ioport_map(unsigned long port, unsigned int count);
+void ioport_unmap(void *addr);
+
+/*
+ I/O memory。映射为内存的寄存器或设备内存
+
+ 通过内存地址访问这些设备。/proc/iomem端口地址信息
+*/
+<linux/ioport.h>
+struct resource *request_mem_region(unsigned long start/*物理起始地址*/, unsigned long len, char *name); //分配一个地址空间
+void release_mem_region(unsigned long start, unsigned long len);
+
+
+#include <asm/io.h>
+void *ioremap(unsigned long phys_addr, unsigned long size);	//将物理地址转换为虚拟地址。通过页表访问
+void *ioremap_nocache(unsigned long phys_addr, unsigned long size);
+void iounmap(void * addr);
+
+<asm/io.h> 		
+unsigned int ioread8(void *addr);				//访问I/O内存空间.地址为ioremap的返回地址
+unsigned int ioread16(void *addr);
+unsigned int ioread32(void *addr);
+void iowrite8(u8 value, void *addr);
+void iowrite16(u16 value, void *addr);
+void iowrite32(u32 value, void *addr);
+
+void ioread8_rep(void *addr, void *buf, unsigned long count);	//连续读写
+void ioread16_rep(void *addr, void *buf, unsigned long count);
+void ioread32_rep(void *addr, void *buf, unsigned long count);
+void iowrite8_rep(void *addr, const void *buf, unsigned long count);
+void iowrite16_rep(void *addr, const void *buf, unsigned long count);
+void iowrite32_rep(void *addr, const void *buf, unsigned long count);
+
+void memset_io(void *addr, u8 value, unsigned int count);	//操作连续一块io内存
+void memcpy_fromio(void *dest, void *source, unsigned int count);
+void memcpy_toio(void *dest, void *source, unsigned int count);
+
+//老的函数，不建议使用？？？  现在的内核基本都使用这些函数。都是虚拟地址
+unsigned readb(address);					
+unsigned readw(address);
+unsigned readl(address);
+void writeb(unsigned value, address);
+void writew(unsigned value, address);
+void writel(unsigned value, address);
+
+//虚拟地址和物理地址转换。。ioremap返回的地址不能使用下面的函数转换
+virt_to_phys(void *x)
+phys_to_virt(void *x)
+

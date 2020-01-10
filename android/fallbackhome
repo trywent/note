@@ -73,8 +73,7 @@ frameworks/base/core/java/android/os/UserManager.java
 frameworks/base/services/core/java/com/android/server/pm/UserManagerService.java
 
 
-//关闭非核心服务
-config.disable_noncore@SystemServer.java
+
 
 
 

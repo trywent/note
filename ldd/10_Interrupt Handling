@@ -1,3 +1,93 @@
 /*
  interrupt
+ 中断和其它代码同步执行
+
 */
+/proc/interrupts	//列出当前使用的中断，和中断数目
+/proc/stat		//列出中断总数，和各个中断的个数
+
+
+//请求中断号
+<linux/interrupt.h>
+static inline int __must_check request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,const char *name, void *dev)
+
+void free_irq(unsigned int, void *);
+
+
+flags:
+SA_INTERRUPT		//快速中断处理，执行时当前处理器的中断被关闭。"Fast and Slow Handlers"
+SA_SHIRQ		//设备间共享中断。"Interrupt Sharing"
+SA_SAMPLE_RANDOM 	//是随机产生的，能够当做随机数被/dev/random and /dev/urandom使用
+
+
+
+NR_IRQS			//当前平台的中断号个数
+
+//探测中断号
+unsigned long probe_irq_on(void);	//开始探测
+int probe_irq_off(unsigned long);	//传入probe_irq_on的返回值。返回当前时间段产生中断的中断号
+//手动探测。将所有可能的中断都注册，然后使能中断。根据探测过程中产生的中断，获取设备对应的中断
+
+
+
+/* 中断流程
+ 
+*/
+1 产生中断，将中断号入栈跳转到do_IRQ
+2 do_IRQ锁定对应的中断号。并回复中断控制器，控制器继续处理其它中断
+3 查找对应的中断处理函数
+4 释放锁，并返回
+
+
+/*  中断处理函数约束
+ 中断发生时当前进程的执行被打断。寄存器状态被保存
+*/
+1 不能和用户空间交换数据。因为没有进程上下文
+2 不能睡眠		//中断处理上下文也不是进程，不会睡眠，也不会被调度。中断处理时cpu的进程调度被关闭。不会去执行其它进程（会卡死）。
+3 不能schedule(让出cpu)
+
+static irqreturn_t sample_interrupt(int irq, void *dev_id/*request_irq传入的指针参数*/, struct pt_regs*regs/*中断前的上下文信息*/)
+
+/* 关闭和打开中断
+ spinlock时会关闭中断
+ 
+*/
+<asm/irq.h>
+void disable_irq(int irq);		//关闭某个中断
+void disable_irq_nosync(int irq);
+void enable_irq(int irq);
+
+<asm/system.h>
+void local_irq_save(unsigned long flags);//关闭当前处理器上所有中断
+void local_irq_disable(void);
+void local_irq_restore(unsigned long flags);
+void local_irq_enable(void);
+
+
+/*
+ 中断处理上半部(快速响应中断)，下半部(由上半部安排的长时间执行任务)
+*/
+
+
+//下半部处理方法:
+
+tasklet:
+DECLARE_TASKLET(name, function, data);
+tasklet_schedule(&tasklet_struct);
+
+
+workqueues:
+INIT_WORK(&struct work_struct, (void (*)(void *)) func, NULL);
+schedule_work(&struct work_struct)
+
+
+/*
+  中断共享。中断处理函数判断是否是自己的中断
+*/
+request_irq(unsigned int irq, irq_handler_t handler, SA_SHIRQ ,const char *name, void *dev/*必须设置，且唯一*/)
+void free_irq(unsigned int, void *);
+
+
+1 中断发生，kernel调用每个注册的当前中断号的中断处理函数
+2 中断处理函数根据传入的dev_id，判断是否是自己的设备中断。非自己的返回IRQ_NONE
+

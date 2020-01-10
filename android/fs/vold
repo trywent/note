@@ -14,9 +14,20 @@ main(int argc, char** argv) {
 - CommandListener *cl = new CommandListener()
 - vm->setBroadcaster((SocketListener *) cl)-->mBroadcaster = sl
 - nm->setBroadcaster((SocketListener *) cl)-->mBroadcaster = sl
+- process_config(vm){
+	- std::string path(android::vold::DefaultFstabPath()) //fstab.sl8541_automobile
+	- fstab = fs_mgr_read_fstab(path.c_str())\
+	- for (int i = 0; i < fstab->num_entries; i++) 
+	  -  if (fs_mgr_is_voldmanaged(&fstab->recs[i])) {
+		- std::string sysPattern(fstab->recs[i].blk_device)
+		- std::string nickname(fstab->recs[i].label)
+		- vm->addDiskSource(std::shared_ptr<VolumeManager::DiskSource>(new VolumeManager::DiskSource(sysPattern, nickname, partname..)))
+		}
+	}
 - vm->start()
 - nm->start()
 - cl->startListener()
+- ccl->startListener()
 }@main.cpp
 
 

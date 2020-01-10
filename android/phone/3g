@@ -1,3 +1,7 @@
+/*
+ 3g dongle
+*/
+
 ===========================================
 模式转换：
 init.rc中加入服务u3gmonitor，用来监听uevent是否3gUSB插入。运行usb_modeswitch.sh转换模式
