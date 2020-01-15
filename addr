@@ -11,7 +11,7 @@ https://github.com/trywent/note
 //192.168.1.95
 bsp_王波
 fytwangbo
-
+smbclient -L //192.168.1.95 -U bsp_王波%fytwangbo
 
 //redmine http://redmine.rockchip.com.cn/
 fyttek

@@ -131,7 +131,7 @@ queue_property_triggers@init_parser.c
 
 load_persistent_properties(加载/data/property/中的属性，都是永久保存的)
 
-加载kernel属性：
+//加载kernel属性：
 main-->process_kernel_cmdline-->export_kernel_boot_props@init.c
 
 //属性设置 设置property：通过socket通信设置。PROP_SERVICE_NAME "property_service"
@@ -306,6 +306,19 @@ HandlePowerctlMessage(const std::string& command) {
 - ActionManager::GetInstance().QueueBuiltinAction(shutdown_handler, "shutdown_done")
 }@reboot.cpp
 
+/*
+ 设置属性
+*/
+//ro.boot
+main-->process_kernel_cmdline-->
+import_kernel_nv(const std::string& key, const std::string& value, bool for_emulator){
+- if (key == "qemu") {
+	- strlcpy(qemu, value.c_str(), sizeof(qemu))
+  }else if(android::base::StartsWith(key, "androidboot.")
+	- property_set("ro.boot." + key.substr(12), value)
+}
+
+export_kernel_boot_props()
 
 /*
  设置console

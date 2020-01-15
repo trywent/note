@@ -87,9 +87,19 @@ endUsbDeviceAdded{
   //设备处理
 - ComponentName usbDeviceConnectionHandler = getUsbDeviceConnectionHandler()
 - if (usbDeviceConnectionHandler == null) {
-	- getCurrentUserSettings().deviceAttached(mNewDevice)-->deviceAttached@UsbProfileGroupSettingsManager.java
+	- getCurrentUserSettings().deviceAttached(mNewDevice){//发送设备添加广播
+		- final Intent intent = createDeviceAttachedIntent(device){
+			- Intent intent = new Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+			- intent.putExtra(UsbManager.EXTRA_DEVICE, device)
+			}
+		- mContext.sendBroadcastAsUser(intent, UserHandle.ALL)
+		- resolveActivity
+		}@UsbProfileGroupSettingsManager.java
 	}
 }@UsbHostManager.java
+
+
+
 
 frameworks/base/services/usb/java/com/android/server/usb/UsbHostManager.java
 frameworks/base/services/core/jni/com_android_server_UsbHostManager.cpp

@@ -1,8 +1,9 @@
 /*
- networkManager
+ networkManager  互联网管理
+
  dumpsys  network_management
- dumpsys  netpolicy:
- dumpsys  netstats:
+ dumpsys  netpolicy
+ dumpsys  netstats
  dumpsys  network_scor
 */
 

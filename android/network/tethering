@@ -1,5 +1,5 @@
 /*
- 通过设备的USB, BT, and WiFi 当做网关共享网络
+ android设备通过USB, BT, and WiFi作为网关共享网络。（向其它设备提供网络）
 
 */
 Tethering(INetworkManagementService nmService,INetworkStatsService statsService, INetworkPolicyManager policyManager){

@@ -1,0 +1,40 @@
+/*
+ 以太网
+
+ dumpsys ethernet
+*/
+//发布服务
+onStart{
+- publishBinderService(Context.ETHERNET_SERVICE, mImpl)
+}@EthernetService.java
+
+//
+mSystemServiceManager.startService(ETHERNET_SERVICE_CLASS)@SystemServer.java-->
+EthernetService-->mImpl = new EthernetServiceImpl(context)@EthernetService.java-->
+EthernetServiceImpl(Context context) {
+- mContext = context
+- mEthernetConfigStore = new EthernetConfigStore()
+- mTracker = new EthernetNetworkFactory(mListeners){
+	- 
+	}@EthernetNetworkFactory.java
+}EthernetServiceImpl.java
+
+//开始处理网络事件
+onBootPhase@EthernetService.java-->start{
+- HandlerThread handlerThread = new HandlerThread("EthernetServiceThread");
+- handlerThread.start()
+- mHandler = new Handler(handlerThread.getLooper())
+- mTracker.start(mContext, mHandler){
+	- mFactory = new LocalNetworkFactory(NETWORK_TYPE, context, mHandler.getLooper())
+	- mFactory.register()
+	  //监听网络事件
+	- mInterfaceObserver = new InterfaceObserver()
+	- mNMService.registerObserver(mInterfaceObserver)
+	- mHandler.post(() -> trackFirstAvailableInterface())
+	}@EthernetNetworkFactory.java
+- mStarted.set(true)
+}@thernetServiceImpl.java
+
+frameworks/opt/net/ethernet/java/com/android/server/ethernet/EthernetService.java
+frameworks/opt/net/ethernet/java/com/android/server/ethernet/EthernetServiceImpl.java
+frameworks/opt/net/ethernet/java/com/android/server/ethernet/EthernetNetworkFactory.java

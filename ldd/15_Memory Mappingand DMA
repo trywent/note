@@ -1,55 +1,93 @@
 /*
+ 内存映射，DMA
+*/
+//本章三部分
+- mmap系统调用，允许映射设备内存到用户空间		//用户空间访问设备内存
+- 将用户空间的地址映射到内核中(使用函数get_user_page)	//内核访问用户空间内存
+- 直接内存访问(DMA),使外围设备直接访问系统内存		//外设访问系统内存
+
+//地址类型：
+User virtual addresses	//用户虚拟地址 用户空间程序使用的地址，每个进程有自己的地址空间。
+Physical addresses	//物理地址   在处理器和系统内存间使用。
+Bus addresses		/*外设地址   在外围设备和内存间使用。通常与物理地址一样，但不是绝对。
+			  一些架构能够提供I/O内存管理单元(IOMMU),将总线与内存地址进行映射。
+			  设置IOMMU是进行DMA时必要的操作*/
+Kernel logical addresses//内核逻辑地址  是连续的(物理内存设备)。在大部分结构上逻辑地址和物理地址的区别仅是一个固定的偏移值
+
+Kernel virtual addresses//内核虚拟地址  内核逻辑地址是虚拟地址，虚拟地址可能不连续。包含物理内存地址(不连续)，外设地址
+
+//物理地址和页
+物理内存被分成称做页的连续单元。通常为4096byte。常量PAGE_SIZE@<asm/page.h>)定义了页的大小。
+
+/* High and Low Memory
 
 */
+逻辑地址和内核虚拟地址在有大量内存的32为系统上的区别非常明显。在32位系统上地址范围是4G。
+但内核限制了内核地址空间为1G
+Low memory	//在内核空间中有逻辑地址的内存。
+High memory	//内核中没有逻辑地址的内存。
 
--mmap系统调用，允许映射设备内存到用户空间。
--另一个映射方向，将用户空间的地址映射到内核中(使用函数get_user_page)。
--直接内存访问(DMA),使外围设备直接访问系统内存
+/* memory map
 
-__________________________
-linux中的内存管理
-地址类型：
-
-User virtual addresses
-(用户虚拟地址)用户空间程序使用的地址，每个进程有自己的地址空间。
-
-Physical addresses
-(物理地址)在处理器和系统内存间使用。
-
-Bus addresses
-(总线地址)在外围设备和内存间使用。通常与物理地址一样，但不是绝对。
-一些架构能够提供I/O内存管理单元(IOMMU),将总线与内存地址进行映射。
-设置IOMMU是进行DMA时必要的操作
+*/
+<linux/mm_types.h>
+struct page{		//对应硬件地址
+- unsigned long flags;
+- atomic_t _count;	//当前页的引用计数
+- void *virtual;	//内核虚拟地址。highmem为null
+}
 
 
-Kernel logical addresses
-(内核逻辑地址)内核空间的地址。映射到主内存，经常被当作物理地址。在
-大部分结构上逻辑地址和物理地址的区别仅是一个固定的偏移值。
+struct page *virt_to_page(void *kaddr);	//传入逻辑地址，返回页指针
+struct page *pfn_to_page(int pfn);	//传入页编号，返回页指针
+void *page_address(struct page *page);	//传入页指针，返回虚拟地址
 
-Kernel virtual addresses
-(内核虚拟地址)与逻辑地址类似，将内核空间地址映射到物理地址。内核虚拟
-地址并不与逻辑地址一样，与物理地址一一对应。所有的逻辑地址是虚拟地址
-，但很多内核虚拟地址不是逻辑地址。
+#include <linux/highmem.h>
+void *kmap(struct page *page);		/*返回page对应的虚拟地址。page在low mem中返回逻辑地址，
+					 在high-mem中会创建一个特别映射到内核虚拟地址*/
+void kunmap(struct page *page);		//最后必须释放
 
-------------------
-物理地址和页
-物理内存被分成称做页的连续单元。许多系统内部处理内存都是以页为单位。页
-大小根据架构的不同而不同。通常为4096byte。常量PAGE_SIZE (defined in <asm/page.h>)
-定义了页的大小。
-虚拟地址和物理地址都由页编号和页内偏移量组成。如果是4096大小的页，地址中低12为偏移量，
-其他位表示页编号。
+#include <linux/highmem.h>
+#include <asm/kmap_types.h>
+void *kmap_atomic(struct page *page, enum km_type type);
+void kunmap_atomic(void *addr, enum km_type type);
 
-------------------
-High and Low Memory
-逻辑地址和内核虚拟地址在有大量内存的32为系统上，的区别非常明显。在32位
-系统上地址范围是4G。
+/*
+ 虚拟地址空间
+ 
+ /proc/pid/maps 查看进程内存使用情况
+ /proc/self
+*/
+//进程的内存空间
+- 程序的可执行代码空间(text)
+- 多个数据空间，已初始化数据(执行前已被初始化)，未初始化数据(BSS "block started by symbol"),栈空间
+- One area for each active memory mapping
 
-内核将4G虚拟地址空间分成用户空间(3G)和内核(1G)。内核将物理地址映射到分配到的地址
-空间上。内核对地址的操作必须是已经映射的地址。x86linux系统上最大使用的内核内存
-必须小于1G.
 
-Low memory
-在内核空间中有逻辑地址的内存。
-High memory
-没有逻辑地址的内存。
+//cat /proc/pid/maps
+start-end	//虚拟地址区间
+perm		//读写可执行权限。最后一个p(private),s(share)
+offset		//文件映射地址的偏移值
+major:minor	//设备号。对于文件来说就是文件所在磁盘的块设备号
+inode		//文件inode
+image		//文件名
+
+
+//mmap
+struct vm_area_struct{
+- unsigned long vm_start;
+- unsigned long vm_end;		//区间。和/proc/*/maps中一样
+- struct file *vm_file;		//关联的struct file
+- unsigned long vm_pgoff;	//文件中的偏移值
+- unsigned long vm_flags;	//VM_IO(映射到IO空间).MV_RESERVED
+- struct vm_operations_struct *vm_ops{//这个内存区域操作函数
+	- void (*open)(struct vm_area_struct *vma);	//初始化
+	- void (*close)(struct vm_area_struct *vma);
+	- struct page *(*nopage)(struct vm_area_struct *vma, unsigned long address, int *type);
+	- int (*populate)(struct vm_area_struct *vm, unsigned long address, unsigned
+		long len, pgprot_t prot, unsigned long pgoff, int nonblock);
+	};
+- void *vm_private_date;	//驱动保存的自己使用的数据
+}
+
 
