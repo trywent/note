@@ -13,7 +13,8 @@ WindowAnimator(WindowManagerService service){
 }@WindowAnimator.java
 
 //
-getScreenRotationAnimationLocked-->getDisplayContentsAnimatorLocked(int displayId){
+ScreenRotationAnimation getScreenRotationAnimationLocked-->
+getDisplayContentsAnimatorLocked(int displayId){
 - DisplayContentsAnimator displayAnimator = mDisplayContentsAnimators.get(displayId)
 - displayAnimator == null{
 	- displayAnimator = new DisplayContentsAnimator()

@@ -19,23 +19,65 @@ extern "C" {
 #endif 
 
 /*
+ 对象创建和操作
 
 */
-赋值重载：
-className cl //默认构造
-c1 = c2      //赋值重载
 
-拷贝重载：
-className c1(c2);
-className c1 = c2 //调用复制构造函数,c1,c2可能指向同一个指针
+//创建
+cls obj = new cls //在堆空间创建
+cls obj		  //在栈空间创建	
 
-_________________________
-new operator和operator new：
+//new 和operator new：
+new cls --> operator new()执行方法分配内存
 new operator   //用来调用operator new分配内存，并调用相应的构造方法
-operator new   //仅仅分配内存
+operator new   //是一个方法，可以被重写。分配内存
 placement new  //在已经分配的内存上构造对象，new(p) xxx,在p指向的内存处构造对象xxx(*p赋值为xxx)
 
-_________________________
+//赋值构造：
+className cl; //默认构造
+c1 = c2;      //赋值构造
+
+//拷贝构造：
+className c1(c2);
+className c1 = c2 //调用赋值构造函数,c1,c2可能指向同一个指针
+
+//C++中，当我们设计与编写一个类时，若不显著写明，则类会默认为我们提供如下几个函数：
+（1）构造函数
+（2）析构函数
+（3）拷贝构造函数
+（4）拷贝赋值函数（operator=）
+（5）移动构造函数
+
+以及全局的默认操作符函数
+（1）operator,
+（2）operator &
+（3）operator &&
+（4）operator *
+（5）operator->
+（6）operator->*
+ (7) operator new
+ (8) operator delete
+
+/* 虚函数 Virtual
+   
+*/
+若类中有虚函数，则对象中有一个虚函数表指针。表中包含有定义的虚函数。
+
+调用对象中函数时，若函数是虚函数会调用实际对象实现的虚函数。
+
+//纯虚函数
+virtual void print() const = 0;
+（1）=0说明它是纯虚函数
+（2）const表明不能修改其数据成员
+
+ 
+//virtual xxxx const =0
+const修饰，通俗的理解就是在这个函数内不能修改类的成员变量，除非那个成员变量是   mutable   的   
+=0表示这个成员函数是纯虚函数(理解函数指针为0)
+
+/*
+ 声明的解读，从右到左
+*/
 //  #1      #2                #3      #4      #5
 int const * const Method3(int const * const&) const;
 then read it from right to left.
@@ -54,7 +96,7 @@ then read it from right to left.
 FOO::fun(int arg)            //FOO::fun(FOO* this,int arg)
 FOO::fun(int arg) const      //FOO::fun(const FOO* this,int arg) 
 
-调用区分当类的对象是const使，调用fun是fun(const this,arg)。其他的是fun(this ,arg)
+调用区分当类的对象是const时，调用fun是fun(const this,arg)。其他的是fun(this ,arg)
 //引用和指针:
 1.A pointer can be re-assigned any number of times while a reference can not be re-seated after binding.
 2.Pointers can point nowhere (NULL), whereas reference always refer to an object.
@@ -74,27 +116,7 @@ RAII("Resource Acquisition Is Initialization")。资源初始化后，能够保�
 
 smart pointer: shared_ptr（会对引用进行计数，当没有引用对象时对象被释放）
 
-//C++中，当我们设计与编写一个类时，若不显著写明，则类会默认为我们提供如下几个函数：
-（1）构造函数
-（2）析构函数
-（3）拷贝构造函数
-（4）拷贝赋值函数（operator=）
-（5）移动构造函数
 
-以及全局的默认操作符函数
-（1）operator,
-（2）operator &
-（3）operator &&
-（4）operator *
-（5）operator->
-（6）operator->*
-(7)operator new
-(8)operator delete
---------------------- 
-作者：lixiaogang_theanswer 
-来源：CSDN 
-原文：https://blog.csdn.net/lixiaogang_theanswer/article/details/81090622 
-版权声明：本文为博主原创文章，转载请附上博文链接！
 //
 成员初始化：
 除了显式的初始化还可默认初始化，成员的默认初始化和函数中变量初始化类似。
@@ -125,12 +147,5 @@ template <class 形参名，class 形参名，......> 返回类型 函数名(参
 'abcd' 字符字面量.一个4byte数值,填充了abcd
 
 
-virtual void print() const = 0;
-（1）=0说明它是纯虚函数
-（2）const表明不能修改其数据成员
 
- 
-//virtual xxxx const =0
-const修饰，通俗的理解就是在这个函数内不能修改类的成员变量，除非那个成员变量是   mutable   的   
-=0表示这个成员函数是纯虚函数(理解函数指针为0)
 

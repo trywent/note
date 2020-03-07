@@ -76,7 +76,7 @@ inoremap < <><ESC>i
 
 
 /*****************************
- session
+ session 可以保存当前的vim打开的文件状态，下一次可以恢复
 
  创建session时需要关闭nerdtree
 */

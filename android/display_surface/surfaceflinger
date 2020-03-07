@@ -1,9 +1,9 @@
-//service surfaceflinger /system/bin/surfaceflinger@init.rc
-inti1@SystemServcer.java-->android_server_SystemServer_init1@com_android_server_SystemServer.cpp-->
-system_init-->SurfaceFlinger::instantiate@system_init.c-->instantiate-->publish@BinderServcie.h-->
-sm->addService-->addService@BpServiceManager-->BpServiceManager.addService-->remote()->transact
-@IServiceManager.cpp
+/*
+ surfaceFlinger
 
+*/
+
+//service surfaceflinger /system/bin/surfaceflinger@init.rc
 main{
 - new SurfaceFlinger-->onFirstRef-->(消息队列初始化)mEventQueue.init
 - flinger->init
@@ -11,100 +11,63 @@ main{
 - flinger->run-->waitForEvent@SurfaceFlinger.cpp
 }@main_surfaceflinger.cpp
 
-
-//消息队列
-SurfaceFlinger::onFirstRef-->(MessageQueue)mEventQueue.init{
-- 保存surfaceFlinger，mFlinger
-- new Looper
-- new Handler
-}
-
 //初始化
 SurfaceFlinger::init{
 - eglInitialize(mEGLDisplay= eglGetDisplay(EGL_DEFAULT_DISPLAY))
-- new EventThread(vsyncSrc= DispSyncSource("app"))//应用程序的刷新事件源
-- mSFEventThread = new EventThread(sfVsyncSrc= DispSyncSource("sf"))//surfaceflinger刷新事件源
+  //应用程序的刷新事件源
+- sp<VSyncSource> vsyncSrc= DispSyncSource(&mPrimaryDispSync,vsyncPhaseOffsetNs, true, "app")
+- mEventThread = new EventThread(vsyncSrc, *this, false)
+  //surfaceflinger刷新事件源		
+- sp<VSyncSource> sfVsyncSrc = new DispSyncSource(&mPrimaryDispSync,sfVsyncPhaseOffsetNs, true, "sf")
+- mSFEventThread = new EventThread(sfVsyncSrc, *this, true)
 - mEventQueue.setEventThread(mSFEventThread)
-- mHwc = mRealHwc = new HWComposer //设置hwcomposer
-- mHwc->setEventHandler(this) //设置hw同步事件的回调
-- getDefaultDisplayDeviceLocked()->makeCurrent(mEGLDisplay, mEGLContext)
-- 新建一个进程用来控制hal层打开关闭sync，EventControlThread
-- initializeDisplays--onInitializeDisplays-->onScreenAcquired-->
-	resyncToHardwareVsync-->mEventControlThread->setVsyncEnabled//开始同步信号
-- new StartBootAnimThread().start()
+  //render
+- mRenderEngine = RenderEngine::create(mEGLDisplay,...)
+- mEGLContext = mRenderEngine->getEGLContext()
+  //设置hwcomposer
+- mHwc.reset(new HWComposer(false))
+- mHwc->registerCallback(this, mComposerSequenceId) 						//设置hw同步事件的回调
+  //
+- mEventControlThread = new EventControlThread(this)
+- mEventControlThread->run("EventControl", PRIORITY_URGENT_DISPLAY)
+  //初始化display,获取屏幕信息
+- initializeDisplays{
+	- sp<MessageBase> msg = new MessageScreenInitialized(this)
+	- postMessageAsync(msg)-->(MessageQueue线程处理)SurfaceFlinger::onInitializeDisplays()
+	}
 }@SurfaceFlinger.cpp
 
-
-//hw的同步源
-HWComposer::vsync-->SurfaceFlinger::onVSyncReceived{
-- mPrimaryDispSync.addResyncSample
-- enableHardwareVsync
+//surfaceflinger提供的接口
+ISurfaceComposer{//提供的接口
+- createConnection
+- createDisplayEventConnection
+- createDisplay
+- destroyDisplay
+- setTransactionState
 }
 
-
-===================
-//MessageQueue接受display的同步事件信息，分发同步信息
-
-SurfaceFlinger::onFirstRef-->(MessageQueue)mEventQueue.init{
-- 保存surfaceFlinger，mFlinger
-- new Looper
-- new Handler
-}
-
-SurfaceFlinger::init{
-- setEventThread{
-	- 创建事件监听，mEvents = eventThread->createEventConnection-->new connetion//连接到EventThread
-	- createEventConnection
-	- looper开始监听，mLooper->addFd(cb_eventReceiver)
-	}
+SurfaceFlinger::onTransact{
+- 创建/销毁surface，BnSurfaceComposer::onTransact
+- 1002(SHOW_UPDATES)Surface更新时闪烁界面,mDebugRegion
 - 
 }
 
-SurfaceFlinger::run-->MessageQueue::waitMessage{
-- IPCThreadState::self()->flushCommands //获取client操作？
-- 等待同步消息，mLooper->pollOnce-->cb_eventReceiver-->eventReceiver{//读取EventThread事件
-	- mHandler->dispatchInvalidate
+
+//处理message
+SurfaceFlinger::onMessageReceived(int32_t what) {
+- MessageQueue::INVALIDATE{
+	- updateVrFlinger
+	- handleMessageTransaction
+	- handleMessageInvalidate
+	- signalRefresh
 	}
-}
-
-//请求同步事件
-MessageQueue::invalidate-->mEvents->requestNextVsync
-
-//收到同步事件
-MessageQueue::Handler::handleMessage(INVALIDATE/REFRESH)-->mQueue.mFlinger->onMessageReceived
-SurfaceFlinger::onMessageReceived{
-- INVALIDATE--signalRefresh
-- REFRESH--handleMessageRefresh
-}
+- MessageQueue::REFRESH-->handleMessageRefresh
+}@SurfaceFlinger.cpp
 
 
-frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
-frameworks/native/libs/gui/ISurfaceComposer.cpp
-frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-frameworks/native/services/surfaceflinger/MessageQueue.cpp
-
-===================
-//producer
-createDefaultDisplayDevice-->new DisplayDevice(fbs,producer)-->new Surface(producer)@DisplayDevice.cpp
--->
-
-
-//consumer显示到fb
-createDefaultDisplayDevice-->new FramebufferSurface(consumer)
-
-FramebufferSurface::onFrameAvailable-->HWComposer::fbPost
-
-
-
-
-
-frameworks/native/services/surfaceflinger/DisplayDevice.cpp
-frameworks/native/services/surfaceflinger/MonitoredProducer.cpp
-frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
-============
 //(应用提交绘制数据)layer更新
-repaintEverything-->signalTransaction/signalLayerUpdate@SurfaceFlinger.cpp-->
-invalidate-->mEvents->requestNextVsync-->mHandler->dispatchInvalidate
+repaintEverything-->signalTransaction/signalLayerUpdate-->mEventQueue.invalidate()@SurfaceFlinger.cpp
+-->invalidate-->mEvents->requestNextVsync-->mHandler->dispatchInvalidate
 -->Handler::handleMessage@MessageQueue.cpp-->
 onMessageReceived(INVALIDATE){
 - handleMessageTransaction
@@ -123,8 +86,6 @@ handleTransactionLocked-->onHotplugReceived-->createDefaultDisplayDevice{
 }@SurfaceFlinger.cppp
 
 //
-signalRefresh-->MessageQueue::refresh-->mHandler->dispatchRefresh-->
-sendMessage(REFRESH)@MessageQueue.cpp-->onMessageReceived(REFRESH)-->
 handleMessageRefresh{
 - preComposition
 - rebuildLayerStacks
@@ -184,27 +145,203 @@ postComposition{
 - mAnimFrameTracker.advanceFrame
 }
 
+/*  MessageQueue两个作用：
+    - 接受display的热拔插事件，脉冲事件，发出消息 Message(MessageQueue::INVALIDATE)
+    - ipc调用接口后发送对应处理消息，在surfaceFlinger主线程中处理消息   Message(MessageQueue::REFRESH)
 
+*/
+SurfaceFlinger::onFirstRef-->mEventQueue.init(this)@SurfaceFlinger.cpp-->
+init{
+- mFlinger = flinger
+- mLooper = new Looper(true)
+- mHandler = new Handler(*this)
+}@MessageQueue.cpp
 
-==================
-//surfaceFlinger 提供的接口 ISurfaceComposer.cpp
-ISurfaceComposer{//提供的接口
-- createConnection
-- createDisplayEventConnection
-- createDisplay
-- destroyDisplay
-- setTransactionState
+//设置接收一个线程发出的事件(显示屏的脉冲事件)。并处理
+SurfaceFlinger::init-->mEventQueue.setEventThread(mSFEventThread)@SurfaceFlinger.cpp-->
+setEventThread(const sp<EventThread>& eventThread){
+- mEventThread = eventThread
+- mEvents = eventThread->createEventConnection-->new connetion//连接到EventThread
+- mEvents->stealReceiveChannel(&mEventTube)
+- mLooper->addFd(mEventTube.getFd(), 0, Looper::EVENT_INPUT,MessageQueue::cb_eventReceiver, this)
+}@MessageQueue.cpp
+
+//请求脉冲事件
+MessageQueue::invalidate-->mEvents->requestNextVsync@MessageQueue.cpp-->mEventConnection->requestNextVsync()
+@DisplayEventReceiver.cpp
+
+//接收事件
+MessageQueue::cb_eventReceiver(int fd, int events, void* data)-->MessageQueue::eventReceiver{
+- DisplayEventReceiver::getEvents(&mEventTube, buffer, 8)
+  //收到脉冲事件，后发送消息
+- if (buffer[i].header.type == DisplayEventReceiver::DISPLAY_EVENT_VSYNC)
+	- mHandler->dispatchInvalidate()-->mQueue.mLooper->sendMessage(this, Message(MessageQueue::INVALIDATE))
 }
 
+//MessageQueue::postMessage发出的message
+MessageQueue::postMessage(const sp<MessageBase>& messageHandler, nsecs_t relTime)-->
+mLooper->sendMessageDelayed(relTime, messageHandler, dummyMessage)@MessageQueue.cpp
 
-SurfaceFlinger::onTransact{
-- 创建/销毁surface，BnSurfaceComposer::onTransact
-- 1002(SHOW_UPDATES)Surface更新时闪烁界面,mDebugRegion
+//处理message
+SurfaceFlinger::run-->MessageQueue::waitMessage{
+- IPCThreadState::self()->flushCommands					//传完当前所有的ipc数据
+- mLooper->pollOnce-->MessageQueue::Handler::handleMessage(const Message& message)//读取EventThread事件，并处理
+}@MessageQueue.cpp
+
+MessageQueue::Handler::handleMessage(const Message& message){
+- INVALIDATE:mQueue.mFlinger->onMessageReceived(message.what)
+- REFRESH:mQueue.mFlinger->onMessageReceived(message.what)
+}@MessageQueue.cpp
+
+
+//Looper
+ //监听某个事件
+ Looper::addFd(int fd, int ident, int events, const sp<LooperCallback>& callback, void* data)
+ //发送消息
+ Looper::sendMessage(const sp<MessageHandler>& handler, const Message& message)
+ Looper::sendMessageAtTime(nsecs_t uptime, const sp<MessageHandler>& handler,const Message& message)
+ //获取事件，并交给handler处理
+ pollOnce(int timeoutMillis)
+ Looper::pollOnce(int timeoutMillis, int* outFd, int* outEvents, void** outData)
+
+
+frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
+frameworks/native/libs/gui/ISurfaceComposer.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/MessageQueue.cpp
+system/core/libutils/Looper.cpp
+/* client{ 客户端操作接口
+	- createSurface 创建surface(layer)
+	}
+
+   layer{
+	- 
+	}
+*/
+//client
+sp<ISurfaceComposerClient> SurfaceFlinger::createConnection(){
+- client = new Client(this){
+	- mFlinger(flinger)
+	}
+- initClient(client)-->client->initCheck()
+}SurfaceFlinger.cpp
+
+//创建surface
+Client::createSurface(const String8& name,uint32_t w, uint32_t h, PixelFormat format, uint32_t flags,const sp<IBinder>& parentHandle,
+ uint32_t windowType, uint32_t ownerUid,sp<IBinder>* handle, sp<IGraphicBufferProducer>* gbp){
+- sp<MessageBase> msg = new MessageCreateLayer(mFlinger.get(),name, this, w, h, format...){
+	- flinger(flinger), client(client)
+	}
+- mFlinger->postMessageSync(msg)-->handler-->flinger->createLayer(name, client, w, h, format, flags,...)
+- return static_cast<MessageCreateLayer*>( msg.get() )->getResult()
+}@Client.cpp
+
+SurfaceFlinger::createLayer(const String8& name, const sp<Client>& client,uint32_t w, uint32_t h, PixelFormat format, uint32_t flags,
+        uint32_t windowType, uint32_t ownerUid, sp<IBinder>* handle,sp<IGraphicBufferProducer>* gbp, sp<Layer>* parent){
+- String8 uniqueName = getUniqueLayerName(name)
+  //创建普通layer
+- ISurfaceComposerClient::eFXSurfaceNormal:-->createNormalLayer(client,uniqueName, w, h, flags, format,handle, gbp, &layer)
+	-->createNormalLayer(const sp<Client>& client,const String8& name, uint32_t w, uint32_t h, uint32_t flags, PixelFormat& format,
+        sp<IBinder>* handle, sp<IGraphicBufferProducer>* gbp, sp<Layer>* outLayer){
+	- *outLayer = new Layer(this, client, name, w, h, flags)
+	- (*outLayer)->setBuffers(w, h, format, flags)
+	- *handle = (*outLayer)->getHandle()
+	- *gbp = (*outLayer)->getProducer()
+	}
+  //创建dimlayer
+- ISurfaceComposerClient::eFXSurfaceDim:-->createDimLayer(client,uniqueName, w, h, flags, handle, gbp, &layer){
+	- *outLayer = new LayerDim(this, client, name, w, h, flags)
+	- *handle = (*outLayer)->getHandle()
+	- *gbp = (*outLayer)->getProducer()
+	}
+- layer->setInfo(windowType, ownerUid)	//窗口类型
+- addClientLayer(client, *handle, *gbp, layer, *parent){
+	- mCurrentState.layersSortedByZ.add(layer)
+	- mGraphicBufferProducerList.add(IInterface::asBinder(layer))
+	- client->attachLayer(handle, layer)
+	}
+- mInterceptor.saveSurfaceCreation(layer)
 - 
-}
+}@SurfaceFlinger.cpp
+
+//销毁
+Client::destroySurface@Client.cpp-->onLayerRemoved-->
+removeLayer(const sp<Layer>& layer, true/*topLevelOnly*/){
+- auto& p = layer->getParent() //获取父layer,surfaceView父layer为Activity窗口
+- if(!topLevelOnly) p->removeChild(layer) //有父layer一般不删除
+  else mCurrentState.layersSortedByZ.remove(layer)
+- layer->onRemovedFromCurrentState()
+}@SurfaceFlinger.cpp
 
 
-//=======
+
+frameworks/native/services/surfaceflinger/Client.h
+frameworks/native/services/surfaceflinger/Client.cpp
+frameworks/native/libs/gui/ISurfaceComposerClient.cpp
+/*  layer
+
+*/
+//surfaceFlinger创建对应的layer(包含producer，consumer)，用来获取bufferQueue
+new Layer(this, client, name, w, h)-->onFirstRef{
+- createBufferQueue(&producer, &consumer,true/*to surfaceflinger*/)//
+- mProducer = new MonitoredProducer(producer, mFlinger)
+- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)
+- mSurfaceFlingerConsumer.setFrameAvailableListener(this) //bufferqueu监听器回调
+}@Layer.cpp
+
+
+
+frameworks/native/services/surfaceflinger/Layer.cpp
+/* 更新窗口大小，位置，层次
+   
+   signalTransaction/signalLayerUpdate-->mEventQueue.invalidate()  需要显示屏的脉冲事件
+*/
+SurfaceFlinger::setTransactionState(const Vector<ComposerState>& state,const Vector<DisplayState>& displays, uint32_t flags){
+- if (flags & eAnimation) {
+	- 
+	}
+ //遍历设置display
+- transactionFlags |= setDisplayStateLocked(displays[i]){
+
+	}
+ //遍历设置ComposerState
+- const ComposerState& s(state[i])
+- sp<Client> client( static_cast<Client *>(s.client.get()) )
+- transactionFlags |= setClientStateLocked(client, s.state)
+ //设置
+- if (transactionFlags) {
+	- setTransactionFlags(transactionFlags)-->signalTransaction()-->mEventQueue.invalidate()
+	}
+}@SurfaceFlinger.cpp
+
+/* 更新窗口显示内容
+   
+   signalRefresh-->mEventQueue.refresh()
+*/
+
+//producer
+createDefaultDisplayDevice-->new DisplayDevice(fbs,producer)-->new Surface(producer)@DisplayDevice.cpp
+-->
+
+
+//consumer显示到fb
+createDefaultDisplayDevice-->new FramebufferSurface(consumer)
+
+FramebufferSurface::onFrameAvailable-->HWComposer::fbPost
+
+
+
+
+
+frameworks/native/services/surfaceflinger/DisplayDevice.cpp
+frameworks/native/services/surfaceflinger/MonitoredProducer.cpp
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+
+
+/* 
+
+*/
+
 drawMesh@GLES20RenderEngine.cpp-->
 ProgramCache::getInstance().useProgram-->ProgramCache@ProgramCache.cpp
 

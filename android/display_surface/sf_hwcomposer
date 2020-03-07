@@ -1,3 +1,11 @@
+/*
+ 显示屏操作
+ 
+ android6 使用HWComposer_hw1.cpp
+ android8.1 TARGET_USES_HWC2 := true@BoardCommon.mk 使用HWComposer.cpp
+
+*/
+
 //加载模块
 SurfaceFlinger::init-->HWComposer{
 - 初始化mCBContext
@@ -18,7 +26,7 @@ SurfaceFlinger::init-->HWComposer{
 	- 保存display信息到mDisplayData
 	}
 - 若没有硬件脉冲则需要模拟，new VSyncThread-->onFirstRef-->run-->threadLoop
-}
+}@HWComposer_hw1.cpp
 
 //屏步刷新同步事件，hal回调....mEventHandler为surfaceFlinger
 注册回调mHwc->registerProcs-->(读取到同步信息)hook_vsync{
@@ -27,17 +35,13 @@ SurfaceFlinger::init-->HWComposer{
 	-->onVSyncReceived@SurfaceFlinger.cpp
 }
 
-
-
 //创建layer
 createWorkList{
 - 创建mDisplayData.list中hwc_layer_1_t
 - 记录个数disp.list->numHwLayers = numLayers
 }
 
-
-
-
+frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer_hw1.cpp
 
 
 

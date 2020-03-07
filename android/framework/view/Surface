@@ -57,16 +57,15 @@ frameworks/base/core/jni/android_view_SurfaceSession.cpp
 
  mNativeObject 一个指针指向SurfaceComposerClient
 */
-//创建native surface
+//创建native surfaceControl
 SurfaceControl(SurfaceSession session, String name, int w, int h, int format, int flags,
             SurfaceControl parent, int windowType, int ownerUid){
 - mName = name
-- mNativeObject = nativeCreate(session, name, w, h, format, flags,...)
+- mNativeObject = nativeCreate(session, name, w, h, format, flags,...) //创建surfaceControl
 }@SurfaceControl.java
 
-nativeCreate(JNIEnv* env, jclass clazz, jobject sessionObj,
-        jstring nameStr, jint w, jint h, jint format, jint flags, jlong parentObject,
-        jint windowType, jint ownerUid){
+nativeCreate(JNIEnv* env, jclass clazz, jobject sessionObj,jstring nameStr, 
+	jint w, jint h, jint format, jint flags, jlong parentObject,jint windowType, jint ownerUid){
 - name(env, nameStr)
   //获取surfaceSession创建的SurfaceComposerClient
 - sp<SurfaceComposerClient> client(android_view_SurfaceSession_getClient(env, sessionObj))
@@ -92,9 +91,25 @@ SurfaceControl build() {
 }@SurfaceControl.java
 
 
+//开始设置。所有的设置保存在一个对象中，提交时统一提交
+openTransaction-->nativeOpenTransaction@SurfaceControl.java-->SurfaceComposerClient::openGlobalTransaction
+@android_view_SurfaceControl.cpp
+
+//设置
+setLayer
+setSize
+hide
+show
+
+
+//提交设置
+closeTransaction-->nativeCloseTransaction@SurfaceControl.java-->SurfaceComposerClient::closeGlobalTransaction
+@android_view_SurfaceControl.cpp
+
 frameworks/base/core/java/android/view/SurfaceControl.java
 frameworks/base/core/jni/android_view_SurfaceControl.cpp
 frameworks/native/libs/gui/SurfaceControl.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
 /*
  Surface(java层) 
  mCanvas用于绘制图像
@@ -146,7 +161,13 @@ nativeLockCanvas(JNIEnv* env, jclass clazz,jlong nativeObject, jobject canvasObj
 
 
 3//填充数据
-
+drawSoftware(Surface surface, AttachInfo attachInfo, int xoff, int yoff, boolean scalingRequired, Rect dirty){
+- Canvas canvas = mSurface.lockCanvas(dirty)
+- mView.draw(canvas){//绘制
+	- 
+	}@View.java
+- surface.unlockCanvasAndPost(canvas)
+}@ViewRootImpl.java
 
 
 4//提交绘制。将一个填充了绘制数据的buffer，传送给bufferQueue

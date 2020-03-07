@@ -1,84 +1,85 @@
-//hardware中各个模块都编译成动态库，在使用某个模块时再加载。
+/*
+ Hardware Abstraction Laye(hal)提供硬件操作接口
 
-1，hw_get_module(ID)-->hw_get_module_by_class{
-- 构建库名name = ID.[prop] //ro.product.board,ro.hardware
-- 加载库,load(name){
-	- dlopen(path)//打开库
-	- hmi = dlsym(HAL_MODULE_INFO_SYM_AS_STR)//所有的模块都有一个名为HAL_MODULE_INFO_SYM的结构体
-	- 
-	}
-}@hardware.c
-
-2，(获取hw_module_t后可调用其中的函数methods)methods.open(打开模块，设置设备函数)-->设置hw_device_t
-
-	hmi.open
-
-3，通过hw_device_t操作
-
-int access(const char *pathname, int mode)是否有权限访问一个文件，可以访问返回0
-hardware/libhardware/hardware.c
-
-
-//模块的实现：
-1，实现一个名为HAL_MODULE_INFO_SYM结构体.(加载对应的模块库后，获取这个名的结构体)
-
-____________________________
-不同的设备结构都是以hw_device_t结构开始的，这样加载模块获取hw_device_t 设备后就可以
-获得各个不同设备结构的地址了。
-
-
-hw_module_t:
+ hardware中各个模块都编译成动态库，在使用某个模块时再加载。
+*/
+//hw_module_t 通过methonds获取struct hw_device_t
 typedef struct hw_module_t {
-    /** tag must be initialized to HARDWARE_MODULE_TAG */
-    uint32_t tag;
-    
+    uint32_t tag;    
     uint16_t module_api_version;
-
-    /** Identifier of module */
     const char *id;
-
-    /** Name of this module */
     const char *name;
-
-    /** Author/owner/implementor of the module */
     const char *author;
-
-    /** Modules methods */
     struct hw_module_methods_t* methods;
-
-    /** module's dso */
     void* dso;
-
-    /** padding to 128 bytes, reserved for future use */
     uint32_t reserved[32-7];
-
 } hw_module_t;
 
-
-_______________________________
+//打开。获取struct hw_device_t
 typedef struct hw_module_methods_t {
-    /** Open a specific device */
     int (*open)(const struct hw_module_t* module, const char* id,
             struct hw_device_t** device);
-
 } hw_module_methods_t;
 
-
-_______________________________
-
-一个模块可以用支持多个设备。
+//通过struct hw_device_t 获取 xxx_hw_device
 typedef struct hw_device_t {
-    /** tag must be initialized to HARDWARE_DEVICE_TAG */
     uint32_t tag;  
     uint32_t version;
-
-    /** reference to the module this device belongs to */
     struct hw_module_t* module;
-
-    /** padding reserved for future use */
     uint32_t reserved[12];
-
-    /** Close this device */
     int (*close)(struct hw_device_t* device);
 
 } hw_device_t;
+
+/* 加载库，获取接口的步骤
+
+*/
+//获取HAL_MODULE_INFO_SYM的 struct hw_module_t
+1，hw_get_module(ID)-->hw_get_module_by_class(const char *id, const char *path, const struct hw_module_t **pHmi){
+- name = ID.[prop]	//构建库名ro.product.board,ro.hardware
+- load(name){		//加载库,打开库，找到结构体HAL_MODULE_INFO_SYM
+	- dlopen(path)
+	- struct hw_module_t *hmi = dlsym(HAL_MODULE_INFO_SYM_AS_STR)
+	}
+- *pHmi = hmi
+}@hardware.c
+
+//获取struct hw_device_t
+2，hmi.open-->hw_module_t->methods.open(打开模块，设置设备函数)-->设置hw_device_t
+
+//通过struct hw_device_t获取对应的设备结构体指正。
+3，hw_device_t
+
+hardware/libhardware/hardware.c
+
+/*
+ 具体的xxx硬件模块接口。获取了common指针就获取了硬件模块的指针
+
+ hardwareComposer:
+ hwc.h
+
+ audio:
+ Device.h
+ StreamOut.h
+ StreamIn.h
+
+ android8.0
+ audio:IDevice IStream
+ 
+*/
+struct xxx_module {
+    struct hw_module_t common;
+};
+
+struct xxx_hw_device {//硬件设备的接口
+    struct hw_device_t common;
+    interface1;
+    interface2;
+    ...   
+}
+
+//硬件模块的库实现：
+struct xxx_module HAL_MODULE_INFO_SYM = {
+- struct hw_module_t common
+}
+

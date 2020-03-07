@@ -1,0 +1,27 @@
+/* gralloc
+
+
+  7731/vendor/sprd/external/drivers/gpu/midgard
+*/
+gralloc_device_open{
+- 打开GRALLOC_HARDWARE_GPU0{
+	- 创建，gralloc_context_t
+	- 设置gralloc_context_t，dev->device.common
+	- 设置gralloc_context_t，gralloc_alloc和gralloc_free函数
+	}
+- fb_device_open{  //android打开的设备
+	- 创建fb_context_t，并初始化设置函数setSwapInterval，post
+	- 映射fb文件，mapFrameBuffer-->mapFrameBufferLocked{
+		- 打开fb0,获取显示屏信息保存到module中(module->info,finfo,fps,xdpi,ydpi)
+		- 映射fb0，保存地址到module->framebuffer->base
+		}
+	- 将获取的信息保存到fb_context_t中
+	}@framebuffer.cpp
+}@gralloc.cpp
+
+
+hardware/libhardware/include/hardware/fb.h
+hardware/libhardware/modules/gralloc/gralloc.cpp
+hardware/libhardware/modules/gralloc/framebuffer.cpp
+
+

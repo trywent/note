@@ -24,6 +24,7 @@ ThreadLocal<Choreographer> sThreadInstance = new ThreadLocal<Choreographer>() {
         }
     }
 
+ViewRootImpl@ViewRootImpl.java-->getInstance()-->sThreadInstance.get()@Choreographer.java
 //WindowManager线程
 ThreadLocal<Choreographer> sSfThreadInstance = new ThreadLocal<Choreographer>() {
                 protected Choreographer initialValue() {
@@ -31,6 +32,9 @@ ThreadLocal<Choreographer> sSfThreadInstance = new ThreadLocal<Choreographer>() 
                     return new Choreographer(looper, VSYNC_SOURCE_SURFACE_FLINGER);
                 }
             }
+
+WindowAnimator@WindowAnimator.java-->getSfInstance()-->sSfThreadInstance.get()@Choreographer.java
+
 
 Choreographer(Looper looper, int vsyncSource){
 - mLooper = looper
@@ -114,12 +118,12 @@ postCallbackDelayedInternal(CALLBACK_ANIMATION,callback)-->
 */
 FrameDisplayEventReceiver{
 - onVsync(long timestampNanos, int builtInDisplayId, int frame/*递增的帧号*/){
-- mHavePendingVsync = true //有待处理同步事件
-- mTimestampNanos = timestampNanos //记录收到事件的时间
-- mFrame = frame
-- Message msg = Message.obtain(mHandler, this) //设置message.callback = this
-- msg.setAsynchronous
-- mHandler.sendMessageAtTime(msg)-->this.run-->doFrame
+  - mHavePendingVsync = true //有待处理同步事件
+  - mTimestampNanos = timestampNanos //记录收到事件的时间
+  - mFrame = frame
+  - Message msg = Message.obtain(mHandler, this) //设置message.callback = this
+  - msg.setAsynchronous
+  - mHandler.sendMessageAtTime(msg)-->this.run-->doFrame
  }
 
 -run-->doFrame(mTimestampNanos, mFrame)

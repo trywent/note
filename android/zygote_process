@@ -117,6 +117,9 @@ AndroidRuntime::start(const char* className, const Vector<String8>& options, boo
 	- parseCompilerRuntimeOption("dalvik.vm.image-dex2oat-Xms"...)
 	- parseCompilerRuntimeOption("dalvik.vm.image-dex2oat-Xmx"...)
 	- addOption("--image-classes=/system/etc/preloaded-classes") //预加载的类
+	  //设置语言persist.sys.locale persist.sys.language
+	- const std::string locale = readLocale()
+	- strncat(localeOption, locale.c_str(), PROPERTY_VALUE_MAX),addOption(localeOption)
 	- JNI_CreateJavaVM(pJavaVM, pEnv, &initArgs)
 	}
 - onVmCreated(env)

@@ -1,0 +1,72 @@
+/*
+ 显示屏操作
+
+ android8.1 TARGET_USES_HWC2 := true@BoardCommon.mk 使用HWComposer.cpp
+
+*/
+
+HWComposer{
+- Device
+- Layer
+}
+
+//创建hwcomposer
+SurfaceFlinger::init-->new HWComposer(false)-->
+HWComposer(bool useVrComposer){
+- mLastHwVSync[i] = 0,mVSyncCounts[i] = 0
+- std::unique_ptr<HWC2::Device> mHwcDevice = std::make_unique<HWC2::Device>(useVrComposer)-->Device(bool useVrComposer)@HWC2.cpp
+- mRemainingHwcVirtualDisplays = mHwcDevice->getMaxVirtualDisplayCount()
+}@HWComposer.cpp
+
+//创建mComposer,获取hal服务
+Device::Device(bool useVrComposer){
+- mComposer(std::make_unique<Hwc2::Composer>(useVrComposer))-->Composer(false /*不是vr*/){
+	- mWriter(kWriterInitialSize)
+	- mComposer = IComposer::getService()
+	- mComposer->createClient-->mClient
+	}@ComposerHal.cpp
+- loadCapabilities{
+	- capabilities = mComposer->getCapabilities()
+	- mCapabilities.emplace(static_cast<Capability>(capability))
+	}
+}@HWC2.cpp
+
+
+//注册hal回调
+SurfaceFlinger::init()-->registerCallback(this)@SurfaceFlinger.cpp-->
+HWComposer::registerCallback(HWC2::ComposerCallback* callback,int32_t sequenceId)-->
+mHwcDevice->registerCallback(callback, sequenceId)@HWComposer.cpp
+-->Device::registerCallback(ComposerCallback* callback, int32_t sequenceId){
+- sp<ComposerCallbackBridge> callbackBridge(new ComposerCallbackBridge(callback, sequenceId))
+- mComposer->registerCallback(callbackBridge) //注册到hal
+}@HWC2.cpp
+
+//调用hal回调
+ComposerCallbackBridge::onVsync(Hwc2::Display display, int64_t timestamp)/*hal层回调*/-->
+mCallback->onVsyncReceived(mSequenceId, display, timestamp)@HWC2.cpp-->
+SurfaceFlinger::onVsyncReceived(int32_t sequenceId,hwc2_display_t displayId, int64_t timestamp){
+- mHwc->onVsync(displayId, timestamp, &type)-->HWComposer::onVsync@HWComposer.cpp
+- bool needsHwVsync = mPrimaryDispSync.addResyncSample(timestamp)
+- if (needsHwVsync) {
+	- enableHardwareVsync()
+    } else {
+        - disableHardwareVsync(false)
+    }
+}@SurfaceFlinger.cpp
+
+
+//创建layer
+createWorkList{
+- 创建mDisplayData.list中hwc_layer_1_t
+- 记录个数disp.list->numHwLayers = numLayers
+}
+
+frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
+frameworks/native/services/surfaceflinger/DisplayHardware/HWC2.cpp
+frameworks/native/services/surfaceflinger/DisplayHardware/ComposerHal.cpp
+
+
+
+
+
+

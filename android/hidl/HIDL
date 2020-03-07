@@ -1,4 +1,22 @@
-//=============hwservicemanager
+/******************
+  HAL interface definition language(HIDL)
+ 
+  client(harddware/interface/中Ixxx.hal 定义的接口)	---	hal服务(harddware/libhardware/include/xxx.h中定义的接口)hal
+  
+*/
+Ixxx.hal{
+- 新定义获取hal服务的接口，getService
+- 新定义的硬件设备操作接口，通过服务调用
+}
+
+xxx.h{
+- 原来的硬件设备的操作接口，hal服务端调用这些接口（原来是client直接调用）
+}
+
+/* hwservicemanager
+  
+   hal层的服务都会加入到hwsm
+*/
 start hwservicemanager@init.rc-->/system/bin/hwservicemanager@hwservicemanager.rc
 -->main{
 - new ServiceManager()
@@ -14,7 +32,9 @@ ServiceManager::add{
 
 
 
-//=============hal servcice
+/* hal servcice
+   服务的启动和注册，获取
+*/
 service xxx_service /vendor/bin/hw/android.hardware.xxx@1.0-service@Ixxx.rc-->
 main{//HAL层只需实现该方法.用于启动服务
 - android::ProcessState::initWithDriver("/dev/vndbinder");
@@ -57,6 +77,8 @@ system/hwservicemanager/Vintf.cpp
 system/libvintf/VintfObject.cpp
 system/libhidl/transport/ServiceManagement.cpp
 
-//============client使用HAL接口
+/* client使用HAL接口
+
+*/
 IGnss::getService()
 ICameraProvider::getService()

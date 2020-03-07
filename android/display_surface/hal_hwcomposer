@@ -1,0 +1,162 @@
+/* HAL hwcomposer
+
+*/
+
+//composer模块
+typedef struct hwc_module {
+    struct hw_module_t common;
+} hwc_module_t;
+
+//composer设备
+typedef struct hwc_composer_device_1 {
+    struct hw_device_t common;
+    int (*prepare)(struct hwc_composer_device_1 *dev,size_t numDisplays, hwc_display_contents_1_t** displays);	
+
+    int (*set)(struct hwc_composer_device_1 *dev,size_t numDisplays, hwc_display_contents_1_t** displays);	//eglSwapBuffers
+
+    int (*eventControl)(struct hwc_composer_device_1* dev, int disp,int event, int enabled);	//关闭或打开h/w composer事件(HWC_EVENT_VSYNC)
+
+    union {
+        int (*blank)(struct hwc_composer_device_1* dev, int disp, int blank);
+        int (*setPowerMode)(struct hwc_composer_device_1* dev, int disp,int mode);		//替代blank
+    };
+
+    int (*query)(struct hwc_composer_device_1* dev, int what, int* value);
+    void (*registerProcs)(struct hwc_composer_device_1* dev,hwc_procs_t const* procs);		//注册回调
+    void (*dump)(struct hwc_composer_device_1* dev, char *buff, int buff_len);
+
+    int (*getDisplayConfigs)(struct hwc_composer_device_1* dev, int disp,uint32_t* configs, size_t* numConfigs);	//获取显示屏config
+
+    int (*getDisplayAttributes)(struct hwc_composer_device_1* dev, int disp, uint32_t config, const uint32_t* attributes, int32_t* values);
+
+    int (*getActiveConfig)(struct hwc_composer_device_1* dev, int disp);
+
+    int (*setActiveConfig)(struct hwc_composer_device_1* dev, int disp,int index);
+    int (*setCursorPositionAsync)(struct hwc_composer_device_1 *dev, int disp, int x_pos, int y_pos);	//鼠标箭头，在prepare()/set()之间调用
+    void* reserved_proc[1];
+
+} hwc_composer_device_1_t;
+
+
+//hal层显示器状态回调
+typedef struct hwc_procs {
+    void (*invalidate)(const struct hwc_procs* procs);				//触发屏幕刷新
+    void (*vsync)(const struct hwc_procs* procs, int disp, int64_t timestamp);	//vsync event
+    void (*hotplug)(const struct hwc_procs* procs, int disp, int connected);	//显示器连接断开事件
+} hwc_procs_t;
+
+//输出到屏幕的内容
+typedef struct hwc_display_contents_1 {
+    /*  文件描述符，在合成结束时发送信号    */
+    int retireFenceFd;
+
+    union {
+        struct {
+            hwc_display_t dpy;
+            hwc_surface_t sur;
+        };
+        /*虚拟显示*/
+        struct {
+            buffer_handle_t outbuf;
+            int outbufAcquireFenceFd;
+        };
+    };
+    uint32_t flags;
+    size_t numHwLayers;
+    hwc_layer_1_t hwLayers[0];
+
+} hwc_display_contents_1_t;
+
+
+//
+typedef struct hwc_layer_1 {
+    /*
+     * HWC_BACKGROUND 		背景层，只有backgroundColor有效
+     * HWC_FRAMEBUFFER_TARGET 	OpenGL ES合成的内容目标层
+     * HWC_FRAMEBUFFER 		OpenGL ES将该层绘制到framebuffer
+     * HWC_OVERLAY		被hwc合成(不被OpenGl ES合成)
+     * HWC_SIDEBAND		该层的数据来自sideband video stream
+     * HWC_CURSOR_OVERLAY 	该层不被HWC合成
+     */
+    int32_t compositionType;
+
+    uint32_t hints;
+    uint32_t flags;
+
+    union {
+        hwc_color_t backgroundColor;	//HWC_BACKGROUND layer
+	
+	struct {			//正常layer	    
+            union {			//数据源
+                /* HWC_FRAMEBUFFER, HWC_OVERLAY,HWC_FRAMEBUFFER_TARGET要合成的数据buffer,一般从 gralloc中分配 */
+                buffer_handle_t handle;
+                /* HWC_SIDEBAND 类型时sideband数据源 */
+                const native_handle_t* sidebandStream;
+            };            
+            uint32_t transform;		///* transformation to apply to the buffer during composition */            
+            int32_t blending;		///* blending to apply during composition */
+            union {			//源数据的区域
+                hwc_rect_t sourceCropi;
+                hwc_rect_t sourceCrop;
+                hwc_frect_t sourceCropf;
+            };
+            hwc_rect_t displayFrame;		//绘制到屏幕哪个区域
+            hwc_region_t visibleRegionScreen;	//在屏幕上的可见区域
+            int acquireFenceFd;		//用来获取通知buffer中数据可用
+            int releaseFenceFd;		//为sync fence object设置的文件描述符，用于hwc读取buffer后发送信号
+            uint8_t planeAlpha;		//透明度
+            uint8_t _pad[3];
+            hwc_region_t surfaceDamage;	//source buffer内容被修改的大小
+        };
+    };
+
+    uint8_t reserved[96 - 84];
+
+} hwc_layer_1_t;
+
+
+
+/*
+ default 实现
+ */
+hwc_module_t HAL_MODULE_INFO_SYM = {
+    .common = {
+        .tag = HARDWARE_MODULE_TAG,
+        .version_major = 1,
+        .version_minor = 0,
+        .id = HWC_HARDWARE_MODULE_ID,
+        .name = "Sample hwcomposer module",
+        .author = "The Android Open Source Project",
+        .methods = &hwc_module_methods,
+    }
+}
+
+static struct hw_module_methods_t hwc_module_methods = {
+    .open = hwc_device_open
+};
+
+hwc_device_open{
+- struct hwc_context_t *dev = (hwc_context_t*)malloc(sizeof(*dev))
+- dev->device.prepare = hwc_prepare
+- dev->device.set = hwc_set
+}
+
+
+HWComposer::fbPost-->mFbDev->post(/*写入位置fb地址保存在module中*/, /*要写入的数据*/buffer->handle)
+@HWComposer.cpp-->fb_post@framebuffer.cpp
+
+
+
+
+//获取display信息
+queryDisplayProperties{
+- 获取config，默认为1个，mHwc->getDisplayConfigs
+- 获取属性，mHwc->getDisplayAttributes
+- 保存信息到mDisplayData
+}
+
+
+hardware/libhardware/include/hardware/hwcomposer.h
+hardware/libhardware/modules/hwcomposer/hwcomposer.cpp
+
+

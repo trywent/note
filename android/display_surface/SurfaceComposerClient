@@ -1,23 +1,21 @@
 /******************************
  SurfaceComposerClient(对应java SurfaceSession)   创建操作surface的接口
+ 
+ 将所有设置保存到mComposerStates，mDisplayStates@composer，最后一起提交
 
-//本地实现接口，设置layer（surface）的位置大小...
-setPosition
-setSize    
-status_t setLayer
-openGlobalTransaction
-closeGlobalTransaction
 */
+SurfaceSession-->nativeCreate@android_view_SurfaceSession.cpp
 SurfaceComposerClient(创建Composer)-->onFirstRef{
 - sp<ISurfaceComposer> sm(ComposerService::getComposerService())-->
 	ComposerService::getComposerService-->ComposerService::connectLocked{
 	- getService("SurfaceFlinger")
 	}
-- ISurfaceComposerClient mClient = sm->createConnection-->(/*SurfaceFlinger*/)new Client@SurfaceFlinger
+  //SurfaceFlinger端
+- ISurfaceComposerClient mClient = sm->createConnection-->new Client@SurfaceFlinger
 }@SurfaceComposerClient.cpp
 
 
-//创建surfaceControl
+//创建surfaceControl，提供给上层的操作接口
 createSurface(const String8& name,uint32_t w,uint32_t h, PixelFormat format, uint32_t flags,SurfaceControl* parent,int32_t windowType,int32_t ownerUid)
 -->createSurfaceChecked(String8(name.c_str()), w, h, format, &surface,){
 - sp<IBinder> handle
@@ -26,29 +24,66 @@ createSurface(const String8& name,uint32_t w,uint32_t h, PixelFormat format, uin
 - *outSurface = new SurfaceControl(this, handle, gbp, true /* owned */)
 }SurfaceComposerClient.cpp
 
-//开始
+//窗口操作接口
+composer{
+//保存所有的设置，最后提交
+ SortedVector<ComposerState> mComposerStates
+ SortedVector<DisplayState > mDisplayStates
+//本地端接口，设置layer（surface）的位置大小...
+ openGlobalTransaction
+ setPosition
+ setSize    
+ setLayer
+ closeGlobalTransaction
+}@SurfaceComposerClient.cpp
+
+
+//创建ComposerState，并加入容器
+layer_state_t* getLayerStateLocked(const sp<SurfaceComposerClient>& client, const sp<IBinder>& id){
+- ComposerState s
+- s.client = client->mClient, s.state.surface = id
+- if(mComposerStates.indexOf(s)<0){	//不在容器中，则加入
+	- mComposerStates.add(s)
+	}
+- return &(out[index].state) 		//s.state
+}@SurfaceComposerClient.cpp
+
+//创建DisplayState，并加入容器
+DisplayState& getDisplayStateLocked(const sp<IBinder>& token){
+- DisplayState s
+- s.token = token
+- if (mDisplayStates.indexOf(s) < 0) {
+	- mDisplayStates.add(s);
+    }
+- return mDisplayStates
+}@SurfaceComposerClient.cpp
+
+//开始设置。每次开始设置时增加计数
 nativeOpenTransaction-->SurfaceComposerClient::openGlobalTransaction-->
-Composer::openGlobalTransaction-->Composer::getInstance().openGlobalTransactionImpl
--->mTransactionNestCount += 1@SurfaceComposerClient.cpp
+Composer::openGlobalTransaction-->Composer::getInstance().openGlobalTransactionImpl{
+- mTransactionNestCount += 1
+}@SurfaceComposerClient.cpp
 
-
+//设置
 setSize@SurfaceControl.java-->ctrl->setSize@android_view_SurfaceControl.cpp-->
 setSize-->client->setSize@SurfaceControl.cpp-->setSize-->Composer::setSize{
-- 将状态加入mComposerStates，getLayerStateLocked{
-	- 创建ComposerState，并保存
-	- 返回ComposerState
-	}
+- 将状态加入mComposerStates，
 - 将要设置的值保存到，ComposerState
 }@SurfaceComposerClient.cpp
 
-//提交
-closeGlobalTransactionImpl{
-- 保存mComposerStates,mDisplayStates
-- 设置flag，eSynchronous/eAnimation
-- sm->setTransactionState-->setTransactionState@SrufaceFlinger.cpp
+//提交设置mComposerStates,mDisplayStates。每次结束设置时减少计数，当减到为0时开始提交
+closeGlobalTransactionImpl(bool synchronous){
+- sp<ISurfaceComposer> sm(ComposerService::getComposerService())
+- if(--mTransactionNestCount) return //设置计数大于1返回
+- Vector<ComposerState> transaction = mComposerStates
+- Vector<DisplayState> displayTransaction = mDisplayStates
+- if (mForceSynchronous) {
+	- flags |= ISurfaceComposer::eSynchronous
+	}
+- sm->setTransactionState((transaction, displayTransaction, flags))-->setTransactionState@SrufaceFlinger.cpp
 }SurfaceComposerClient.cpp
 
-//surfaceFlinger设置
+//设置到surfaceFlinger
 setTransactionState{
 - 设置display，setDisplayStateLocked
 - 设置layer状态，setClientStateLocked{
@@ -61,9 +96,12 @@ setTransactionState{
 }@Surfaceflinger.cpp
 
 /*
- surfaceControl
+ surfaceControl,提供给上层的操作接口
+	SurfaceComposerClient	用于操作surface
+	IGraphicBufferProducer  用于填充显示数据的buffer
 
 */
+createSurface-->
 SurfaceControl(const sp<SurfaceComposerClient>& client,const sp<IBinder>& handle,const sp<IGraphicBufferProducer>& gbp,bool owned){
 - mClient(client)
 - mHandle(handle)
@@ -71,22 +109,38 @@ SurfaceControl(const sp<SurfaceComposerClient>& client,const sp<IBinder>& handle
 - mOwned(owned)
 }@SurfaceControl.cpp
 
+//设置
+SurfaceControl::setLayer-->mClient->setLayer
 
-//创建surface
+SurfaceControl::setPosition-->mClient->setPosition
+
+SurfaceControl::setSize-->mClient->setSize
+
+//创建surface。用于填充显示数据
 getSurface-->generateSurfaceLocked{
 - sp<Surface> mSurfaceData = new Surface(mGraphicBufferProducer, false)
+- return mSurfaceData
 }@SurfaceControl.cpp
 
+//销毁,surface,GraphicBufferProducer
+~SurfaceControl-->destroy(){
+- mClient->destroySurface(mHandle)
+- mClient.clear()
+- mHandle.clear()
+- mGraphicBufferProducer.clear()
+- IPCThreadState::self()->flushCommands()
+}@SurfaceControl.cpp
 
-
-
-
+frameworks/base/core/java/android/view/SurfaceSession.java
+frameworks/base/core/java/android/view/SurfaceControl.java
+frameworks/base/core/jni/android_view_SurfaceControl.cpp
+frameworks/base/core/jni/android_view_SurfaceSession.cpp
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
 frameworks/native/libs/gui/SurfaceControl.cpp
-
 
 /*
  surface (native)
- 应用端绘制和提交数据
+ 应用端填充显示数据
 
 */
 Surface(const sp<IGraphicBufferProducer>& bufferProducer, bool controlledByApp){
@@ -146,44 +200,7 @@ surface->unlockAndPost{
 }@Surface.cpp
 
 
-frameworks/base/core/java/android/view/SurfaceSession.java
-frameworks/base/core/java/android/view/SurfaceControl.java
-frameworks/base/core/jni/android_view_SurfaceControl.cpp
-frameworks/base/core/jni/android_view_SurfaceSession.cpp
-frameworks/native/libs/gui/SurfaceComposerClient.cpp
-frameworks/native/libs/gui/SurfaceControl.cpp
-/******************************
-  surfaceFlinger 创建client,layer
 
- */
-
-//创建
-SurfaceFlinger::createConnection() {
-- initClient(new Client(this))
-}
-
-//surfaceFlinger创建对应的layer(包行producer，consumer)，用来获取bufferQueue
-Client::createSurface()-->flinger->createLayer@client.cpp-->createLayer-->
-createNormalLayer(client){
-- 创建outLayer，new Layer(this, client, name, w, h)-->onFirstRef{
-	- createBufferQueue(&producer, &consumer,true/*to surfaceflinger*/)//
-	- mProducer = new MonitoredProducer(producer, mFlinger)
-	- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)
-	- mSurfaceFlingerConsumer.setFrameAvailableListener(this) //bufferqueu监听器回调
-	}@Layer.cpp
-- addClientLayer(client, *handle, *gbp, layer, *parent){
-	- client->attachLayer-->mLayers.add(handle, layer)
-	}
-}@SurfaceFlinger.cpp
-
-//销毁
-Client::destroySurface@Client.cpp-->onLayerRemoved-->
-removeLayer(const sp<Layer>& layer, true/*topLevelOnly*/){
-- auto& p = layer->getParent() //获取父layer,surfaceView父layer为Activity窗口
-- if(!topLevelOnly) p->removeChild(layer) //有父layer一般不删除
-  else mCurrentState.layersSortedByZ.remove(layer)
-- layer->onRemovedFromCurrentState()
-}@SurfaceFlinger.cpp
 
 
 

@@ -13,7 +13,7 @@ ro.fyt.anim_scale_setting=1.0
 persist.sys.timezone=Asia/Shanghai
 
 #默认语言
-persist.sys.locale=zh-CN
+persist.sys.locale=zh-Hans-CN
 
 #默认输入法
 ro.build.fytinputmethod=
@@ -62,6 +62,6 @@ setprop sys.fyt.setparama lsecadbdebug9
 #打开a2dpsrc
 persist.lsec.enable_a2dp=true
 
-#使用内置蓝牙obd
+#使用内置蓝牙obd(使能内置蓝牙接口，原来被外置修改过)
 sys.fyt.systemobd=true
 
