@@ -10,18 +10,15 @@
 
 */
 
-
 DisplayContent,TaskStack,Task,AppWindowToken extends WindowContainer{}
-DisplayContent {//容器结构
-- TaskStack{
-	- Task{
-		-AppWindowToken{
-		}
-	}
-}
-}
+DisplayContent //容器结构
+ - TaskStack
+   - Task
+     - AppWindowToken
 
-0/*======
+
+
+/**********************
  RootWindowContainer
  
  创建DisplayContent并加入RootWindowContainer
@@ -44,13 +41,39 @@ createDisplayContent(){
 }@RootWindowContainer.java
 
 
+//设置窗口布局
+performSurfacePlacement-->performSurfacePlacement(false)-->performSurfacePlacementLoop
+-->mService.mRoot.performSurfacePlacement@WindowSurfacePlacer.java-->
+performSurfacePlacement(boolean recoveringMemory){
+  1.//焦点窗口
+- updateInputWindowsNeeded = mService.updateFocusedWindowLocked
+  2.//布局
+- mService.openSurfaceTransaction()
+- applySurfaceChangesTransaction{
+	- mService.mWatermark.positionSurface//设置水印,安全模式...显示位置
+	- 遍历DisplayContent,dc.applySurfaceChangesTransaction
+	- mService.mDisplayManagerInternal.performTraversalInTransactionFromWindowManager
+	}
+- mService.closeSurfaceTransaction
+  //应用切换
+- WindowSurfacePlacer surfacePlacer = mService.mWindowPlacerLocked
+- surfacePlacer.handleAppTransitionReadyLocked
+  //
+- handleResizingWindows()
+ //销毁不可见窗口
+- 遍历,mService.mDestroySurface
+- WindowState win = mService.mDestroySurface.get(i)
+- win.destroyOrSaveSurfaceUnchecked
+}@RootWindowContainer.java
+
+
 
 frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
-1/*======
+/**********************
   displayContent初始化.加入到RootWindowContainer中
   displayContent包含4种Container
 	mAboveAppWindowsContainers
-	mTaskStackContainers //所有应用窗口容器
+	mTaskStackContainers 		//所有应用窗口容器
 	mBelowAppWindowsContainers
 	mImeWindowsContainers
 */
@@ -72,7 +95,7 @@ DisplayContent(Display display, WindowManagerService service,WindowLayersControl
 
 //初始化屏幕信息
 initializeDisplayBaseInfo() {
-- updateBaseDisplayMetrics(mDisplayInfo.logicalWidth, mDisplayInfo.logicalHeight,mDisplayInfo.logicalDensityDpi);
+- updateBaseDisplayMetrics(mDisplayInfo.logicalWidth, mDisplayInfo.logicalHeight,mDisplayInfo.logicalDensityDpi)
 - mInitialDisplayWidth = mDisplayInfo.logicalWidth;
 - mInitialDisplayHeight = mDisplayInfo.logicalHeight;
 }
@@ -94,7 +117,7 @@ updateDisplayInfo@DisplayContent.java-->updateDisplayInfo(bounds){
 }@TaskStack.java
 
 //遍历窗口,执行回调callback
-forAllWindows@@DisplayContent.java-->....-->
+forAllWindows@DisplayContent.java-->....-->
 forAllWindows{
 - child.forAllWindows(callback,traverseTopToBottom){
 	//没有子窗口
@@ -105,6 +128,14 @@ forAllWindows{
 	}@WindowState.java
 }@AppWindowToken.java
 
+performSurfacePlacement-->applySurfaceChangesTransaction-->dc.applySurfaceChangesTransaction@RootWindowContainer.java
+applySurfaceChangesTransaction(boolean recoveringMemory){
+  //循环执行，最多循环6次
+- int repeats++
+- if (repeats < LAYOUT_REPEAT_THRESHOLD/*4*/) {
+	- performLayout(repeats == 1, false)
+	}
+}@DisplayContent.java
 
 ----------- 1
 //更新窗口
@@ -166,7 +197,7 @@ performDisplayOverrideConfigUpdate@ActivityManagerService.java-->setNewDisplayOv
 -->setDisplayOverrideConfigurationIfNeeded@RootWindowContainer.java-->displayContent.onOverrideConfigurationChanged
 
 
-2/*======
+/**********************
   TaskStack
   - 栈大小信息
 */
@@ -218,7 +249,7 @@ adjustConfigurationForBounds(Rect bounds,Configuration config){
 
 
 
-3/*======
+/**********************
   Task
 */
 TaskWindowContainerController(int taskId, TaskWindowContainerListener listener,StackWindowController stackController,  Rect bounds){
@@ -270,7 +301,7 @@ getBounds{
 }@Task.java
 
 
-4/*======
+/**********************
  AppWindowToken extends WindowToken
  
 */
@@ -313,19 +344,10 @@ viewRootImpl.java-->addWindow(Session session,IWindow Client,WindowManager.Layou
 setBounds-->updateAdjustedBounds
 onOverrideConfigurationChanged-->onConfigurationChanged@WindowContainer.java
 
-/* AppWindow动画
 
-
-*/
-
-//设置动画
-setAnimation
-
-stepAnimationLocked(long currentTime) {
-- 
-
-}
 /**********************
+ configuration
+
  WindowContainer
 	- mOverrideConfiguration
 	- mFullConfiguration

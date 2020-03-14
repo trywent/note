@@ -6,13 +6,22 @@ WindowManagerService{
 - mRoot = new RootWindowContainer(this)
 - mPolicy = policy
 - mFxSession = new SurfaceSession()
-
+  //app变化
 - mAppTransition = new AppTransition(context, this)
+- mAppTransition.registerListenerLocked(mActivityManagerAppTransitionNotifier)
+  //栈大小变化
 - AnimationHandler animationHandler = new AnimationHandler()
 - animationHandler.setProvider(new SfVsyncFrameCallbackProvider())
 - mBoundsAnimationController = new BoundsAnimationController(context, mAppTransition,animationHandler)
+  //动画过程比例
+- setAnimatorDurationScale(Settings.Global.ANIMATOR_DURATION_SCALE, mAnimatorDurationScaleSetting)
+  //动画器
 - WindowAnimator mAnimator = new WindowAnimator(this)
-
+- initPolicy
+  //水印
+- openSurfaceTransaction
+- createWatermarkInTransaction
+- closeSurfaceTransaction
 }@WindowManagerService.java
 
 getActivityDisplayOrCreateLocked(int displayId)@ActivityStackSupervisor.java-->
@@ -33,7 +42,7 @@ onDisplayAdded(displayId){
 getWindowSession@WindowManagerGlobal.java-->openSession-->new Session(IInputMethodClient,IInputContext)
 @WindowManagerServivce.java
 
-//window
+//加入window
 addWindow(Session,IWindow client,WindowManager.LayoutParams attrs,Rect outContentInsets,
 	 Rect outStableInsets, Rect outOutsets,InputChannel outInputChannel){
 - WindowToken token = displayContent.getWindowToken(attrs.token) //获取对应ActivityRecord的WindowToken(本质一个AppWindowToken)
@@ -73,6 +82,34 @@ relayoutWindow(Session session, IWindow client, int seq,
 - outStableInsets.set(win.mStableInsets)
 - outOutsets.set(win.mOutsets)
 }
+/*
+  app切换
+*/
+prepareAppTransition(int transit, boolean alwaysKeepCurrent)-->
+prepareAppTransition(int transit, boolean alwaysKeepCurrent, int flags, boolean forceOverride){
+- boolean prepared = mAppTransition.prepareAppTransitionLocked(transit, alwaysKeepCurrent,flags, forceOverride)
+- if(prepared && dc != null && dc.okToAnimate()){
+	- mSkipAppTransitionAnimation = false
+	}
+}@WindowManagerService.java
+
+prepareAppTransitionLocked(int transit, boolean alwaysKeepCurrent, int flags,boolean forceOverride{
+- setAppTransition(transit, flags){
+	- mNextAppTransition = transit
+	- mNextAppTransitionFlags |= flags
+	- setLastAppTransition(TRANSIT_UNSET, null, null){
+		- mLastUsedAppTransition = transit	
+		}
+	- updateBooster()	//应用状态变化，加大线程优先级，加大cpu频率
+	}
+- boolean prepared = prepare(){
+	- setAppTransitionState(APP_STATE_IDLE)
+	- notifyAppTransitionPendingLocked()	//通知listener
+	}
+- return prepared
+}@AppTransition.java
+
+frameworks/base/services/core/java/com/android/server/wm/AppTransition.java
 =====================
 /*
  屏幕显示方位
@@ -166,8 +203,9 @@ updateRotationUnchecked{
 }@DisplayContent.java
 
 
-======================
-//应用窗口大小
+/*
+ 应用窗口大小
+*/
 
 relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,Surface outSurface){
 - WindowState win = windowForClientLocked-->mWindowMap.get(client) //获取对应窗口
@@ -187,31 +225,48 @@ getWindowLayerFromTypeLw@WindowManagerPolicy.java
 
 frameworks/base/core/java/android/view/WindowManagerPolicy.java
 =====================
+/*
+ 更新焦点窗口。TODO 移动到DisplayContent
+*/
+updateFocusedWindowLocked{
+- WindowState newFocus = mRoot.computeFocusedWindow()-->
+	mFindFocusedWindow(WindowState w){ //遍历windowContainer
+	- AppWindowToken focusedApp = mService.mFocusedApp
+	- AppWindowToken wtoken = w.mAppToken
+	}@DisplayContent.java
+ //窗口改变
+- mCurrentFocus = newFocus
+}@WindowManagerService.java
+=====================
 /* 冻结画面
   设置旋转动画到WindowAnimator
 */
+startFreezingScreen(int exitAnim, int enterAnim)-->
 startFreezingDisplayLocked(boolean inTransaction, int exitAnim, int enterAnim,int displayId){
 - mScreenFrozenLock.acquire() //wakeLock
 - mDisplayFrozen = true
 - mFrozenDisplayId = displayContent.getDisplayId()
 - mAppTransition.freeze(){
-
-	}
-- mExitAnimId = exitAnim,mEnterAnimId = enterAnim
-  //先停止WindowAnimator中已有动画
+	- setAppTransition(AppTransition.TRANSIT_UNSET, 0)
+	- clear()
+	- notifyAppTransitionCancelledLocked(mNextAppTransition)
+	}@AppTransition.java
+  //设置旋转动画
+- mExitAnimId = exitAnim,mEnterAnimId = enterAnim  
 - ScreenRotationAnimation screenRotationAnimation = mAnimator.getScreenRotationAnimationLocked(mFrozenDisplayId)
-- screenRotationAnimation.kill()
+- screenRotationAnimation.kill()	////先停止WindowAnimator中已有动画
 - screenRotationAnimation = new ScreenRotationAnimation
 - mAnimator.setScreenRotationAnimationLocked(mFrozenDisplayId,screenRotationAnimation) //设置到WindowAnimator
 }@WindowManangerService.java
 
-
-stopFreezingDisplayLocked{
+stopFreezingScreen()-->
+stopFreezingDisplayLocked(){
 - DisplayContent displayContent = mRoot.getDisplayContent(mFrozenDisplayId)
 - displayId = mFrozenDisplayId
 - mDisplayFrozen = false
-- mAnimator.setScreenRotationAnimationLocked(displayId, null)//设置旋转动画为空
-  //冻结结束,更新画面
+  //清空旋转动画
+- mAnimator.setScreenRotationAnimationLocked(displayId, null)
+  //冻结结束,更新方位
 - boolean configChanged = updateOrientationFromAppTokensLocked
 - mH.obtainMessage(H.SEND_NEW_CONFIGURATION)
 }

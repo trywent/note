@@ -1,4 +1,5 @@
-//窗口动画
+/* 窗口动画
+*/
 WindowAnimator       //在windowManagerService中进行窗口切换的动画
 WindowStateAnimator  //在windowState中的动画效果
 AppWindowAnimator    //应用窗口动画
@@ -31,8 +32,10 @@ createScaleUpAnimationLocked
 createThumbnailAnimationLocked
 
 
-___________________________________
-设置动画：
+
+/*
+ 设置动画：
+*/
 
 应用窗口动画(mWinAnimator):这里的动画基本都为null
 setTokenVisibilityLocked-->win.mWinAnimator.applyAnimationLocked@WindowManagerService.java-->
@@ -79,8 +82,9 @@ win.mWinAnimator.applyAnimationLocked
 
 设置窗口服务中动画器：
 
-______________________________
-执行：
+/*
+ 执行：
+*/
 窗口服务中动画执行：
 performLayoutAndPlaceSurfacesLockedInner-->scheduleAnimationLocked-->mChoreographer.
 postCallback(mAnimationRunnable)-->AnimationRunnable.run-->mAnimator.animate@WindowManagerService.java
@@ -135,8 +139,10 @@ stepAnimation{
 
 frameworks/base/services/java/com/android/server/wm/WindowAnimator.java
 
-====================================
-窗口切换动画：
+/*******************
+  窗口切换动画：
+
+*/
 
 设置要执行的动画类型：
 prepareAppTransition(int transit, boolean alwaysKeepCurrent){
@@ -153,7 +159,6 @@ executeAppTransition{
 - performLayoutAndPlaceSurfacesLocked
 }
 
-====================================
 
 performLayoutAndPlaceSurfacesLockedInner{
 - mAppTransitionReady==true执行转换,handleAppTransitionReadyLocked{

@@ -1,65 +1,6 @@
-/* 
- DispSync提供Vsync帧同步事件，给到EventThread
-
+/*
+  surfaceFlinger中Vsync接口
 */
-//创建DispSync,并初始化
-SurfaceFlinger{
-- mPrimaryDispSync("PrimaryDispSync")
-- mPrimaryDispSync.init(hasSyncFramework, dispSyncPresentTimeOffset) 
-}@SurfaceFlinger.cpp
-
-DispSync("PrimaryDispSync"){
-- mName("PrimaryDispSync")
-- mThread(new DispSyncThread(name))-->DispSyncThread{
-	- mName(name)
-	- mPeriod(0)
-	}
-}@DispSync.cpp
-
-DispSync::init(bool hasSyncFramework, int64_t dispSyncPresentTimeOffset){
-  //开始执行threadLoop
-- mThread->run("DispSync", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE)-->DispSyncThread::threadLoop
-- sched_setscheduler(mThread->getTid(), SCHED_FIFO, &param)
-- reset()
-- beginResync()
-}@DispSync.cpp
-
-//等待事件
-DispSyncThread::threadLoop{
-  //获取最近的要触发的事件
-- nsecs_t targetTime = computeNextEventTimeLocked(now)-->computeListenerNextEventTimeLocked
-  //等待
-- mCond.waitRelative(mMutex, targetTime - now)
-  //判断被触发的监听器，准备回调
-- Vector<CallbackInvocation> callbackInvocations = gatherCallbackInvocationsLocked(now){
-	- for (size_t i = 0; i < mEventListeners.size(); i++) {
-		- nsecs_t t = computeListenerNextEventTimeLocked(mEventListeners[i],onePeriodAgo)
-		- if (t < now) {
-			- CallbackInvocation ci
-                	- ci.mCallback = mEventListeners[i].mCallback
-			- callbackInvocations.push(ci)
-			}
-		}
-	}
-  //触发回调
-- if (callbackInvocations.size() > 0){
-	- fireCallbackInvocations(callbackInvocations)-->callbacks[i].mCallback->onDispSyncEvent(callbacks[i].mEventTime-->
- 		DispSyncSource::onDispSyncEvent@SurfaceFlinger.cpp
-	}
-}@DispSync.pp
-
-//获取listener要触发的时间
-computeListenerNextEventTimeLocked(const EventListener& listener,nsecs_t baseTime) {
-- 
-}@DispSysnc.cpp
-
-
-DispSync::setPeriod(nsecs_t period) {
-- mPeriod = period
-- mThread->updateModel(mPeriod, mPhase, mReferenceTime)
-}@DispSync.cpp
-
-
 //设置display初始模式
 SurfaceFlinger::onInitializeDisplays-->setPowerModeInternal(getDisplayDevice(d.token), HWC_POWER_MODE_NORMAL,false)
 -->setPowerModeInternal(const sp<DisplayDevice>& hw,int mode, bool stateLockHeld){
@@ -90,9 +31,9 @@ SurfaceFlinger::onInitializeDisplays-->setPowerModeInternal(getDisplayDevice(d.t
 }@SurfaceFlinger.cpp
 
 
-//
-SurfaceFlinger::resyncWithRateLimit-->resyncToHardwareVsync(false)-->
-resyncToHardwareVsync(bool makeAvailable){
+//请求vsync
+requestNextVsync-->mFlinger.resyncWithRateLimit()@EventThread.cpp-->- resyncToHardwareVsync(false)-->
+resyncToHardwareVsync(bool makeAvailable){ //两个请求之间的间隔要大于500ms
 - if (makeAvailable) {
         - mHWVsyncAvailable = true
     } else if (!mHWVsyncAvailable) {
@@ -102,14 +43,164 @@ resyncToHardwareVsync(bool makeAvailable){
 - auto& activeConfig = mHwc->getActiveConfig(HWC_DISPLAY_PRIMARY)
 - nsecs_t period = activeConfig->getVsyncPeriod()
 - mPrimaryDispSync.setPeriod(period)
-- mPrimaryDispSync.beginResync()
-- mEventControlThread->setVsyncEnabled(true)
-- mPrimaryHWVsyncEnabled = true
+- if(!mPrimaryHWVsyncEnabled){
+	- mPrimaryDispSync.beginResync()
+	- mEventControlThread->setVsyncEnabled(true)
+	- mPrimaryHWVsyncEnabled = true
+	}
 }@SurfaceFlinger.cpp
+
+/* 
+ DispSync
+
+ DispSync(DispSyncThread) --> DispSyncSource --> EventThread
+ 
+*/
+//创建DispSync,并初始化
+SurfaceFlinger{
+- mPrimaryDispSync("PrimaryDispSync")
+- mPrimaryDispSync.init(hasSyncFramework, dispSyncPresentTimeOffset) 
+}@SurfaceFlinger.cpp
+
+DispSync("PrimaryDispSync"){
+- mName("PrimaryDispSync")
+- mThread(new DispSyncThread(name))-->DispSyncThread{
+	- mName(name)
+	- mPeriod(0)
+	}
+}@DispSync.cpp
+
+DispSync::init(bool hasSyncFramework, int64_t dispSyncPresentTimeOffset){
+  //开始执行threadLoop
+- mThread->run("DispSync", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE)-->DispSyncThread::threadLoop
+- sched_setscheduler(mThread->getTid(), SCHED_FIFO, &param)
+- reset()
+- beginResync()
+}@DispSync.cpp
+
+
+
+//
+DispSync::beginResync() {
+- mModelUpdated = false
+- mNumResyncSamples = 0
+}
+
+//一个循环数组中。mFirstResyncSample永远指向最开始的一个数据（时间递增，非乱序）。
+//mNumResyncSamples事件个数，可被复位为0
+DispSync::addResyncSample(nsecs_t timestamp) {
+- size_t idx = (mFirstResyncSample + mNumResyncSamples) % MAX_RESYNC_SAMPLES
+- mResyncSamples[idx] = timestamp	//记录vsync事件发生的时间戳
+- if (mNumResyncSamples == 0) {		//复位后第一次获取vsync时间值
+	- mPhase = 0
+	- mReferenceTime = timestamp	//记录复位后第一个vsync的时间，作为基准值
+	- mThread->updateModel(mPeriod, mPhase, mReferenceTime)
+	}
+- if (mNumResyncSamples < MAX_RESYNC_SAMPLES) {
+        mNumResyncSamples++
+    } else {
+        mFirstResyncSample = (mFirstResyncSample + 1) % MAX_RESYNC_SAMPLES
+    }
+- updateModelLocked
+}@DispSync.cpp
+
+//设置period
+DispSync::setPeriod(nsecs_t period) {
+- mPeriod = period
+- mPhase = 0
+- mReferenceTime
+- mThread->updateModel(mPeriod, mPhase, mReferenceTime)
+}@DispSync.cpp
+
+DispSync::updateModelLocked() {
+  //有6个vsync就可以计算脉冲的平均时间间隔。去除3个值计算平均值。第一个值，一个最小值，一个最大值
+- mPeriod = durationSum / (mNumResyncSamples - 3)
+  //每个vsync的间隔时间与mperiod平均差值
+- mPhase = nsecs_t(atan2(sampleAvgY, sampleAvgX) / scale)
+  //设置跳过帧数后的周期值
+- mPeriod += mPeriod * mRefreshSkipCount		
+- mThread->updateModel(mPeriod, mPhase, mReferenceTime)	//设置周期，偏移，参考值
+- mModelUpdated = true
+}
+
+/* 
+ DispSyncThread 根据hal上报的Vsync时间，计算vsync周期。定时产生事件并发送给client
+
+*/
+DispSync-->DispSyncThread{
+- mName(name)
+- mPeriod(0)
+}DispSync.cpp
+
+//更新参考时间
+DispSync::updateModel(nsecs_t period, nsecs_t phase, nsecs_t referenceTime) {
+- mPeriod = period
+- mPhase = phase
+- mReferenceTime = referenceTime
+}@DispSync.cpp
+
+//加入listener
+DispSyncSource::setVSyncEnabled(bool enable)-->mDispSync->addEventListener(mName, mPhaseOffset,(this))@SurfaceFlinger.cpp-->
+DispSyncThread::addEventListener(const char* name, nsecs_t phase, const sp<DispSync::Callback>& callback){
+- EventListener listener
+- listener.mPhase = phase
+- listener.mCallback = callback
+- listener.mLastEventTime = systemTime() - mPeriod / 2 + mPhase -mWakeupLatency
+- mEventListeners.push(listener)
+}@DispSync.cpp
+
+//等待事件,分发给listener
+DispSyncThread::threadLoop{
+  //获取最近的要触发的事件
+- nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC)
+- nsecs_t targetTime = computeNextEventTimeLocked(now){
+	- for (size_t i = 0; i < mEventListeners.size(); i++) {
+		- nsecs_t t = computeListenerNextEventTimeLocked(mEventListeners[i],now)
+		- if (t < nextEventTime) nextEventTime = t
+		}
+	}
+  //等待
+- mCond.waitRelative(mMutex, targetTime - now)
+  //判断被触发的监听器，准备回调
+- now = systemTime(SYSTEM_TIME_MONOTONIC)
+- Vector<CallbackInvocation> callbackInvocations = gatherCallbackInvocationsLocked(now){
+	  //获取当前时间，
+	- nsecs_t onePeriodAgo = now - mPeriod
+	- for (size_t i = 0; i < mEventListeners.size(); i++) {
+		- nsecs_t t = computeListenerNextEventTimeLocked(mEventListeners[i],onePeriodAgo)
+		- if (t < now) {
+			- CallbackInvocation ci
+                	- ci.mCallback = mEventListeners[i].mCallback
+			- callbackInvocations.push(ci)
+			}
+		}
+	- return callbackInvocations
+	}
+  //触发回调,surfaceFlinger中加入listener
+- if (callbackInvocations.size() > 0){
+	- fireCallbackInvocations(callbackInvocations)-->callbacks[i].mCallback->onDispSyncEvent(callbacks[i].mEventTime-->
+ 		DispSyncSource::onDispSyncEvent@SurfaceFlinger.cpp
+	}
+}@DispSync.pp
+
+//获取listener要触发的时间
+computeListenerNextEventTimeLocked(const EventListener& listener,nsecs_t baseTime/*单调递增的系统启动时间*/) {
+- baseTime -= mReferenceTime				//从第一个采样到baseTime经过的时间
+- nsecs_t phase = mPhase + listener.mPhase		//
+- baseTime -= phase
+- if (baseTime < 0) baseTime = -mPeriod
+  //获得正确basetime(整数脉冲的倍数)后，计算下一个脉冲时间
+- nsecs_t numPeriods = baseTime / mPeriod		//当前时间有多少个脉冲
+- nsecs_t t = (numPeriods + 1) * mPeriod + phase	//下一个脉冲的时间+偏移
+- t += mReferenceTime
+- t -= mWakeupLatency					//等待唤醒所需的时间
+- return t						//计算出下一个脉冲的时间
+}@DispSysnc.cpp
+
 
 
 /* DispSyncSource public VSyncSource, private DispSync::Callback
-   操作vsync开关，接收vsync事件回调
+   操作vsync开关。接收DispSync事件，转发给EventThread
 */
 //创建DispSyncSource
 SurfaceFlinger::init{
@@ -120,7 +211,8 @@ SurfaceFlinger::init{
 - mEventQueue.setEventThread(mSFEventThread)
 }@SurfaceFlinger.cpp
 
-//打开vsync,加入回调到DispSync
+//加入listener接收DispSync的事件
+enableVSyncLocked@EventThread.cpp-->
 DispSyncSource::setVSyncEnabled(bool enable){
 - if(enable){
   	- mDispSync->addEventListener(mName, mPhaseOffset, static_cast<DispSync::Callback*>(this))
@@ -129,15 +221,18 @@ DispSyncSource::setVSyncEnabled(bool enable){
 	}
 }@SurfaceFlinger.cpp
 
+//加入回调，将事件转发给EventThread
+enableVSyncLocked-->mVSyncSource->setCallback(static_cast<VSyncSource::Callback*>(this))@EventThread.cpp-->
+DispSyncSource::setCallback(const sp<VSyncSource::Callback>& callback)-->mCallback = callback@SurfaceFlinger.cpp
 
-//将事件发送到回调
+//接收DispSync的事件，转发给callback(EventThread)
 DispSyncSource::onDispSyncEvent-->callback->onVSyncEvent@SurfaceFlinger
--->EventThread::onVSyncEvent
+-->EventThread::onVSyncEvent@EventThread.cpp
+
 
 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 frameworks/native/services/surfaceflinger/DispSync.cpp
-
-/* EventThread  
+/* EventThread接收事件(从DispSyncSource,surfaceflinger获取)，转发给client
    	获取display的连接移除事件
   	获取DispSync的脉冲事件vsync。分发脉冲事件给上层的client
 */
@@ -155,11 +250,16 @@ EventThread(const sp<VSyncSource>& src, SurfaceFlinger& flinger, bool interceptV
 
 //应用获取vsync, 建立连接(相当一个listener)
 sp<IDisplayEventConnection> SurfaceFlinger::createDisplayEventConnection(ISurfaceComposer::VsyncSource vsyncSource) {
-- mSFEventThread->createEventConnection()
-- mEventThread->createEventConnection()
+- return mSFEventThread->createEventConnection()	//surfaceflinger
+- return mEventThread->createEventConnection()-->return new Connection(const_cast<EventThread*>(this))	//app
 }@SurfaceFlinger.cpp
 
-EventThread::createEventConnection()-->new Connection(const_cast<EventThread*>(this))-->
+EventThread::createEventConnection()-->new Connection(const_cast<EventThread*>(this)){
+- count(-1)		//vsync事件，请求一次发送一次
+- mEventThread(eventThread)
+- mChannel(gui::BitTube::DefaultSize)
+}
+
 EventThread::Connection::onFirstRef()-->mEventThread->registerDisplayEventConnection(this)-->
 EventThread::registerDisplayEventConnection{
 - mDisplayEventConnections.add(connection)
@@ -181,16 +281,17 @@ enableVSyncLocked() {
 	}
 }@EventThread.cpp
 
-//请求帧同步事件
+//请求帧同步事件.请求一次发送一次
 EventThread::Connection::requestNextVsync()-->mEventThread->requestNextVsync(this){
 - mFlinger.resyncWithRateLimit()
 - if (connection->count < 0) {
+	- connection->count = 0	//默认值为-1(不发送vsync)，0(发送一次vsync)
 	- mCondition.broadcast()
 	}
 }@EventThread.cpp
 
 
-//收到DispSync发出的事件。封装发送给client。帧同步信号
+//收到DispSyncSource发出的事件。封装发送给client。帧同步信号
 fireCallbackInvocations-->callbacks[i].mCallback->onDispSyncEvent(callbacks[i].mEventTime)
 @DispSync.cpp-->DispSyncSource::onDispSyncEvent@SurfaceFlinger.cpp-->
 onVSyncEvent(nsecs_t timestamp) {

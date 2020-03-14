@@ -59,7 +59,8 @@ setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
 - mInputChannel = new InputChannel()
   //加入窗口，获取inset,outSet信息
 - mWindowSession.addToDisplay(mWindow, mWindowAttributes,getHostVisibility(), 
-	mAttachInfo.mContentInsets, mAttachInfo.mStableInsets,mAttachInfo.mOutsets, mInputChannel)
+	mAttachInfo.mContentInsets, mAttachInfo.mStableInsets,mAttachInfo.mOutsets, mInputChannel)-->
+	mService.addWindow(this, window, seq, attrs, viewVisibility...)@Session.java-->addWindow@WindowManagerService.java
 }@ViewRootImpl.java
 
 

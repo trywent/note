@@ -1,0 +1,39 @@
+/**********************
+ 布局,surface(窗口)管理
+
+*/
+WindowSurfacePlacer(WindowManagerService service) {
+- mService = service
+- mWallpaperControllerLocked = mService.mRoot.mWallpaperController
+- mPerformSurfacePlacement = () -> {
+         - performSurfacePlacement();
+        }
+}@WindowSurfacePlacer.java
+
+//请求vsync脉冲，执行mPerformSurfacePlacement
+requestTraversal-->mService.mAnimationHandler.post(mPerformSurfacePlacement)@WindowSurfacePlacer.java
+
+performSurfacePlacement-->performSurfacePlacement(boolean force)-->
+performSurfacePlacementLoop{
+- if (!mService.mForceRemoves.isEmpty()){//移除窗口
+	- boolean recoveringMemory = true
+	- WindowState ws = mService.mForceRemoves.remove(0)
+	- ws.removeImmediately()	
+	}
+  //执行surfacePlacement
+- mService.mRoot.performSurfacePlacement(recoveringMemory)
+  //需要布局performSurfacePlacement。WindowAnimator中下一次vsync事件触发执行
+- if (mService.mRoot.isLayoutNeeded()) {
+	- requestTraversal-->mService.mAnimationHandler.post(mPerformSurfacePlacement)-->performSurfacePlacement
+	- mService.mH.sendEmptyMessage(REPORT_WINDOWS_CHANGE)
+	}
+}@WindowSurfacePlacer.java
+
+//
+performSurfacePlacement-->surfacePlacer.handleAppTransitionReadyLocked@RootWindowContainer.java-->
+handleAppTransitionReadyLocked{
+- int appsCount = mService.mOpeningApps.size()
+- int transit = mService.mAppTransition.getAppTransition()
+}@WindowSurfacePlacer.java
+
+frameworks/base/services/core/java/com/android/server/wm/WindowSurfacePlacer.java

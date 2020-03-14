@@ -1,10 +1,17 @@
 /*=========================
  ActivityManagerService----WindowManagerService
+ ActvityManager中创建WindowContainerController用于管理WindowContainer
 
- ActvityManager中创建WindowContainerController用于管理windowMananger中WindowContainer
+ WindowContainer对应的类:
+	ActivityStack   ----  TaskStack
+	TaskRecord      ----  Task
+	ActivityRecord  ----  AppWindowToken
 
- ConfigurationContainer管理Activity中configuration
- windowContainer管理window中configuration
+	W@viewRootImpl  ----  WindowState
+
+ configuration:
+	ConfigurationContainer管理Activity中configuration
+	windowContainer管理window中configuration
 */
 //activity
 ActivityStackSupervisor{

@@ -229,24 +229,24 @@ R.anim.dock_right_enter
 R.anim.dock_right_exit
 
 //AppTransition应用动画
-com.android.internal.R.styleable.WindowAnimation_activityCloseEnterAnimation//6
-com.android.internal.R.styleable.WindowAnimation_activityCloseExitAnimation//7
-com.android.internal.R.styleable.WindowAnimation_taskOpenEnterAnimation//8
-com.android.internal.R.styleable.WindowAnimation_taskOpenExitAnimation//9
-com.android.internal.R.styleable.WindowAnimation_taskCloseEnterAnimation//10
-com.android.internal.R.styleable.WindowAnimation_taskCloseExitAnimation//11
-com.android.internal.R.styleable.WindowAnimation_taskToFrontEnterAnimation // 12
-com.android.internal.R.styleable.WindowAnimation_taskToFrontExitAnimation // 13
-com.android.internal.R.styleable.WindowAnimation_taskToBackEnterAnimation //14
-com.android.internal.R.styleable.WindowAnimation_taskToBackExitAnimation // 15
-com.android.internal.R.styleable.WindowAnimation_wallpaperOpenEnterAnimation//16
-com.android.internal.R.styleable.WindowAnimation_wallpaperOpenExitAnimation//17
-com.android.internal.R.styleable.WindowAnimation_wallpaperCloseEnterAnimation//18
-com.android.internal.R.styleable.WindowAnimation_wallpaperCloseExitAnimation//19
+com.android.internal.R.styleable.WindowAnimation_activityCloseEnterAnimation	//6
+com.android.internal.R.styleable.WindowAnimation_activityCloseExitAnimation	//7
+com.android.internal.R.styleable.WindowAnimation_taskOpenEnterAnimation		//8
+com.android.internal.R.styleable.WindowAnimation_taskOpenExitAnimation		//9
+com.android.internal.R.styleable.WindowAnimation_taskCloseEnterAnimation	//10
+com.android.internal.R.styleable.WindowAnimation_taskCloseExitAnimation		//11
+com.android.internal.R.styleable.WindowAnimation_taskToFrontEnterAnimation	//12
+com.android.internal.R.styleable.WindowAnimation_taskToFrontExitAnimation	//13
+com.android.internal.R.styleable.WindowAnimation_taskToBackEnterAnimation	//14
+com.android.internal.R.styleable.WindowAnimation_taskToBackExitAnimation	//15
+com.android.internal.R.styleable.WindowAnimation_wallpaperOpenEnterAnimation	//16
+com.android.internal.R.styleable.WindowAnimation_wallpaperOpenExitAnimation	//17
+com.android.internal.R.styleable.WindowAnimation_wallpaperCloseEnterAnimation	//18
+com.android.internal.R.styleable.WindowAnimation_wallpaperCloseExitAnimation	//19
 
 target/common/R/com/android/internal/R.java
 ____________________
-属性动画
+//属性动画
 <set
   android:ordering=["together" | "sequentially"]>
 
@@ -275,7 +275,7 @@ ____________________
 </set>
 
 
-View动画：
+//View动画：
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:interpolator="@[package:]anim/interpolator_resource"
     android:shareInterpolator=["true" | "false"] >

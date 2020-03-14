@@ -2,11 +2,10 @@
  WindowStateAnimator
 
 */
-WindowState-->
-WindowStateAnimator(WindowState win){//windowState中创建
+WindowState-->WindowStateAnimator(WindowState win){//windowState中创建
 - WindowManagerService mService = win.mService
 - mWin = win
-}
+}@WindowStateAnimator.java
 
 
 //创建 surfaceControl
@@ -81,12 +80,59 @@ destroySurfaceLocked{
 
  
 
-//动画
+/*
+  动画
+*/
+//设置动画
+setAnimation(Animation anim, long startTime, int stackClip){
+- mAnimation = anim
+- mAnimation.restrictDuration(WindowManagerService.MAX_ANIMATION_DURATION)
+- mAnimation.scaleCurrentDuration(mService.getWindowAnimationScaleLocked())
+  //
+- mTransformation.clear()
+- mTransformation.setAlpha(mLastHidden ? 0 : 1)
+}@WindowStateAnimator.java
+
+applyAnimationLocked(int transit, boolean isEntrance) {}
+
+//动画执行。WindowAnimator收到vsync执行动画
+animate-->dc.updateWindowsForAnimator@WindowAnimator.java-->updateWindowsForAnimator(WindowAnimator animator)
+-->forAllWindows(mUpdateWindowsForAnimator, true)-->winAnimator.stepAnimationLocked@DisplayContent.java-->
 stepAnimationLocked(long currentTime){
+- if (!mLocalAnimating) {				//第一次初始化animation
+	- mAnimation.initialize
+	- mAnimation.setStartTime
+	- mLocalAnimating = true
+	- mAnimating = true
+	}
+- stepAnimation(currentTime){
+	- currentTime = getAnimationFrameTime(mAnimation, currentTime)
+	- mTransformation.clear()
+	- boolean more = mAnimation.getTransformation(currentTime, mTransformation)
+	}
+- if(stepAnimation)return true 				//动画没有执行完成
+ //动画执行完成
+- mAnimating = false
+- mAnimation = null
+- mTransformation.clear()
+- mWin.onExitAnimationDone()
+- mAnimator.setPendingLayoutChanges
+- mWin.mAppToken.updateReportedVisibilityLocked()	//通知appToken-->ActivityRecord
+}@WindowStateAnimator.java
+
+
+//将animation结果作用到窗口
+animate-->dc.prepareWindowSurfaces-->forAllWindows(mPrepareWindowSurfaces, false)@WindowAnimator.java-->
+prepareSurfaceLocked(final boolean recoveringMemory){
 - 
-}
+- computeShownFrameLocked
+- setSurfaceBoundariesLocked(recoveringMemory)
+}@WindowStateAnimator.java
 
-
+computeShownFrameLocked() {
+- 
+- 
+}@WindowStateAnimator.java
 
 frameworks/base/services/core/java/com/android/server/wm/WindowStateAnimator.java
 frameworks/base/services/core/java/com/android/server/wm/WindowSurfaceController.java

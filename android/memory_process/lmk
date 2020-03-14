@@ -1,5 +1,11 @@
 /***********************
  内存管理
+  - 每个进程有个优先级
+  - 可用内存分为多个等级（值越小，优先级越高）
+  - 当可用内存小于某个等级时，触发杀对用优先级的进程
+
+ 查看进程adj:
+  dumpsys activity o
 */
 cat /proc/pid/status
 
@@ -20,7 +26,6 @@ minfree:
 8192,10240,12288,14336,16384,20480
 
 
-
 内存信息(读取/proc/meminfo)：mMemInfoReader@RunningProcessesView.java
 mForegroundProcessText //系统内存 总内存-可用内存-应用内存
 mBackgroundProcessText //可用内存  MemFree + Cached + 后台可杀进程
@@ -29,57 +34,83 @@ mAppsProcessText       //应用内存 所有应用的进程内存
 
 
 Settings/src/com/android/settings/applications/RunningProcessesView.java
-=====================
-
+/************************
+  android设置优先级
+  
+*/
+//更新所有进程adj
 updateOomAdjLocked{
+  //遍历进程
+- int N = mLruProcesses.size()
+- ProcessRecord app = mLruProcesses.get(i)
+- computeOomAdjLocked(app, ProcessList.UNKNOWN_ADJ, TOP_APP, true, now)	//计算进程的adj
+- applyOomAdjLocked(app, true, now, nowElapsed)				//设置adj
 - 
+}@ActivityManagerService.java
+
+//计算adj值
+computeOomAdjLocked(ProcessRecord app, int cachedAdj, ProcessRecord TOP_APP,boolean doingAll, long now){
+
+}@ActivityManagerService.java
+
+
+//设置adj
+applyOomAdjLockedProcessRecord app, boolean doingAll, long now, long nowElapsed) {
 - 
-- 遍历mLruProcesses{
-	- ENABLE_B_SERVICE_PROPAGATION(B级服务){
+- ProcessList.setOomAdj(app.pid, app.uid, app.curAdj)
 
-		}
-	- 应用没有被杀且有进程{
-		- computeOomAdjLocked
-		- app.curAdj,应用优先级没有设置{}
-		- applyOomAdjLocked
-		- 检查进程状态curProcState{}
-		}
-	}
-}
+}@ActivityManagerService.java
 
-applyOomAdjLocked{
-- 
-- ProcessList.setOomAdj(app.curAdj)
 
-}
+//设置某个app的adj
+updateOomAdjLocked(ProcessRecord app, int cachedAdj,ProcessRecord TOP_APP, boolean doingAll, long now){
+- computeOomAdjLocked(app, cachedAdj, TOP_APP, doingAll, now)
+- ProcessInfo info = createProcessInfo(app)
+- processLmkAdjTunningIfneeded(info, mLastMemoryLevel, now)
+- applyOomAdjLocked(app, doingAll, now, SystemClock.elapsedRealtime())
+}@ActivityManagerService.java
 
-/*设置杀进程阈值
-  6中回收内存杀进程的级别 0 1 2 3 9 15
+/*
+  根据分辨率，设置kernel中回收内存杀进程的级别 0 1 2 3 9 15
   mOomAdj = new int[] {
             FOREGROUND_APP_ADJ, VISIBLE_APP_ADJ, PERCEPTIBLE_APP_ADJ,
             BACKUP_APP_ADJ, CACHED_APP_MIN_ADJ, CACHED_APP_MAX_ADJ
     }
- *mOomMinFreeLow  512M内存
- *mOomMinFreeHigh 1G内存	
+  mOomMinFreeLow  512M内存
+  mOomMinFreeHigh 1G内存
 */
-updateOomLevels{
-- 
-- writeLmkd(LMK_TARGET)
-}
-
-//设置进程优先级
-setOomAdj-->writeLmkd{
-- openLmkdSocket{
-	- new LocalSocket(LocalSocket.SOCKET_SEQPACKET)
-	- sLmkdSocket.connect(new LocalSocketAddress("lmkd"))
-	- sLmkdOutputStream//创建stream，写数据
+applyDisplaySize(WindowManagerService wm){
+- Point p = new Point()
+- wm.getBaseDisplaySize(Display.DEFAULT_DISPLAY, p)
+- updateOomLevels(p.x, p.y, true)-->
+	updateOomLevels(int displayWidth, int displayHeight, boolean write){
+	- 
+	- writeLmkd(LMK_TARGET)
 	}
-- sLmkdOutputStream.write//写入对应pid要设置的amt（adjustment value）值
-}
+}@ProcessList.java
 
+//设置进程adj到kernel
+setOomAdj(int pid, int uid, int amt){
+- ByteBuffer buf = ByteBuffer.allocate(4 * 4)
+- buf.putInt(LMK_PROCPRIO)
+- buf.putInt(pid)
+- buf.putInt(uid)
+- buf.putInt(amt)
+- writeLmkd(buf){
+	- openLmkdSocket{
+		- new LocalSocket(LocalSocket.SOCKET_SEQPACKET)
+		- sLmkdSocket.connect(new LocalSocketAddress("lmkd"))
+		- sLmkdOutputStream//创建stream，写数据
+		}
+	- sLmkdOutputStream.write//写入对应pid要设置的amt（adjustment value）值
+	}
+}@ProcessList.java
+
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
 frameworks/base/services/core/java/com/android/server/am/ProcessList.java
-===============
-//daemon
+/************************
+ daemon
+*/
 main{
 - 初始化init{
 	- epoll_create
@@ -113,8 +144,10 @@ system/core/lmkd/lmkd.c
 
 /proc/sys/vm # echo 1 > overcommit_memory
 
-===========================
-//kernel
+
+/************************
+ kernel
+*/
 使用方法：
 echo "0,8" > /sys/module/lowmemorykiller/parameters/adj
 echo "1024,4096" > /sys/module/lowmemorykiller/parameters/minfree

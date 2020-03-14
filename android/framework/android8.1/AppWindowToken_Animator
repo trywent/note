@@ -1,0 +1,68 @@
+/*
+ AppToken
+ AppWindowAnimator
+
+*/
+AppWindowToken(WindowManagerService service, IApplicationToken token,...
+            AppWindowContainerController controller, Configuration overrideConfig, Rect bounds){
+- AppWindowToken(WindowManagerService service, IApplicationToken token, DisplayContent dc,  Rect bounds){
+	- appToken = token
+	- mInputApplicationHandle = new InputApplicationHandle(this)
+	- mAppAnimator = new AppWindowAnimator(this, service)
+	- onOverrideConfigurationChanged(overrideConfig)
+	- mBounds.set(bounds)
+	}
+- setController(controller){
+	- controller.setContainer(this)
+	- mController = controller
+	}
+- hidden = true
+}@AppWindowToken.java
+
+AppWindowToken-->AppWindowAnimator(final AppWindowToken atoken, WindowManagerService service) {
+- mAppToken = atoken
+- mService = service
+- mAnimator = mService.mAnimator
+}@AppWindowAnimator.java
+
+
+//设置动画
+applyAnimationLocked(AppWindowToken atoken, WindowManager.LayoutParams lp,
+            int transit, boolean enter...){
+- Animation a = mAppTransition.loadAnimation(lp, transit, enter, displayConfig.uiMode...)
+- atoken.mAppAnimator.setAnimation(a, containingWidth, containingHeight, width...)
+}@WindowManagerService.java
+
+setAnimation(Animation anim, int width, int height...int transit,int transitFlags){
+- animation = anim
+- anim.initialize(width, height, parentWidth, parentHeight)
+- anim.restrictDuration(WindowManagerService.MAX_ANIMATION_DURATION)
+- 
+}@AppWindowAnimator.java
+
+
+//执行动画
+animate-->dc.stepAppWindowsAnimation@WindowAnimator.java-->stepAppWindowsAnimation@WinddowContainer.java-->
+stepAppWindowsAnimation(long currentTime){
+- mAppAnimator.wasAnimating = mAppAnimator.animating
+- mAppAnimator.stepAnimationLocked(currentTime)
+	- mAppAnimator.animating = true
+	- mService.mAnimator.setAnimating(true)
+}@AppWindowToken.java
+ //TaskStack中也有执行。不知道为什么？
+stepAppWindowsAnimation{
+- super.stepAppWindowsAnimation(currentTime)
+- mTmpAppTokens.addAll(mExitingAppTokens)
+- for (int i = 0; i < mTmpAppTokens.size(); i++) {
+	- final AppWindowAnimator appAnimator = mTmpAppTokens.get(i).mAppAnimator
+        - appAnimator.stepAnimationLocked(currentTime))
+	}
+}@TaskStack.java
+
+stepAnimationLocked(long currentTime){
+
+}@AppWindowAnimator.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
+frameworks/base/services/core/java/com/android/server/wm/AppWindowAnimator.java

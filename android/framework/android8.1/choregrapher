@@ -1,6 +1,9 @@
 /**********************
- 应用并不知道绘制画面,更新画面的时间点.需要一个统一的刷新频率.脉冲事件需要主动请求 
- Choreographer:用于接收固定时间间隔事件(屏幕刷新间隔16.66ms),处理动画,输入,绘制
+ 应用并不知道绘制画面,更新画面的时间点.需要一个统一的刷新频率
+ Choreographer:
+	1 将要执行的任务加入到队列mCallbackQueues
+	2 请求vsync事件
+	3 接收vysnc事件(屏幕刷新间隔16.66ms),处理动画,输入,绘制
 
  WindowManagerService,ViewRootImpl,animator都使用Choreographer提供的脉冲
 
@@ -9,14 +12,14 @@
 */
 //获取脉冲事件
 {
-- nativeInit //初始化
+- nativeInit 	//初始化
 - nativeDispose //销毁释放
-- onVsync //收到脉冲事件,处任务后调用scheduleVsync,请求下一次脉冲
+- onVsync 	//收到脉冲事件,处任务后调用scheduleVsync,请求下一次脉冲
 - scheduleVsync //请求脉冲事件
 }DisplayEventReceiver.java
 
 
-//每个thread可以获取一个Choreographer
+//App thread，获取Choreographer
 ThreadLocal<Choreographer> sThreadInstance = new ThreadLocal<Choreographer>() {
         protected Choreographer initialValue() {
 	    Looper looper = Looper.myLooper()
@@ -25,14 +28,13 @@ ThreadLocal<Choreographer> sThreadInstance = new ThreadLocal<Choreographer>() {
     }
 
 ViewRootImpl@ViewRootImpl.java-->getInstance()-->sThreadInstance.get()@Choreographer.java
-//WindowManager线程
+//WindowManager线程,获取Choreographer
 ThreadLocal<Choreographer> sSfThreadInstance = new ThreadLocal<Choreographer>() {
                 protected Choreographer initialValue() {
 		    Looper looper = Looper.myLooper()
                     return new Choreographer(looper, VSYNC_SOURCE_SURFACE_FLINGER);
                 }
             }
-
 WindowAnimator@WindowAnimator.java-->getSfInstance()-->sSfThreadInstance.get()@Choreographer.java
 
 
@@ -42,19 +44,20 @@ Choreographer(Looper looper, int vsyncSource){
   //同步事件接收
 - mDisplayEventReceiver = new FrameDisplayEventReceiver(looper, vsyncSource)
 	-->DisplayEventReceiver(Looper looper, int vsyncSource){
-	- dispatchVsync-->onVsync //收到同步事件,底层回调
+	- dispatchVsync-->onVsync 		//收到同步事件,底层回调
 	}
-- mCallbackQueues[i] = new CallbackQueue() //4种回调
+- mCallbackQueues[i] = new CallbackQueue()	//4种回调
 }@Choreographer.java
 
 1/*
- 请求脉冲
+ 请求Vsync
 
 */
+//主线程上处理事件
 FrameHandler.handleMessage(Message msg){
   //用于非VSYNC时,无脉冲事件直接执行
 - MSG_DO_FRAME:doFrame(System.nanoTime())
-  //请求事件,每个线程必须主动请求?
+  //非主线程发送MSG_DO_SCHEDULE_VSYNC，请求vsync事件
 - MSG_DO_SCHEDULE_VSYNC:doScheduleVsync{
 	- scheduleVsyncLocked
 	}
@@ -63,7 +66,7 @@ FrameHandler.handleMessage(Message msg){
 	}
 }
 
-//请求一个脉冲
+//请求一个vsync
 scheduleFrameLocked(long now){
 - mFrameScheduled = true
 - 使用屏幕刷新频率,USE_VSYNC{//请求一个脉冲事件
@@ -82,14 +85,14 @@ scheduleFrameLocked(long now){
 }
 
 2/*
-  将任务加入队列.收到脉冲时处理
+  将任务加入队列。请求vsync,收到vsync时处理
   CALLBACK_INPUT       //first
   CALLBACK_ANIMATION   //before traversals
   CALLBACK_TRAVERSAL   //layout and draw
   CALLBACK_COMMIT      //post-draw
 */
 
-//加入mCallbackQueues队列
+//将任务加入mCallbackQueues队列.并请求vsync,接收到vsync事件时执行任务
 postCallbackDelayedInternal(int callbackType,Runnable action,long delayMillis){
 - mCallbackQueues[callbackType].addCallbackLocked(dueTime, action, token){ //加入queue
 	- CallbackRecord callback = obtainCallbackLocked(dueTime, action, token){
@@ -113,7 +116,7 @@ postCallbackDelayedInternal(CALLBACK_ANIMATION,callback)-->
 
 
 3/*
- Choreographer处理事件.收到脉冲时,执行队列中任务
+ Choreographer处理事件.收到vsync时,执行队列中任务
 
 */
 FrameDisplayEventReceiver{
@@ -162,7 +165,7 @@ frameworks/base/core/java/android/view/DisplayEventReceiver.java
 frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp
 
 /**********************
- AnimationHandler:animator使用这个类中的方法,获取脉冲回调
+ AnimationHandler中 animator使用choreography。发起脉冲回调
 
 */
 Choreographer.FrameCallback mFrameCallback = new Choreographer.FrameCallback() {
@@ -198,9 +201,14 @@ addOneShotCommitCallback
 
 frameworks/base/core/java/android/animation/AnimationHandler.java
 /**********************
- ViewRootImpl
  view中发起同步的绘制事件
+ ViewRootImpl使用choreography。发起脉冲回调
+ 
 */
+{
+- mChoreographer = Choreographer.getInstance()
+}@ViewRootImpl.java
+
 {
 - postOnAnimation-->mViewRootImpl.mChoreographer.postCallback(Choreographer.CALLBACK_ANIMATION)
 - postOnAnimationDelayed

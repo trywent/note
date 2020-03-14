@@ -145,6 +145,7 @@ postComposition{
 - mAnimFrameTracker.advanceFrame
 }
 
+
 /*  MessageQueue两个作用：
     - 接受display的热拔插事件，脉冲事件，发出消息 Message(MessageQueue::INVALIDATE)
     - ipc调用接口后发送对应处理消息，在surfaceFlinger主线程中处理消息   Message(MessageQueue::REFRESH)

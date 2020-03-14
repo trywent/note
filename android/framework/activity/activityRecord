@@ -20,19 +20,29 @@ ActivityRecord(ActivityManagerService _service, Intent _intent,ActivityInfo aInf
 - IApplicationToken.Stub  appToken = new Token(this);
 - info = aInfo;
 - state = INITIALIZING;
-}
+}@ActivityRecord.java
+
+createWindowContainer(){
+- mWindowContainerController = new AppWindowContainerController(taskController, appToken...)
+}@ActivityRecord.java
+
+//设置可见
+setVisibility(boolean visible){
+- mWindowContainerController.setVisibility(visible, mDeferHidingClient)
+}@ActivityRecord.java
 
 
-windowsVisible{
-- 设置状态为可见，nowVisible = true
-- 若不是在idle状态，则stack.processStoppingActivitiesLocked
-- 若已经是idle状态，{
-	- 清除所有等待的activity，mWaitingVisibleActivities	
-	- 发送stack.mHandler.sendMessage(ActivityStack.IDLE_NOW_MSG)-->activityIdleInternal{
-		- 		
-		}
-	}
-}
+onWindowsVisible{
+- nowVisible = true
+- if (idle || mStackSupervisor.isStoppingNoHistoryActivity()) {	//有其它activity等待当前activity可见
+	- mStackSupervisor.mActivitiesWaitingForVisibleActivity.clear()
+	- mStackSupervisor.scheduleIdleLocked(
+  }else{
+	- mStackSupervisor.processStoppingActivitiesLocked
+  }
+}ActivityRecord.java
+
+
 
 //finishing:
 makeFinishing{
@@ -40,4 +50,8 @@ makeFinishing{
 - 任务中的activity个数减1，task.numActivities--
 - 若已经stoped，清除没有处理的操作
 }
+
+
+
+frameworks/base/services/core/java/com/android/server/am/ActivityRecord.java
 

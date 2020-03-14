@@ -1,5 +1,7 @@
 /**********************
  动画效果
+
+ https://developer.android.google.cn/training/animation
 */
 
 //图像内容动画(animate bitmaps):图像内容变化.圆形按钮变成方形
@@ -22,8 +24,30 @@
 - startActivity()
 }
 
+/**********************
+ 相关类
 
-1/* 
+*/
+//动画的属性开始结束，时长，循环，
+{
+- mEnded
+- mStarted 
+- mDuration
+- mRepeatCount
+}Animation.java
+
+//一个时间点时动画的属性
+{
+- mMatrix
+- mAlpha
+}Transformation.java
+
+
+使用步骤：
+
+
+
+/* 
  属性动画:在一个时间段内,产生对应时间点的属性值.
  动画的步进方式也使用choregrapher(AnimationHandler封装)
 
@@ -42,20 +66,29 @@ Property Animation{
 }
 
 //定义所有与动画有关的时间,时长,当前属性的值,目的属性值...
-ValueAnimator{            
+ValueAnimator extends Animator implements AnimationHandler.AnimationFrameCallback{            
 - int duration		   //时长	
 - int startPropertyValue   //开始值
 - int endPropertyValue 	   //结束值
-- start()                    //调用后动画开始
+- start()                  //调用后动画开始
 - TimeInterpolator	   //插值器,属性值改变的方式(线性改变，加速改变，降速改变)
-- TypeEvaluator              //估值器,包含方法，用来计算属性值
+- TypeEvaluator            //估值器,包含方法，用来计算属性值
 }
 
 //开始
 start(boolean playBackwards){
-- addAnimationCallback-->getAnimationHandler().addAnimationFrameCallback(this)//加入脉冲回调
+- addAnimationCallback-->getAnimationHandler().addAnimationFrameCallback(this)//加入脉冲回调，choreography
 - startAnimation
 }@ValueAnimator.java
+
+//vsync回调
+mFrameCallback.doFrame-->doAnimationFrame-->callback.doAnimationFrame@AnimationHandler.java-->
+doAnimationFrame{
+- 
+- animateBasedOnTime
+- 
+}@ValueAnimator.java
+
 
 //结束animator
 endAnimation{
@@ -66,7 +99,7 @@ endAnimation{
 
 frameworks/base/core/java/android/animation/ValueAnimator.java
 frameworks/base/core/java/android/animation/AnimationHandler.java
-3/*
+/*
   frame-by-frame animation:帧动画
 */
 

@@ -1,0 +1,85 @@
+/*********************
+ service
+	- service不会自动运行在一个单独进程
+	- service不会自动运行在另一个线程
+*/
+//service作用
+- 在后台处理工作(同一进程)。Context.startService()
+- 为其它进程中的应用提供功能(单独进程)。Context.bindService()
+
+//service 生命周期
+onCreate() 服务被创建时系统调用的函数
+onStartCommand() 当组件调用startService时系统调用的函数
+onBind()  组件绑定到service时，系统调用的函数
+onDestroy() 服务被销毁时系统调用的函数
+
+
+
+//startService启动服务
+- Context.startService()
+- onCreate()
+- onStartCommand(Intent, int, int)
+- Context.stopService()
+
+//binder启动服务
+- Context.bindService()
+- onCreate
+- onBind(Intent)
+
+//service的后台递增优先级：
+- service执行onCreate(), onStartCommand(), or onDestroy()时被当做foreground服务，不会被杀
+- service启动后优先级比可见进程低，比不可见进程优先级高
+- 如果client绑定到service，service的优先级比client高
+- 若Service被startForeground(int, android.app.Notification)启动，则Service被用户可见(状态条通知)，不会被杀
+/*************************************
+ service 
+*/
+
+//启动
+bindService(Intent service, ServiceConnection conn)-->
+bindServiceCommon(service,conn,mMainThread.getHandler()){
+- IServiceConnection sd = mPackageInfo.getServiceDispatcher(conn){
+	- ServiceDispatcher map = mServices.get(context)
+	- sd = map.get(c) //先从缓存中查找,
+	- sd = new ServiceDispatcher(c),map.put(c, sd)//没有则创建
+	- return sd.getIServiceConnection() //返回mIServiceConnection. InnerConnection extends IServiceConnection.Stub
+	}
+- ActivityManager.getService().bindService(mMainThread.getApplicationThread(),service,mIServiceConnection)
+}@ContextImpl.java
+
+bindService-->mServices.bindServiceLocked@ActivityManagerService.java-->
+bindServiceLocked(Intent service, IServiceConnection connection){
+- ServiceLookupResult res = retrieveServiceLocked(service,)
+- ServiceRecord s = res.record
+- AppBindRecord b = s.retrieveAppBindingLocked 
+- ConnectionRecord c = new ConnectionRecord(b) //保存connection
+- ArrayList<ConnectionRecord> clist = s.connections.get(binder)
+- clist.add(c)
+- mServiceConnections.get(binder).add(c)
+- getServiceMapLocked(s.userId).ensureNotStartingBackgroundLocked(s)-->ServiceMap.ensureNotStartingBackgroundLocked
+	-->rescheduleDelayedStartsLocked{
+	- 
+				
+	}
+}@ActiveServices.java
+
+获取IServiceConnection流程:
+bindService@ContextImpl.java-->mPackageInfo（返回IServiceConnection）.getServiceDispatcher-->
+new ServiceDispatcher(c, context, handler, flags)--sd.getIServiceConnection-->ServiceDispatcher.
+getIServiceConnection(返回new InnerConnection)@LoadedApk.java-->
+
+
+//startService
+startService(Intent service)-->startServiceCommon(service,mUser)-->ActivityManager.getService().startService
+@ContextImpl.java-->startService-->mServices.startServiceLocked@ActivityManagerService.java-->
+startServiceLocked(Intent service,boolean fgRequired){
+- ServiceLookupResult res = retrieveServiceLocked(service)
+- ServiceRecord r = res.record
+- startServiceInnerLocked
+}@ActiveService.java
+
+
+frameworks/base/core/java/android/app/ContextImpl.java
+frameworks/base/core/java/android/app/LoadedApk.java
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/core/java/com/android/server/am/ActiveServices.java

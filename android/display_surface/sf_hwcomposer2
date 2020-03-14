@@ -61,6 +61,7 @@ createWorkList{
 - 记录个数disp.list->numHwLayers = numLayers
 }
 
+
 frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
 frameworks/native/services/surfaceflinger/DisplayHardware/HWC2.cpp
 frameworks/native/services/surfaceflinger/DisplayHardware/ComposerHal.cpp
