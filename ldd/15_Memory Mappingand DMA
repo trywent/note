@@ -8,44 +8,41 @@
 
 //地址类型：
 User virtual addresses	//用户虚拟地址 用户空间程序使用的地址，每个进程有自己的地址空间。
-Physical addresses	//物理地址   在处理器和系统内存间使用。
-Bus addresses		/*外设地址   在外围设备和内存间使用。通常与物理地址一样，但不是绝对。
-			  一些架构能够提供I/O内存管理单元(IOMMU),将总线与内存地址进行映射。
-			  设置IOMMU是进行DMA时必要的操作*/
+Physical addresses		//物理地址   在处理器和系统内存间使用。
+Bus addresses			/*外设地址   在外围设备和内存间使用。通常与物理地址一样，但不是绝对。
+							一些架构能够提供I/O内存管理单元(IOMMU),将总线与内存地址进行映射。
+							设置IOMMU是进行DMA时必要的操作*/
 Kernel logical addresses//内核逻辑地址  是连续的(物理内存设备)。在大部分结构上逻辑地址和物理地址的区别仅是一个固定的偏移值
 
 Kernel virtual addresses//内核虚拟地址  内核逻辑地址是虚拟地址，虚拟地址可能不连续。包含物理内存地址(不连续)，外设地址
 
 //物理地址和页
 物理内存被分成称做页的连续单元。通常为4096byte。常量PAGE_SIZE@<asm/page.h>)定义了页的大小。
+通常一个地址的高20位为页表地址，低12位为页表中的偏移地址
 
-/* High and Low Memory
+//但内核在32位系统上，将虚拟地址分为两部分，内核地址空间为1G，用户空间地址为3G
+Low memory	//在内核空间中有逻辑地址的内存。1G
+High memory	//内核中没有逻辑地址的内存。3G
 
-*/
-逻辑地址和内核虚拟地址在有大量内存的32为系统上的区别非常明显。在32位系统上地址范围是4G。
-但内核限制了内核地址空间为1G
-Low memory	//在内核空间中有逻辑地址的内存。
-High memory	//内核中没有逻辑地址的内存。
-
-/* memory map
-
+/*************
+   memory map
+   内核使用page管理内存。使用页表获取虚拟地址对应的物理地址
 */
 <linux/mm_types.h>
-struct page{		//对应硬件地址
+struct page{		//对应物理内存页
 - unsigned long flags;
 - atomic_t _count;	//当前页的引用计数
 - void *virtual;	//内核虚拟地址。highmem为null
 }
 
-
 struct page *virt_to_page(void *kaddr);	//传入逻辑地址，返回页指针
-struct page *pfn_to_page(int pfn);	//传入页编号，返回页指针
+struct page *pfn_to_page(int pfn);		//传入页编号，返回页指针
 void *page_address(struct page *page);	//传入页指针，返回虚拟地址
 
 #include <linux/highmem.h>
-void *kmap(struct page *page);		/*返回page对应的虚拟地址。page在low mem中返回逻辑地址，
-					 在high-mem中会创建一个特别映射到内核虚拟地址*/
-void kunmap(struct page *page);		//最后必须释放
+void *kmap(struct page *page);			/*返回page对应的虚拟地址。page在low mem中返回逻辑地址，
+										 在high-mem中会创建一个特别映射到内核虚拟地址*/
+void kunmap(struct page *page);			//最后必须释放
 
 #include <linux/highmem.h>
 #include <asm/kmap_types.h>
@@ -53,7 +50,7 @@ void *kmap_atomic(struct page *page, enum km_type type);
 void kunmap_atomic(void *addr, enum km_type type);
 
 /*
- 虚拟地址空间
+ 虚拟地址空间（virtual memory area VMA）用于管理进程中一段连续的，用于某种目的的内存(映射文件，mmap驱动)
  
  /proc/pid/maps 查看进程内存使用情况
  /proc/self
@@ -73,12 +70,12 @@ inode		//文件inode
 image		//文件名
 
 
-//mmap
+//vm_area_struct结构体。表示一个虚拟内存和物理内存映射的数据信息结构？
 struct vm_area_struct{
 - unsigned long vm_start;
-- unsigned long vm_end;		//区间。和/proc/*/maps中一样
+- unsigned long vm_end;		//虚拟地址。和/proc/*/maps中一样
 - struct file *vm_file;		//关联的struct file
-- unsigned long vm_pgoff;	//文件中的偏移值
+- unsigned long vm_pgoff;	//文件中的页偏移号。物理内存的页号（可以计算出物理地址）
 - unsigned long vm_flags;	//VM_IO(映射到IO空间).MV_RESERVED
 - struct vm_operations_struct *vm_ops{//这个内存区域操作函数
 	- void (*open)(struct vm_area_struct *vma);	//初始化
@@ -90,4 +87,37 @@ struct vm_area_struct{
 - void *vm_private_date;	//驱动保存的自己使用的数据
 }
 
+//进程中管理所有内存信息
+mm_struct{
+- vma
+- page table
+}@linux/sched.h
 
+//驱动中的mmap操作。用户空间地址映射设备内存，使用户空间进程直接操作设备内存(ram，io register)
+mmap (caddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)	//系统调用
+int (*mmap) (struct file *filp, struct vm_area_struct *vma);				//驱动操作函数
+
+/*
+ 驱动实现mmap，只要创建虚拟地址对应的页表。跳过kmalloc直接操作页表？
+ 
+  memory：RAM，IO register
+ */
+//有两种方法创建页表（使虚拟地址映射到物理地址）
+1. 通过remap_pfn_range
+int remap_pfn_range(struct vm_area_struct *vma,unsigned long virt_addr, 	//映射保留的内存(reserved)和IO
+	unsigned long pfn,unsigned long size, pgprot_t prot);
+int io_remap_page_range(struct vm_area_struct *vma,unsigned long virt_addr, //io内存
+	unsigned long phys_addr,unsigned long size, pgprot_t prot);
+ 
+2. 通过vma中的nopage
+struct page *(*nopage)(struct vm_area_struct *vma,unsigned long address, int *type);//用户进程访问VMA中页不存在时被调用
+
+
+//映射I/O 区间
+//映射RMA。
+- remap_pfn_range  不能映射普通内存，只能映射保留的内存
+
+/*
+ 重映射内核虚拟地址
+ 将内核总vmalloc获取的内存，映射到用户空间。但是不能使用这种方法映射ioremap
+*/
