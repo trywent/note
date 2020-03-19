@@ -16,7 +16,34 @@ DisplayContent //容器结构
    - Task
      - AppWindowToken
 
+//加入child
+addChild(child){
+- mChildren.add
+- child.setParent-->onParentSet
+}@WindowContainer.java
 
+//遍历窗口层级,执行回调callback
+forAllWindows(ToBooleanFunction<WindowState> callback, boolean traverseTopToBottom){
+- if (traverseTopToBottom) {
+	- for (int i = mChildren.size() - 1; i >= 0; --i) {
+		- mChildren.get(i).forAllWindows(callback, traverseTopToBottom)		
+		}
+  }else{
+	-for (int i = 0; i < mChildren.size(); i++) {
+		- mChildren.get(i).forAllWindows(callback, traverseTopToBottom)	
+		}
+  }
+}@WindowContainer.java
+
+forAllWindows{
+- child.forAllWindows(callback,traverseTopToBottom){
+	//没有子窗口
+	- applyInOrderWithImeWindows(callback)-->callback.apply(this)
+	//有子窗口
+	- forAllWindowTopToBottom(callback)-->callback.apply//从上至下
+	- forAllWindowBottomToTop //从下至上
+	}@WindowState.java
+}@AppWindowToken.java
 
 /**********************
  RootWindowContainer
@@ -28,10 +55,10 @@ RootWindowContainer(WindowManagerService service) {
 - mService = service;
 - mLayersController = new WindowLayersController(mService);
 - mWallpaperController = new WallpaperController(mService);
-}
+}@RootWindowContainer.java
 
-getDisplayContentOrCreate-->
-createDisplayContent(){
+//创建displayContaint
+getDisplayContentOrCreate-->createDisplayContent(){
 - DisplayContent dc = new DisplayContent(display, mService, mLayersController,mWallpaperController)
   //设置displayInfo..读取保存的屏幕信息。将当前屏幕信息设置到LogicDisplay
 - DisplayInfo displayInfo = dc.getDisplayInfo()
@@ -50,7 +77,7 @@ performSurfacePlacement(boolean recoveringMemory){
   2.//布局
 - mService.openSurfaceTransaction()
 - applySurfaceChangesTransaction{
-	- mService.mWatermark.positionSurface//设置水印,安全模式...显示位置
+	- mService.mWatermark.positionSurface	//设置水印,安全模式...显示位置
 	- 遍历DisplayContent,dc.applySurfaceChangesTransaction
 	- mService.mDisplayManagerInternal.performTraversalInTransactionFromWindowManager
 	}
@@ -76,6 +103,9 @@ frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.jav
 	mTaskStackContainers 		//所有应用窗口容器
 	mBelowAppWindowsContainers
 	mImeWindowsContainers
+
+
+ 这里面计算窗口的大小。每个display包含systemui窗口，app窗口
 */
 
 DisplayContent(Display display, WindowManagerService service,WindowLayersController layersController){
@@ -101,50 +131,26 @@ initializeDisplayBaseInfo() {
 }
 
 updateDisplayAndOrientation(int uiMode){
-
-}
+- 初始化mDisplayInfo
+- mService.mDisplayManagerInternal.setDisplayInfoOverrideFromWindowManager(mDisplayInfo)
+}@DisplayContent.java
 
 //保存windowToken(对应ActivityRecord)
 onDisplayChanged(dc)-->dc.reParentWindowToken@WindowToken.java-->reParentWindowToken-->
 addWindowToken(IBinder binder, WindowToken token)-->mTokenMap.put(binder, token)@DisplayContent.java
 
-/*更新displayInfo*/
-updateDisplayInfo@DisplayContent.java-->updateDisplayInfo(bounds){
-- mChildren.get(taskNdx).updateDisplayInfo{
-
-	}@Task.java
-- setBounds
-}@TaskStack.java
-
-//遍历窗口,执行回调callback
-forAllWindows@DisplayContent.java-->....-->
-forAllWindows{
-- child.forAllWindows(callback,traverseTopToBottom){
-	//没有子窗口
-	- applyInOrderWithImeWindows(callback)-->callback.apply(this)
-	//有子窗口
-	- forAllWindowTopToBottom(callback)-->callback.apply//从上至下
-	- forAllWindowBottomToTop //从下至上
-	}@WindowState.java
-}@AppWindowToken.java
-
-performSurfacePlacement-->applySurfaceChangesTransaction-->dc.applySurfaceChangesTransaction@RootWindowContainer.java
+//将当前display中的窗口执行布局
 applySurfaceChangesTransaction(boolean recoveringMemory){
   //循环执行，最多循环6次
 - int repeats++
-- if (repeats < LAYOUT_REPEAT_THRESHOLD/*4*/) {
-	- performLayout(repeats == 1, false)
-	}
-}@DisplayContent.java
+- if (repeats < LAYOUT_REPEAT_THRESHOLD/*4*/)
 
------------ 1
-//更新窗口
-applySurfaceChangesTransaction(boolean recoveringMemory){
 - mWallpaperController.adjustWallpaperWindows(this)
   //有待处理FINISH_LAYOUT_REDO_CONFIG
 - mService.updateOrientationFromAppTokensLocked
   //有待处理FINISH_LAYOUT_REDO_LAYOUT
 - setLayoutNeeded()-->mLayoutNeeded = true
+  //执行布局
 - performLayout
 - mService.mPolicy.beginPostLayoutPolicyLw
 - forAllWindows(mApplyPostLayoutPolicy, true)
@@ -153,16 +159,16 @@ applySurfaceChangesTransaction(boolean recoveringMemory){
 - forAllWindows(mApplySurfaceChangesTransaction)
 }@DisplayContent.java
 
-/* 更新窗口大小  */
+//执行布局
 performLayout(boolean initial, boolean updateInputWindows){
 - mService.mPolicy.beginLayoutLw(isDefaultDisplay, dw, dh, mRotation)
 - mService.mPolicy.getContentRectLw(mContentRect)
 - forAllWindows(mPerformLayout, true)-->mPerformLayout(windowState w){
 	- w.prelayout()
-	- mService.mPolicy.layoutWindowLw-->win.computeFrameLw@PhoneWindowManager.java// 计算窗口大小
+	- mService.mPolicy.layoutWindowLw-->win.computeFrameLw@PhoneWindowManager.java	//计算窗口大小
 	}
 
-- forAllWindows(mPerformLayoutAttached, true )-->mPerformLayoutAttached(WindowState w){ //layout关联窗口
+- forAllWindows(mPerformLayoutAttached, true )-->mPerformLayoutAttached(WindowState w){	//layout关联窗口
 	- 
 	}
   //更新input
@@ -171,21 +177,21 @@ performLayout(boolean initial, boolean updateInputWindows){
 - mService.mPolicy.finishLayoutLw
 }@DisplayContent.java
 
-//windowState更新窗口大小
-mApplySurfaceChangesTransaction(WindowState){
-- 
+//布局完成,更新窗口大小
+mApplySurfaceChangesTransaction(WindowState w){
+- WindowSurfacePlacer surfacePlacer = mService.mWindowPlacerLocked
 - w.updateResizingWindowIfNeeded()
 }@DisplayContent.java
 
 //设置窗口layer
 assignWindowLayers-->mLayersController.assignWindowLayers(this)@DisplayContent.java-->
 assignWindowLayers{
-- dc.forAllWindows(mAssignWindowLayersConsumer)-->mAssignWindowLayersConsumer{ //设置所有窗口layer
-	- mCurBaseLayer = mCurLayer = w.mBaseLayer //mBaseLayer=policy.getWindowLayerLw
+- dc.forAllWindows(mAssignWindowLayersConsumer)-->mAssignWindowLayersConsumer{	//设置所有窗口layer
+	- mCurBaseLayer = mCurLayer = w.mBaseLayer 				//mBaseLayer=policy.getWindowLayerLw
 	- assignAnimLayer(WindowState w, int layer){
 		- w.mLayer = layer	
 		- w.mWinAnimator.mAnimLayer = w.getAnimLayerAdjustment()
-                	+ w.getSpecialWindowAnimLayerAdjustment //mLayer + specialAdjustment
+                	+ w.getSpecialWindowAnimLayerAdjustment 		//mLayer + specialAdjustment
 		}
 	- 
 	}
@@ -195,6 +201,22 @@ assignWindowLayers{
 //更新配置
 performDisplayOverrideConfigUpdate@ActivityManagerService.java-->setNewDisplayOverrideConfiguration@WindowManagerService.java
 -->setDisplayOverrideConfigurationIfNeeded@RootWindowContainer.java-->displayContent.onOverrideConfigurationChanged
+
+//WindowStateAnimator动画步进，和窗口显示
+updateWindowsForAnimator(WindowAnimator animator)-->forAllWindows(mUpdateWindowsForAnimator, true)-->
+mUpdateWindowsForAnimator(WindowState w){
+- WindowStateAnimator winAnimator = w.mWinAnimator
+- boolean nowAnimating = winAnimator.stepAnimationLocked()
+- w.performShowLocked()
+}@DisplayContent.java
+
+prepareWindowSurfaces-->forAllWindows(mPrepareWindowSurfaces, false)-->
+mPrepareWindowSurfaces(WindowState w){
+- w.mWinAnimator.prepareSurfaceLocked(true)
+}@DisplayContent.java
+
+
+
 
 
 /**********************
@@ -229,6 +251,14 @@ StackWindowController(int stackId, StackWindowListener listener, boolean onTop, 
 		}
 	}
 }@StackWindowController.java
+
+//更新displayInfo
+updateDisplayInfo@DisplayContent.java-->updateDisplayInfo(bounds){
+- mChildren.get(taskNdx).updateDisplayInfo{
+
+	}@Task.java
+- setBounds
+}@TaskStack.java
 
 //调整窗口大小,
 resize(Rect bounds, SparseArray<Configuration> configs)-->mContainer.setBounds@StackWindowController.java-->
@@ -304,6 +334,7 @@ getBounds{
 /**********************
  AppWindowToken extends WindowToken
  
+ appWindowToken中可以包含windowState
 */
 
 AppWindowContainerController(TaskWindowContainerController taskController,IApplicationToken token, 
@@ -336,13 +367,27 @@ viewRootImpl.java-->addWindow(Session session,IWindow Client,WindowManager.Layou
 - WindowState win = new WindowState(this, session, client, token){
 	- mToken = token
 	}
-- win.mToken.addWindow(win) //将WindowState加入AppWindowToken
+- win.mToken.addWindow(win)-->addWindow{ //将WindowState加入AppWindowToken
+	- super.addWindow(w){
+		- addChild(win, mWindowComparator)
+		}@WindowToken.java
+	- boolean gotReplacementWindow |= candidate.setReplacementWindowIfNeeded(w)
+	- mService.scheduleWindowReplacementTimeouts(this)
+	}@AppWindowToken.java
 }@WindowManagerService.java
 
 
 //改变大小
 setBounds-->updateAdjustedBounds
 onOverrideConfigurationChanged-->onConfigurationChanged@WindowContainer.java
+
+/**********************
+  windowState
+ 
+  activity的RootViewImpl对应一个windowState。其它加入到windowmanager的view对应WindowState
+
+*/
+
 
 
 /**********************
@@ -359,10 +404,7 @@ WindowContainer{
 - mOverrideConfiguration          //当前容器的配置,每个容器的大小可能不一样
 - mFullConfiguration
 - mMergedOverrideConfiguration
-- addChild(child){
-	- mChildren.add
-	- child.setParent-->onParentSet
-	}
+- addChild
 - onConfigurationChanged{
 	- mFullConfiguration.setTo
 	- 遍历child,更新child.onConfigurationChanged

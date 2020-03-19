@@ -1,5 +1,5 @@
 /**********************
- 布局,surface(窗口)管理
+ 布局窗口位置，大小
 
 */
 WindowSurfacePlacer(WindowManagerService service) {
@@ -20,7 +20,7 @@ performSurfacePlacementLoop{
 	- WindowState ws = mService.mForceRemoves.remove(0)
 	- ws.removeImmediately()	
 	}
-  //执行surfacePlacement
+  //执行RootWindowContainer的surfacePlacement
 - mService.mRoot.performSurfacePlacement(recoveringMemory)
   //需要布局performSurfacePlacement。WindowAnimator中下一次vsync事件触发执行
 - if (mService.mRoot.isLayoutNeeded()) {
@@ -29,7 +29,7 @@ performSurfacePlacementLoop{
 	}
 }@WindowSurfacePlacer.java
 
-//
+//应用切换
 performSurfacePlacement-->surfacePlacer.handleAppTransitionReadyLocked@RootWindowContainer.java-->
 handleAppTransitionReadyLocked{
 - int appsCount = mService.mOpeningApps.size()

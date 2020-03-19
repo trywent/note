@@ -1,5 +1,7 @@
 /**********************
  WindowAnimator
+ 所有动画从这里执行
+
 */
 
 WindowManagerService-->WindowAnimator mAnimator = new WindowAnimator(this)-->
@@ -12,7 +14,7 @@ WindowAnimator(WindowManagerService service){
         }
 }@WindowAnimator.java
 
-//
+//旋转动画
 ScreenRotationAnimation getScreenRotationAnimationLocked-->
 getDisplayContentsAnimatorLocked(int displayId){
 - DisplayContentsAnimator displayAnimator = mDisplayContentsAnimators.get(displayId)
@@ -28,40 +30,42 @@ setScreenRotationAnimationLocked(ScreenRotationAnimation animation){
 }
 
 //设置动画
+由app的窗口设置动画
 
-
-//执行动画
+//执行动画。vsync驱动
 scheduleAnimationLocked@WindowManagerService.java-->scheduleAnimation-->
 mChoreographer.postFrameCallback(mAnimationFrameCallback)-->mAnimationFrameCallback
 animate(frameTimeNs){
+- scheduleAnimation
 - 
 - mService.openSurfaceTransaction()
   //遍历所有display。执行所有display上的动画
 - int displayId = mDisplayContentsAnimators.keyAt(i)
 - DisplayContent dc = mService.mRoot.getDisplayContentOrCreate(displayId)
-  //执行所有app动画
+  	//执行app动画
 - dc.stepAppWindowsAnimation(mCurrentTime)-->stepAppWindowsAnimation{
 	- WindowContainer wc = mChildren.get(i)	//遍历所有child
 	- wc.stepAppWindowsAnimation		//最后只有appToken中有app动画
 	}@WindowContainer.java
-  //旋转动画
+  	//旋转动画
 - ScreenRotationAnimation screenRotationAnimation = displayAnimator.mScreenRotationAnimation
 - screenRotationAnimation.stepAnimationLocked
-  //遍历所有窗口执行动画
-- dc.updateWindowsForAnimator-->forAllWindows(mUpdateWindowsForAnimator)-->
-	mUpdateWindowsForAnimator(WindowState w){//遍历所有窗口
-	- WindowStateAnimator winAnimator = w.mWinAnimator
-	- winAnimator.stepAnimationLocked 	//动画步进
-	- w.performShowLocked() 		//窗口显示
-	}@DisplayContent.java
+  	//遍历所有窗口，执行WindowStateAnimator动画
+- dc.updateWindowsForAnimator-->forAllWindows(mUpdateWindowsForAnimator)@DisplayContent.java
 - dc.updateWallpaperForAnimator
-  //遍历所有窗口，将动画结果作用到窗口
-- dc.prepareWindowSurfaces-->forAllWindows(mPrepareWindowSurfaces, false)-->
-	w -> w.mWinAnimator.prepareSurfaceLocked(true)@DisplayContents.java-->
-	prepareSurfaceLocked@WindowStateAnimator.java
-//遍历所有dispaly
+  	//遍历所有窗口，将动画结果作用到窗口
+- dc.prepareWindowSurfaces-->forAllWindows(mPrepareWindowSurfaces, false)@DisplayContent.java
+  //遍历所有dispaly。更新旋转，辅助访问，分屏条等窗口
+- DisplayContent dc = mService.mRoot.getDisplayContentOrCreate(displayId)
+- dc.checkAppWindowsReadyToShow()
+- screenRotationAnimation.updateSurfacesInTransaction()
+- orAnimating(dc.getDockedDividerController().animate(mCurrentTime))
+- mService.mDragState.stepAnimationLocked(mCurrentTime)
 - mService.closeSurfaceTransaction()
-
+  //是否执行布局
+- boolean hasPendingLayoutChanges = mService.mRoot.hasPendingLayoutChanges(this)
+- doRequest = mService.mRoot.copyAnimToLayoutParams(
+- mWindowPlacerLocked.requestTraversal()
 }@WindowAnimator.java
 
 

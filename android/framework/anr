@@ -1,13 +1,51 @@
-//No response to an input event (such as key press or screen touch events) within 5 seconds.
-//A BroadcastReceiver hasn't finished executing within 10 seconds.
-
+/* No response to an input event (such as key press or screen touch events) within 5 seconds.
+   A BroadcastReceiver hasn't finished executing within 10 seconds.
+*/
 //android4.4  8
 kill  -s 3 <pid>  
 
 //android6,
-kill -s 6 pid  //dump core logcat -s DEBUG
+kill -s 6 pid  //dump core logcat -s DEBUG'
+
+appNotResponding(ProcessRecord app, ActivityRecord activity,
+            ActivityRecord parent, boolean aboveSystem, final String annotation) {
+- 
+  //保存anr/trace.txt
+- dumpStackTraces(boolean clearTraces, ArrayList<Integer> firstPids...){
+	- String tracesDirProp = SystemProperties.get("dalvik.vm.stack-trace-dir", "")	//目录
+	- if (tracesDirProp.isEmpty()) {
+		- String globalTracesPath = SystemProperties.get("dalvik.vm.stack-trace-file", null)
+		- tracesFile = new File(globalTracesPath)
+		- tracesFile.createNewFile()
+	  }else{
+		- File tracesDir = new File(tracesDirProp)
+		- tracesFile = createAnrDumpFile(tracesDir)
+	  }
+	- dumpStackTraces(tracesFile.getAbsolutePath(), firstPids, nativePids, extraPids)
+	}@ActivityManagerService.java
+  //创建信息
+- StringBuilder info = new StringBuilder()
+- mService.addErrorToDropBox("anr", app, app.processName, ..., tracesFile)
+  //弹框
+- makeAppNotRespondingLocked(app,...)
+- Message msg = Message.obtain()
+- msg.what = ActivityManagerService.SHOW_NOT_RESPONDING_UI_MSG
+- mService.mUiHandler.sendMessage(msg)
+}@AppErrors.java
+
+//进程开始：
+AndroidRuntime::startVm{
+- opt.optionString= "-Xstacktracefile:"+ property_get("dalvik.vm.stack-trace-file");
+
+}
+
+
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/core/java/com/android/server/am/AppErrors.java
+frameworks/base/core/jni/AndroidRuntime.cpp
+
 /*
- 按键5s
+ input事件5s
 */
 //超时时间
 KEY_DISPATCHING_TIMEOUT = ActivityManager.isLowRamDeviceStatic()? 10*1000 : 8*1000;
@@ -22,6 +60,11 @@ handleTargetsNotReadyLocked-->onANRLocked-->doNotifyANRLockedInterruptible
 - 窗口不为空， ActivityManagerNative.getDefault().inputDispatchingTimedOut(mPid)@InputMonitor.java
 	-->appNotResponding@ActivityManagerService.java
 }
+
+inputDispatchingTimedOut{
+- 
+- mHandler.post-->mAppErrors.appNotResponding(proc, activity, parent, aboveSystem, annotation)
+}@ActivityManagerService.java
 
 frameworks/base/services/java/com/android/server/wm/InputMonitor.java
 frameworks/base/services/java/com/android/server/input/InputManagerService.java
@@ -110,30 +153,8 @@ frameworks/base/services/java/com/android/server/am/ActiveServices.java
 static final int CONTENT_PROVIDER_PUBLISH_TIMEOUT = SystemProperties.getBoolean("ro.config.low_ram", false) ? 20*1000 : 10*1000;
 @ActivityManangerService.java
 
-===================
 
 appNotRespondingViaProvider
 inputDispatchingTimedOut
 
--->appNotResponding{
-- 
-- 保存anr/trace.txt,dumpStackTraces{
-	- 
-	}
-- 弹框，sendMessage(SHOW_NOT_RESPONDING_MSG)-->AppNotRespondingDialog
-}@ActivityManagerService.java
 
-
-frameworks/base/services/java/com/android/server/am/ActivityManagerService.java
-
-
-====================
-进程开始：
-AndroidRuntime::startVm{
-- opt.optionString= "-Xstacktracefile:"+ property_get("dalvik.vm.stack-trace-file");
-
-}
-
-
-
-frameworks/base/core/jni/AndroidRuntime.cpp

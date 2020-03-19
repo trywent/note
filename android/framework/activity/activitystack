@@ -100,6 +100,7 @@ resumeTopActivityInnerLocked-->scheduleResumeActivity@ActivitStack.java
   调用schedulePauseActivity,当app执行pause完成后,resumeTop
 
 */
+resumeTopActivityInnerLocked-->
 startPausingLocked(boolean userLeaving, boolean uiSleeping,ActivityRecord resuming, boolean pauseImmediately){
 - ActivityRecord prev = mResumedActivity //当前要执行pause的Activity
 - mPausingActivity = prev

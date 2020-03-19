@@ -67,7 +67,7 @@ setView(View view, WindowManager.LayoutParams attrs, View panelParentView){
 //relayout,设置mSurface.用于绘制数据
 //public final Surface mSurface = new Surface()
 relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,boolean insetsPending){
-- mWindowSession.relayout(mWindow, mSeq, params,mMeasuredWidth,mMeasuredHeight,mSurface)@ViewRootImpl.java
+- mWindowSession.relayout(mWindow, mSeq, params,mMeasuredWidth,mMeasuredHeight,...mWinFrame,..mSurface)@ViewRootImpl.java
   -->mService.relayoutWindow@Session.java-->relayoutWindow@WindowManangerService.java
 }@ViewRootImpl.java
 
@@ -110,7 +110,7 @@ performTraversals{
 	- mLayoutRequested = true //需要布局
 	- desiredWindowWidth,desiredWindowHeight //设置为屏幕大小
   }else{
-	- desiredWindowWidth,desiredWindowHeight //设置为frame大小
+	- desiredWindowWidth = frame.width(),desiredWindowHeight = frame.height() //设置为frame大小。mWinFrame从relayoutWindow的outFrame获取
 	- if(desiredWindowWidth != mWidth) {mLayoutRequested = true} //大小变化
   }
   //大小发生变化,测量大小

@@ -1,6 +1,7 @@
 /******************************
  WindowStateAnimator
-
+  
+   
 */
 WindowState-->WindowStateAnimator(WindowState win){//windowState中创建
 - WindowManagerService mService = win.mService
@@ -8,11 +9,11 @@ WindowState-->WindowStateAnimator(WindowState win){//windowState中创建
 }@WindowStateAnimator.java
 
 
-//创建 surfaceControl
+//创建 WindowSurfaceController surfaceControl
 relayoutWindow-->
 createSurfaceControl(Surface outSurface, int result, WindowState win,WindowStateAnimator winAnimator)@WindowManagerService.java-->
 createSurfaceLocked(windowType){
-  //surfacecontroller
+  //WindowSurfaceController surfacecontroller
 - mSurfaceController = new WindowSurfaceController(mSession.mSurfaceSession,width, height){
 	- mSurfaceW = w
 	- mSurfaceH = h
@@ -30,11 +31,7 @@ createSurfaceLocked(windowType){
 - mService.closeSurfaceTransaction()
 }@WindowStateAnimator.java
 
-animate@WindowAnimator.java-->prepareWindowSurfaces@DisplayContent.java-->
-prepareSurfaceLocked{
-- computeShownFrameLocked
-- setSurfaceBoundariesLocked
-}@WindowStateAnimator.java
+
 
 /*
  surfaceInsets 会影响实际窗口大小
@@ -81,8 +78,35 @@ destroySurfaceLocked{
  
 
 /*
-  动画
+  窗口动画：显示，隐藏
+
+  AppWindowAnimator应用切换的效果也是在这里获取，并作用到窗口上
 */
+//窗口的状态类型
+TRANSIT_ENTER = 1
+TRANSIT_EXIT = 2
+TRANSIT_SHOW = 3
+TRANSIT_HIDE = 4
+TRANSIT_PREVIEW_DONE = 5
+@WindowManagerPolicy.java
+//statusbar,navibar,dockdivider，starting 系统窗口动画
+R.anim.dock_top_exit
+R.anim.dock_top_enter
+R.anim.dock_bottom_exit_keyguard
+R.anim.dock_bottom_exit
+R.anim.dock_bottom_enter
+R.anim.dock_right_exit
+R.anim.dock_right_enter
+R.anim.dock_left_exit
+R.anim.dock_left_enter
+com.android.internal.R.anim.app_starting_exit
+
+//普通窗口动画
+com.android.internal.R.styleable.WindowAnimation_windowEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_windowExitAnimation
+com.android.internal.R.styleable.WindowAnimation_windowShowAnimation
+com.android.internal.R.styleable.WindowAnimation_windowHideAnimation
+
 //设置动画
 setAnimation(Animation anim, long startTime, int stackClip){
 - mAnimation = anim
@@ -93,9 +117,23 @@ setAnimation(Animation anim, long startTime, int stackClip){
 - mTransformation.setAlpha(mLastHidden ? 0 : 1)
 }@WindowStateAnimator.java
 
-applyAnimationLocked(int transit, boolean isEntrance) {}
+//设置窗口动画
+showLw/hideLw-->mWinAnimator.applyAnimationLocked@WindowState.java-->
+applyAnimationLocked(int transit, boolean isEntrance) {
+  //系统窗口的动画，statusbar,navibar,dockdivider
+- int anim = mPolicy.selectAnimationLw(mWin, transit)
+  //普通窗口的动画
+- if (anim != 0) {
+	- Animation a = anim != -1 ? AnimationUtils.loadAnimation(mContext, anim) : null
+  }else{
+	- int attr = com.android.internal.R.styleable.WindowAnimation_windowEnterAnimation	//加载对应的动画
+	- Animation a = mService.mAppTransition.loadAnimationAttr(mWin.mAttrs, attr)
+  }
+- setAnimation(a)
+- 
+}@WindowStateAnimator.java
 
-//动画执行。WindowAnimator收到vsync执行动画
+//动画执行,获取mTransformation
 animate-->dc.updateWindowsForAnimator@WindowAnimator.java-->updateWindowsForAnimator(WindowAnimator animator)
 -->forAllWindows(mUpdateWindowsForAnimator, true)-->winAnimator.stepAnimationLocked@DisplayContent.java-->
 stepAnimationLocked(long currentTime){
@@ -121,18 +159,49 @@ stepAnimationLocked(long currentTime){
 }@WindowStateAnimator.java
 
 
-//将animation结果作用到窗口
+//将动画结果WindowStateAnimator.mTransformation 和AppWindoWAnimator.transformation作用到窗口
 animate-->dc.prepareWindowSurfaces-->forAllWindows(mPrepareWindowSurfaces, false)@WindowAnimator.java-->
 prepareSurfaceLocked(final boolean recoveringMemory){
 - 
 - computeShownFrameLocked
 - setSurfaceBoundariesLocked(recoveringMemory)
+  //
+- if (mIsWallpaper && !mWin.mWallpaperVisible) {
+	- hide("prepareSurfaceLocked")		//是壁纸且不可见
+  }else if(w.isParentWindowHidden() || !w.isOnScreen()){
+	- hide("prepareSurfaceLocked")
+  }else if(mLastLayer != mAnimLayer||mLastAlpha != mShownAlpha|| mLastDtDy != mDtDy
+                || w.mLastHScale != w.mHScale){	//可见状态，层次，大小，位置发生变化
+	- boolean prepared = mSurfaceController.prepareToShowInTransaction(mShownAlpha...)
+	- mSurfaceController.setLayer(mAnimLayer)
+	- if(showSurfaceRobustlyLocked()){	//显示窗口
+		- 
+		}
+  }
 }@WindowStateAnimator.java
 
 computeShownFrameLocked() {
-- 
-- 
+- Transformation attachedTransformation = mParentWinAnimator.mTransformation
+- Transformation appTransformation = mAppAnimator.transformation	//AppWindoWAnimator的动画结果
+- mShownAlpha *= mTransformation.getAlpha()				//当前窗口动画结果
 }@WindowStateAnimator.java
+
+
+/* WindowSurfaceController控制surface
+   设置窗口可见状态，位置，大小，层次
+*/
+
+showSurfaceRobustlyLocked-->mSurfaceController.showRobustlyInTransaction@WindowStateAnimator.java-->
+showRobustlyInTransaction{
+- mHiddenForOtherReasons = false
+- updateVisibility(){
+	- if (mHiddenForCrop || mHiddenForOtherReasons) {
+		- hideSurface
+	  }else{
+		- showSurface()	
+	  }
+	}
+}@WindowSurfaceController.java
 
 frameworks/base/services/core/java/com/android/server/wm/WindowStateAnimator.java
 frameworks/base/services/core/java/com/android/server/wm/WindowSurfaceController.java

@@ -1,9 +1,11 @@
 /******************************
- windowsState
- 位置：窗口在屏幕中的位置
- 大小：窗口在屏幕中的显示区域。应用的view绘制的范围
+ windowsState 位置 大小
 
+ 和应用进程中view交互：
+ ISession mSession  Session
+ IWindow mClient    ViewRootImpl中的Window
 
+ 窗口属性：
  mShownPosition 窗口位置。屏幕坐标
  mVisibleInsets 决定可见区域的inset。窗口坐标
  mContentInsets 被systmui,输入法遮蔽区域的inset位置。窗口坐标
@@ -50,7 +52,19 @@ computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
 	- mDisplayFrame.set(mContainingFrame)
   }
 - 
-}
+}@WindowState.java
+
+//设置是否可见，并通知应用。应用中的可见状态比较超前，实际还有动画过程？
+setVisibility@AppWindowContainerController.java-->setVisibility@AppWindowToken.java-->
+sendAppVisibilityToClients@WindowToken.java-->
+sendAppVisibilityToClients{
+- super.sendAppVisibilityToClients()
+- boolean clientHidden = mAppToken.isClientHidden()
+- mClient.dispatchAppVisibility(!clientHidden)-->dispatchAppVisibility@ViewRootImpl.java
+}@WindowState.java
+
+
+onAppVisibilityChanged
 
 //窗口发生变化,加入mResizingWindows
 mApplySurfaceChangesTransaction@DisplayContent.java-->
@@ -72,7 +86,6 @@ updateResizingWindowIfNeeded{
 	- mService.mResizingWindows.add(this) //加入resizing中
 	}
 }@WindowState.java
-
 
 //通知应用窗口发生变化
 handleResizingWindows-->win.reportResized()@RootWindowContainer.java-->

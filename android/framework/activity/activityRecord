@@ -22,13 +22,24 @@ ActivityRecord(ActivityManagerService _service, Intent _intent,ActivityInfo aInf
 - state = INITIALIZING;
 }@ActivityRecord.java
 
+//创建controller
 createWindowContainer(){
+- TaskWindowContainerController taskController = task.getWindowContainerController()
+- updateOverrideConfiguration
 - mWindowContainerController = new AppWindowContainerController(taskController, appToken...)
 }@ActivityRecord.java
 
-//设置可见
+//设置启动窗口
+showStartingWindow(ActivityRecord prev, boolean newTask, boolean taskSwitch, boolean fromRecents){
+- CompatibilityInfo compatInfo = service.compatibilityInfoForPackageLocked
+- boolean shown = mWindowContainerController.addStartingWindow(packageName, theme,
+	compatInfo, nonLocalizedLabel, labelRes, icon, logo...)
+- 
+}@ActivityRecord.java
+
+//设置可见.AppWindowTokenController-->AppWindowToken-->WindowState-->(应用进程)ViewRootImpl
 setVisibility(boolean visible){
-- mWindowContainerController.setVisibility(visible, mDeferHidingClient)
+- mWindowContainerController.setVisibility-->setVisibility@AppWindowTokenController.java
 }@ActivityRecord.java
 
 
@@ -42,8 +53,6 @@ onWindowsVisible{
   }
 }ActivityRecord.java
 
-
-
 //finishing:
 makeFinishing{
 - finishing = true
@@ -52,6 +61,5 @@ makeFinishing{
 }
 
 
-
 frameworks/base/services/core/java/com/android/server/am/ActivityRecord.java
-
+frameworks/base/services/core/java/com/android/server/wm/AppWindowContainerController.java

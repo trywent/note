@@ -2,6 +2,7 @@
  AppToken
  AppWindowAnimator
 
+ 应用切换动画：应用图标缩放。动画效果在WindowStateAnimator中执行
 */
 AppWindowToken(WindowManagerService service, IApplicationToken token,...
             AppWindowContainerController controller, Configuration overrideConfig, Rect bounds){
@@ -25,8 +26,19 @@ AppWindowToken-->AppWindowAnimator(final AppWindowToken atoken, WindowManagerSer
 - mAnimator = mService.mAnimator
 }@AppWindowAnimator.java
 
+//设置可见状态。从ActivityRecord设置过来
+setVisibility@AppWindowContainerController.java-->
+setVisibility(WindowManager.LayoutParams lp,boolean visible, int transit, 
+	boolean performLayout, boolean isVoiceInteraction){
+- setClientHidden(!visible){
+	- mClientHidden = hideClient
+	- sendAppVisibilityToClients()-->sendAppVisibilityToClients@WindowState.java
+	}
+- 
+}AppWindowToken.java
 
 //设置动画
+setVisibility-->mService.applyAnimationLocked(this, lp, transit, visible, isVoiceInteraction)@AppWindowToken.java
 applyAnimationLocked(AppWindowToken atoken, WindowManager.LayoutParams lp,
             int transit, boolean enter...){
 - Animation a = mAppTransition.loadAnimation(lp, transit, enter, displayConfig.uiMode...)
@@ -41,14 +53,15 @@ setAnimation(Animation anim, int width, int height...int transit,int transitFlag
 }@AppWindowAnimator.java
 
 
-//执行动画
-animate-->dc.stepAppWindowsAnimation@WindowAnimator.java-->stepAppWindowsAnimation@WinddowContainer.java-->
+//执行动画。只有AppWindowToken和TaksStack重写stepAppWindowsAnimation
+animate-->dc.stepAppWindowsAnimation@WindowAnimator.java-->stepAppWindowsAnimation()@WinddowContainer.java-->
 stepAppWindowsAnimation(long currentTime){
 - mAppAnimator.wasAnimating = mAppAnimator.animating
 - mAppAnimator.stepAnimationLocked(currentTime)
 	- mAppAnimator.animating = true
 	- mService.mAnimator.setAnimating(true)
 }@AppWindowToken.java
+
  //TaskStack中也有执行。不知道为什么？
 stepAppWindowsAnimation{
 - super.stepAppWindowsAnimation(currentTime)
@@ -59,10 +72,135 @@ stepAppWindowsAnimation{
 	}
 }@TaskStack.java
 
+ //执行动画获取transformation。。动画的效果在WindowStateAnimator中执行
 stepAnimationLocked(long currentTime){
+- animation.setStartTime(currentTime + correction)
+- thumbnail.show()
+- thumbnailAnimation.setStartTime(currentTime + correction)
+- stepAnimation(currentTime){			//获取transformation
+	- transformation.clear()
+	- long animationFrameTime = getAnimationFrameTime(animation, currentTime)
+	- boolean hasMoreFrames = animation.getTransformation(animationFrameTime, transformation)
+	- return hasMoreFrames
+	}
+- stepThumbnailAnimation			//执行缩略图动画
+- if(stepAnimation(currentTime))return true	//动画未完成
+  //动画执行完成
+- mAppToken.setAppLayoutChanges(FINISH_LAYOUT_REDO_ANIM, "AppWindowToken")
+- clearAnimation()
+- transformation.clear()
+- mService.mAppTransition.notifyAppTransitionFinishedLocked(mAppToken.token)
+}@AppWindowAnimator.java
 
+/* 缩略图动画
+
+*/
+//设置动画
+createThumbnailAppAnimator(int transit, AppWindowToken appToken,int openingLayer, int closingLayer){
+- GraphicBuffer thumbnailHeader = mService.mAppTransition.getAppTransitionThumbnailHeader(taskId)
+- SurfaceControl surfaceControl = new SurfaceControl(mService.mFxSession...)
+  //将缩略图传入surface
+- Surface drawSurface = new Surface()
+- drawSurface.copyFrom(surfaceControl)
+- drawSurface.attachAndQueueBuffer(thumbnailHeader)
+  //设置到app
+- anim = mService.mAppTransition.createThumbnailAspectScaleAnimationLocked
+- openingAppAnimator.thumbnail = surfaceControl
+- openingAppAnimator.thumbnailLayer = openingLayer
+- openingAppAnimator.thumbnailAnimation = anim
+}@WindowSurfacePlacer.java
+
+//执行动画
+stepAnimationLocked-->
+stepThumbnailAnimation(long currentTime) {
+- thumbnailAnimation.getTransformation(animationFrameTime, thumbnailTransformation)
+- ScreenRotationAnimation screenRotationAnimation = mAnimator.getScreenRotationAnimationLocked(Display.DEFAULT_DISPLAY)
+- thumbnailTransformation.postCompose(screenRotationAnimation.getEnterTransformation())
+- thumbnail.setPosition(tmpFloats[Matrix.MTRANS_X], tmpFloats[Matrix.MTRANS_Y])	//位置
+- thumbnail.setAlpha(thumbnailTransformation.getAlpha())			//透明度
+- thumbnail.setLayer(thumbnailForceAboveLayer + 1)				//层次
+- thumbnail.setMatrix(tmpFloats[Matrix.MSCALE_X], tmpFloats[Matrix.MSKEW_Y]..)	//大小
+- thumbnail.setWindowCrop(thumbnailTransformation.getClipRect())		//裁剪？
 }@AppWindowAnimator.java
 
 
 frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
 frameworks/base/services/core/java/com/android/server/wm/AppWindowAnimator.java
+
+/*
+  AppTransition 应用变化  
+  
+*/
+//动画类型
+com.android.internal.R.styleable.WindowAnimation_activityCloseEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_activityCloseExitAnimation
+com.android.internal.R.styleable.WindowAnimation_activityOpenEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_activityOpenExitAnimation
+com.android.internal.R.styleable.WindowAnimation_launchTaskBehindSourceAnimation
+com.android.internal.R.styleable.WindowAnimation_launchTaskBehindTargetAnimation
+com.android.internal.R.styleable.WindowAnimation_taskCloseEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_taskCloseExitAnimation
+com.android.internal.R.styleable.WindowAnimation_taskOpenEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_taskOpenExitAnimation
+com.android.internal.R.styleable.WindowAnimation_taskToBackEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_taskToBackExitAnimation
+com.android.internal.R.styleable.WindowAnimation_taskToFrontEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_taskToFrontExitAnimation
+com.android.internal.R.styleable.WindowAnimation_wallpaperCloseEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_wallpaperCloseExitAnimation
+com.android.internal.R.styleable.WindowAnimation_wallpaperIntraCloseEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_wallpaperIntraCloseExitAnimation
+com.android.internal.R.styleable.WindowAnimation_wallpaperIntraOpenEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_wallpaperIntraOpenExitAnimation
+com.android.internal.R.styleable.WindowAnimation_wallpaperOpenEnterAnimation
+com.android.internal.R.styleable.WindowAnimation_wallpaperOpenExitAnimation
+
+//加载动画
+Animation loadAnimation(WindowManager.LayoutParams lp, int transit, boolean enter...){
+- Animation a
+  //加载动画
+- if(isKeyguardGoingAwayTransit(transit) && enter){	//解锁
+ 	- a = loadKeyguardExitAnimation(transit
+  }else if(transit == TRANSIT_KEYGUARD_OCCLUDE){	//显示在锁屏上的通知？来电，音乐
+
+  }else if(transit == TRANSIT_KEYGUARD_UNOCCLUDE && !enter){
+
+  }else if(isVoiceInteraction && (transit == TRANSIT_ACTIVITY_OPEN
+		|| transit == TRANSIT_TASK_OPEN
+                || transit == TRANSIT_TASK_TO_FRONT)){
+
+  }else if(isVoiceInteraction && (transit == TRANSIT_ACTIVITY_CLOSE
+                || transit == TRANSIT_TASK_CLOSE
+                || transit == TRANSIT_TASK_TO_BACK)){
+
+  }else if(transit == TRANSIT_ACTIVITY_RELAUNCH){
+
+  }else if(mNextAnimationHelper.getNextTransitionType() == mNextAppTransitionType){
+
+  }else if(mNextAppTransitionType == NEXT_TRANSIT_TYPE_CUSTOM){
+
+  }else if(mNextAppTransitionType == NEXT_TRANSIT_TYPE_CUSTOM_IN_PLACE){
+
+  }else if(NextAppTransitionType == NEXT_TRANSIT_TYPE_CLIP_REVEAL){
+
+  }else if(mNextAppTransitionType == NEXT_TRANSIT_TYPE_SCALE_UP){
+
+  }else if(mNextAppTransitionType == NEXT_TRANSIT_TYPE_THUMBNAIL_SCALE_UP){
+
+  }else if(mNextAppTransitionType == NEXT_TRANSIT_TYPE_THUMBNAIL_ASPECT_SCALE_UP){
+
+  }else{
+	- switch (transit) 
+	- animAttr = WindowAnimation_activityOpenEnterAnimation...
+	- a = animAttr != 0 ? loadAnimationAttr(lp, animAttr) : null
+  }
+- return a
+}@AppTransition.java
+
+
+
+applyOptionsLocked@ActivityRecord.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/AppTransition.java
+

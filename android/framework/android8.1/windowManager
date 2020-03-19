@@ -45,8 +45,8 @@ getWindowSession@WindowManagerGlobal.java-->openSession-->new Session(IInputMeth
 //加入window
 addWindow(Session,IWindow client,WindowManager.LayoutParams attrs,Rect outContentInsets,
 	 Rect outStableInsets, Rect outOutsets,InputChannel outInputChannel){
-- WindowToken token = displayContent.getWindowToken(attrs.token) //获取对应ActivityRecord的WindowToken(本质一个AppWindowToken)
-- AppWindowToken atoken = token.asAppWindowToken() //FIRST_APPLICATION_WINDOW -LAST_APPLICATION_WINDOW 应用窗口
+- WindowToken token = displayContent.getWindowToken(attrs.token)	//获取对应ActivityRecord的WindowToken(本质一个AppWindowToken)
+- AppWindowToken atoken = token.asAppWindowToken()			//FIRST_APPLICATION_WINDOW -LAST_APPLICATION_WINDOW 应用窗口
 - WindowState win = new WindowState(this, session, client, token,attrs){
 	- mSession = s
 	- mClient = c
@@ -54,9 +54,9 @@ addWindow(Session,IWindow client,WindowManager.LayoutParams attrs,Rect outConten
 	}
 - win.attach()
 - mWindowMap.put(client.asBinder(), win)
-- win.mToken.addWindow(win) //将windowState加入到AppWindowToken
+- win.mToken.addWindow(win) 						//将windowState加入到AppWindowToken
 - mPolicy.getInsetHintLw(win.mAttrs, taskBounds, displayInfo.rotation,displayInfo.logicalWidth, displayInfo.logicalHeight, 
-	outContentInsets,outStableInsets, outOutsets) //获取窗口inset大小
+	outContentInsets,outStableInsets, outOutsets) 			//获取窗口inset大小
 }@WindowManagerService.java
 
 // surface,outset,inset信息
@@ -67,13 +67,18 @@ relayoutWindow(Session session, IWindow client, int seq,
             Rect outFrame, Rect outOverscanInsets, Rect outContentInsets,
             Rect outVisibleInsets, Rect outStableInsets, Rect outOutsets, Rect outBackdropFrame,
             MergedConfiguration mergedConfiguration, Surface outSurface){
+- WindowState win = windowForClientLocked(session, client, false)
+- if (win.mLayoutSeq == -1) {				//第一次计算窗口大小
+	- win.setDisplayLayoutNeeded()
+        - mWindowPlacerLocked.performSurfacePlacement(true)
+        }
 - win.relayoutVisibleWindow
 - createSurfaceControl(Surface outSurface,WindowState win){
 	- WindowSurfaceController surfaceController = winAnimator.createSurfaceLocked(win.mAttrs.type, win.mOwnerUid)
 	- surfaceController.getSurface(outSurface)
 	}
-
- //获取窗口信息
+- mWindowPlacerLocked.performSurfacePlacement(true)	//计算窗口的大小
+ //设置窗口信息
 - outFrame.set(win.mCompatFrame)
 - outOverscanInsets.set(win.mOverscanInsets)
 - outContentInsets.set(win.mContentInsets)
@@ -85,6 +90,8 @@ relayoutWindow(Session session, IWindow client, int seq,
 /*
   app切换
 */
+
+//设置应用切换的状态，将要执行的切换类型
 prepareAppTransition(int transit, boolean alwaysKeepCurrent)-->
 prepareAppTransition(int transit, boolean alwaysKeepCurrent, int flags, boolean forceOverride){
 - boolean prepared = mAppTransition.prepareAppTransitionLocked(transit, alwaysKeepCurrent,flags, forceOverride)
@@ -193,30 +200,16 @@ rotationForOrientationLw(int orientation, int lastRotation) {
 //最终调用位置,更新方位
 updateRotationUnchecked{
 -
-- mService.mPolicy.rotationForOrientationLw(lastOrientation, oldRotation) //从传感器获取方位
+- mService.mPolicy.rotationForOrientationLw(lastOrientation, oldRotation)	//从传感器获取方位
 - updateDisplayAndOrientation{//更新displayManager
 	- 初始化mDisplayInfo
 	- mService.mDisplayManagerInternal.setDisplayInfoOverrideFromWindowManager(mDisplayInfo)
 	}
-- mService.mDisplayManagerInternal.performTraversal(getPendingTransaction()) //DisplayManager设置display
+- mService.mDisplayManagerInternal.performTraversal(getPendingTransaction())	//DisplayManager设置display
 - scheduleAnimation
 }@DisplayContent.java
 
 
-/*
- 应用窗口大小
-*/
-
-relayoutWindow(Session session, IWindow client,int requestedWidth,Rect outFrame,Surface outSurface){
-- WindowState win = windowForClientLocked-->mWindowMap.get(client) //获取对应窗口
-- mPolicy.adjustWindowParamsLw(attrs) //调整属性
-- createSurfaceControl(outSurface)//surface
-- configChanged = updateOrientationFromAppTokensLocked //更新方位
- //获取surface
-- createSurfaceControl(outSurface, result, win, winAnimator)
- //设置frame大小
-- outFrame.set(win.mCompatFrame)
-}@WindowManagerService.java
 
 //窗口层次
 getWindowLayerFromTypeLw@WindowManagerPolicy.java

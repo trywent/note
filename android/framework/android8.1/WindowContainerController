@@ -279,7 +279,7 @@ ensureActivityConfigurationLocked{
 - setLastReportedConfiguration(newMergedOverrideConfig)
 }@AcvitiyRecord.java
 
-//mBounds。windstate的窗口计算使用这里的计算值
+//mBounds。windowstate的窗口计算使用这里的计算值
 updateOverrideConfiguration{
 - computeBounds(mTmpBounds){
 	- 
@@ -299,7 +299,46 @@ setTask(TaskRecord task, boolean reparenting){
 	}@ConfigurationContainer.java
 }@ActivityRecord.java
 
+//设置启动窗口(starting window)
+addStartingWindow(String pkg, int theme, CompatibilityInfo compatInfo,
+            CharSequence nonLocalizedLabel, int labelRes, int icon, int logo...){
+- TaskSnapshot snapshot = mService.mTaskSnapshotController.getSnapshot
+- int type = getStartingWindowType(newTask, taskSwitch, processRunning,...)
+- if (type == STARTING_WINDOW_TYPE_SNAPSHOT) {
+	- return createSnapshot(snapshot)
+	}
+  //应用窗口的主题是否允许有启动窗口
+- if (theme != 0) {
+	- boolean windowIsTranslucent = ent.array.getBoolean(com.android.internal.R.styleable.Window_windowIsTranslucent)
+	}
+  //和上个应用复用启动窗口？
+- if (mContainer.transferStartingWindow(transferFrom)) {
+	- return true
+	}
+  //新建启动窗口
+- mContainer.startingData = new SplashScreenStartingData
+- scheduleAddStartingWindow-->mService.mAnimationHandler.postAtFrontOfQueue(mAddStartingWindow)-->
+	mAddStartingWindow{
+	- startingData = mContainer.startingData
+	- container = mContainer
+	- StartingSurface surface = startingData.createStartingSurface(container)
+	}
+}@AppWindowContainerController.java
 
+//设置可见
+setVisibility-->mWindowContainerController.setVisibility@ActivityRecord.java-->
+setVisibility(boolean visible, boolean deferHidingClient){
+- AppWindowToken wtoken = mContainer
+  //
+- if (wtoken.okToAnimate() && mService.mAppTransition.isTransitionSet()) {
+	- if (visible) {
+        	- mService.mOpeningApps.add(wtoken)
+          } else {
+                - mService.mClosingApps.add(wtoken)
+          }
+	}
+- wtoken.setVisibility(null, visible, TRANSIT_UNSET, true, wtoken.mVoiceInteraction)
+}@AppWindowContainerController.java
 
 frameworks/base/services/core/java/com/android/server/am/ActivityStarter.java
 frameworks/base/services/core/java/com/android/server/am/ActivityStack.java
@@ -307,8 +346,6 @@ frameworks/base/services/core/java/com/android/server/am/TaskRecord.java
 frameworks/base/services/core/java/com/android/server/wm/AppWindowContainerController.java
 frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
 frameworks/base/services/core/java/com/android/server/am/ConfigurationContainer.java
-
-
 ======================
 /*******************************
  configuration

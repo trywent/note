@@ -42,3 +42,18 @@ lsec123456
 
 //food
 192.168.1.138
+
+//software
+geogebra 几何绘图工具
+
+//shadowsocket
+ShadowSocks Port
+33519
+
+ShadowSocks Password
+njBtYdtPbj
+
+服务器|加密方式：
+1、c31s1.jamjams.net | aes-256-gcm
+2、c31s2.jamjams.net | aes-256-gcm
+3、c31s5.jamjams.net | aes-256-cfb
