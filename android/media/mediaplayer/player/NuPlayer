@@ -1,5 +1,5 @@
 /*************************
-  服务端player接口：  NULPlayerDriver
+  NUPlayerDriver  mediaplayerservice获取的player接口
 
 */
 enum player_type {
@@ -21,15 +21,6 @@ enum State {
         STATE_STOPPED_AND_PREPARING,    // equivalent to PAUSED, but seeking
         STATE_STOPPED_AND_PREPARED,     // equivalent to PAUSED, but seek complete
 }
-//factory
-MediaPlayerService::MediaPlayerService@MediaPlayerService.cpp-->
-registerBuiltinFactories{
-- registerFactory_l(new StagefrightPlayerFactory(), STAGEFRIGHT_PLAYER)
-- registerFactory_l(new NuPlayerFactory(), NU_PLAYER)
-- registerFactory_l(new TestPlayerFactory(), TEST_PLAYER)
-- registerFactory_l(new ApePlayerFactory(),APE_PLAYER);
-}@MediaPlayerFactory.cpp
-
 
 //创建NuPlayerDriver 开始线程 "NuPlayerDriver Looper"
 createPlayer(NU_PLAYER)-->factory->createPlayer@MediaPlayerService.cpp-->
@@ -70,7 +61,7 @@ notifySetDataSourceCompleted{
 NuPlayerDriver::prepare()-->prepare_l
 
 /*************************
- NULPlayer:  mDriver为NuPlayerDriver
+ NUPlayer:  mDriver为NuPlayerDriver
 
 */
 struct NuPlayer: public AHandler{
@@ -150,6 +141,8 @@ onStart(int64_t startPositionUs, MediaPlayerSeekMode mode){
 
 /*初始化mVideoDecoder,mAudioDecoder
   获取数据格式创建解码器
+
+  Nuplayer--- Decoder--- MediaCodec---ACodec
 */
 instantiateDecoder(bool audio,&decoder){
 - sp<AMessage> format = mSource->getFormat(audio) //获取音视频的格式

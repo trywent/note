@@ -1,6 +1,6 @@
 /*extrator
 
-可解析媒体框架支持的各种文件格式的组件
+ 解析媒体框架支持的文件格式
 */
 
 serviceName "media.extractor"

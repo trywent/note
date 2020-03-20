@@ -1,4 +1,5 @@
-/************************* client
+/*************************
+ MediaCodec
  解码器接口函数。提供给java层，NuPlayer使用
  MediaCodec中使用ACodec 
 
@@ -38,14 +39,12 @@ MediaCodec::init(const AString &name, bool nameIsType, bool encoder){
 	}
 - mLooper->registerHandler(this)
   //ACodec消息
-- mCodec->setCallback(
-            std::unique_ptr<CodecBase::CodecCallback>(
-                    new CodecCallback(new AMessage(kWhatCodecNotify, this))))
+- mCodec->setCallback(std::unique_ptr<CodecBase::CodecCallback>
+	(new CodecCallback(new AMessage(kWhatCodecNotify, this))))
   //Buffer消息
 - mBufferChannel = mCodec->getBufferChannel();
-- mBufferChannel->setCallback(
-            std::unique_ptr<CodecBase::BufferCallback>(
-                    new BufferCallback(new AMessage(kWhatCodecNotify, this))))
+- mBufferChannel->setCallback(std::unique_ptr<CodecBase::BufferCallback>
+	(new BufferCallback(new AMessage(kWhatCodecNotify, this))))
   //发送初始化消息
 - sp<AMessage> msg = new AMessage(kWhatInit, this);
   msg->setString("name", name);

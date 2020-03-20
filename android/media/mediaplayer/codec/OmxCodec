@@ -1,46 +1,9 @@
-/**************************client
- IOMX --- omx服务
- WOmx 封装IOMX
- IOMXNode --- omx component
-
-*/
-
-//client
-OMXClient::connect{
-//treble
-- connectTreble{
-	- sp<IOmx> tOmx = IOmx::getService(name)
-	- sp<IOMX> mOMX = new utils::LWOmx(tOmx){
-		- mBase(base)
-		}@WOmx.cpp
-	}
-//非treble
-- connectLegacy
-}@OMXClient.cpp
-
-
-//创建服务端node,observer用于接收服务端信息
-LWOmx::allocateNode(const char *name, const sp<IOMXObserver> &observer,sp<IOMXNode> *omxNode)-->
-mBase->allocateNode(name, new TWOmxObserver(observer),
-            [&fnStatus, omxNode](Status status, sp<IOmxNode> const& node) {
-                fnStatus = toStatusT(status);
-                *omxNode = new LWOmxNode(node);
-            }))@WOmx.cpp
-
-//
-LWOmx::createInputSurface(
-        sp<::android::IGraphicBufferProducer>* bufferProducer,
-        sp<::android::IGraphicBufferSource>* bufferSource)
-
-frameworks/av/media/libstagefright/OMXClient.cpp
-frameworks/av/media/libmedia/omx/1.0/WOmx.cpp
 /**************************codecService
   open MAX兼容解码器
 
   非安全解码器和软件编码器位于编解码器进程中。
   安全解码器和硬件编码器位于 mediaserver（未变更）中
 */
-
 ServiceName "media.codec"
 service mediacodec /vendor/bin/hw/android.hardware.media.omx@1.0-service @android.hardware.media.omx@1.0-service.rc-->
 main{
@@ -54,16 +17,41 @@ main{
 }@main_codecservice.cpp
 
 
-//加载xml中声明的解码器
+/*加载xml中声明的解码器
+  
+ media_codecs.xml{
+	- setting属性
+	- 编码器，码率，分辨率的限制
+	- 解码器，码率，分辨率的限制
+	}
+ media_codecs_performance.xml{
+	- 编解码器的帧率限制
+	}
+*/
+
 defaultSearchDirs[] = {"/odm/etc", "/vendor/etc", "/etc", nullptr};
 defaultMainXmlName = "media_codecs.xml";
 defaultPerformanceXmlName ="media_codecs_performance.xml";
 defaultProfilingResultsXmlPath ="/data/misc/media/media_codecs_profiling_results.xml"
 
 OmxStore("default",defaultSearchDirs,defaultMainXmlName,defaultPerformanceXmlName,defaultProfilingResultsXmlPath){
-- MediaCodecsXmlParser parser(searchDirs)
+- MediaCodecsXmlParser parser(searchDirs,mainXmlName,performanceXmlName,profilingResultsXmlPath){
+	- findFileInDirs(searchDirs, mainXmlName, &path){
+		- parseTopLevelXMLFile(path.c_str(), false)
+		}
+	- findFileInDirs(searchDirs, performanceXmlName, &path){
+		- parseTopLevelXMLFile(path.c_str(), false)
+		}
+	}@MediaCodecXmlParser.cpp
+  //加载设置 MediaCode的setting
+- auto& serviceAttributeMap = parser.getServiceAttributeMap()
+- for (const auto& attributePair : serviceAttributeMap) {
+	- ServiceAttribute attribute
+	- attribute.key = attributePair.first
+	- mServiceAttributeList[i] = std::move(attribute)
+	}
+  //加载编解码器
 - const auto& roleMap = parser.getRoleMap
-  //
 - for (const auto& rolePair : roleMap) {
 	- RoleInfo role
 	- role.role = rolePair.first
@@ -92,11 +80,11 @@ addPlugin(createOMXPlugin()){
 - OMX_U32 index = 0，char name[128]
 - while(plugin->enumerateComponents(name,index++)){
 	- String8 name8(name)
-	- mPluginByComponentName.add(name8,pulgin) //保存解码器名字到mPluginByComponentName
+	- mPluginByComponentName.add(name8,pulgin) 	//保存解码器名字到mPluginByComponentName
 	}
 }@OMXMaster.cpp
 
-//创建解码
+//创建解码，并返回到client
 Omx::allocateNode(name,observer,_hidl_cb/*omxNode*/){
 - sp<OMXNodeInstance> instance = new OMXNodeInstance(this, new LWOmxObserver(observer), name.c_str()){
 	- mOwner(owner)
@@ -108,8 +96,19 @@ Omx::allocateNode(name,observer,_hidl_cb/*omxNode*/){
 	- mHandle = handle
 	- mDispatcher = new CallbackDispatcher(this)
 	}@OMXNodeInstance.cpp
-- _hidl_cb(toStatus(OK), new TWOmxNode(instance))
+- _hidl_cb(toStatus(OK), new TWOmxNode(instance))	//将codec返回给client
 }@Omx.cpp
+
+OMXMaster::makeComponentInstance(const char *name,const OMX_CALLBACKTYPE *callbacks,
+        OMX_PTR appData,OMX_COMPONENTTYPE **component){
+- index = mPluginByComponentName.indexOfKey(name) 
+- plugin = mPluginByComponentName.valueAt(index)			//根据name获取pluging(硬解,软解)
+- plugin->makeComponentInstance(name,callback,appData,compoment){	//创建component(decoder) 
+	- makeComponentInstance@SprdOMXPlugin.cpp			//硬解 
+ 	- makeComponentInstance(const char *name,const OMX_CALLBACKTYPE *callbacks,OMX_PTR appData,OMX_COMPONENTTYPE **component)//软解
+	}
+- mPluginByInstance.add(*component, plugin)
+}@OMXMaster.cpp
 
 //
 Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
@@ -121,6 +120,9 @@ Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
 - bufferProducer = graphicBufferSource->getIGraphicBufferProducer()
 }@Omx.cpp
 
+
+frameworks/av/media/libstagefright/omx/1.0/OmxStore.cpp
+frameworks/av/media/libstagefright/xmlparser/MediaCodecsXmlParser.cpp
 /**************************软解Component
  SoftOMXComponent
  
@@ -140,27 +142,14 @@ OMX_CALLBACKTYPE OMXNodeInstance::kCallbacks = {
     &OnEvent, &OnEmptyBufferDone, &OnFillBufferDone
 }@OMXNodeInstance.cpp
 
-
-
-OMXMaster::makeComponentInstance(const char *name,const OMX_CALLBACKTYPE *callbacks,
-        OMX_PTR appData,OMX_COMPONENTTYPE **component){
-- index = mPluginByComponentName.indexOfKey(name) 
-- plugin = mPluginByComponentName.valueAt(index)//根据name获取pluging(硬解,软解)
-- plugin->makeComponentInstance(name,callback,appData,compoment){//创建component(decoder)
- //硬解
- -makeComponentInstance{
-	- 
-	}@SprdOMXPlugin.cpp
- //软解
- -makeComponentInstance(const char *name,const OMX_CALLBACKTYPE *callbacks,OMX_PTR appData,OMX_COMPONENTTYPE **component){
-	- dlopen(libName),创建库名并打开//"libstagefright_soft_"
-	- createSoftOMXComponent = dlsym(createSoftOMXComponent) //查找函数
-	- codec = createSoftOMXComponent(name,callback,compoment) //创建codec
-	- codec->initCheck
-	}@SoftOMXPlugin.cpp
- }
-- mPluginByInstance.add(*component, plugin)
-}@OMXMaster.cpp
+//创建软解component,codec
+OMXMaster::makeComponentInstance-->plugin->makeComponentInstance(name,callback,appData,compoment)@OMXMaster.cpp-->
+makeComponentInstance(const char *name,const OMX_CALLBACKTYPE *callbacks,OMX_PTR appData,OMX_COMPONENTTYPE **component){
+- dlopen(libName),					 //打开"libstagefright_soft_"
+- createSoftOMXComponent = dlsym(createSoftOMXComponent) //查找函数
+- codec = createSoftOMXComponent(name,callback,compoment)//创建codec
+- codec->initCheck
+}@SoftOMXPlugin.cpp
 
 //通知解码事件
 notify-->(*mCallbacks->EventHandler)(mComponent)@SoftOMXComponent.cpp
@@ -195,6 +184,10 @@ frameworks/av/media/libstagefright/omx/SoftOMXComponent.cpp
  
 */
 
+makeComponentInstance@SprdOMXPlugin.cpp
+
+
+
 /*CCDecode
 
 Closed Caption(CC)，意思就是隐藏的带有解释意味的字幕（CAPTION）(描述当前画面的字母,供听力障碍者,枪声，虫鸣鸟叫，对白)
@@ -211,8 +204,50 @@ frameworks/av/media/libstagefright/omx/1.0/Omx.cpp
 frameworks/av/media/libstagefright/omx/OMXMaster.cpp
 frameworks/av/media/libstagefright/xmlparser/MediaCodecsXmlParser.cpp
 frameworks/av/media/libstagefright/omx/OMXNodeInstance.cpp
-
-
 //hardware中的omx没有使用
 hardware/interfaces/media/omx/1.0/IOmx.hal
 hardware/interfaces/media/omx/1.0/android.hardware.media.omx@1.0_genc++/gen/android/hardware/media/omx/1.0/OmxAll.cpp
+
+/**************************client
+ IOMX --- omx服务
+ WOmx 封装IOMX
+ IOMXNode --- omx component
+
+*/
+
+//创建解码器
+UninitializedState::onAllocateComponent{
+- OMXClient client
+- client.connect(owners[matchIndex].c_str(), &trebleFlag)	//根据解码器名字
+- sp<IOMX> omx = client.interface()				//omx服务端接口
+- sp<IOMXNode> omxNode
+- omx->allocateNode(componentName.c_str(), observer, &omxNode)
+}@ACodec.cpp
+
+//client连接到omx
+OMXClient::connect{
+//treble
+- connectTreble{
+	- sp<IOmx> tOmx = IOmx::getService(name)
+	- sp<IOMX> mOMX = new utils::LWOmx(tOmx){
+		- mBase(tOmx)
+		}@WOmx.cpp
+	}
+//非treble
+- connectLegacy
+}@OMXClient.cpp
+
+
+//创建服务端node,observer接收创建TWOmxNode
+LWOmx::allocateNode(const char *name, const sp<IOMXObserver> &observer,sp<IOMXNode> *omxNode)-->
+mBase->allocateNode(name, new TWOmxObserver(observer),[&fnStatus, omxNode](Status status, sp<IOmxNode> const& node) {
+                fnStatus = toStatusT(status);*omxNode = new LWOmxNode(node); }))@WOmx.cpp-->
+Omx::allocateNode(name,observer,_hidl_cb/*omxNode*/)@Omx.cpp
+
+//
+LWOmx::createInputSurface(
+        sp<::android::IGraphicBufferProducer>* bufferProducer,
+        sp<::android::IGraphicBufferSource>* bufferSource)
+
+frameworks/av/media/libstagefright/OMXClient.cpp
+frameworks/av/media/libmedia/omx/1.0/WOmx.cpp

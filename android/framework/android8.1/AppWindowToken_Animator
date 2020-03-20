@@ -199,7 +199,12 @@ Animation loadAnimation(WindowManager.LayoutParams lp, int transit, boolean ente
 
 
 
-applyOptionsLocked@ActivityRecord.java
+applyOptionsLocked-->service.mWindowManager.overridePendingAppTransitionThumb@ActivityRecord.java-->
+overridePendingAppTransitionThumb-->mAppTransition.overridePendingAppTransitionThumb@WindowManagerService.java
+overridePendingAppTransitionThumb(GraphicBuffer srcThumb, int startX, int startY,
+             IRemoteCallback startedCallback, boolean scaleUp){
+- 
+}@AppTransition.java
 
 
 frameworks/base/services/core/java/com/android/server/wm/AppTransition.java

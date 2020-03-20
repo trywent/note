@@ -1,7 +1,7 @@
 /*
- client
+ Acodec封装了OmxCodec
 
- MediaCode ---> Acodec ---> (server)omxCodec
+ MediaCodec ---> Acodec ---> (server)omxCodec
 */
 
 struct CodecBase : public AHandler
@@ -127,7 +127,7 @@ initiateSetup-->msg->setWhat(kWhatSetup)-->onSetup
 MediaCodec::init@MediaCodec.cpp-->initiateAllocateComponent-->msg->setWhat(kWhatAllocateComponent)-->
 UninitializedState::onAllocateComponent{
 - Vector<AString> matchingCodecs
-  //查找匹配的解码器名字
+  //根据名字查找匹配的解码器名字
 - if (msg->findString("componentName", &componentName)) {
 	- sp<IMediaCodecList> list = MediaCodecList::getInstance()
 	- ssize_t index = list->findCodecByName(componentName.c_str())
@@ -136,10 +136,10 @@ UninitializedState::onAllocateComponent{
   }else{
 	- MediaCodecList::findMatchingCodecs(mime.c_str(),encoder,&matchingCodecs)
   }
-- sp<CodecObserver> observer = new CodecObserver
-  //根据名字创建服务端解码器
+- sp<CodecObserver> observer = new CodecObserver	//OMX服务回调接口
+  //根据匹配的解码器名字，创建一个解码器
 - for (size_t matchIndex = 0; matchIndex < matchingCodecs.size();++matchIndex){
-	- sp<CodecObserver> observer = new CodecObserver //OMX服务回调接口
+	- componentName = matchingCodecs[matchIndex]
 	- OMXClient client
 	- client.connect(owners[matchIndex].c_str(), &trebleFlag)
 	- sp<IOMX> omx = client.interface()-->return mOMX@OMXClient.h
@@ -150,7 +150,7 @@ UninitializedState::onAllocateComponent{
 - notify = new AMessage(kWhatOMXMessageList, mCodec);
 - notify->setInt32("generation", ++mCodec->mNodeGeneration);
 - observer->setNotificationMessage(notify)
-  //服务端解码
+  //初始化设置解码
 - mCodec->mOMX = omx
 - mCodec->mOMXNode = omxNode
 - mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str())

@@ -1,8 +1,37 @@
 /*
- 实现MediaPlayerInterface
+  应用端MediaPlayer
 */
 
-MediaPlayerInterface : public MediaPlayerBase
+{//播放流程
+-new MediaPlayer();
+-setAudioStreamType(AudioManager.STREAM_MUSIC)
+-setDataSource(getApplicationContext(), myUri)
+-setSurface(Surface surface)/setDisplay(SurfaceHolder)//视频播放时需要设置
+-prepare()//获取源，解码。导致耗时长，mediaPlayer使用另一线程执行
+-start()，pause，stop
+-release
+}MediaPlayer.java
 
+
+
+/*
+ 服务端MediaPlayer
+ 实现MediaPlayerInterface
+
+*/
+class MediaPlayerBase : public RefBase{
+- start()
+- stop()
+- setDataSource(int fd, int64_t offset, int64_t length) 
+- setVideoSurfaceTexture(const sp<IGraphicBufferProducer>& bufferProducer)
+}@MediaPlayerInterface.h
+
+
+MediaPlayerInterface : public MediaPlayerBase{
+- setAudioSink(const sp<AudioSink>& audioSink) { mAudioSink = audioSink; }
+}@MediaPlayerInterface.h
 
 frameworks/av/media/libmediaplayerservice/include/MediaPlayerInterface.h
+
+
+

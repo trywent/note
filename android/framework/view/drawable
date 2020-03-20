@@ -50,3 +50,17 @@ XML中使用资源：
 //通过XML
 Creating from resource XML
 当可绘制对象不在代码中初始化，则可在xml中定义它。
+
+
+/*
+ PaintDrawable
+ 可以设置圆角
+*/
+<shape xmlns:android="http://schemas.android.com/apk/res/android" >
+  <corners    //定义圆角   
+    android:radius="10dp"  //全部的圆角半径；   
+    android:topLeftRadius="5dp"  //左上角的圆角半径；   
+    android:topRightRadius="5dp" //右上角的圆角半径；   
+    android:bottomLeftRadius="5dp"  //左下角的圆角半径；   
+    android:bottomRightRadius="5dp" /> //右下角的圆角半径。
+</shape>

@@ -5,9 +5,9 @@
 -new MediaPlayer();
 -setAudioStreamType(AudioManager.STREAM_MUSIC)
 -setDataSource(getApplicationContext(), myUri)
+-setSurface(Surface surface)/setDisplay(SurfaceHolder)//视频播放时需要设置
 -prepare()//获取源，解码。导致耗时长，mediaPlayer使用另一线程执行
 -start()，pause，stop
--setSurface(Surface surface)/setDisplay(SurfaceHolder)//视频播放时需要设置
 -release
 }MediaPlayer.java
 
@@ -36,13 +36,13 @@ setOnErrorListener(OnErrorListener)@MediaPlayer.java
 
 native_setup-->android_media_MediaPlayer_native_setup-->mp->setListener@android_media_MediaPlayer.cpp
 
-收到并处理错误：
+//收到并处理错误：
 MediaPlayer::notify-->listener->notify@mediaPlayer.cpp-->JNIMediaPlayerListener::notify
 -->env->CallStaticVoidMethod(mClass, fields.post_event)@android_media_MediaPlayer.cpp
 -->postEventFromNative-->mp.mEventHandler.sendMessage(发送消息)-->
 EventHandler.handleMessage(MEDIA_ERROR)-->mOnErrorListener.onError@MediaPlayer.java
 
-mediaPlayer销毁：
+//mediaPlayer销毁：
 IMediaDeathNotifier::DeathNotifier::binderDied-->notifier->died@IMediaDeathNotifier.cpp
 -->MediaPlayer::died--> notify(MEDIA_ERROR_SERVER_DIED)@mediaplayer.cpp
 
@@ -54,13 +54,14 @@ setAudioStreamType@MediaPlayer.java-->android_media_MediaPlayer_setAudioStreamTy
 -->mp->setAudioStreamType@android_media_MediaPlayer.cpp-->MediaPlayer::setAudioStreamType
 (设置mStreamType值)@mediaplayer.cpp
 
-服务端在prepare时设置：
+//服务端在prepare时设置：
 MediaPlayer::prepareAsync_l-->mPlayer->setAudioStreamType(mStreamType)@mediaplayer.cpp
 -->MediaPlayerService::Client::setAudioStreamType-->mAudioOutput->setAudioStreamType
 @MediaPlayerService.cpp
 
 3.
-/* 设置源：setDataSource   创建服务端player
+/* 设置源：setDataSource   
+   mediaplayerService创建player
 
 
 */
@@ -100,6 +101,13 @@ setDataSource(httpService, pathStr,&headersVector){
 }@mediaplayer.cpp
 
 4.
+/*视频设置surface
+*/
+setSurface/setDisplay@MediaPlayer.java-->android_media_MediaPlayer_setVideoSurface-->
+setVideoSurface-->getMediaPlayer().setVideoSurfaceTexture@android_media_MediaPlayer.cpp
+-->setVideoSurfaceTexture(bufferProducer)-->mPlayer->setVideoSurfaceTexture@mediaplayer.cpp
+
+5.
 /* 准备:prepare
 */
 prepare@MediaPlayer.java-->android_media_MediaPlayer_prepare-->
@@ -114,8 +122,7 @@ MediaPlayer::prepare-->MediaPlayer::prepareAsync_l{
 }@mediaplayer.cpp
 
 
-
-5. 
+6. 
 /*开始播放:start
 */
 start-->_start@MediaPlayer.java-->android_media_MediaPlayer_start-->getMediaPlayer.start
@@ -123,12 +130,7 @@ start-->_start@MediaPlayer.java-->android_media_MediaPlayer_start-->getMediaPlay
 MediaPlayerService::Client::start-->getPlayer()->start@MediaPlayerService.cpp
 
 
-6.
-/*视频设置surface
-*/
-setSurface/setDisplay@MediaPlayer.java-->android_media_MediaPlayer_setVideoSurface-->
-setVideoSurface-->getMediaPlayer().setVideoSurfaceTexture@android_media_MediaPlayer.cpp
--->setVideoSurfaceTexture(bufferProducer)-->mPlayer->setVideoSurfaceTexture@mediaplayer.cpp
+
 
 frameworks/base/media/java/android/media/MediaPlayer.java
 frameworks/base/media/jni/android_media_MediaPlayer.cpp

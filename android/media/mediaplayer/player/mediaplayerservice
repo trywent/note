@@ -1,0 +1,186 @@
+/* mediaPlayerService
+
+  MediaPlayer@MediaPlayer.java-->MediaPlayer@mediaplayer.cpp-->
+  client@MediaPlayerService.cpp-->根据播放文件类型创建对应的Player
+  
+  client中包含本地player,audio,window
+
+*/
+main--> MediaPlayerService::instantiate@main_mediaserver.cpp
+MediaPlayerService::instantiate-->addService(String16("media.player"), new MediaPlayerService())
+-->{
+- mNextConnId = 1
+ //注册播放器内置factory
+- MediaPlayerFactory::registerBuiltinFactories()
+}@MediaPlayerService.cpp
+
+
+/*
+ mediaplayer的服务端client
+
+ 返回IMediaPlayer
+*/
+service->create@mediaplayer.cpp-->create(const sp<IMediaPlayerClient>& client,audio_session_t audioSessionId){
+  //class Client : public BnMediaPlayer :public BnInterface<IMediaPlayer>
+- sp<Client> c = new Client(this, pid, connId, client){
+	- mPid = pid
+	- mService = service
+	- mClient = client
+	}
+- mClients.add(w)
+- return c
+}@MediaPlayerService.cpp
+
+//client
+class Client : public BnMediaPlayer {
+sp<MediaPlayerBase>           mPlayer;
+sp<MediaPlayerService>        mService;
+sp<IMediaPlayerClient>        mClient;
+sp<AudioOutput>               mAudioOutput;
+pid_t                         mPid;
+status_t                      mStatus;
+bool                          mLoop;
+int32_t                       mConnId;
+audio_session_t               mAudioSessionId;
+audio_attributes_t *          mAudioAttributes;
+uid_t                         mUid;
+sp<ANativeWindow>             mConnectedWindow;
+sp<IBinder>                   mConnectedWindowBinder;
+struct sockaddr_in            mRetransmitEndpoint;
+bool                          mRetransmitEndpointValid;
+sp<Client>                    mNextClient;
+sp<MediaPlayerBase::Listener> mListener;
+}@MediaPlayerService.h
+
+/*设置源(创建Nuplayer)
+ setDataSource
+	- setDataSource_pre 创建NuPlayer,创建audioOutput
+	- MediaPlayerBase->setDataSource
+	- setDataSource_post
+*/
+
+//http
+player->setDataSource@mediaplayer.cpp-->Client::setDataSource(const sp<IMediaHTTPService> &httpService,const char *url){
+- "content://"{
+	- String16 url16(url)
+	- int fd = android::openContentProviderFile(url16)
+	- setDataSource(fd, 0, 0x7fffffffffLL) //设置文件
+	}
+- 其它url{
+	- player_type playerType = MediaPlayerFactory::getPlayerType(this, url)  //默认播放器类型	 
+	- sp<MediaPlayerBase> p = setDataSource_pre(playerType)//创建播放器	  
+	- setDataSource_post(p, p->setDataSource(httpService, url, headers))
+	}
+}@MediaPlayerService.cpp
+
+//设置播放文件
+MediaPlayerService::Client::setDataSource(int fd, int64_t offset, int64_t length){
+ //获取文件状态
+- struct stat sb
+- fstat(fd, &sb)
+ //设置源，创建client.mPlayer player
+- playerType = MediaPlayerFactory::getPlayerType(this,fd)
+- sp<MediaPlayerBase> p = setDataSource_pre(playerType)
+- setDataSource_post(p, p->setDataSource(fd, offset, length)){
+	- mPlayer = p
+	}
+}@MediaPlayerService.cpp
+
+//创建player 设置audioOutput
+setDataSource_pre(player_type){
+  //player
+- sp<MediaPlayerBase> p = createPlayer(playerType){
+	- sp<MediaPlayerBase> p = getPlayer()
+	- MediaPlayerFactory::createPlayer
+	}
+  //监听extractor进程
+- binder = defaultServiceManager()->getService(String16("media.extractor")
+- mExtractorDeathListener=new ServiceDeathNotifier(binder)
+- binder->linkToDeath(mExtractorDeathListener)
+  //监听codec进程
+- sp<IOmx> omx = IOmx::getService()//默认执行
+- mCodecDeathListener = new ServiceDeathNotifier(omx)
+- omx->linkToDeath(mCodecDeathListener)
+  //设置audio
+- mAudioOutput =new AudioOutput
+- p->setAudioSink(mAudioOutput)
+}@MediaPlayerService.cpp
+
+//设置源
+setDataSource-->p->setDataSource(fd)@MediaPlayerService.cpp
+
+/* setVideoSurfaceTexture
+   设置surface,显示视频
+*/
+MediaPlayerService::Client::setVideoSurfaceTexture(){
+- sp<MediaPlayerBase> p = getPlayer()
+- sp<IBinder> binder(IInterface::asBinder(bufferProducer))
+  //
+- sp<ANativeWindow> anw = new Surface(bufferProducer, true)
+- nativeWindowConnect(anw.get(), "setVideoSurfaceTexture")
+- p->setVideoSurfaceTexture(bufferProducer)
+- disconnectNativeWindow_l(){
+	- nativeWindowDisconnect(mConnectedWindow.get(), "disconnectNativeWindow")
+	- mConnectedWindow.clear()
+	}
+  //初始化本地的窗口变量
+- mConnectedWindow = anw
+- mConnectedWindowBinder = binder
+}@MediaPlayerService.cpp
+
+/* prepareAsync
+
+*/
+MediaPlayerService::Client::prepareAsync{
+- sp<MediaPlayerBase> p = getPlayer()
+- p->prepareAsync()
+}@MediaPlayerService.cpp
+
+
+/* start
+
+*/
+MediaPlayerService::Client::start-->p->start@MediaPlayerService.cpp
+
+/********************
+  MediaPlayerFactory
+*/
+//player factory
+MediaPlayerService::MediaPlayerService@MediaPlayerService.cpp-->
+registerBuiltinFactories{
+- registerFactory_l(new StagefrightPlayerFactory(), STAGEFRIGHT_PLAYER)
+- registerFactory_l(new NuPlayerFactory(), NU_PLAYER)
+- registerFactory_l(new TestPlayerFactory(), TEST_PLAYER)
+- registerFactory_l(new ApePlayerFactory(),APE_PLAYER);
+}@MediaPlayerFactory.cpp
+
+//根据播放文件，获取需要的播放器类型
+MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client, const char* url)-->GET_PLAYER_TYPE_IMPL{
+- player_type ret = STAGEFRIGHT_PLAYER
+   //遍历sFactoryMap,查找分数最高player
+- for (size_t i = 0; i < sFactoryMap.size()){
+	- IFactory* v = sFactoryMap.valueAt(i)
+	- thisScore = v->scoreFactory(a, bestScore)
+	- if (thisScore > bestScore) ret = sFactoryMap.keyAt(i)
+	}
+- bestScore==0.0 getDefaultPlayerType //分数为0,返回默认播放器NU_PLAYER
+@MediaPlayerFactory.cpp
+
+//创建player
+MediaPlayerFactory::createPlayer( player_type playerType,listener,pid_t pid){
+- factory = sFactoryMap.valueFor(playerType)
+- sp<MediaPlayerBase> p = factory->createPlayer(pid)-->NuPlayerFactory::createPlayer-->new NuPlayerDriver
+- p->initCheck
+- p->setNotifyCallback
+}@MediaPlayerFactory.cpp
+
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+frameworks/av/media/mediaserver/main_mediaserver.cpp
+frameworks/av/media/libmedia/IMediaPlayerService.cpp
+frameworks/av/media/libmedia/IMediaPlayer.cpp
+frameworks/av/media/libstagefright/AudioPlayer.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerFactory.cpp
+frameworks/av/media/libmediaplayerservice/StagefrightPlayer.cpp
+frameworks/av/media/libstagefright/AwesomePlayer.cpp
+
+
