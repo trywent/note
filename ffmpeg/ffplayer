@@ -1,0 +1,112 @@
+/**************************
+  ffmpeg
+*/
+流程：
+0 av_register_all			//初始化
+1 avformat_open_input			//打开文件获取编码信息
+2 avcodec_find_decoder， avcodec_alloc_context3，avcodec_open2	//根据信息获取解码器,打开解码器
+3 av_frame_alloc，av_frame_get_buffer， av_read_frame		//分配空间。储存的读取文件，储存解码后的数据
+4 avcodec_send_packet			//解码	
+5 avcodec_receive_frame			//获取解码数据
+6 sws_scale				//转换数据
+ 
+//多媒体文件结构
+typedef struct AVFormatContext {
+- unsigned int nb_streams	//文件中的流个数。视频流，音频流
+- AVStream **streams		//流结构
+- char *url			//文件名，路径
+}AVFormatContext@avformat.h
+
+//文件中的流
+typedef struct AVStream {
+- int index
+- AVCodecContext *codec		//不再使用。使用codecpar
+- AVCodecParameters *codecpar	//
+}AVStream@avformat.h
+
+//流的编码信息
+typedef struct AVCodecParameters {
+- enum AVMediaType codec_type
+- enum AVCodecID   codec_id
+- int width
+- int height
+- int      channels		//通道
+- int      sample_rate
+}AVCodecParameters@avformat.h
+
+
+//注册所有格式和解码器
+av_register_all-->ff_thread_once(&av_format_next_init, av_format_init_next)@allformats.c
+
+
+ffmpeg/libavformat/avformat.h
+ffmpeg/libavcodec/avcodec.h
+ffmpeg/libavformat/allformats.c
+/**************************
+ 读取数据，存储数据
+*/
+//分配帧空间
+AVFrame *av_frame_alloc(void)
+void av_frame_free(AVFrame **frame)
+
+//分配AVFrame帧中的buffer用于存储数据
+int av_frame_get_buffer(AVFrame *frame, int align)
+void av_frame_unref(AVFrame *frame)			//释放帧中的buffer
+
+
+ffmpeg/libavutil/frame.h
+ffmpeg/libavutil/frame.c
+
+/**************************
+ format
+
+ 获取文件格式，编码信息
+*/
+
+//打开一个流文件
+int avformat_open_input(AVFormatContext **ps, const char *url, ff_const59 AVInputFormat *fmt, AVDictionary **options)
+void avformat_close_input(AVFormatContext **ps)
+@util.c
+
+//读取下一帧数据
+int av_read_frame(AVFormatContext *s, AVPacket *pkt)
+
+ffmpeg/libavformat/avformat.h
+libavformat/utils.c
+
+/**************************
+  codec libavcodec
+
+  数据编解码
+*/
+//从注册的codec找到对应id的解码器
+AVCodec *avcodec_find_decoder(enum AVCodecID id)	
+AVCodec *avcodec_find_decoder_by_name(const char *name)	
+
+//获取codec的context
+AVCodecContext *avcodec_alloc_context3(const AVCodec *codec)
+void avcodec_free_context(AVCodecContext **avctx)
+
+//初始化AVCodecContext以使用AVCodec
+int avcodec_open2(AVCodecContext *avctx, const AVCodec *codec, AVDictionary **options)
+int avcodec_close(AVCodecContext *avctx)
+
+//解码
+int avcodec_send_packet(AVCodecContext *avctx, const AVPacket *avpkt)	//将数据传入到解码器
+int avcodec_receive_frame(AVCodecContext *avctx, AVFrame *frame)	//读取解码后的数据
+
+
+ffmpeg/libavcodec/avcodec.h
+/**************************
+ 数据转换
+*/
+
+//获取SwsContext
+struct SwsContext *sws_getContext(int srcW, int srcH, enum AVPixelFormat srcFormat,int dstW, int dstH,
+	enum AVPixelFormat dstFormat,int flags, SwsFilter *srcFilter,SwsFilter *dstFilter, const double *param)
+
+//将解码后的数据转化为期望大小，格式
+int sws_scale(struct SwsContext *c, const uint8_t *const srcSlice[],const int srcStride[], 
+	int srcSliceY, int srcSliceH,uint8_t *const dst[], const int dstStride[])
+
+ffmpeg/libswscale/swscale.h

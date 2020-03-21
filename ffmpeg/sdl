@@ -1,0 +1,39 @@
+/*
+ SDLSimple DirectMedia Layer
+*/
+流程
+1 初始化SDL_Init
+2 创建window,render,texture
+3 填充数据到texture,将texture数据填充到render
+4 将render数据显示到屏幕
+5 销毁，关闭
+
+//初始化 SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER
+int SDL_Init(Uint32 flags)	
+void SDLCALL SDL_Quit(void)
+
+//创建窗口
+SDL_Window *SDL_CreateWindow(const char *title, int x, int y, int w, int h, Uint32 flags)
+void SDLCALL SDL_DestroyWindow(SDL_Window * window)
+
+//创建render
+SDL_Renderer * SDLCALL SDL_CreateRenderer(SDL_Window * window,int index, Uint32 flags)
+int SDLCALL SDL_RenderClear(SDL_Renderer * renderer)				//清除当前render
+int SDLCALL SDL_RenderCopy(SDL_Renderer * renderer,SDL_Texture * texture,	//将texture的数据拷贝到render
+	const SDL_Rect * srcrect,const SDL_Rect * dstrect)
+void SDLCALL SDL_RenderPresent(SDL_Renderer * renderer)				//将render内容显示到屏幕
+void SDLCALL SDL_DestroyRenderer(SDL_Renderer * renderer)
+
+//创建texture
+SDL_Texture * SDLCALL SDL_CreateTexture(SDL_Renderer * renderer,Uint32 format,int access, int w,int h)
+int SDLCALL SDL_UpdateYUVTexture(SDL_Texture * texture,const SDL_Rect * rect,const Uint8 *Yplane,	//将数据填充到texture
+	int Ypitch, const Uint8 *Uplane, int Upitch, const Uint8 *Vplane, int Vpitch)
+void SDLCALL SDL_DestroyTexture(SDL_Texture * texture)
+
+//获取sdl事件
+int SDL_PollEvent(SDL_Event * event)
+
+
+SDL2-2.0.10/src/video/SDL_video.c
+SDL2-2.0.10/src/SDL.c
+SDL2-2.0.10/src/events/SDL_events.c
