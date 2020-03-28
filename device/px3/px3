@@ -11,3 +11,9 @@ dd if=/sdcard/boot.img of=/dev/block/platform/emmc/by-name/boot
 write /sys/bus/platform/drivers/usb20_otg/force_usb_mode 2
 //host
 write /sys/bus/platform/drivers/usb20_otg/force_usb_mode 1
+
+
+//px3两种烧录。。进入loader失败时，可以尝试3188的loader烧录img成功后，再换回px3的loader
+maskrom + RKMiniLoaderAll_PX3_V2.32_0913模式
+loader    maskrom和loader重启后进入该模式烧录其它img
+

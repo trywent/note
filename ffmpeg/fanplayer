@@ -1,0 +1,24 @@
+/*
+ 
+*/
+//接口
+nativeOpen (String url, Object surface, int w, int h, String params)
+nativeClose(long hplayer)
+nativePlay (long hplayer)
+nativePause(long hplayer)
+nativeSeek (long hplayer, long ms)
+nativeSetParam(long hplayer, int id, long value)
+nativeGetParam(long hplayer, int id)
+nativeSetDisplaySurface(long hplayer, Object surf)
+
+
+
+
+player_prepare(PLAYER *player){
+- 
+- init_stream
+}@ffplayer.c
+
+player-android/apk/app/src/main/java/com/rockcarry/fanplayer/MediaPlayer.java
+player-android/jni/fanplayer_jni.cpp
+src/ffplayer.c

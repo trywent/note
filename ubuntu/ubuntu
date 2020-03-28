@@ -3,6 +3,7 @@ gedit /etc/passwd
 gedit  /etc/shadow
 
 //查看用户
+chage -l username
 cat /etc/passwd
 
 more /etc/passwd
@@ -13,8 +14,11 @@ sudo adduser username
 //查看组
 groupmod <TAB 3次>
 
-sudo adduser username sudo //设置超级用户权限
-adduser username group //添加用户到组group
+//修改密码
+sudo passwd username
+
+sudo adduser username sudo 	//设置超级用户权限
+adduser username group 		//添加用户到组group
 
 //======================
 //install downgrade

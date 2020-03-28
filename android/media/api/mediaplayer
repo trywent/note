@@ -6,7 +6,7 @@
 -setAudioStreamType(AudioManager.STREAM_MUSIC)
 -setDataSource(getApplicationContext(), myUri)
 -setSurface(Surface surface)/setDisplay(SurfaceHolder)//视频播放时需要设置
--prepare()//获取源，解码。导致耗时长，mediaPlayer使用另一线程执行
+-prepare()					      //获取源，解码。导致耗时长，mediaPlayer使用另一线程执行
 -start()，pause，stop
 -release
 }MediaPlayer.java

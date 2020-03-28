@@ -23,6 +23,9 @@ extern "C" {
 
 */
 
+//构造函数
+不能为virtual
+
 //创建
 cls obj = new cls //在堆空间创建
 cls obj		  //在栈空间创建	
@@ -68,7 +71,7 @@ className c1 = c2 //调用赋值构造函数,c1,c2可能指向同一个指针
 //纯虚函数
 virtual void print() const = 0;
 （1）=0说明它是纯虚函数
-（2）const表明不能修改其数据成员
+（2）const表明不能修改类的数据成员
 
  
 //virtual xxxx const =0
@@ -146,6 +149,12 @@ template <class 形参名，class 形参名，......> 返回类型 函数名(参
 "abdc" 一个字符串
 'abcd' 字符字面量.一个4byte数值,填充了abcd
 
+
+/*
+ 关键字
+*/
+explicit	//显式构造函数，只对有一个未知参数的构造函数有效（有的构造函数有默认参数）。
+implicit	//隐式构造函数。默认调用的构造函数
 
 
 

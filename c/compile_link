@@ -1,33 +1,87 @@
 /*****************
   compile
+  
+
 */
+gcc:
+-c ：指编译，不链接，生成目标文件“.o”。
+-S ：只编译，不汇编，生成汇编代码“.S”。
+-E ：只进行预编译/预处理，不做其他处理。
+-f : -fFLAG和-fnoFLAG打开或关闭标示。pic(position independent code)
+-m : 代表模式。-mabi=xxx -mcpu=xxx
+-o file：把输出文件输出到file里。
+-g ：在可执行程序中包含标准调试信息。
+-v ：打印出编译器内部编译各过程的命令行信息和编译器的版本。
+-I dir ：头文件路径
+-L dir ：链接时的库路径
+-static ：连接静态库（静态库也可以用动态库链接方式链接）
+-llibrary ：连接名为library的库文件（动态静态都可以）
+-Wa,<options> :Pass comma-separated <options> on to the assembler
+-Wp,<options> :Pass comma-separated <options> on to the preprocessor
+-Wl,<options> :Pass comma-separated <options> on to the linker
+-Wl :将后面的参数传给linker
+	-soname,xxx 
+	-rpath_link 链接的路径
+	-rpath=/path 指定运行时库的路径对于交叉编译，只有配合 --sysroot 选项才能起作用
 
 
+静态库(不能直接执行，经过链接后可以)：编译时将库嵌入到代码中，不用加载。编译后代码两增大。
+动态库(能够被加载到内存，供其他程序执行)：代码运行时打开加载库。运行速度较慢
+
+//编译生成预处理文件
+gcc -E foo.c
 
 
+//编译创建静态库：使用archiver(ar)创建静态库
+gcc -c calc_mean.c -o calc_mean.o		//生成.o文件
+ar  -r libmean.a      calc_mean.o		//
+
+//编译创建动态库：
+gcc -c -fPIC calc_mean.c -o calc_mean.o    				//生成.o文件
+gcc -shared -Wl,-soname,libmean.so.1 -o libmean.so.1.0.1  calc_mean.o	//
 
 
-
-
-
-
-
-
-
+//防止编译器重排序，优化代码：
+__asm__ __volatile__ ("" : : : "memory");
 
 
 
 
 /*****************
   link
+
+  链接后的库不需要主动打开
 */
 
+//链接动态库：
+gcc main.c -o outfile -L. -lmean
+
+//链接静态库：
+gcc -static main.c -L. -lmean -o outfile
+gcc -llibmean.a -o outfile
+
+//同时链接静态库，动态库
+gcc -o outfile -Wl,-B,static -lxxxstatica -Wl,-B,dynamic -lxxxshareso
+
+//静态库链接有先后顺序。在android上
+- 1.a 依赖 2.a
+- 则1在2前面 LOCAL_LDFLAGS= 1.a 2.a 
 
 
+//动态加载库，不需要编译时链接
+lib = dlopen("libshared.so",)
+sym = dlsym(lib, "func")
+(void (*)(void))sym;
 
+/*****************
+ 运行时
+ public.libraries.android
+*/
 
 /*****************
   工具
 */
 dumpobj   xxx      //查看obj信息
 readelf  -l xxx    //读取elf信息
+ldd xxx  //查看可执行文件对库的依赖 
+objdump  //查看obj文件信息

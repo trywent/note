@@ -54,7 +54,12 @@ AndroidBoard.mk{
 - device/sprd/pike2/common/AndroidKernel.mk
 }
 
-================
-编译使用overlay：
+
+//编译使用overlay：
 　　PRODUCT_PACKAGE_OVERLAYS: used by a particular product
 　　DEVICE_PACKAGE_OVERLAYS: used several products that share a common device model
+
+/*
+ android soong  android.bp
+*/
+

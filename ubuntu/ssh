@@ -1,4 +1,6 @@
-//
+/**
+
+*/
 sudo apt-get install openssh-server //安装ssh服务
 //共用服务器
 git_wb@192.168.1.95
@@ -27,7 +29,9 @@ ssh-copyid user@host
 拷贝A中.ssh到C中.ssh。C可免密登录
 //server
 sudo apt-get install openssh-server
-如果有修改配置/etc/ssh/sshd_config，需要重启ssh服务器
+
+
+//如果有修改配置/etc/ssh/sshd_config，需要重启ssh服务器
 
 /etc/init.d/ssh restart
 

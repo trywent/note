@@ -255,15 +255,13 @@ make -j8 PRODUCT-sdk-sdk showcommands dist
 user_MODULES：=user_PACKAGES：=$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_PACKAGES)
 
 
-===================================
-生成密钥：
+//生成密钥：
 development/tools/make_key testkey  '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
 
 
 查看密钥：
 openssl x509 -noout -subject -issuer -in media.x509.pem
-====================================
-属性文件生成：
+//属性文件生成：
 # default.prop
 一般在root/下，基本由build/core/main.mk设置ADDITIONAL_DEFAULT_PROPERTIES
 
@@ -271,8 +269,7 @@ openssl x509 -noout -subject -issuer -in media.x509.pem
 - 由build/tools/buildinfo.sh 生成
 - (mstar中加入的system.prop)
 - ADDITIONAL_BUILD_PROPERTIES(core/main.mk设置)
-____________________________________
-默认语言设置：
+//默认语言设置：
 ro.product.locale.language@system.prop
 
 # Whether there is default locale set in PRODUCT_PROPERTY_OVERRIDES(build/target/product/基本都不设置)
@@ -301,17 +298,10 @@ PRODUCT_DEFAULT_REGION="$(call default-locale-region,$(PRODUCT_LOCALES))"
 
 设置系统属性@/tools/buildinfo.sh:
  echo "ro.product.locale.language=$PRODUCT_DEFAULT_LANGUA
-____________________________________
-可以自动创建对应目录：
-
+//可以自动创建对应目录：
 PRODUCT_COPY_FILES 
-____________________________________
-./java.mk:include $(BUILD_SYSTEM)/base_rules.mk
-./package.mk:include $(BUILD_SYSTEM)/java.mk
-./config.mk:BUILD_PACKAGE:= $(BUILD_SYSTEM)/package.mk
 
-====================================
-生成的jar包中间文件：
+//生成的jar包中间文件：
 
 out/target/common/obj/JAVA_LIBRARIES/framework_intermediates
 
@@ -319,7 +309,6 @@ out/target/common/obj/JAVA_LIBRARIES/framework_intermediates
 //.mk文件中配置资源
 PRODUCT_AAPT_CONFIG := hdpi xhdpi normal
 PRODUCT_AAPT_PREF_CONFIG := xhdpi
-
 ldpi
 mdpi  //density 160
 hdpi
