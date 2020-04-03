@@ -19,6 +19,11 @@ player_prepare(PLAYER *player){
 - init_stream
 }@ffplayer.c
 
+
+handle_fseek_or_reconnect
+
+
+
 player-android/apk/app/src/main/java/com/rockcarry/fanplayer/MediaPlayer.java
 player-android/jni/fanplayer_jni.cpp
 src/ffplayer.c

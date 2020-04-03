@@ -63,3 +63,5 @@ AndroidBoard.mk{
  android soong  android.bp
 */
 
+mk和bp装换工具out/soong/host/linux-x86/bin/androidmk
+

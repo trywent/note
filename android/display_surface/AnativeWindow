@@ -1,0 +1,21 @@
+/*
+ surface 
+ ANativeWindow
+*/
+
+//ANativeObjectBase
+template <typename NATIVE_TYPE, typename TYPE, typename REF,typename NATIVE_BASE = android_native_base_t>
+class ANativeObjectBase : public NATIVE_TYPE, public REF
+@ANativeObjectBase.h
+
+
+//surface实现了ANavtiveWindow
+class Surface: public ANativeObjectBase<ANativeWindow, Surface, RefBase>
+
+
+
+
+
+frameworks/native/include/ui/ANativeObjectBase.h
+frameworks/native/libs/nativewindow/include/system/window.h
+frameworks/native/libs/nativewindow/ANativeWindow.cpp

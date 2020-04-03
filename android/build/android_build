@@ -314,7 +314,12 @@ mdpi  //density 160
 hdpi
 
 //关闭优化
-WITH_DEXPREOPT=false
+WITH_DEXPREOPT :=false
+
+
+    dex_preopt:{
+	enabled:false,
+    },
 
 //OutOfMemoryError
 export _JAVA_OPTIONS="-Xmx4g"

@@ -1,0 +1,149 @@
+/***********************
+
+ android gradle
+
+ https://developer.android.google.cn/studio/releases/gradle-plugin
+ http://google.github.io/android-gradle-dsl/current/
+*/
+
+1 settings.gradle	//指定哪个模块被包含(一般是当前目录app)。include ‘:app’
+2 build.gradle		//第一级build文件。作用到所有模块
+
+buildscript {		//
+    repositories {	//用于下载依赖的仓库
+        google()
+        jcenter()
+    }
+    dependencies {	//工程的依赖
+        classpath 'com.android.tools.build:gradle:3.6.0'
+    }
+}
+allprojects {		//工程中模块使用的依赖所在的仓库。插件，库
+   repositories {
+       google()
+       jcenter()
+   }
+}
+
+3 build.gradle		//模块的编译文件
+
+apply plugin: 'com.android.application'	//使用android应用插件
+android{				//配置android的编译选项
+	compileSdkVersion 28		//android api版本
+	buildToolsVersion "29.0.2"	//编译工具的sdk版本
+	
+	defaultConfig {			//可以覆盖androidmanifest的配置
+   		applicationId 'com.example.myapp'
+    		minSdkVersion 15
+    		targetSdkVersion 28
+		versionCode 1
+		versionName "1.0"
+  	}
+
+	flavorDimensions "tier"		//定义一个flavor名。使用这种类型分类
+  	productFlavors {		//flavor分类
+    		free {
+     		dimension "tier"
+      		applicationId 'com.example.myapp.free'
+    		}
+
+    		paid {
+      		dimension "tier"
+	     	applicationId 'com.example.myapp.paid'
+    	}
+ 	}
+	
+	splits {			//不同的尺寸，编译不同的apk
+    		density {
+     		enable false
+      		exclude "ldpi", "tvdpi", "xxxhdpi", "400dpi", "560dpi"
+    		}
+  	}
+
+
+	buildTypes {			//编译类型debug,release
+    	release {
+        	minifyEnabled true 	// Enables code shrinking for the release build type.
+        	proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+   	 	}
+  	}
+
+}
+
+dependencies {				//依赖的库，jar
+    implementation project(":lib")
+    implementation 'com.android.support:appcompat-v7:28.0.0'
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+}
+
+4 gradle.properties			//gradle的配置，堆大小
+5 local.properties			//本地的目录信息
+//android 插件
+apply plugin: 'com.android.application'
+
+
+
+
+
+
+/***********************
+
+ gradle
+
+ https://developer.android.google.cn/studio/releases/gradle-plugin
+*/
+创建一个gradle工程步骤
+gradle init
+task
+plugin
+
+/* gradle init	初始化一个工程
+
+*/
+//gradle init后的目录结构
+
+├── build.gradle  1
+├── gradle
+│   └── wrapper
+│       ├── gradle-wrapper.jar  2
+│       └── gradle-wrapper.properties  3
+├── gradlew  4
+├── gradlew.bat  5
+└── settings.gradle  6
+
+1 Gradle build script for configuring the current project
+2 Gradle Wrapper executable JAR
+3 Gradle Wrapper configuration properties
+4 Gradle Wrapper script for Unix-based systems
+5 Gradle Wrapper script for Windows
+6 Gradle settings script for configuring the Gradle build
+
+/*  task
+  
+   可以使用groovy或者kotlin语音创建任务
+*/
+task xxx{}
+
+/* plugin 使用插件
+
+
+*/
+
+
+
+/*****************
+ 使用的语言Groovy
+
+*/
+
+//DSL(domain specific language)特定领域语言
+DSL语言：xml、html
+DSL与通用编程语言的区别：求专不求全，解决特定问题
+
+
+//Groovy介绍：
+1 一种基于JVM的敏捷开发语言
+2 结合了Python、Ruby和Smalltalk的许多强大的特性
+3 Groovy可以与Java完美结合，而且可以使用Java所有的库
+
+

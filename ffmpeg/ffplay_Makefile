@@ -1,0 +1,69 @@
+CXX = gcc
+
+#动态库
+LIBS = -L/home/bsp/src/ffplayer/libs -lSDL2 -lavutil -lavformat -lavcodec -lswscale -lswresample -Wl,-rpath=/home/bsp/src/ffplayer/libs
+#静态库依赖有顺序
+LIB = -L/home/bsp/src/ffplayer/statics -lSDL2  -lavdevice -lavformat -lavfilter -lavcodec -lswscale -lavresample -lswresample -lavutil -lswscale
+LOCAL_LIB = -L/lib/x86_64-linux-gnu -lm -lc -lz -lpthread
+INCLUDE = -I/home/bsp/src/ffplayer/include -I/home/bsp/src/ffplayer/include/SDL2
+
+
+CXXFLAGS = -Wall -c  $(INCLUDE)
+LDFLAGS = $(LIB) $(LOCAL_LIB)
+CFLAGS = -Wall  $(INCLUDE)
+
+SRC = tutorial01.c tutorial02.c tutorial03.c tutorial04.c tutorial05.c tutorial05.c tutorial07.c
+OBJ = tutorial01.o tutorial02.o tutorial03.o tutorial04.o tutorial05.o tutorial05.o tutorial07.o
+EXE = t1 t2 t3 t4 t5 t6 t7
+
+all: $(EXE)
+
+sdl_thread.o:sdl_thread.c
+	$(CXX) $(CXXFLAGS) $< -o $@
+
+t1: tutorial01.o
+	$(CXX) $< $(LDFLAGS) -o $@
+
+tutorial02.o:tutorial02.c
+	$(CXX) $(CXXFLAGS) $< -o $@
+t2:sdl_thread.o tutorial02.o 
+	$(CXX) $^ $(LDFLAGS) -o $@
+
+
+tutorial03.o:tutorial03.c
+	$(CXX) $(CXXFLAGS) $< -o $@
+
+t3:sdl_thread.o tutorial03.o 
+	$(CXX) $^ $(LDFLAGS) -o $@
+
+
+#tutorial04.o:tutorial04.c
+#	$(CXX) $(CXXFLAGS) $< -o $@
+t4:sdl_thread.c tutorial04.c
+	$(CXX)  $^ $(CFLAGS) $(LDFLAGS) -o $@ 
+
+
+tutorial05.o:tutorial05.c
+	$(CXX) $(CXXFLAGS) $< -o $@
+t5:sdl_thread.o tutorial05.o
+	$(CXX) $^ $(LDFLAGS) -o $@
+
+
+tutorial06.o:tutorial06.c
+	$(CXX) $(CXXFLAGS) $< -o $@
+t6:sdl_thread.o tutorial06.o
+	$(CXX) $^ $(LDFLAGS) -o $@
+
+
+tutorial07.o:tutorial07.c
+	$(CXX) $(CXXFLAGS) $< -o $@
+t7:sdl_thread.o tutorial07.o
+	$(CXX) $^ $(LDFLAGS) -o $@
+
+#$(EXE): $(OBJ)
+
+#$(OBJ): $(SRC)
+#	$(CXX) $(CXXFLAGS) $< -o $@
+
+clean:
+	rm *.o && rm $(EXE)

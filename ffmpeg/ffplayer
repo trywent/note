@@ -98,10 +98,12 @@ int avcodec_receive_frame(AVCodecContext *avctx, AVFrame *frame)	//读取解码�
 
 ffmpeg/libavcodec/avcodec.h
 /**************************
- 数据转换
+ 数据处理 swscale
+ 尺寸切换，
 */
 
 //获取SwsContext
+//设置src大小，格式。dst大小，格式
 struct SwsContext *sws_getContext(int srcW, int srcH, enum AVPixelFormat srcFormat,int dstW, int dstH,
 	enum AVPixelFormat dstFormat,int flags, SwsFilter *srcFilter,SwsFilter *dstFilter, const double *param)
 
@@ -110,3 +112,34 @@ int sws_scale(struct SwsContext *c, const uint8_t *const srcSlice[],const int sr
 	int srcSliceY, int srcSliceH,uint8_t *const dst[], const int dstStride[])
 
 ffmpeg/libswscale/swscale.h
+
+/**************************
+ 数据处理 AVfilter
+ 尺寸切换，滤镜，
+ 
+*/
+scale filter		//尺寸转换
+overylay filter		//叠加
+buffer filter		//源数据(处理前的数据)
+buffersink filter	//目标数据(处理后的数据)
+
+AVFilterGraph *avfilter_graph_alloc(void)							//创建AVFilterGraph
+AVFilter *avfilter_get_by_name(const char *name)						//创建AVFilter
+int avfilter_graph_create_filter(AVFilterContext **filt_ctx, const AVFilter *filt,		//将AVFilter加入AVFilterGraph
+           const char *name, const char *args, void *opaque,AVFilterGraph *graph_ctx)
+int avfilter_link(AVFilterContext *src, unsigned srcpad,AVFilterContext *dst, unsigned dstpad)	//连接AVFilter
+
+//filter 设置流程
+AVFilterGraph *graph = avfilter_graph_alloc()	//一串filter的集合（代表一个功能）
+AVFilterContext *filt_src			//用于操作source filter
+avfilter_graph_create_filter(&filt_src, avfilter_get_by_name("buffer"), "src",NULL, is, graph)
+AVFilterContext *filt_out			//用于操作sink filter
+ret = avfilter_graph_create_filter(&filt_out, avfilter_get_by_name("buffersink"), "out", NULL, pix_fmts, graph)
+avfilter_link(filt_src, 0, filt_out, 0)		//连接source和sink
+avfilter_graph_config(graph, NULL)		//配置
+
+//filter 处理数据流程。执行以上fliter的配置后就可以往filter填充数据
+int av_buffersrc_add_frame(AVFilterContext *ctx, AVFrame *frame)	//填充数据到buffersrc
+int av_buffersink_get_frame(AVFilterContext *ctx, AVFrame *frame)	//从buffersink获取处理后的数据
+
+

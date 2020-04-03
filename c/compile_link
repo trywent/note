@@ -1,7 +1,9 @@
 /*****************
   compile
-  
 
+ GNU编译器套装（英语：GNU Compiler Collection，缩写为GCC)。原名为GNU C语言编译器（GNU C Compiler）
+
+ Clang编译器前端。它采用了LLVM作为其后端
 */
 gcc:
 -c ：指编译，不链接，生成目标文件“.o”。
@@ -23,10 +25,18 @@ gcc:
 	-soname,xxx 
 	-rpath_link 链接的路径
 	-rpath=/path 指定运行时库的路径对于交叉编译，只有配合 --sysroot 选项才能起作用
-
+-Wall	:显示所有警告
+-Werror=xxx :所有warning当做错误
+-Wno-error=xxx :取消错误提示
 
 静态库(不能直接执行，经过链接后可以)：编译时将库嵌入到代码中，不用加载。编译后代码两增大。
 动态库(能够被加载到内存，供其他程序执行)：代码运行时打开加载库。运行速度较慢
+
+//系统库
+libz  压缩库（Z）
+librt 实时库（real time）
+libm  数学库（math）
+libc  标准C库（C lib
 
 //编译生成预处理文件
 gcc -E foo.c

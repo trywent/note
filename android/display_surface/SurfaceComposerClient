@@ -96,7 +96,7 @@ setTransactionState{
 }@Surfaceflinger.cpp
 
 /*
- surfaceControl,提供给上层的操作接口
+ surfaceControl,提供给上层的操作接口。通过SurfaceComposerClient创建
 	SurfaceComposerClient	用于操作surface
 	IGraphicBufferProducer  用于填充显示数据的buffer
 

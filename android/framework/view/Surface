@@ -1,7 +1,11 @@
 /******************************
- SurfaceSession 应用client端到surfaceflinger的一个连接(创建surface的接口)
+ SurfaceSession 应用client端到surfaceflinger的一个连接(创建surface的接口)。对应SurfaceComposerClient
  SurfaceControl 操作native surface的接口
  Surface 封装SurfaceControl的接口.应用绘制数据都是通过Surface
+
+
+ cpp层中是由SurfaceComposerClient控制显示窗口
+
 */
 //activity中view创建surface
 addWindow@WindowManagerService.java-->attach@WindowState.java-->
@@ -78,9 +82,8 @@ nativeCreate(JNIEnv* env, jclass clazz, jobject sessionObj,jstring nameStr,
 - return reinterpret_cast<jlong>(surface.get())
 }@android_view_SurfaceControl.cpp
 
-
-destory-->nativeDestroy@SurfaceControl.java-->
-destroy-->mClient->destroySurface(mHandle)@SurfaceControl.cpp
+//销毁
+destory-->nativeDestroy@SurfaceControl.java-->destroy-->mClient->destroySurface(mHandle)@SurfaceControl.cpp
 
 //SurfaceControl.Builder
 Builder(SurfaceSession session) {
@@ -101,7 +104,6 @@ setSize
 hide
 show
 
-
 //提交设置
 closeTransaction-->nativeCloseTransaction@SurfaceControl.java-->SurfaceComposerClient::closeGlobalTransaction
 @android_view_SurfaceControl.cpp
@@ -121,6 +123,16 @@ frameworks/native/libs/gui/SurfaceComposerClient.cpp
  3 提交buffer unlockCanvasAndPost-->
 
 */
+android_view_Surface_createFromIGraphicBufferProducer(JNIEnv* env,
+        const sp<IGraphicBufferProducer>& bufferProducer){
+- sp<Surface> surface(new Surface(bufferProducer, true))
+- android_view_Surface_createFromSurface(JNIEnv* env, const sp<Surface>& surface){
+	- jobject surfaceObj = env->NewObject(gSurfaceClassInfo.clazz,gSurfaceClassInfo.ctor, (jlong)surface.get())
+		-->Surface(long nativeObject)@Surface.java
+	}
+}@android_view_Surface.cpp
+
+
 1//创建surface
 mSurface.copyFrom(mSurfaceControl)-->copyFrom(SurfaceControl other){
 - long surfaceControlPtr = other.mNativeObject
@@ -143,7 +155,7 @@ lockCanvas(Rect inOutDirty){
 //初始化canvas
 nativeLockCanvas(JNIEnv* env, jclass clazz,jlong nativeObject, jobject canvasObj, jobject dirtyRectObj) {
 - sp<Surface> surface(reinterpret_cast<Surface *>(nativeObject))
-  //获取rect大小.获取ANativeWindow_Buffer (一个显示窗口)
+  //获取rect大小.获取ANativeWindow_Buffer (一个显示窗口的buffer,用于填充绘制数据)
 - dirtyRect.left   = env->GetIntField(dirtyRectObj, gRectClassInfo.left)
 - Rect* dirtyRectPtr = &dirtyRect
 - ANativeWindow_Buffer outBuffer
@@ -177,6 +189,20 @@ unlockCanvasAndPost-->nativeUnlockCanvasAndPost@Surface.java-->nativeUnlockCanva
 }@android_view_Surface.cpp
 
 
+//从surface获取buffer
+Surface::lock( ANativeWindow_Buffer* outBuffer, ARect* inOutDirtyBounds){
+  //从队列中获取一个buffer
+- ANativeWindowBuffer* out
+- dequeueBuffer(&out, &fenceFd)
+- sp<GraphicBuffer> backBuffer(GraphicBuffer::getSelf(out))
+  //设置到outBuffer
+- void* vaddr
+- backBuffer->lockAsync(GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN,
+		newDirtyRegion.bounds(), &vaddr, fenceFd)
+- outBuffer->bits   = vaddr
+}@Surface.cpp
+
+//填充buffer完成，提交数据
 surface->unlockAndPost{
 - mLockedBuffer->unlock
 - queueBuffer{
