@@ -1,0 +1,167 @@
+/*
+ android
+
+*/
+public interface IMediaPlayer {	//接口和系统接口几乎一样
+- setDataSource
+- prepareAsync
+- start
+- stop
+- pause
+- seekTo
+}
+
+//创建player
+IjkMediaPlayer(IjkLibLoader libLoader)-->initPlayer(libLoader){
+- loadLibrariesOnce(libLoader){
+	- libLoader.loadLibrary("ijkffmpeg")
+	- libLoader.loadLibrary("ijksdl")
+	- libLoader.loadLibrary("ijkplayer")
+	}
+- initNativeOnce-->native_init
+- Looper looper = Looper.myLooper()
+- mEventHandler = new EventHandler(this, looper)
+- native_setup(new WeakReference<IjkMediaPlayer>(this))
+}@IjkMediaPlayer.java
+
+
+//natvie method
+static JNINativeMethod g_methods[] = {
+    { "_setDataSource",        (void *)IjkMediaPlayer_setDataSourceCallback },
+    { "_setAndroidIOCallback", (void *)IjkMediaPlayer_setAndroidIOCallback },
+    { "_setVideoSurface",      (void *) IjkMediaPlayer_setVideoSurface },
+    { "_prepareAsync",         (void *) IjkMediaPlayer_prepareAsync },
+    { "_start",                (void *) IjkMediaPlayer_start },
+    { "_stop",                 (void *) IjkMediaPlayer_stop },
+    { "seekTo",                (void *) IjkMediaPlayer_seekTo },
+    { "_pause",                (void *) IjkMediaPlayer_pause },
+    { "isPlaying",             (void *) IjkMediaPlayer_isPlaying },  
+}@ijkplayer_jni.c
+
+//库加载
+JNI_OnLoad(JavaVM *vm, void *reserved){
+- IJK_FIND_JAVA_CLASS(env, g_clazz.clazz, JNI_CLASS_IJKPLAYER)	//"tv/danmaku/ijk/media/player/IjkMediaPlayer"
+- (*env)->RegisterNatives(env, g_clazz.clazz, g_methods, NELEM(g_methods) )
+- ijkmp_global_init@ijkplay.c-->ffp_global_init@ff_ffplay.c
+- 
+}@ijkplayer_jni.c
+
+//初始化
+IjkMediaPlayer_native_setup{
+- IjkMediaPlayer *mp = ijkmp_android_create(message_loop)
+- jni_set_media_player(env, thiz, mp)
+}@ijkplayer_jni.c
+
+
+ijkplayer/android/ijkplayer/ijkplayer-java/src/main/java/tv/danmaku/ijk/media/player/IMediaPlayer.java
+ijkplayer/android/ijkplayer/ijkplayer-java/src/main/java/tv/danmaku/ijk/media/player/AbstractMediaPlayer.java
+ijkplayer/android/ijkplayer/ijkplayer-java/src/main/java/tv/danmaku/ijk/media/player/IjkMediaPlayer.java
+ijkplayer/ijkmedia/ijkplayer/android/ijkplayer_jni.c
+/*
+ jni4android
+
+*/
+
+
+J4A_loadClass__J4AC_tv_danmaku_ijk_media_player_IjkMediaPlayer(JNIEnv *env)
+
+ijkplayer/ijkmedia/ijkj4a/j4a/j4a_base.c
+ijkplayer/ijkmedia/ijkj4a/j4a/class/tv/danmaku/ijk/media/player/IjkMediaPlayer.c
+
+
+/*
+ native
+
+*/
+//ffmpeg
+JNI_OnLoad@ijkplayr_jni.c-->ijkmp_global_init@ijkplay.c-->
+ffp_global_init{
+- avcodec_register_all
+- avdevice_register_all
+- avfilter_register_all
+- av_register_all
+- ijkav_register_all
+}@ff_play.c
+
+
+//MediaPlayer
+struct IjkMediaPlayer {
+    volatile int ref_count;
+    pthread_mutex_t mutex;
+    FFPlayer *ffplayer;
+
+    int (*msg_loop)(void*);
+    SDL_Thread *msg_thread;
+    SDL_Thread _msg_thread;
+
+    int mp_state;
+    char *data_source;
+    void *weak_thiz;
+
+    int restart;
+    int restart_from_beginning;
+    int seek_req;
+    long seek_msec;
+};
+
+ijkmp_android_create(int(*msg_loop)(void*)){
+  //创建IjkMediaPlayer
+- IjkMediaPlayer *mp = ijkmp_create(msg_loop){
+	- IjkMediaPlayer *mp = (IjkMediaPlayer *) mallocz(sizeof(IjkMediaPlayer))
+	- mp->ffplayer = ffp_create()
+	- mp->msg_loop = msg_loop
+	}@ijkplayer.c
+  //创建vout
+- mp->ffplayer->vout = SDL_VoutAndroid_CreateForAndroidSurface()@ijksdl_vout_android_surface.c
+	-->SDL_VoutAndroid_CreateForANativeWindow{
+	- SDL_Vout *vout = SDL_Vout_CreateInternal(sizeof(SDL_Vout_Opaque))
+	- vout->opaque_class    = &g_nativewindow_class
+	- vout->create_overlay  = func_create_overlay
+	}@ijksdl_vout_android_nativewindow.c
+  //pipeline
+- mp->ffplayer->pipeline = ffpipeline_create_from_android(mp->ffplayer){
+	- IJKFF_Pipeline *pipeline = ffpipeline_alloc(&g_pipeline_class, sizeof(IJKFF_Pipeline_Opaque))
+	- IJKFF_Pipeline_Opaque *opaque = pipeline->opaque
+	- pipeline->func_destroy              = func_destroy
+	- pipeline->func_open_video_decoder   = func_open_video_decoder
+	}@ffpipeline_android.c
+- ffpipeline_set_vout(mp->ffplayer->pipeline, mp->ffplayer->vout)
+}@ijkplayer_android.c
+
+
+//设置源
+ijkmp_set_data_source(IjkMediaPlayer *mp, const char *url)-->ijkmp_set_data_source_l@ijkplayer.c
+
+
+//perpare。读取线程read_thread，渲染线程video_refresh_thread
+ijkmp_prepare_async-->ijkmp_prepare_async_l{
+- ijkmp_change_state_l(mp, MP_STATE_ASYNC_PREPARING)
+- msg_queue_start(&mp->ffplayer->msg_queue)
+- ijkmp_inc_ref(mp)
+- mp->msg_thread = SDL_CreateThreadEx(&mp->_msg_thread, ijkmp_msg_loop, mp, "ff_msg_loop")
+  //打开文件
+- ffp_prepare_async_l(mp->ffplayer, mp->data_source){
+	- av_opt_set_dict(ffp, &ffp->player_opts)
+	- ffp->aout = ffpipeline_open_audio_output(ffp->pipeline, ffp)
+	- VideoState *is = stream_open(ffp, file_name, NULL){
+		- VideoState *is = av_mallocz(sizeof(VideoState))
+		- frame_queue_init(&is->pictq, &is->videoq, ffp->pictq_size, 1)	//初始化视频，音频，字幕frame队列
+		- packet_queue_init(&is->videoq)				//初始化视频，音频，字幕package队列
+		- init_clock(&is->vidclk, &is->videoq.serial)			//初始化视频，音频，字幕时钟
+		- is->video_refresh_tid = SDL_CreateThreadEx(&is->_video_refresh_tid, video_refresh_thread, ffp, "ff_vout")
+		- is->read_tid = SDL_CreateThreadEx(&is->_read_tid, read_thread, ffp, "ff_read")
+		}
+	}@ff_ffplay.c
+}@ijkplayer.c
+
+
+
+
+ijkplayer/ijkmedia/ijkplayer/android/ijkplayer_android.c
+ijkplayer/ijkmedia/ijkplayer/ijkplayer.c
+ijkplayer/ijkmedia/ijkplayer/android/ijkplayer_jni.c
+ijkplayer/ijkmedia/ijkplayer/ff_ffplay.c
+ijkplayer/ijkmedia/ijksdl/android/ijksdl_vout_android_surface.c
+ijkplayer/ijkmedia/ijkplayer/android/pipeline/ffpipeline_android.c
+ijkplayer/ijkmedia/ijksdl/android/ijksdl_vout_android_nativewindow.c
+

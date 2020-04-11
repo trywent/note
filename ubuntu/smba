@@ -2,39 +2,55 @@
 
 
 //install Samba
-    sudo apt-get update
-    sudo apt-get install samba
+sudo apt-get update
+sudo apt-get install samba
 
 //Set a password for your user in Samba //最好和已有用户同名
-
-    sudo smbpasswd -a <user_name>
-
+sudo smbpasswd -a <user_name>
 
 //创建共享文件夹
 mkdir /home/<user_name>/<folder_name>
 
-//编辑 "/etc/samba/smb.conf"
-sudo nano /etc/samba/smb.conf
-//增加
-    [<folder_name>]
-    path = /home/<user_name>/<folder_name>
-    valid users = <user_name>
-    read only = no
+//编辑 sudo vim /etc/samba/smb.conf 增加
+[<folder_name>]			
+path = /home/<user_name>/<folder_name>
+valid users = <user_name>
+read only = no
 
+
+//访问软连接
+在配置文件的“[global]”节的最后，加上下面三条设置：
+follow symlinks = yes
+wide links = yes
+unix extensions = no
 
 //重启samba:
 sudo service smbd restart
+
+//共享home目录 需要修改下面的注释
+[homes]
+   comment = Home Directories
+   browseable = yes
+   read only = no
+   create mask = 0775
+   directory mask = 0775
+   valid users = %S
+
+sudo smbpasswd -a wing 	//创建smba的密码
 
 //测试smb.conf是否正确:"
 testparm
 
 //访问:
-      sudo apt-get install smbclient
-      # List all shares:
-      smbclient -L //<HOST_IP_OR_NAME>/<folder_name> -U <user>
-      # connect:
-      smbclient //<HOST_IP_OR_NAME>/<folder_name> -U <user>
+sudo apt-get install smbclient
+smbclient -L //<HOST_IP_OR_NAME>/<folder_name> -U <user>	# List all shares:
+smbclient //<HOST_IP_OR_NAME>/<folder_name> -U <user>	# connect:
 
 
 //挂载
 sudo mount -t cifs //192.168.1.230/open_src /mnt -o username=api,password=api
+
+
+//windows中映射共享的目录
+
+打开我的电脑---》网络右键----》映射网络驱动器---》填入地址\\192.168.1.230\open_src

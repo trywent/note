@@ -1,5 +1,7 @@
 /*
- SDLSimple DirectMedia Layer
+ SDL Simple DirectMedia Layer
+
+ 平台相关的接口，显示接口，声音接口
 */
 流程
 1 初始化SDL_Init
@@ -24,7 +26,7 @@ int SDLCALL SDL_RenderCopy(SDL_Renderer * renderer,SDL_Texture * texture,	//将t
 void SDLCALL SDL_RenderPresent(SDL_Renderer * renderer)				//将render内容显示到屏幕
 void SDLCALL SDL_DestroyRenderer(SDL_Renderer * renderer)
 
-//创建texture
+//创建texture，填充音视频解码后的数据
 SDL_Texture * SDLCALL SDL_CreateTexture(SDL_Renderer * renderer,Uint32 format,int access, int w,int h)
 int SDLCALL SDL_UpdateYUVTexture(SDL_Texture * texture,const SDL_Rect * rect,const Uint8 *Yplane,	//将数据填充到texture
 	int Ypitch, const Uint8 *Uplane, int Upitch, const Uint8 *Vplane, int Vpitch)

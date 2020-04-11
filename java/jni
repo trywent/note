@@ -28,10 +28,7 @@ const struct JNINativeInterface ... = {
 
     RegisterNatives,
     UnregisterNatives,
-}
-
-
-dalvik/vm/Jni.cpp
+}@dalvik/vm/Jni.cpp
 
 /********************
  使用jni
@@ -41,12 +38,12 @@ dalvik/vm/Jni.cpp
 
 //动态加载库
 static {
-   System.loadLibrary("libname");
+   System.loadLibrary("libxxx");
 }
 
 //静态链接库到VM
-1 静态链接的库名xxxname，必须定义一个函数JNI_OnLoad_xxxname
-2 System.loadLibrary("xxxname")，和动态调用一样
+1 静态链接的库名xxx，必须定义一个函数JNI_OnLoad_xxx
+2 System.loadLibrary("xxx")，和动态调用一样
 
 //navite函数命名：
 - Java_前缀
@@ -60,6 +57,10 @@ _0XXXX 	a Unicode character XXXX.
 _1 	the character "_"
 _2 	the character ";" in signatures
 _3 	the character "[" in signatures 
+
+//注册jni函数
+jniRegisterNativeMethods@JNIHelp.cpp-->(*env)->RegisterNatives-->
+RegisterNatives(遍历methods注册)-->dvmRegisterJNIMethod@Jni.cpp
 
 
 /*

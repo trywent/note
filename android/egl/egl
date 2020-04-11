@@ -1,14 +1,90 @@
-//
-SurfaceFlinger::init
+/*
+ OpenGL® ES: cross-platform API for rendering advanced 2D and 3D graphics embedded and mobile systems (嵌入式平台上的图形接口)
+
+ EGL: OpenGL ES or OpenVGand the underlying native platform window system(openGL ES和平台窗口系统的接口)
+*/
+//egl
+EGLContext{
+- EGL EGL_INSTANCE = new com.google.android.gles_jni.EGLImpl()
+- EGL getEGL() {
+	- return EGL_INSTANCE
+	}
+}@EGLContext.java
+
+//GLSurfaceView opengl实现的surfaceview
+setRenderer(Renderer renderer){
+- mEGLConfigChooser = new SimpleEGLConfigChooser(true)
+- mEGLContextFactory = new DefaultContextFactory()
+- mEGLWindowSurfaceFactory = new DefaultWindowSurfaceFactory()
+- mRenderer = renderer
+- mGLThread = new GLThread(mThisWeakRef){
+	- mGLSurfaceViewWeakRef = glSurfaceViewWeakRef
+	}
+- mGLThread.start()-->run-->guardedRun{
+	- mEglHelper = new EglHelper(mGLSurfaceViewWeakRef)
+	- 
+	}
+}@GLSurfaceView.java
 
 
 
 
-//
-native_surface = session()->createSurface()//创建本地surface
-EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-eglInitialize(display, 0, 0);//初始化display
-eglChooseConfig(display, attribs, &config, 1, &numConfigs);//参数配置
-surface = eglCreateWindowSurface(display, config, native_surface.get());
-context = eglCreateContext(display, config);
-eglSwapBuffers(display, surface)
+
+frameworks/base/opengl/java/javax/microedition/khronos/egl/EGLContext.java
+frameworks/base/opengl/java/com/google/android/gles_jni/EGLImpl.java
+frameworks/base/opengl/java/android/opengl/GLSurfaceView.java
+frameworks/base/core/jni/com_google_android_gles_jni_EGLImpl.cpp
+frameworks/base/core/jni/android_opengl_EGLExt.cpp
+/*
+ native 层
+
+*/
+surface的两种形式：
+single-buffered	只有一个buffer,绘制到buffer的数据会显示
+back-buffered	两个buffer,一个可见一个不可见。绘制的数据在不可见buffer,需要调用eglSwapBuffers
+
+//android平台
+typedef struct ANativeWindow*           EGLNativeWindowType;
+typedef EGLNativeWindowType  NativeWindowType;
+
+//使用流程
+native_surface = session()->createSurface()			//创建本地surface
+EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY)		//获取display
+eglInitialize(display, 0, 0);					//egl初始
+eglChooseConfig(display, attribs, &config, 1, &numConfigs)	//参数配置
+surface = eglCreateWindowSurface(display, config, native_surface.get())	//将平台上的surface，转为gles的surface
+context = eglCreateContext(display, config)			//
+eglSwapBuffers(display, surface)				//交换数据
+
+//context
+jni_eglGetCurrentContext@com_google_android_gles_jni_EGLImpl.cpp-->
+eglGetCurrentContext(void){
+- EGLContext ctx = getContext()
+- return ctx
+}@eglApi.cpp
+
+//display
+jni_eglGetCurrentDisplay@com_google_android_gles_jni_EGLImpl.cpp-->
+eglGetCurrentDisplay(void)(EGLint readdraw){
+- EGLContext ctx = getContext()
+- egl_context_t const * const c = get_context(ctx)
+- return c->dpy
+}@eglApi.cpp
+
+//surface
+jni_eglGetCurrentSurface@com_google_android_gles_jni_EGLImpl.cpp-->
+eglGetCurrentSurface(EGLint readdraw){
+- EGLContext ctx = getContext()
+- egl_context_t const * const c = get_context(ctx)
+- switch(readdraw){
+	- case EGL_READ: return c->read;
+	- case EGL_DRAW: return c->draw
+	}
+}@eglApi.cpp
+
+
+
+frameworks/native/opengl/include/EGL/eglplatform.h
+frameworks/base/core/jni/com_google_android_gles_jni_EGLImpl.cpp
+frameworks/native/opengl/libs/EGL/eglApi.cpp
+frameworks/native/opengl/libagl/texture.cpp

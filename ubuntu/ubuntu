@@ -1,40 +1,36 @@
-//
+/*
+  用户管理
+*/
 gedit /etc/passwd
 gedit  /etc/shadow
 
-//查看用户
-chage -l username
-cat /etc/passwd
 
+chage -l username	//查看用户
+cat /etc/passwd
 more /etc/passwd
 
-//增加用户
-sudo adduser username
+sudo adduser username	//增加用户
+groupmod <TAB 3次>	//查看组
 
-//查看组
-groupmod <TAB 3次>
-
-//修改密码
-sudo passwd username
+sudo passwd username	//修改密码
 
 sudo adduser username sudo 	//设置超级用户权限
 adduser username group 		//添加用户到组group
+/*
+ 应用安装
+*/
 
-//======================
-//install downgrade
+//安装特定版本应用
 apt-cache showpkg packagename
-
 sudo apt-get install packagename=version
-
-sudo echo “package hold” | sudo dpkg –set-selections //no update
+sudo echo “package hold” | sudo dpkg –set-selections	//no update
 
 
 //
 sudo apt-get install <package-name>=<package-version-number> OR
-
 sudo apt-get -t=<target release> install <package-name>
 
-apt-cache showpkg <package-name> //lists all available version
+apt-cache showpkg <package-name>			//lists all available version
 apt-mark hold <package-name>
 
 update-alternatives --config package
@@ -45,12 +41,38 @@ dpkg -i package-name-here.deb
 dpkg --install package-name-here.deb
 dpkg -i -R /path/to/dir/name/with/lots/of/dot-deb-files/
 dpkg -i --recursive /path/to/dir/name/with/lots/of/dot-deb-files/
+
 //有依赖问题时使用下面命令：
 sudo apt-get -f install
 
+/*
+ 安装nvidia显卡驱动，切换显卡驱动
+
+
+*/
+
+系统设置---软件更新---附加驱动	//界面模式。执行命令software-properties-gtk打开界面
+关于这台机器---详细 		//显示当前使用的显卡驱动
+		
+//命令模式
+sudo ubuntu-drivers devices	//查看设备驱动，推荐的驱动
+sudo apt-get install xxx	//安装推荐的驱动
+
+sudo apt-get install nvidia-prime	//安装驱动选择
+sudo prime-select intel		//选择intel驱动
+sudo prime-select nvidia	//选择nvidia驱动
+prime-select query		//查看当前使用的驱动
+sudo apt purge nvidia-*		//卸载nvidia驱动
+
+/*
+ vmware player
+ 
+ 安装vmware tool后屏幕才会变化。之前使用tab
+*/
+
+sudo apt-get install open-vm-tools-desktop
 //磁盘uuid
  ls -l /dev/disk/by-uuid
-
 
 //串口工具
 minicom 

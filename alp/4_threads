@@ -1,0 +1,40 @@
+/*
+ #include <pthread.h>
+*/
+
+
+
+
+/*
+ mutex 互斥量两种状态lock，unlock
+ 
+*/
+pthread_mutex_t fastmutex = PTHREAD_MUTEX_INITIALIZER;			//同一个线程多次执行lock会死锁
+pthread_mutex_t recmutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;	//同一个线程多次执行lock返回成功，必须和unlock次数对应
+pthread_mutex_t errchkmutex = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;	//同一个线程多次执行lock会返回错误
+
+int  pthread_mutex_init(pthread_mutex_t  *mutex,  	//初始化
+	const  pthread_mutex‐attr_t *mutexattr);	
+int pthread_mutex_lock(pthread_mutex_t *mutex);		//锁定，如果被其它线程锁定，则线程挂起等待
+int pthread_mutex_trylock(pthread_mutex_t *mutex);	//锁定，如果被其它线程锁定，立即返回错误
+int pthread_mutex_unlock(pthread_mutex_t *mutex);	//释放
+int pthread_mutex_destroy(pthread_mutex_t *mutex);	//销毁
+
+
+/*
+ condition 必须和mutex一起使用。防止一个线程等待时，另一个线程刚好发出通知
+
+*/
+
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int pthread_cond_init(pthread_cond_t    *cond, 
+	   pthread_condattr_t *cond_attr);
+
+int pthread_cond_signal(pthread_cond_t *cond);				//通知一个等待的线程继续执行
+int pthread_cond_broadcast(pthread_cond_t *cond);			//通知所有等待的线程继续
+
+int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);	//释放mutex等待条件，挂起线程
+int pthread_cond_timedwait(pthread_cond_t   *cond, 			//释放mutex等待条件，超时后返回错误
+	   pthread_mutex_t*mutex, const struct timespec *abstime);
+
+int pthread_cond_destroy(pthread_cond_t *cond);

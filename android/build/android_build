@@ -323,3 +323,11 @@ WITH_DEXPREOPT :=false
 
 //OutOfMemoryError
 export _JAVA_OPTIONS="-Xmx4g"
+
+//user和debug
+ro.debuggable=1 打开console
+
+{//su
+LOCAL_MODULE:= su
+LOCAL_MODULE_TAGS := debug
+}@/system/extras/su/Android.mk

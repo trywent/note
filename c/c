@@ -1,3 +1,7 @@
-//
+/*
+ Opaque Pointers 不透明指针
 
+ 指针的指向的数据类型不明确，不能直接访问指针的数据。通过函数访问(函数内部知道指针的数据类型)
+*/
 
+typedef struct _hidden_struct *handle //_hidden_struct不定义时，编译也不会出错

@@ -1,6 +1,13 @@
+/*
+  su可执行文件有设置调用者的用户，用户组权限
+  su的权限 4755
+*/
+
+
+system/extras/su/su.cpp
 //修改权限
-chmod 4755 //分配 setuid权限
-chmod 6755 //分配setgid setuid权限
+sudo chmod 4755 //分配 setuid权限
+sudo chmod 6755 //分配setgid setuid权限
 
 
 //https://docs.oracle.com/cd/E19683-01/816-4883/secfile-69/index.html

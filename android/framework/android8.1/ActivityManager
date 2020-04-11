@@ -97,7 +97,7 @@ attachApplicationLocked(IApplicationThread thread,int pid){
 - thread.bindApplication(processName
 }@ActivityManangerService.java
 
-//binder监听进程挂
+//binder监听到应用进程挂
 AppDeathRecipient.binderDied-->appDiedLocked-->appDiedLocked-->
 handleAppDiedLocked{
 - mStackSupervisor.handleAppDiedLocked(app)
