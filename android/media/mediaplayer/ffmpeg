@@ -1,0 +1,20 @@
+/*
+ ffmpeg
+
+ 
+*/
+
+
+//extractor 获取audio,video,title流数据
+MediaExtractor::CreateFromService{
+- new FFMPEGExtractor(source)
+}MediaExtractor.cpp
+
+
+frameworks/av/media/libstagefright/FfmpegExtractor.cpp
+
+//codec 只实现了audio
+
+
+
+vendor/sprd/modules/media/omx-components/audio/ffmpegdec/ffmpeg_audio_codec.cpp

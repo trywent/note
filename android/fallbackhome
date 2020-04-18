@@ -46,6 +46,8 @@ isUserUnlocked@UserManager.java-->isUserUnlocked-->LocalService.isUserUnlockingO
 
 /*
  android.intent.category.HOME android:priority="-1000"
+
+ 启动完成后还有当前activity的界面。需要设置userunlock状态
 */
 //Android is starting  
 onCreate{

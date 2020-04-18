@@ -2,17 +2,27 @@
  audio
 */
 
-//声音
-i2s0---->8288
+//直接修改dumpswitch 0X2 打开输出
+<dumpmusic  num="16"  dump_switch = "0x0" dump_path="/data/local/media/" total_switch="ON">
+	<dump_play  index="0" item_name ="music.dump0"  dump_file_name ="dump_offload_vbc.pcm"  switch="0" />
+	<dump_play  index="1" item_name ="music.dump1"  dump_file_name ="dump_primary_vbc.pcm"  switch="0" />
+	<dump_play  index="2" item_name ="music.dump2"  dump_file_name ="dump_vaudio_vbc.pcm"  switch="0" />
+	<dump_play  index="3" item_name ="music.dump3"  dump_file_name ="dump_voip_write.pcm"  switch="0" />
+	<dump_play  index="4" item_name ="music.dump4"  dump_file_name ="dump_btsco_write.pcm"  switch="0" />
+	<dump_record index="5" item_name ="record.dump0" dump_file_name ="dump_record_after_vbc.pcm" switch="0" />
+	<dump_record index="6" item_name ="record.dump1" dump_file_name ="dump_record_hal.pcm" switch="0" />
+</dumpmusic>
+@audio_hw.xml
 
-bta_av_sink_data_cback
-
-//bluetooth
-WCN->CP0->DSP->2731
+setprop media.dump.switch 1 //输出音乐 没卵用
 
 
-44 SYS_IIS0: vbc_iis1 >vbc_iis2 vbc_iis3 ap_iis0 ap_iis1 ap_iis2 ap_iis3 pubcp_iis0 tgdsp_iis0 tgdsp_iis1 tgdsp_iis2 tgdsp_iis3
-45 SYS_IIS1: vbc_iis1 vbc_iis2 vbc_iis3 >ap_iis0 ap_iis1 ap_iis2 ap_iis3 pubcp_iis0 tgdsp_iis0 tgdsp_iis1 tgdsp_iis2 tgdsp_iis3
-46	ENUM	1	SYS_IIS2                                 vbc_iis1
-47	ENUM	1	SYS_IIS3                                 vbc_iis1
+
+
+//通路
+arm--->i2s2--->2720a(pmic)
+arm--->i2s0--->8288			//多媒体声音
+WCN--->CP0--->DSP--->2720a(pmic)	//蓝牙电话
+
+
 

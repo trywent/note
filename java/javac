@@ -1,0 +1,12 @@
+/*
+ javac
+
+ 
+*/
+javac [ options ] [ sourcefiles ] [ classes] [ @argfiles ]
+
+-cp path or -classpath path	//查找.class文件的位置
+-d directory			//.class存放的位置
+-s dir				//生成的源码存放位置（注解生成？）
+-source release			//源码支持的版本1.7(java7) 1.8(java8)
+-target version			//生成的目标可以哪儿版本jvm运行

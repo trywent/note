@@ -1,0 +1,69 @@
+/*
+ uboot
+*/
+
+
+/*
+ lcd mipi驱动接口平台提供
+ panel的初始化参数客户提供
+*/
+//panel驱动信息
+static struct panel_cfg supported_panel[] = {
+	...
+#ifdef CONFIG_LCD_TD4310_TRULY_MIPI_FHD
+	{
+		.lcd_id = 0x4310,
+		.drv = &td4310_truly_driver,
+	},
+#endif
+	{
+		.lcd_id = 0xFFFF,
+		.drv = &dummy_mipi_driver,
+	},
+}
+
+//lcd初始化
+lcd_ctrl_init(lcdbase/*fb_base 内存*/)@lcd.c-->lcd_ctrl_init{
+ sprdfb_probe{
+	- sprd_panel_probe	//遍历supported_panel找到对应的设备驱动
+	- get_fb_base_from_dt	//dtb获取base addr
+	- sprd_dispc_probe	//panel control控制函数初始化
+	}
+- get_bmp_base_from_dt(&bmp)
+- lcd_set_flush_dcache
+}@sprd_main.c
+
+//探测显示屏panel设备
+prd_panel_probe{
+- for (i = 0; i < ARRAY_SIZE(supported_panel); i++) {
+	- panel_drv = supported_panel[i].drv
+	- info = panel_drv->info
+	- ops = panel_drv->ops
+	- ops->power(true)
+	- if(!ops->read_id())	//探测到设备
+		break;	  
+	- ops->power(false)	//不是当前驱动，关闭供电，还原初始化
+	- panel_if_uinit()
+	}  
+- ops->init()			//初始化panel
+- lcd_id_to_kernel = supported_panel[i].lcd_id
+}@sprd_panel.c
+
+//panel control
+sprd_dispc_probe(void){
+- struct sprd_dispc *dispc = &dispc_device
+- dispc->core = dispc_core_ops_attach()
+- dispc->clk = dispc_clk_ops_attach()
+- dispc->glb = dispc_glb_ops_attach()
+- dispc_context_init(dispc)
+- sprd_dispc_resume(dispc)
+}@sprd_dispc.c
+
+
+
+bsp/bootloader/u-boot15/common/lcd.c
+bsp/bootloader/u-boot15/drivers/video/sprd/sprd_main.c
+bsp/bootloader/u-boot15/drivers/video/sprd/sprd_dispc.c
+bsp/bootloader/u-boot15/drivers/video/sprd/sharkl5pro/global_dispc.c
+bsp/bootloader/u-boot15/drivers/video/sprd/sprd_panel.c
+bsp/bootloader/u-boot15/drivers/video/sprd/lcd/panel_cfg.h

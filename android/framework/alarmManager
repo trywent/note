@@ -1,4 +1,7 @@
-//
+/*
+ AlarmManager接口
+
+*/
 AlarmManager这个类提供访问系统定时服务。使应用能够设置成在将来某个时刻运行。
 到达定时时间，系统会将已注册的intent广播出去，执行目标应用。注册的定时器在设
 备睡眠后也有效(能够设置成到时唤醒设备)，直到设备关闭或重启
@@ -10,8 +13,46 @@ Alarm Manager 能够保持CPU是唤醒的状态，直到alarm receiver的onRecei
 可能会发生服务还没启动，设备就进入睡眠了。为了防止这种情况BroadcastReceiver和Service 
 需要实现保持设备唤醒状态知道服务运行成功。
 
-Note:Alarm Manager 通常用作在将来某个时刻执行应用.更简单有效的延时操作(短时倒计时，超时)
-是使用hanlder
+//唤醒时间可能会被系统调整
+set(@AlarmType int type, long triggerAtMillis, String tag, OnAlarmListener listener,Handler targetHandler)
+
+//唤醒时间限制在一个窗口中 起始+间隔 这个时间段中 windowStartMillis+windowLengthMillis
+ setWindow(@AlarmType int type, long windowStartMillis, long windowLengthMillis,PendingIntent operation)
+
+
+//PendingIntent operation	触发后发出的广播
+//OnAlarmListener listener	触发后调用
+setImpl(@AlarmType int type, long triggerAtMillis, long windowMillis,
+            long intervalMillis, int flags, PendingIntent operation, final OnAlarmListener listener,
+            String listenerTag, Handler targetHandler, WorkSource workSource,
+            AlarmClockInfo alarmClock
+
+setRepeating(@AlarmType int type, long triggerAtMillis,long intervalMillis, PendingIntent operation)-->
+setImpl(type, triggerAtMillis, legacyExactLength(), intervalMillis, 0, operation,null, null, null, null, null){
+  //设置唤醒listener，唤醒后被调用
+- if (listener != null) {
+	- sWrappers = new ArrayMap<OnAlarmListener, ListenerWrapper>()
+	- ListenerWrapper recipientWrapper = new ListenerWrapper(listener)
+	- sWrappers.put(listener, recipientWrapper)
+	- Handler handler = (targetHandler != null) ? targetHandler : mMainThreadHandler
+	}
+  //调用服务端，传入包名
+- mService.set(mPackageName, type, triggerAtMillis, windowMillis, intervalMillis, flags, operation, recipientWrapper...)
+}@AlarmManager.java
+
+
+/*
+ AlarmManagerService
+*/
+
+Alarm {
+type;		//类型
+packageName;
+count;
+when;		//触发的墙时间
+windowLength;
+whenElapsed;	//触发的启动时间。batch使用这个值，设置到内核也是这个时间值
+}
 
 //服务开始
 onStart() {
@@ -28,6 +69,8 @@ onStart() {
 }@AlarmManagerService.java
 
 //设置时间
+//
+//
 setCurrentTimeMillis@systemClock.java-->setTime-->setKernelTime(mNativeData, millis)@AlarmManagerService.java-->
 android_server_AlarmManagerService_setKernelTime(JNIEnv*, jobject, jlong nativeData, jlong millis){
 - AlarmImpl *impl = reinterpret_cast<AlarmImpl *>(nativeData)
@@ -44,9 +87,97 @@ android_server_AlarmManagerService_setKernelTime(JNIEnv*, jobject, jlong nativeD
 
 
 //设置定时器
-set(@AlarmType int type, long triggerAtMillis, PendingIntent operation)-->
-setImpl(int type, long triggerAtMillis, long windowMillis, long intervalMillis...)-->
-mService.set{
+//0 RTC_WAKEUP			会唤醒设备，System.currentTimeMillis()当前的实际时间(包含时区)
+//1 RTC				不会唤醒设备。当设备睡眠状态时，唤醒后才会触发 System.currentTimeMillis()
+//2 ELAPSED_REALTIME_WAKEUP	唤醒设备，SystemClock.elapsedRealtime()设备的启动时间
+//3 ELAPSED_REALTIME		不会唤醒设备，SystemClock.elapsedRealtime()
+set(String callingPackage,
+                int type, long triggerAtTime, long windowLength, long interval, int flags,
+                PendingIntent operation, IAlarmListener directReceiver, String listenerTag,
+                WorkSource workSource, AlarmManager.AlarmClockInfo alarmClock) {
+- int callingUid = Binder.getCallingUid()
+- mAppOps.checkPackage(callingUid, callingPackage)
+- setImpl(type, triggerAtTime, windowLength, interval, operation, directReceiver...)
+}
+
+
+setImpl(int type, long triggerAtTime, long windowLength, long interval,
+            PendingIntent operation, IAlarmListener directReceiver, String listenerTag,
+            int flags, WorkSource workSource, AlarmManager.AlarmClockInfo alarmClock,
+            int callingUid, String callingPackage)-->
+setImplLocked(int type, long when, long whenElapsed, long windowLength,
+            long maxWhen, long interval, PendingIntent operation, IAlarmListener directReceiver,
+            String listenerTag, int flags, boolean doValidate, WorkSource workSource,
+            AlarmManager.AlarmClockInfo alarmClock, int callingUid, String callingPackage){
+- Alarm a = new Alarm(type, when, whenElapsed, windowLength, maxWhen, interval,
+                operation, directReceiver, listenerTag, workSource, flags, alarmClock,
+                callingUid, callingPackage)
+- removeLocked(operation, directReceiver)
+- setImplLocked(a, false, doValidate)
+}@AlarmManagerService.java
+
+setImplLocked(Alarm a, boolean rebatching, boolean doValidate) {
+  //对齐时间
+- alignTime = mAlignHelper.checkAndAdjustAlarm(a.type, a.when,a.whenElapsed, a.maxWhenElapsed, a.operation, a.flags, a.tiggerTimeAdjusted)
+- a.whenElapsed = alignTime
+  //计算所在的batch
+- int whichBatch = ((a.flags&AlarmManager.FLAG_STANDALONE) != 0)? -1 : attemptCoalesceLocked(a.whenElapsed, a.maxWhenElapsed)
+- Batch batch = new Batch(a)
+- addBatchLocked(mAlarmBatches, batch)
+  //设置到kernel
+- rescheduleKernelAlarmsLocked{
+	 //计算mAlarmBatches 合适的设置时间
+	- final Batch firstWakeup = findFirstWakeupBatchLocked()
+	- Batch firstBatch = mAlarmBatches.get(0)
+	- setLocked(ELAPSED_REALTIME_WAKEUP, firstWakeup.start)
+	}
+  //计算下一次alarm
+- updateNextAlarmClockLocked
+}@AlarmManagerService.java
+
+//等待定时事件
+onStart-->AlarmThread.start-->run{
+  //等待唤醒事件
+- waitForAlarm(mNativeData)-->android_server_AlarmManagerService_waitForAlarm( jlong nativeData){
+	- AlarmImpl *impl = reinterpret_cast<AlarmImpl *>(nativeData)
+	- result = impl->waitForAlarm(){
+		- 	
+		}
+	}@com_android_server_AlarmManagerService.cpp
+- long nowRTC = System.currentTimeMillis()
+- long nowELAPSED = SystemClock.elapsedRealtime()
+  //内核调整了时间。且调整大于正负1s
+- if ((result & TIME_CHANGED_MASK) != 0) {
+	- removeImpl(mTimeTickSender)
+	- removeImpl(mDateChangeSender)
+	- rebatchAllAlarms
+ 	}
+ //收到其它事件，定时？
+- if (result != TIME_CHANGED_MASK) {
+	- boolean hasWakeup = triggerAlarmsLocked(triggerList, nowELAPSED, nowRTC)//计算要触发的alarm
+	- if (!hasWakeup && checkAllowNonWakeupDelayLocked(nowELAPSED)) {//没有有要触发的alarm
+		-
+	  }else{//有要触发的alarm
+		- 
+	  }
+	}
+}@AlarmManagerService.java
+
+//计算要触发的alarm，保存到triggerList
+triggerAlarmsLocked(triggerList, nowELAPSED, nowRTC){
+ //遍历mAlarmBatches
+- Batch batch = mAlarmBatches.get(0)
+- mAlarmBatches.remove(0)
+ //遍历batch中的alarm
+- Alarm alarm = batch.get(i)
+- setImplLocked(alarm.type, alarm.when + delta, nextElapsed, alarm.windowLength...)	//设置alarm
+}@AlarmManagerService.java
+
+
+/*
+ android6
+*/
+set{
 - 转换rtc时间为启动时间，triggerElapsed
 - 计算最大延迟时间，maxElapsed
 - setImplLocked{

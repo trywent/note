@@ -1,5 +1,5 @@
 /*
- 
+ fanplayer
 */
 //接口
 nativeOpen (String url, Object surface, int w, int h, String params)

@@ -10,6 +10,22 @@ dd if=/storage/USB0/u-boot.bin of=/dev/block/mmcblk0boot1
 
 echo device > /sys/devices/20200000.usb/host_dev
 
+//
+增加可以软件切换USB host与device模式的结点
+    echo device > /sys/devices/20200000.usb/host_dev //软件从模式
+    echo host > /sys/devices/20200000.usb/host_dev //软件主模式
+    echo hardware > /sys/devices/20200000.usb/host_dev //硬件决定主从模式
+
+//log
+*#*#83781#*#*
+
+//GPS
+*#*#2266#*#*
+
+
+
+ro.ge2.mode=gps_beidou
+
 //读取uart寄存器
 lookat -l 2 0x70100024
 

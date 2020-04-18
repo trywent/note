@@ -1,3 +1,7 @@
+/*
+ 
+*/
+
 //tinymix -D 1/2/3 查看sprdphone对应的声卡是哪个
 tinycap /data/afe_in.wav -D 3 -d 2 -c 2 -r 48000 -p 320 -n 2
 

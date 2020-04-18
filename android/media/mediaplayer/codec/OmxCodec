@@ -123,7 +123,8 @@ Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
 
 frameworks/av/media/libstagefright/omx/1.0/OmxStore.cpp
 frameworks/av/media/libstagefright/xmlparser/MediaCodecsXmlParser.cpp
-/**************************软解Component
+/**************************
+ 软解Component
  SoftOMXComponent
  
 */
@@ -142,7 +143,7 @@ OMX_CALLBACKTYPE OMXNodeInstance::kCallbacks = {
     &OnEvent, &OnEmptyBufferDone, &OnFillBufferDone
 }@OMXNodeInstance.cpp
 
-//创建软解component,codec
+//创建软解component,codec。解码器在不同的库中libstagefright_soft_
 OMXMaster::makeComponentInstance-->plugin->makeComponentInstance(name,callback,appData,compoment)@OMXMaster.cpp-->
 makeComponentInstance(const char *name,const OMX_CALLBACKTYPE *callbacks,OMX_PTR appData,OMX_COMPONENTTYPE **component){
 - dlopen(libName),					 //打开"libstagefright_soft_"
@@ -179,7 +180,8 @@ FillBufferDone-->OnFillBufferDone{
 
 
 frameworks/av/media/libstagefright/omx/SoftOMXComponent.cpp
-/**************************硬解Component
+/**************************
+ 硬解Component
 
  
 */
@@ -208,10 +210,12 @@ frameworks/av/media/libstagefright/omx/OMXNodeInstance.cpp
 hardware/interfaces/media/omx/1.0/IOmx.hal
 hardware/interfaces/media/omx/1.0/android.hardware.media.omx@1.0_genc++/gen/android/hardware/media/omx/1.0/OmxAll.cpp
 
-/**************************client
+/**************************
+ client
+ 
  IOMX --- omx服务
  WOmx 封装IOMX
- IOMXNode --- omx component
+ IOMXNode --- omx component相当解码器
 
 */
 

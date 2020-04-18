@@ -1,0 +1,45 @@
+/*
+ kernel
+*/
+export BSP_KERNEL_DEFCONFIG="sprd_sharkl5Pro_defconfig"
+export BSP_DTB="ums512-1h10"
+export BSP_DTBO="ums512-1h10-overlay"
+
+
+
+
+/*
+ panel
+*/
+module_mipi_dsi_driver(sprd_panel_driver)-->sprd_panel_driver{
+- .driver = {
+		.name = "sprd-mipi-panel-drv",
+		.of_match_table = panel_of_match,
+	}
+- .probe = sprd_panel_probe
+}@sprd_panel.c
+
+
+bsp/kernel/kernel4.14/drivers/gpu/drm/sprd/sprd_panel.c
+
+
+/*
+  touchscreen
+*/
+late_initcall(ts_init)-->ts_init{
+  //获取dts信息
+- ts_board_init(){
+	- of_find_compatible_node(NULL, NULL, ATS_COMPATIBLE)	// "adaptive-touchscreen"
+	- g_board = ts_parse_dt(pn)
+	- ts_bus_init(pn->parent, board->controller == NULL)
+	}@ats_loader.c
+- platform_driver_register(&ats_driver)
+}@ats_core.c
+
+ats_driver.probe-->ts_probe(struct platform_device *pdev){
+- 
+}@ats_core.c
+
+
+bsp/kernel/kernel4.14/drivers/input/touchscreen/adaptive-ts/ats_core.c
+bsp/kernel/kernel4.14/drivers/input/touchscreen/adaptive-ts/ats_loader.c

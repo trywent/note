@@ -12,11 +12,10 @@ isten(PhoneStateListener listener, int events){
 frameworks/base/telephony/java/android/telephony/TelephonyManager.java
 
 /*
-　telephony
+　telephony管理处
 
  打印信息：dumpsys telephony.registry
 */
-
 
 //telephony.registry 服务
 startOtherServices{

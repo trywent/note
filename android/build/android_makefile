@@ -1,5 +1,60 @@
-/*
- android makefile编译
+/*********************
+  android build
+*/
+
+//编译选项
+{
+add_lunch_combo aosp_arm-eng	//默认combo
+add_lunch_combo aosp_arm64-eng
+
+//查找device目录下的vendorsetup.sh。可以手动添加eng,user，userdebug版本
+for f in `test -d device && find -L device -maxdepth 4 -name 'vendorsetup.sh' 2> /dev/null | sort` \
+         `test -d vendor && find -L vendor -maxdepth 4 -name 'vendorsetup.sh' 2> /dev/null | sort` \
+         `test -d product && find -L product -maxdepth 4 -name 'vendorsetup.sh' 2> /dev/null | sort`
+do
+    echo "including $f"
+    . $f
+done
+}@envsetup.sh
+
+//lunche的功能
+lunch{
+- selection 				//选择的编译项 sp7731e_1h10_native-userdebug
+- product=${selection%%-*}  		//根据编译项，获取产品名 sp7731e_1h10_native
+- variant_and_version=${selection#*-} 	//根据编译项，获取编译类型 userdebug
+- TARGET_PRODUCT=$product
+- TARGET_BUILD_VARIANT=$variant
+- export TARGET_PRODUCT
+- export TARGET_BUILD_VARIANT
+  //设置变量。从makefile文件中获取配置的变量
+- build_build_var_cache{
+	- build/core/config.mk
+	}
+  //设置环境
+- set_stuff_for_environment{
+	- settitle{
+		- export PROMPT_COMMAND
+		}
+	- setpath{
+		- 
+		}
+	}
+}@envsetup.sh
+
+//android8.1编译工具路径设置
+TARGET_GCC_VERSION := 4.9@make/core/config.mk //设置编译器版本
+
+{
+- toolchaindir=x86/x86_64-linux-android-$targetgccversion/bin 	//x86
+- toolchaindir=arm/arm-linux-androideabi-$targetgccversion/bin	//arm
+- export ANDROID_TOOLCHAIN=$gccprebuiltdir/$toolchaindir
+- export ANDROID_BUILD_PATHS=$(get_build_var ANDROID_BUILD_PATHS):$ANDROID_TOOLCHAIN:$ANDROID_TOOLCHAIN_2ND_ARCH:$ANDROID_DEV_SCRIPTS: //设置android编译器变量
+- export PATH=$ANDROID_BUILD_PATHS$PATH 			//设置路径
+}@envsetup.sh
+
+
+/*********************
+ android makefile的结构
 */
 
 {
@@ -12,13 +67,13 @@
 	- BUILD_PACKAGE:= $(BUILD_SYSTEM)/package.mk
 	  ....
 	- include $(BUILD_SYSTEM)/envsetup.mk{
-		- include $(SRC_TARGET_DIR)/board/$(TARGET_DEVICE)/BoardConfig.mk
-		- include $(BUILD_SYSTEM)/product_config.mk
+		- include $(SRC_TARGET_DIR)/board/$(TARGET_DEVICE)/BoardConfig.mk	//板配置
+		- include $(BUILD_SYSTEM)/product_config.mk				//产品配置
 		}envsetup.mk
 	}@config.mk
 }build/make/core/main.mk
 
-//编译目标product设置
+//product设置。查找device下的AndroidProducts.mk
 {
 - include $(BUILD_SYSTEM)/product.mk
 - include $(BUILD_SYSTEM)/device.mk{
@@ -26,26 +81,21 @@
 	}
   //获取device,vendor目录所有中AndroidProducts.mk
 - all_product_configs := $(get-all-product-makefiles)
-- current_product_makefile //查找对应product的makefile
+- current_product_makefile
 - $(call import-products, $(current_product_makefile))
 }product_config.mk
 
-//dex优化开关
-
-
-/*
- 平台配置的makefile。 AndroidProducts.mk
-*/
-
-product_config.mk-->AndroidProducts.mk{
+//AndroidProducts.mk
+{
 - PRODUCT_MAKEFILES += (LOCAL_DIR)/sp7731e_1h10_native.mk{
 	- device/sprd/pike2/common/DeviceCommon.mk
 	}
-}
+}@AndroidProducts.mk
 
-envsetup.mk-->BoardConfig.mk{
+//BoardConfig.mk
+{
 - include device/sprd/pike2/common/BoardCommon.mk
-}
+}@BoardConfig.mk
 
 //自定义的编译目标
 AndroidBoard.mk{
@@ -55,11 +105,251 @@ AndroidBoard.mk{
 }
 
 
+
+/*********************
+ 编译目标：systme，recovery，boot,OTA
+*/
+droid: droidcore dist_files
+
+droidcore: files \
+	systemimage \
+	$(INSTALLED_BOOTIMAGE_TARGET) \
+	$(INSTALLED_RECOVERYIMAGE_TARGET) \
+	$(INSTALLED_USERDATAIMAGE_TARGET) \
+	$(INSTALLED_CACHEIMAGE_TARGET) \
+	$(INSTALLED_FILES_FILE)
+
+files: prebuilt \
+        $(modules_to_install) \
+        $(modules_to_check) \
+        $(INSTALLED_ANDROID_INFO_TXT_TARGET)
+/*********************
+ 编译system:
+*/
+@build/core/Makefile
+INSTALLED_SYSTEMIMAGE := $(PRODUCT_OUT)/system.img
+$(INSTALLED_SYSTEMIMAGE): $(BUILT_SYSTEMIMAGE) $(RECOVERY_FROM_BOOT_PATCH) | $(ACP)
+	@echo "Install system fs image: $@"
+	$(copy-file-to-target)
+	$(hide) $(ACP) -fp $<.lzo $@.lzo
+	$(hide) $(call assert-max-image-size,$@ $(RECOVERY_FROM_BOOT_PATCH),$(BOARD_SYSTEMIMAGE_PARTITION_SIZE),yaffs)
+
+systemimage: $(INSTALLED_SYSTEMIMAGE)
+|
+$(BUILT_SYSTEMIMAGE): $(FULL_SYSTEMIMAGE_DEPS) $(INSTALLED_FILES_FILE)
+|
+FULL_SYSTEMIMAGE_DEPS := $(INTERNAL_SYSTEMIMAGE_FILES) $(INTERNAL_USERIMAGES_DEPS) $(SELINUX_DEPENDS)
+
+
+INTERNAL_SYSTEMIMAGE_FILES := $(filter $(TARGET_OUT)/%, \
+    $(ALL_PREBUILT) \
+    $(ALL_COPIED_HEADERS) \
+    $(ALL_GENERATED_SOURCES) \
+    $(ALL_DEFAULT_INSTALLED_MODULES)\
+    $(ALL_PDK_FUSION_FILES))
+
+/*********************
+ recovery:
+*/
+@build/core/Makefile
+droidcore: INSTALLED_RECOVERYIMAGE_TARGET
+$(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKIMAGE) $(MINIGZIP) \
+		$(INSTALLED_RAMDISK_TARGET) \
+		$(INSTALLED_BOOTIMAGE_TARGET) \
+		$(recovery_binary) \
+		$(recovery_initrc) $(recovery_kernel) \
+		$(INSTALLED_2NDBOOTLOADER_TARGET) \
+		$(recovery_build_prop) $(recovery_resource_deps) \
+		$(recovery_fstab) \
+		$(busybox_binary) \
+		$(RECOVERY_INSTALL_OTA_KEYS)
+recoveryimage: $(INSTALLED_RECOVERYIMAGE_TARGET)
+------------------------------------
+签名密钥：
+@build/core/Makefile
+OTA_PUBLIC_KEYS := $(DEFAULT_SYSTEM_DEV_CERTIFICATE).x509.pem
+
+@build/core/config.mk
+ifdef PRODUCT_DEFAULT_DEV_CERTIFICATE
+  DEFAULT_SYSTEM_DEV_CERTIFICATE := $(PRODUCT_DEFAULT_DEV_CERTIFICATE)
+else
+  DEFAULT_SYSTEM_DEV_CERTIFICATE := build/target/product/security/testkey
+endif 
+
+@build/core/product_config.mk
+PRODUCT_DEFAULT_DEV_CERTIFICATE := \
+    $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_DEFAULT_DEV_CERTIFICATE))
+
+
+如果定义使用PRODUCT_EXTRA_RECOVERY_KEYS，会将该密钥的位置写入OTA升级包的/META/misc_info.txt文件中。
+/*********************
+ ramdisk.img:(root目录TARGET_ROOT_OUT)
+*/
+BUILT_RAMDISK_TARGET := $(PRODUCT_OUT)/ramdisk.img
+
+
+
+@@build/core/Makefile
+
+/*********************
+ boot.img:bootimage
+*/
+INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel
+INSTALLED_RAMDISK_TARGET := $(BUILT_RAMDISK_TARGET):=$(PRODUCT_OUT)/ramdisk.img
+
+INSTALLED_BOOTIMAGE_TARGET := $(PRODUCT_OUT)/boot.img
+bootimage:$(INSTALLED_BOOTIMAGE_TARGET)
+boot.img:kernel ramdisk.img
+
+
+//kernel编译 sprd
+{
+TARGET_PREBUILT_KERNEL :=  $(KERNEL_OUT)/arch/$(TARGET_KERNEL_ARCH)/boot/Image
+
+$(TARGET_PREBUILT_KERNEL) : $(KERNEL_OUT) $(USER_CONFIG)
+	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) headers_install
+	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) -j${JOBS}
+	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) modules
+	@-mkdir -p $(KERNEL_MODULES_OUT)
+	@-find $(TARGET_OUT_INTERMEDIATES) -name *.ko | xargs -I{} cp {} $(KERNEL_MODULES_OUT)
+}@device/sprd/pike2/common/AndroidKernel.mk
+
+
+//编译out目录下 kernel 和dtb.img
+{
+// Compile Linux Kernel 
+ifneq ($(strip $(TARGET_NO_KERNEL)),true)
+-include device/sprd/pike2/common/AndroidKernel.mk
+file := $(PRODUCT_OUT)/kernel
+#ALL_PREBUILT += $(file)
+$(file) : $(TARGET_PREBUILT_KERNEL) | $(ACP) $(transform-prebuilt-to-target)
+endif 
+// End of Kernel
+
+// Compile dtb
+ifeq ($(strip $(BOARD_KERNEL_SEPARATED_DT)),true)
+include device/sprd/pike2/common/generate_dt_image.mk
+endif 
+// End of dtb
+}@AndroidBoard.mk
+
+
+/*********************
+ userdata:
+
+*/
+
+INSTALLED_USERDATAIMAGE_TARGET := $(BUILT_USERDATAIMAGE_TARGET)
+
+BUILT_USERDATAIMAGE_TARGET := $(PRODUCT_OUT)/userdata.img
+
+//OTA:make otapackage
+@build/core/Makefile
+.PHONY: otapackage
+otapackage: $(INTERNAL_OTA_PACKAGE_TARGET)
+$(INTERNAL_OTA_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS) $(SELINUX_DEPENDS)
+$(BUILT_TARGET_FILES_PACKAGE): \
+		$(INSTALLED_BOOTIMAGE_TARGET) \
+		$(INSTALLED_RADIOIMAGE_TARGET) \
+		$(INSTALLED_RECOVERYIMAGE_TARGET) \
+		$(INSTALLED_SYSTEMIMAGE) \
+		$(INSTALLED_USERDATAIMAGE_TARGET) \
+		$(INSTALLED_CACHEIMAGE_TARGET) \
+		$(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+@BoardConfig
+OTA_BOOTLOGO_IMAGE := $(TOP)/image/emmc/logo.bmp
+
+签名密钥：
+DEFAULT_KEY_CERT_PAIR := $(DEFAULT_SYSTEM_DEV_CERTIFICATE)@build/core/Makefile
+
+output_ota_package：
+默认使用META/misc_info.txt中 default_system_dev_certificate定义的密钥。如果没有设置，则使用
+build/target/product/security/testkey。
+
+密钥生成器：/development/tools/make_key
+
+
+recovery中调用的工具：
+$(PRODUCT_OUT)/obj/EXECUTABLES/updater
+
+------------------------------------
+updatepackage: $(INTERNAL_UPDATE_PACKAGE_TARGET)
+INTERNAL_UPDATE_PACKAGE_TARGET: BUILT_TARGET_FILES_PACKAGE
+
+
+/*********************
+ 编译sdk：
+*/
+ALL_SDK_TARGETS := $(INTERNAL_SDK_TARGET)
+sdk: $(ALL_SDK_TARGETS)
+@main
+
+INTERNAL_SDK_TARGET := $(sdk_dir)/$(sdk_name).zip@Makefile
+
+1:
+. build/envsetup.sh
+lunch xx
+make sdk
+
+2:
+make -j8 PRODUCT-sdk-sdk showcommands dist
+
+
+//编译packages
+user_MODULES：=user_PACKAGES：=$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_PACKAGES)
+
+
+//生成密钥：
+development/tools/make_key testkey  '/C=US/ST=California/L=Mountain View/O=Android/OU=Android/CN=Android/emailAddress=android@android.com'
+
+
+查看密钥：
+openssl x509 -noout -subject -issuer -in media.x509.pem
+//属性文件生成：
+# default.prop
+一般在root/下，基本由build/core/main.mk设置ADDITIONAL_DEFAULT_PROPERTIES
+
+# build.prop
+- 由build/tools/buildinfo.sh 生成
+- (mstar中加入的system.prop)
+- ADDITIONAL_BUILD_PROPERTIES(core/main.mk设置)
+//默认语言设置：
+ro.product.locale.language@system.prop
+
+# Whether there is default locale set in PRODUCT_PROPERTY_OVERRIDES(build/target/product/基本都不设置)
+product_property_override_locale_language := $(strip \
+    $(patsubst ro.product.locale.language=%,%,\
+    $(filter ro.product.locale.language=%,$(PRODUCT_PROPERTY_OVERRIDES))))
+product_property_overrides_locale_region := $(strip \
+    $(patsubst ro.product.locale.region=%,%,\
+    $(filter ro.product.locale.region=%,$(PRODUCT_PROPERTY_OVERRIDES))))
+
+#将1中第一个字串的"_"替换成空格
+define default-locale
+$(subst _, , $(firstword $(1)))
+endef
+
+#如果product_property_override_locale_language为空则，返回参数“$1”中的第一个字串
+define default-locale-language
+$(if $(product_property_override_locale_language),,$(word 1, $(call default-locale, $(1))))
+endef
+define default-locale-region
+$(if $(product_property_overrides_locale_region),,$(word 2, $(call default-locale, $(1))))
+endef
+
+PRODUCT_DEFAULT_LANGUAGE="$(call default-locale-language,$(PRODUCT_LOCALES))" 
+PRODUCT_DEFAULT_REGION="$(call default-locale-region,$(PRODUCT_LOCALES))" 
+
+设置系统属性@/tools/buildinfo.sh:
+ echo "ro.product.locale.language=$PRODUCT_DEFAULT_LANGUA
+
+
 //编译使用overlay：
 　　PRODUCT_PACKAGE_OVERLAYS: used by a particular product
 　　DEVICE_PACKAGE_OVERLAYS: used several products that share a common device model
 
-/*
+
+/*********************
  android soong  android.bp
 */
 

@@ -1,8 +1,27 @@
 /*
+ 移动网络类型
+*/
+TD-LTE/ LTE FDD Baseband	//4G
+WCDMA/HSDPA/HSUPA Baseband	//3G
+TD-SCDMA/HSDPA/HSUPA Baseband	//3G
+CDMA2000 Baseband		//3G
+GSM/GPRS/EDGE Baseband		//2G
+CDMA				//2G
+
+//联通终端 2g/3g/4g
+GSM/WCDMA/TD-LTE和FDD-LTE
+
+//移动终端 2g/3g/4g
+GSM/TD-SCDMA/TD_LTE
+
+//电信终端 2g/3g/4g
+CDMA/CDMA2000/TD-LTE和FDD-LTE
+
+/*
  "phone" 服务
  com.android.phone
 */
-
+TELEPHONY_SERVICE = "phone"
 onCreate() {
 - mPhoneGlobals = new PhoneGlobals(this)
 - mPhoneGlobals.onCreate()

@@ -20,13 +20,13 @@ lunch sp7731e_1h20_native-userdebug
 echo 1 > /proc/sys/kernel/printk
 echo device > sys/devices/platform/soc/soc:ap-ahb/20200000.usb/host_dev
 
-dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/boot bs=1024 count=18328
-dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/recovery bs=1024 count=22082
+dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/boot 
+dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/recovery 
 dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/uboot
 
-dd if=/sdcard/wmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/w_modem bs=1024 count=16384
+dd if=/sdcard/wmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/w_modem 
 dd if=/sdcard/wcnmodem.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/wcnmodem
-dd if=/sdcard/sml-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/sml bs=1024 count=22
+dd if=/sdcard/sml-sign.bin of=/dev/block/platform/soc/soc:ap-ahb/20600000.sdio/by-name/sml 
 
 
 //android 9.0

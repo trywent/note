@@ -1,11 +1,26 @@
-//kernel  
+/*
+  kernel编译配置
+*/  
 -include device/sprd/isharkl2/common/AndroidKernel.mk
+file := $(PRODUCT_OUT)/kernel
+$(file) : $(TARGET_PREBUILT_KERNEL) | $(ACP)		//依赖kernel
+	$(transform-prebuilt-to-target)
 @device/sprd/isharkl2/sp9853i_1h10/AndroidBoard.mk
 
 
+INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel	//android的kernel配置
+@build/make/core/Makefile
+
+
+
+//生成.config文件。编译的版本不同配置不同
 KERNEL_DEFCONFIG := sprd_isharkl2_defconfig@BoardConfig.mk
 
-//动态修改
+ifeq ($(TARGET_BUILD_VARIANT),user)
+DEBUGMODE := BUILD=no
+USER_CONFIG := $(TARGET_OUT)/dummy
+TARGET_DEVICE_USER_CONFIG := $(KERNEL_DIFF_CONFIG)/user_diff_config
+TARGET_DEVICE_CUSTOM_CONFIG := device/sprd/$(TARGET_DEVICE)/ProjectConfig.mk
 $(USER_CONFIG) : $(KERNEL_CONFIG)
 	$(shell ./kernel/scripts/sprd_custom_config_kernel.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_CUSTOM_CONFIG))
 	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_USER_CONFIG))
@@ -13,7 +28,37 @@ $(USER_CONFIG) : $(KERNEL_CONFIG)
 	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_MICROARRAY_CONFIG))
 	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_GOODIX_CONFIG))
 else
+DEBUGMODE := $(DEBUGMODE)
+USER_CONFIG  := $(TARGET_OUT)/dummy
+TARGET_DEVICE_CUSTOM_CONFIG := device/sprd/$(TARGET_DEVICE)/ProjectConfig.mk
+$(USER_CONFIG) : $(KERNEL_CONFIG)
+	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_BOARD_SPEC_CONFIG))
+	$(shell ./kernel/scripts/sprd_create_user_config.sh $(KERNEL_CONFIG) $(TARGET_DEVICE_MICROARRAY_CONFIG)
 @AndroidKernel.mk
 
 
-scrpts/sprd/defconfig_update.sh //defconfig
+//编译生成image
+TARGET_PREBUILT_KERNEL := $(KERNEL_OUT)/arch/$(TARGET_KERNEL_ARCH)/boot/Image
+
+$(TARGET_PREBUILT_KERNEL) : $(KERNEL_OUT) $(USER_CONFIG)  | $(KERNEL_CONFIG)	//生成boot/Image
+	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE_) -j${JOBS}
+@AndroidKernel.mk
+
+file := $(PRODUCT_OUT)/kernel							//生成out下的kernel
+$(file) : $(TARGET_PREBUILT_KERNEL) | $(ACP)					//依赖boot/Image生成kernle
+	$(transform-prebuilt-to-target)		
+@device/sprd/isharkl2/sp9853i_1h10/AndroidBoard.mk
+
+
+
+//打包boot.img
+INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel				//out下的kernel
+INTERNAL_BOOTIMAGE_ARGS := \							//
+	$(addprefix --second ,$(INSTALLED_2NDBOOTLOADER_TARGET)) \
+	--kernel $(INSTALLED_KERNEL_TARGET)
+
+$(INSTALLED_BOOTIMAGE_TARGET): $(MKBOOTIMG) $(AVBTOOL) $(INTERNAL_BOOTIMAGE_FILES) $(BOARD_AVB_BOOT_KEY_PATH)	//创建boot.img
+	$(call pretty,"Target boot image: $@")
+	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) $(INTERNAL_MKBOOTIMG_VERSION_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $@
+@build/make/core/Makefile
+

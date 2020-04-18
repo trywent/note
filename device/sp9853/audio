@@ -1,3 +1,12 @@
+/*
+ audio
+*/
+arm  --->i2s2--->2731	//播放
+2731 --->i2s2--->arm	//录音
+2342b--->i2s0--->arm---	//蓝牙声音
+
+
+
 /************************
  audioTester
 */
@@ -12,10 +21,6 @@ d. Headset3P: Voice call of 3 pole earphone mode for GSM & Narrow band WCDMA
 e. HandsetTD: Voice call of receiver mode for TD
  //bluetooth headset
 m. BTHSD8K: Voice call of 8K BTHS mode
-
-中国移动: GSM(2G),TD-SCDMA(3G),TD-LTE(4G)
-中国联通: GSM(2G),WCDMA(3G),TD-LTE(4G)/FDD-LTE(4G)
-中国电信: CDMA1X(2G),CDMA2000(3G),TD-LTE(4G)/FDD-LTE(4G)
 
 
 /************************

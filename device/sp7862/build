@@ -1,0 +1,46 @@
+/*
+ 7862
+*/
+
+
+/* 
+ kernel android10的kernel编译从android结构中抽出 
+
+*/
+
+export BSP_KERNEL_DEFCONFIG="sprd_sharkl5Pro_defconfig"
+@bsp/device/sharkl5Pro/androidq/ums512_1h10/ums512_1h10_base/common.cfg
+
+export BSP_DTB="ums512-1h10"
+export BSP_DTBO="ums512-1h10-overlay"
+@@bsp/device/sharkl5Pro/androidq/ums512_1h10/ums512_1h10_Natv/common.cfg
+
+//查找device,vendor目录下面的vendorsetup.sh
+source_vendorsetup() {{
+- for dir in device vendor product; do
+	
+}@build/envsetup.sh
+
+
+//重写make命令
+make{
+- make $partition_type "$make_parameters"
+- aosp_make $partition_type "$make_parameters"
+}@vendorsetup.sh
+
+aosp_make(){
+- bash $ANDROID_BUILD_TOP/bsp/build/make_for_androidq.sh $@
+}@vendorsetup.sh
+
+bsp/build/make_for_androidq.sh
+bsp/build/envsetup.sh
+vendor/sprd/feature_configs/vendorsetup.sh
+
+
+/*
+ 制作pac
+*/
+./vendor/sprd/release/IDH/Script/build_pac.sh –a ums512_1h10_Natv-userdebug-native –b BUILD –c ***
+- 参数-a 是./vendor/sprd/release/IDH 目录下面 "sp*" 目录名称
+- 参数-b BUILD|build:编译;PAC|pac:打 pac 包。
+- 参数-c 是编译运营商工程,如果有多个用英文","隔开
