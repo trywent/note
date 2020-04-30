@@ -1,5 +1,5 @@
 /***********************
-
+ intput
 */
 //Event type 事件类型
 EV_SYN 0x00  //分隔事件
@@ -49,18 +49,14 @@ EV_ABS{
 kernel/Documentation/input/event-codes.txt
 
 
-----------------------------
-Device drivers：
-处理硬件，产生输入事件
-
-----------------------------
-Event handlers：
-从设备获取事件分发到用户空间或内核
+//产生事件
+Device drivers：处理硬件，产生输入事件
+//分发事件
+Event handlers：从设备获取事件分发到用户空间或内核
 
 keybdev:提供键盘事件
 mousedev:提供鼠标事件
 evdev：是事件的通用接口，提供事件接口(event0...),
-
 
 
 struct input_dev {	
@@ -69,7 +65,9 @@ struct input_dev {
 	unsigned long relbit[BITS_TO_LONGS(REL_CNT)];
 	unsigned long absbit[BITS_TO_LONGS(ABS_CNT)];
 }
-_____________________________
+/*
+ input 驱动
+*/
 设备注册：
 input_allocate_device-->input_register_device-->input_attach_handler-->input_match_device@input.c
 (匹配handler->id_table中的总线类型，按键类型，按键值等。如果hanlder->match存在则在调用这个函数匹配。
@@ -77,24 +75,24 @@ input_allocate_device-->input_register_device-->input_attach_handler-->input_mat
 (创建并初始化evdev，生成event字符设备文件)-->input_register_handle(设备通过handle关联handler)--
 device_add(&evdev->dev)
 
-增加handler：
+//增加handler：
 evdev_init@evdev.c-->input_register_handler(&evdev_handler)@input.c-->list_add_tail
 
-打开任意输入设备：
+//打开任意输入设备：
 input_fops.open-->input_open_file(将操作函数替换为evdev_fops)@input.c-->(evdev_handler.ops)
 evdev_fops.open-->evdev_open(创建evdev_client，存储按键事件)-->evdev_attach_client-->
 list_add_tail_rcu@evdev.c
 
-上报事件：
+//上报事件：
 input_report_key@input.h-->input_event-->input_handle_event(是否支持该事件，是支持该事件值)-->
 input_pass_event@input.c-->handler->event-->evdev_event(封装事件event，)-->evdev_pass_event(
 将事件存放到client中)-->client->buffer[client->head++] = *event@evdev.c
 
-读取事件：
+//读取事件：
 (在打开阶段操作函数被替换evdev_fops)evdev_fops.read-->evdev_read-->evdev_fetch_next_event
 -->*event = client->buffer[client->tail++]@evdev.c
 
-注入事件：
+//注入事件：
 evdev_fops.write-->evdev_write@evdev.c-->input_inject_event-->input_handle_event@input.c
 
 

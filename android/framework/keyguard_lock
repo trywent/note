@@ -43,7 +43,18 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/keyguard/KeyguardView
 frameworks/base/services/core/java/com/android/server/am/KeyguardController.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarKeyguardViewManager.java
 
+/*
+ android10
 
+*/
+setLockScreenShown-->mKeyguardController.setKeyguardShown@ActivityTaskManagerService.java-->
+setKeyguardShown@KeyguardController.java
+
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+frameworks/base/services/core/java/com/android/server/wm/KeyguardController.java
 /*keyguarService android4.2
 
 */

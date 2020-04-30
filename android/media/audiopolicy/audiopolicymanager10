@@ -1,0 +1,29 @@
+/*
+ audiopolicy
+
+*/
+status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr, audio_io_handle_t *input,
+      audio_unique_id_t riid,audio_session_t session,uid_t uid, const audio_config_base_t *config,
+      audio_input_flags_t flags,audio_port_handle_t *selectedDeviceId,input_type_t *inputType,audio_port_handle_t *portId){
+- sp<DeviceDescriptor> explicitRoutingDevice = mAvailableInputDevices.getDeviceFromId(*selectedDeviceId)
+  //使用现成的input
+- if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) == AUDIO_INPUT_FLAG_MMAP_NOIRQ &&*input != AUDIO_IO_HANDLE_NONE) {
+	- ssize_t index = mInputs.indexOfKey(*input)
+	- sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(index)
+	}
+- if (attributes.source == AUDIO_SOURCE_REMOTE_SUBMIX && strncmp(attributes.tags, "addr=", strlen("addr=")) == 0) {
+	- device = mAvailableInputDevices.getDevice(AUDIO_DEVICE_IN_REMOTE_SUBMIX...)
+  else{
+	- device = mEngine->getInputDeviceForAttributes(attributes, &policyMix)
+  }
+}@AudioPolicyManager.cpp
+
+
+
+Engine::getInputDeviceForAttributes(const audio_attributes_t &attr,sp<AudioPolicyMix> *mix) const{
+- sp<DeviceDescriptor> device = findPreferredDevice(inputs, attr.source, availableInputDevices)
+}
+
+
+frameworks/av/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
+frameworks/av/services/audiopolicy/engineconfigurable/src/Engine.cpp

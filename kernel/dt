@@ -95,8 +95,6 @@ arch/arm/include/asm/mach/arch.h
 
 
 
-
-
 //compatible "<manufacturer>,<model>"
 系统用来匹配对应的驱动
 ===========
@@ -116,5 +114,20 @@ customize_machine-->machine_desc->init_machine@setup.c-->of_platform_populate@pl
 
 arch/arm/kernel/setup.c
 drivers/of/fdt.c
+/*
+ 获取信息接口
+*/
+
+//根据名字获取子节点
+struct device_node *of_get_child_by_name(const struct device_node *node,const char *name)
+
+
+//获取np中子节点list_name中包含的，cells_name的节点。返回值在out_args
+int of_parse_phandle_with_args(const struct device_node *np, const char *list_name,
+	const char *cells_name, int index,struct of_phandle_args *out_args)
+
+drivers/of/base.c
+
+
 
 

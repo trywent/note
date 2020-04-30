@@ -15,6 +15,9 @@ frameworks/base/telephony/java/android/telephony/TelephonyManager.java
 　telephony管理处
 
  打印信息：dumpsys telephony.registry
+
+
+ 展讯配置默认网络 ro.telephony.default_network
 */
 
 //telephony.registry 服务

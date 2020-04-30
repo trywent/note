@@ -1,4 +1,6 @@
-//
+/*
+ 
+*/
 
 //注册uart驱动。注册一次
 uart_register_driver(&sprd_uart_driver)

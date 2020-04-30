@@ -68,7 +68,7 @@ mixer_open{
 mixer_ctl_set_value(struct mixer_ctl *ctl, unsigned int id, int value){
 - struct snd_ctl_elem_value ev
 - ioctl(ctl->mixer->fd, SNDRV_CTL_IOCTL_ELEM_READ, &ev) //读取
-- ev.value.integer.value[id] = value//设置
+- ev.value.integer.value[id] = value			//设置
 - ioctl(ctl->mixer->fd, SNDRV_CTL_IOCTL_ELEM_WRITE, &ev)//写入
 }
 

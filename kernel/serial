@@ -1,13 +1,13 @@
+/*
+ stty -F /dev/ttySx
+*/
+
+
 //====================================
 struct uart_state{
 struct uart_port //硬件端口
 struct tty_port  //上层应用
 }
-
-
-
-
-
 
 
 //====================================

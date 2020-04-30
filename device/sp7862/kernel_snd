@@ -1,0 +1,104 @@
+/*******************************************
+ snd 注册声卡设备
+
+*/
+sound_vbc_v4_sprd_codec: sound@0 {
+- compatible = "sprd,vbc-v4-codec-sc2730";
+- sprd-audio-card,dai-link@0 {
+	
+ }
+- sprd-audio-card,dai-link@1 {
+
+	}
+}@"sprd-sound-fe-be.dtsi"
+
+//平台驱动
+vbc_rxpx_codec_sc27xx_init-->platform_driver_register(&vbc_rxpx_codec_sc27xx_driver)
+platform_driver vbc_rxpx_codec_sc27xx_driver = {
+	.driver = {
+		.name = "vbc-rxpx-codec-sc27xx",
+		.of_match_table = vbc_rxpx_codec_sc27xx_of_match,	//"sprd,vbc-v4-codec-sc2730"
+	},
+	.probe = vbc_rxpx_codec_sc27xx_probe,
+}@vbc-rxpx-codec-sc27xx.c
+
+vbc_rxpx_codec_sc27xx_probe(struct platform_device *pdev){
+- struct asoc_sprd_ptr_num pn_ops = ASOC_SPRD_PRT_NUM(sprd_dai_link_ops)
+- asoc_sprd_card_set_ops(&pn_ops)
+- struct snd_soc_card *card
+- asoc_sprd_card_probe(pdev, &card)
+- sprd_asoc_board_comm_probe
+  //设置并注册声卡设备
+- card->controls = sprd_asoc_card_controls.ptr
+- card->dapm_widgets = sprd_asoc_card_widgets.ptr
+- asoc_sprd_register_card(&pdev->dev, card)-->devm_snd_soc_register_card-->snd_soc_register_card
+}@vbc-rxpx-codec-sc27xx.c
+
+
+asoc_sprd_card_probe(struct platform_device *pdev,struct snd_soc_card **card){
+- agcp_ahb_gpr = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "sprd,syscon-agcp-ahb")
+- arch_audio_set_agcp_ahb_gpr(agcp_ahb_gpr)
+- num_links = of_get_child_count(np)	//分配dail_link空间
+- priv = devm_kzalloc(dev,sizeof(*priv) + sizeof(*dai_link) * num_links,GFP_KERNEL)
+- asoc_sprd_card_parse_of(np, priv)	//解析dts，初始化dail_link
+- snd_soc_card_set_drvdata(&priv->snd_card, priv)
+}@sprd-asoc-card-utils.c
+
+
+
+bsp/kernel/kernel4.14/sound/soc/sprd/vbc-rxpx-codec-sc27xx.c
+bsp/kernel/kernel4.14/sound/soc/sprd/sprd-asoc-card-utils.c
+/*******************************************
+ codec
+
+*/
+sprd_codec_driver_init(void)-->platform_driver_register(&sprd_codec_codec_driver)
+platform_driver sprd_codec_codec_driver = {
+	.driver = {
+		.name = "sprd-codec-sc2730",
+		.owner = THIS_MODULE,
+		.of_match_table = codec_of_match,	//"sprd,sc2730-audio-codec"
+	},
+	.probe = sprd_codec_probe,
+}
+
+sprd_codec_probe(struct platform_device *pdev){
+- struct sprd_codec_priv *sprd_codec = devm_kzalloc(&pdev->dev,sizeof(struct sprd_codec_priv), GFP_KERNEL)
+- platform_set_drvdata(pdev, sprd_codec)
+  //pmic中模拟部分
+- sprd_codec_ana_probe(pdev)
+  //数字部分
+- dig_np = of_parse_phandle(np, "digital-codec", 0)
+- pmu_apb_gpr = syscon_regmap_lookup_by_phandle(np, "sprd,syscon-pmu-apb")
+- arch_audio_set_pmu_apb_gpr(pmu_apb_gpr)
+- dig_pdev = of_find_device_by_node(dig_np)
+- platform_set_drvdata(dig_pdev, sprd_codec)
+- sprd_codec_read_efuse(pdev, "aud_pabst_vcal_efuse",&sprd_codec->aud_pabst_vcal)
+- sprd_codec_dig_probe(dig_pdev)
+  //注册到alsa
+- snd_soc_register_codec(&pdev->dev,&soc_codec_dev_sprd_codec,sprd_codec_dai,ARRAY_SIZE(sprd_codec_dai))
+}@sprd-codec.c
+
+sprd_codec_soc_probe
+
+
+
+bsp/kernel/kernel4.14/sound/soc/sprd/codec/sprd/sc2730/sprd-codec.c
+/*******************************************
+ headset
+
+*/
+sprd_codec_soc_probe@sprd-codec.c-->sprd_headset_parse
+
+
+sprd_headset_soc_probe{
+- 
+- snd_soc_card_jack_new(card, "Headset Jack",SPRD_HEADSET_JACK_MASK, &hdst->hdst_jack, NULL, 0)
+}
+
+
+bsp/kernel/kernel4.14/sound/soc/sprd/codec/sprd/sc2730/sprd-headset-sc2730.c
+
+
+
+

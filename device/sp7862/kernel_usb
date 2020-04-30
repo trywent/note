@@ -1,0 +1,150 @@
+/*********************************************************
+ ums510 模拟侧
+
+ sc27xx模拟部分接口，typec。监听连接断开，发送事件给musb
+
+*/
+usb: usb@5fff0000 {
+ compatible = "sprd,sharkl5-musb", "sprd,sharkl5pro-musb";
+ usb-phy = <&hsphy>;
+}@sharkl5Pro.dtsi
+
+
+extcon_gpio: extcon-gpio {
+ compatible = "linux,extcon-usb-gpio";
+ vbus-gpio = <&pmic_eic 0 GPIO_ACTIVE_HIGH>;
+}
+
+&hsphy {
+ vdd-supply = <&vddusb33>;
+ extcon = <&extcon_gpio>;
+}@ums512-1h10.dts
+
+//驱动初始
+sc27xx_typec_init-->platform_driver_register(&sc27xx_typec_driver)
+sc27xx_typec_driver = {
+	.probe = sc27xx_typec_probe,
+	.driver = {
+		.name = "sc27xx-typec",
+		.of_match_table = typec_sprd_match,
+	},
+}@c27xx_typec.c
+
+//phy设备的父设备是usb
+sc27xx_typec_probe(struct platform_device *pdev){
+- struct sc27xx_typec *sc = devm_kzalloc(&pdev->dev, sizeof(*sc), GFP_KERNEL)
+  //创建struct extcon_dev 并注册.usb设备通过父设备节点获取这个设备
+- sc->edev = devm_extcon_dev_allocate(&pdev->dev, sc27xx_typec_cable)	
+- devm_extcon_dev_register(&pdev->dev, sc->edev)
+- platform_set_drvdata(pdev, sc)
+}@sc27xx_typec.c
+
+
+//中断处理
+sc27xx_typec_interrupt(int irq, void *data){
+  //读取状态
+- struct sc27xx_typec *sc = data
+- regmap_read(sc->regmap, sc->base + SC27XX_INT_MASK, &event)
+- regmap_read(sc->regmap, sc->base + SC27XX_STATUS, &sc->state)
+  //连接
+- sc27xx_typec_connect(sc, sc->state)
+  //断开
+- sc27xx_typec_disconnect(sc, sc->state)
+}@sc27xx_typec.c
+
+
+//节点
+/sys/class/typec/
+
+
+bsp/kernel/kernel4.14/drivers/usb/typec/sc27xx_typec.c
+/*********************************************************
+ phy硬件 管理供电，usb使能,充电
+*/
+sprd_hsphy_driver_init-->platform_driver_register(&sprd_hsphy_driver)
+platform_driver sprd_hsphy_driver = {
+	.probe = sprd_hsphy_probe,
+	.driver = {
+		.name = "sprd-hsphy",
+		.of_match_table = sprd_hsphy_match,
+	},
+}@phy-sprd-sharkl5.c
+
+sprd_hsphy_probe(struct platform_device *pdev){
+- struct sprd_hsphy *phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL)
+- struct usb_otg *otg = devm_kzalloc(&pdev->dev, sizeof(*otg), GFP_KERNEL)
+- phy->phy.dev = dev
+- platform_set_drvdata(pdev, phy)
+- usb_add_phy_dev(&phy->phy)
+}@phy-sprd-sharkl5.c
+
+
+bsp/kernel/kernel4.14/drivers/usb/phy/phy-sprd-sharkl5.c
+
+/*********************************************************
+ ap数字侧 musb控制器
+*/
+&usb {
+	extcon = <&extcon_gpio>, <&pmic_typec>;
+	//vbus-supply = <&vddvbus>;
+}
+@ums512-1h10.dts
+
+musb_sprd_driver_init-->platform_driver_register(&musb_sprd_driver)
+-->musb_sprd_probe(struct platform_device *pdev){
+  //和硬件的连接
+- struct sprd_glue *glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL)
+- glue->xceiv = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0)
+  //usb host设备
+- struct platform_device_info pinfo
+- pdata.platform_ops = &sprd_musb_ops
+- pinfo.name = "musb-hdrc"	//创建musb设备，匹配驱动musb_driver
+- pinfo.data = &pdata
+- glue->musb = platform_device_register_full(&pinfo)
+  //vbus/id脚控制
+- if (of_property_read_bool(node, "extcon")) {
+	- glue->edev = extcon_get_edev_by_phandle(glue->dev, 0)		//vbus通知
+	- glue->vbus_nb.notifier_call = musb_sprd_vbus_notifier
+	- extcon_register_notifier(glue->edev, EXTCON_USB,&glue->vbus_nb)
+	- glue->id_edev = extcon_get_edev_by_phandle(glue->dev, 1)	//id脚通知
+	- glue->id_nb.notifier_call = musb_sprd_id_notifier
+	- extcon_register_notifier(glue->id_edev,EXTCON_USB_HOST,&glue->id_nb)
+	}
+  //获取连接状态
+- musb_sprd_detect_cable(glue)
+}@musb_sprd.c
+
+
+bsp/kernel/kernel4.14/drivers/usb/musb/musb_sprd.c
+/*********************************************************
+ musb驱动 创建hcd
+
+*/
+
+module_platform_driver(musb_driver)-->
+platform_driver musb_driver = {
+	.driver = {
+		.name		= (char *)musb_driver_name,//MUSB_DRIVER_NAME "musb-hdrc"
+		.bus		= &platform_bus_type,
+	},
+	.probe		= musb_probe,
+}@musb_core.c
+
+musb_probe(struct platform_device *pdev){
+- struct device	*dev = &pdev->dev
+- int		irq = platform_get_irq_byname(pdev, "mc")
+- base = devm_ioremap_resource(dev, iomem)
+- musb_init_controller(dev, irq, base){
+	- struct musb	*musb = allocate_instance(dev, plat->config, ctrl){
+		- struct musb *musb = devm_kzalloc(dev, sizeof(*musb), GFP_KERNEL)
+		- INIT_LIST_HEAD(&musb->control)
+		- musb_host_alloc(musb)-->usb_create_hcd(&musb_hc_driver, dev, dev_name(dev))@musb_host.c	//创建hcd
+		}
+	- musb_platform_init(musb)
+	}
+}@musb_core.c
+
+
+
+bsp/kernel/kernel4.14/drivers/usb/musb/musb_host.c
+bsp/kernel/kernel4.14/drivers/usb/musb/musb_core.c

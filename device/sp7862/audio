@@ -4,3 +4,165 @@
 arm  	--->i2s2--->ump510g	//播放
 ump510g --->i2s2--->arm		//录音
 umw2652 --->i2s0--->arm		//蓝牙声音
+
+
+/*
+ audiopolicy
+
+*/
+
+{
+- primary_audio_policy_configuration.xml
+- bluetooth_audio_policy_configuration.xml
+- r_submix_audio_policy_configuration.xml
+}@audio_policy_configuration.xml
+
+
+/**************************************************
+ audio_hw
+
+
+ 不使用tiny_hw.xml
+*/
+
+//使用audio/whale
+BOARD_USES_TINYALSA_AUDIO := true@device/sprd/sharkl5Pro/common/BoardCommon.mk
+USE_AUDIO_WHALE_HAL :=true			//whale
+USE_CONFIGURABLE_AUDIO_POLICY := 1		//audiopolicy使用engineconfigurable
+USE_CUSTOM_CONFIGUREABLE_AUDIO_POLICY := true
+@device/sprd/sharkl5Pro/ums512_1h10/ums512_1h10_Base.mk
+
+
+//设备
+adev_open(const hw_module_t* module, const char* name, hw_device_t** device){
+- struct tiny_audio_device *adev = calloc(1, sizeof(struct tiny_audio_device))
+- adev->hw_device.get_supported_devices = adev_get_supported_devices
+- adev->dev_ctl = init_audio_control(adev)
+}@audio_hw.c
+
+
+struct audio_control *init_audio_control(struct tiny_audio_device *adev){
+- struct audio_control *control
+- control->adev = adev
+- parse_audio_config(&control->config)			//"/vendor/etc/audio_config.xml" loglevel,其它配置
+- control->mixer = mixer_open(card_num)
+- parse_audio_route(control)				//"/vendor/etc/audio_route.xml" 设备配置。android8后使用vendor目录下配置
+- parse_audio_pcm_config(&(control->pcm_handle))	//"/vendor/etc/audio_pcm.xml"   通路配置
+- stream_routing_manager_create(control)		//开始route进程
+- audio_event_manager_create(control
+}@audio_control.cpp
+
+//解析AUDIO_ROUTE_PATH "/vendor/etc/audio_route.xml"
+parse_audio_route(struct audio_control *control){
+- parse_route_device(&(control->route.devices_route), control->mixer, dev){		//device节点
+	- struct device_route *route = alloc_route_device(route_hanler)			//创建route加入route_hanler
+	- route->name
+	- route->devices
+	- parse_route_control(mixer, &route->ctl_on, ctl_on)
+	- parse_route_control(mixer, &route->ctl_off, ctl_off)				//route中的control
+	}
+- parse_vbc_route_device(&(control->route.vbc_iis_mux_route), control->mixer, dev)	//vbc_iis_mux节点
+- parse_vbc_route_device(&(control->route.be_switch_route), control->mixer, dev)	//be_switch节点
+- parse_dsploop_control(&(control->route.dsploop_ctl), control->mixer,tmp)		//dsploop节点
+}@audio_parse.cpp
+
+//解析AUDIO_PCM_FILE  "/vendor/etc/audio_pcm.xml"
+parse_audio_pcm_config(struct pcm_handle_t *pcm){
+- parse_pcm_config(pcm->play, pcm->playback_devices,pcm_tmp){		//playback节点
+	- 
+	}
+- parse_recordpcm_config(pcm->record,pcm->record_devices, pcm_tmp){	//record节点
+	- devices[0]							//recognition channels="1" device 0
+	- devices[1]							//mm_normal channels="2" device 2
+	}
+- parse_compress_config(&(pcm->compress),pcm_tmp)			//compress节点
+}@audio_parse.cpp
+
+
+//audiopatch device被修改?
+createAudioPatch-->adev->hw_device.create_audio_patch-->
+adev_create_audio_patch(struct audio_hw_device *dev,unsigned int num_sources,const struct audio_port_config *sources,
+        unsigned int num_sinks,const struct audio_port_config *sinks,audio_patch_handle_t *handle){
+- adev_in_devices_check(adev,sources_device_type){
+	- 
+	}
+-->select_devices_new
+}@audio_hw.cpp
+
+/**************************************************
+ 设置route
+*/
+stream_routing_manager_create(struct audio_control *actl)-->
+pthread_create(&actl->routing_mgr.routing_switch_thread, &attr, stream_routing_thread_entry, (void *)actl)
+-->stream_routing_thread_entry(void *param){
+- while(!actl->routing_mgr.is_exit){
+	- item = list_head(&actl->switch_device_cmd_list)
+	- struct switch_device_cmd *cmd = node_to_item(item, struct switch_device_cmd, node)
+	- SWITCH_DEVICE:do_select_device(actl,cmd->audio_app_type,cmd->device,cmd->is_in,cmd->update_param,cmd->is_force)
+	- SET_FM_VOLUME:set_audioparam(actl,PARAM_FM_VOLUME_CHANGE, &cmd->param1,false)
+	}
+}@audio_control.cpp
+
+
+do_select_device(struct audio_control *actl,AUDIO_HW_APP_T audio_app_type,audio_devices_t device,bool is_in,bool update_param,bool force_set){
+- 
+}
+
+
+switch_vbc_route(struct audio_control *ctl,int device){
+- switch_vbc_device_route(&ctl->route.vbc_iis_mux_route,device,is_in_device){
+
+	}
+- switch_vbc_device_route(&ctl->route.be_switch_route,device,is_in_device)
+}@audio_control.cpp
+
+
+//选择设备,发送命令到route线程
+select_devices_new(struct audio_control *actl, int audio_app_type, audio_devices_t device,
+	 bool is_in, bool update_param, bool sync, bool force)-->
+select_device_cmd_send(struct audio_control *actl,AUDIO_HW_APP_T audio_app_type,
+	SWITCH_DEVICE_CMD_T cmd_param, audio_devices_t device,bool is_in,bool update_param, bool sync, bool force,int param1){
+- struct switch_device_cmd *cmd = (struct switch_device_cmd *)calloc(1,sizeof(struct switch_device_cmd))
+- cmd->cmd = cmd_param
+- cmd->audio_app_type = audio_app_type
+- cmd->device = device
+- list_add_tail(&actl->switch_device_cmd_list, &cmd->node)
+}@audio_control.cpp
+
+
+/**************************************************
+ output
+*/
+
+/**************************************************
+ input
+
+*/
+adev_open_input_stream(struct audio_hw_device *dev,UNUSED_ATTR audio_io_handle_t handle, audio_devices_t devices,struct audio_config *config,
+	 struct audio_stream_in **stream_in, audio_input_flags_t flags, const char *address __unused, audio_source_t source ){
+- in->devices = devices
+}
+
+//读取数据
+in_read(struct audio_stream_in *stream, void *buffer,size_t bytes){
+- 
+- if (in->standby) {
+	- ret = start_input_stream(in)
+	- in->standby = false
+	}
+}@audio_hw.c
+
+start_input_stream(struct tiny_stream_in *in){
+- usecase = stream_type_to_usecase(in->audio_app_type)
+- set_usecase(control,  usecase, true)
+- switch_vbc_route(adev->dev_ctl,in->devices)
+- dev_ctl_get_in_pcm_config(control, in->audio_app_type, &pcm_devices, in->config)	//根据类型获取录音设备
+- in->pcm = pcm_open(adev->dev_ctl->cards.s_tinycard, pcm_devices, PCM_IN | PCM_MMAP | PCM_NOIRQ|PCM_MONOTONIC , in->config)
+- select_devices_new(adev->dev_ctl,in->audio_app_type,in->devices,true,false,true, true)//设置route
+}@audio_hw.c
+
+
+vendor/sprd/modules/audio/whale/audio_hw.c
+vendor/sprd/modules/audio/whale/audio_control.cpp
+vendor/sprd/modules/audio/whale/audio_parse.cpp
+vendor/sprd/modules/audio/whale/debug/audio_debug.cpp

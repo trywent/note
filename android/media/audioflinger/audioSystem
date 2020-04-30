@@ -2,10 +2,10 @@
  audio接口
 */
 {
-- setDeviceConnectionState/getDeviceConnectionState  //device state
-- initStreamVolume/setStreamVolumeIndex/getStreamVolumeIndex //volume
+- setDeviceConnectionState/getDeviceConnectionState		//device state
+- initStreamVolume/setStreamVolumeIndex/getStreamVolumeIndex	//volume
 - createAudioPatch/releaseAudioPatch/listAudioPatches
-- getDevicesForStream //device
+- getDevicesForStream						//device
 }AudioSystem.java
 
 
@@ -21,11 +21,11 @@
 - getAudioFlingerClient
 - getInputBufferSize
 
-//audiopolicy
+//audiopolicymanager
 - get_audio_policy_service
 - setDeviceConnectionState
-- getOutput/getOutputForAttr/startOutput/stopOutput/releaseOutput //output
-- getInputForAttr/startInput/stopInput/releaseInput   //input
+- getOutput/getOutputForAttr/startOutput/stopOutput/releaseOutput	//output
+- getInputForAttr/startInput/stopInput/releaseInput   			//input
 
 }AudioSystem.cpp
 

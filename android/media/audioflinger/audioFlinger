@@ -1,5 +1,7 @@
-//AudioFlinger: 关联到实际hw设备。写播放数据到hw设备。从hw设备读取数据。
+/***************************************************
+ AudioFlinger 操作hal层接口
 
+*/
 
 AudioFlinger{
 - mDevicesFactoryHal = DevicesFactoryHalInterface::create()-->
@@ -19,7 +21,7 @@ AudioFlinger::instantiate-->publish{
 - 加入，sm->addService
 }@BinderService.h
 
-/*
+/***************************************************
  获取hal接口.
  原来的,获取模块:hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID),
 	获取设备接口:audio_hw_device_open 
@@ -38,8 +40,8 @@ loadHwModule_l{
 frameworks/av/media/libaudiohal/DevicesFactoryHalHybrid.cpp
 frameworks/av/media/libaudiohal/DevicesFactoryHalHidl.cpp
 frameworks/av/media/libaudiohal/DevicesFactoryHalLocal.cpp
-============
-/*openOutput 
+/***************************************************
+ openOutput 
  audiohw创建一个outStream结构
 */
 openOutput-->openOutput_l(audio_module_handle_t module,audio_io_handle_t *output,audio_config_t *config,
@@ -155,8 +157,8 @@ AudioSystem::setMasterMute
 AudioFlinger::setMasterMute-->dev->hwDevice()->set_master_mute@AudioFlinger.cpp
 
 
-===============
-/*input
+/***************************************************
+  input
  保存input数据的buffer在audioflinger侧分配，client(AudioRecord端)获取这个buffer读取数据
  IMemory 进程间拷贝数据。
 */

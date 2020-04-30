@@ -1,4 +1,4 @@
-/*
+/************************************************
 
   dumpsys activity service com.android.systemui
 */
@@ -74,7 +74,7 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/Dependency.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/CommandQueue.java
 
 =======================
-/* 
+/************************************************
  statusBar窗口：
 
  StatusBarWindowView{
@@ -210,7 +210,7 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/Colla
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarWindowManager.java
 =======================
-/*
+/************************************************
  NavigationBar
  
  NavigationBarFragment{//navigation_bar_frame
@@ -301,7 +301,7 @@ InputManager.getInstance().injectInputEvent@KeyButtonView.java-->
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarView.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NavigationBarInflaterView.java
 
-/*
+/************************************************
   状态条颜色变化
 
 */
@@ -348,7 +348,7 @@ setIconTintInternal{
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/LightBarController.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/DarkIconDispatcherImpl.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/LightBarTransitionsController.java
-/*
+/************************************************
  Divider
 */
 
@@ -389,8 +389,7 @@ frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/Divider.
 frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/DividerWindowManager.java
 frameworks/base/packages/SystemUI/src/com/android/systemui/stackdivider/DividerView.java
 
-=======================
-/*
+/************************************************
  Recents：
 */
 start{
@@ -485,7 +484,7 @@ pickUpViewFromPool{
 
 frameworks/base/packages/SystemUI/src/com/android/systemui/recents/Recents.java
 =======================
-/*
+/************************************************
  quickSetting
 */
 
@@ -524,7 +523,7 @@ attach-->new IWallpaperEngineWrapper@WallpaperService.stub-->executeMessage{
 	}
 }@WallpaperService.Engine.java
 
-/*
+/************************************************
  notification
 
 */
@@ -559,6 +558,22 @@ addNotification(StatusBarNotification notification, RankingMap ranking){
 
 frameworks/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationListenerWithPlugins.java
 frameworks/base/packages/SystemUI/plugin/src/com/android/systemui/plugins/NotificationListenerController.java
+
+/************************************************
+ KeyguardViewMediator
+
+*/
+start-->setupLocked{
+- 
+- if (mContext.getResources().getBoolean( com.android.keyguard.R.bool.config_enableKeyguardService)){	//是否打开锁屏
+	- setShowingLocked(!shouldWaitForProvisioning()....)
+	}
+}@KeyguardViewMediator.java
+
+
+
+
+frameworks/base/packages/SystemUI/src/com/android/systemui/keyguard/KeyguardViewMediator.java
 
 =======================
 //android4.4:

@@ -40,8 +40,9 @@ mdpi  //density 160
 hdpi
 
 //关闭优化
-WITH_DEXPREOPT :=false
+关闭android10后不能修改 WITH_DEXPREOPT@build/make/core/board_config.mk
 
+WITH_DEXPREOPT :=false
 
     dex_preopt:{
 	enabled:false,

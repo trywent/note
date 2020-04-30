@@ -1,6 +1,6 @@
 //一个io的控制,在两个寄存器中.
 
-#define BITS_PIN_DS(_x_)                ( ((_x_) << 19) & (BIT_19|BIT_20|BIT_21|BIT_22) )
+#define BITS_PIN_DS(_x_)                ( ((_x_) << 19) & (BIT_19|BIT_20|BIT_21|BIT_22) )	//强度
 #define BIT_PIN_SLP_WTLCP               ( BIT_15 )
 #define BIT_PIN_SLP_PUBCP               ( BIT_14 )
 #define BIT_PIN_SLP_AP                  ( BIT_13 )
@@ -10,7 +10,7 @@
 #define BIT_PIN_SE                      ( BIT_11 )
 #define BIT_PIN_WPU                     ( BIT_7 )
 #define BIT_PIN_WPD                     ( BIT_6 )
-#define BITS_PIN_AF(_x_)                ( ((_x_) << 4) & (BIT_4|BIT_5) )
+#define BITS_PIN_AF(_x_)                ( ((_x_) << 4) & (BIT_4|BIT_5) )			//功能选择，3为gpio
 #define BIT_PIN_SLP_WPU                 ( BIT_3 )
 #define BIT_PIN_SLP_WPD                 ( BIT_2 )
 #define BIT_PIN_SLP_IE                  ( BIT_1 )

@@ -4,8 +4,6 @@
 */
 AudioManager = Context.getSystemService("audio")
 
-
-==============
 AudioService{
 - 更新alias流，updateStreamVolumeAlias
 - 创建并初始化流状态，createStreamStates
@@ -77,8 +75,10 @@ applyDeviceVolume//保存音量在mIndex
 
 mute//
 
-=====================
-ringerMode:
+
+/*
+ ringerMode
+*/
 setRingerModeExternal/setRingerModeInternal-->setRingerMode-->
 setRingerModeInt{
 - 判断流是否需要静音，isStreamAffectedByRingerMode
@@ -101,6 +101,19 @@ dump{
 	}
 - 
 }@AudioService.java
+
+/*
+ route
+*/
+//注册route监听
+startMonitoringRoutes-->mAudioService.startWatchingRoutes(mAudioRoutesObserver)
+@MediaRouter.java-->mRoutesObservers.register@AudioService.java
+
+
+//更新route
+IAudioRoutesObserver.Stub.dispatchAudioRoutesChanged-->updateAudioRoutes
+-->dispatchRouteChanged-->cbi.cb.onRouteChanged@MediaRouter.java
+
 
 
 frameworks/base/media/java/android/media/AudioService.java

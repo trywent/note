@@ -77,3 +77,19 @@ sudo apt-get install open-vm-tools-desktop
 //串口工具
 minicom 
 cutecom
+
+/*
+ 移除老内核
+*/
+# List linux kernel package
+dpkg --list | grep linux-image
+
+# Check current version, don't remove this
+uname -r
+
+//Remove Kernel Image {多个版本号}
+sudo apt-get purge linux-image-x.x.x-{xxx,xxx,xxx,xxx,}
+
+# Remove Kernel Header
+sudo apt-get purge linux-headers-x.x.x-x
+

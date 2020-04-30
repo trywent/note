@@ -1,0 +1,63 @@
+/*
+ wcn
+*/
+
+marlin_init-->platform_driver_register(&marlin_driver)
+platform_driver marlin_driver = {
+	.driver = {
+		.name = "marlin",
+		.of_match_table = marlin_match_table,	//"sprd,marlin3"
+	},
+	.probe = marlin_probe,
+}
+
+marlin_probe(struct platform_device *pdev){
+- marlin_parse_dt(pdev)
+  //bus
+- wcn_bus_init()
+- sprdwcn_bus_preinit
+- sprdwcn_bus_register_rescan_cb(marlin_scan_finish)
+- sdio_pub_int_init(marlin_dev->int_ap)
+- mem_pd_init()
+  //proc
+- proc_fs_init()
+  //opt
+- wcn_op_init()
+- INIT_WORK(&marlin_dev->download_wq, pre_btwifi_download_sdio)
+- INIT_WORK(&marlin_dev->gnss_dl_wq, pre_gnss_download_firmware)
+- INIT_DELAYED_WORK(&marlin_dev->power_wq, marlin_power_wq)		//打开电压
+- schedule_delayed_work(&marlin_dev->power_wq, msecs_to_jiffies(3500))
+}@wcn_boot.c
+
+//打开电压
+marlin_power_wq-->marlin_set_power(WCN_AUTO, true)-->
+marlin_set_power(int subsys, int val){
+ //第一次打开
+- schedule_work(&marlin_dev->gnss_dl_wq)
+- ait_for_completion_timeout(&marlin_dev->gnss_download_done, 10 * HZ)
+- schedule_work(&marlin_dev->download_wq)
+- wait_for_completion_timeout(&marlin_dev->download_done,msecs_to_jiffies(POWERUP_WAIT_MS))
+- set_wifipa_status(subsys, val)
+- power_state_notify_or_not(subsys, val)
+- marlin_set_power(WCN_AUTO, false);
+ //再次打开WCN_AUTO
+- set_wifipa_status(subsys, val)
+ //打开gnss
+- set_wifipa_status(subsys, val)
+ //关闭
+- chip_power_off(subsys)
+}@wcn_boot.c
+
+
+chip_power_on(int subsys){
+- marlin_chip_en(true, false)
+- chip_reset_release(1)
+}
+
+
+chip_power_off(int subsys){
+- marlin_chip_en(false, false)	//关闭en
+- chip_reset_release		//关闭reset
+}
+
+bsp/kernel/kernel4.14/drivers/misc/sprdwcn/platform/wcn_boot.c

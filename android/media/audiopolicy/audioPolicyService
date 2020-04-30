@@ -1,8 +1,13 @@
-/*
+/***************************************************
+ AudioPolicyService	
+ AudioPolicyManager	audioSystem操作的接口
+ AudioPolicyClient	操作audioflinger的接口
+
+ 没有policyhal
 
  audio_policy_configuration.xml中声明所有的支持模块,根据这些配置加载对应的库文件
-
  9853：vendor/sprd/modules/audio/normal/newapm/O.x/AudioPolicyManagerSPRD.cpp
+
 */
 
 
@@ -44,20 +49,21 @@ HwModule{
 
 AudioOutputDescriptor //output
 
+//AudioPolicyService启动
 main(int argc __unused, char **argv)-->AudioPolicyService::instantiate()@main_audioserver.cpp-->
 AudioPolicyService::onFirstRef{
 - mTonePlaybackThread = new AudioCommandThread        
-- mAudioCommandThread = new AudioCommandThread// start audio commands thread
-- mOutputCommandThread = new AudioCommandThread// start output activity command thread
-- mAudioPolicyClient = new AudioPolicyClient(this) //audioflinger的封装
+- mAudioCommandThread = new AudioCommandThread		// start audio commands thread
+- mOutputCommandThread = new AudioCommandThread		// start output activity command thread
+- mAudioPolicyClient = new AudioPolicyClient(this)	// 操作audioflinger的接口
 - mAudioPolicyManager = createAudioPolicyManager(mAudioPolicyClient)
   //音效
 - mAudioPolicyEffects = new AudioPolicyEffects
 }
 
-createAudioPolicyManager-->
+createAudioPolicyManager-->new AudioPolicyManager(clientInterface)@AudioPolicyFactory.cpp-->
 AudioPolicyManager(AudioPolicyClientInterface *clientInterface){
-- mpClientInterface = clientInterface //audioflinger
+- mpClientInterface = clientInterface		// 操作audioflinger的接口
 - mVolumeCurves = new VolumeCurvesCollection()
 - AudioPolicyConfig config(mHwModules, mAvailableOutputDevices, mAvailableInputDevices)
   //解析加载odm/vendor/system下"audio_policy_configuration.xml"
@@ -78,17 +84,17 @@ AudioPolicyManager(AudioPolicyClientInterface *clientInterface){
 	  //将当前可用的设备关联到audiohw
 	- 遍历,mOutputProfiles{
 		- profileType = outProfile->getSupportedDeviceForType(outputDeviceTypes)//找对对应存在的设备
-		- outputDesc = new SwAudioOutputDescriptor(outprofile) //创建当前设备的outputStream
+		- outputDesc = new SwAudioOutputDescriptor(outprofile)			//创建当前设备的outputStream
 		- outputDesc->mDevice = profileType
 		- mpClientInterface->openOutput(&output)
-		- mAvailableOutputDevices[index]->attach //设置attached设备可用状态
-		- addOutput(output, outputDesc) //保存到mOutputs
-		- setOutputDevice //设置route,patch
+		- mAvailableOutputDevices[index]->attach 				//设置attached设备可用状态
+		- addOutput(output, outputDesc)						//保存到mOutputs
+		- setOutputDevice							//设置route,patch
 		}
 	- 遍历,mInputProfiles{
 		- sp<AudioInputDescriptor> inputDesc = new AudioInputDescriptor
 		- mpClientInterface->openInput
-		- devDesc->attach(mHwModules[i])/devDesc->importAudioPort //设置attached设备可用状态
+		- devDesc->attach(mHwModules[i])/devDesc->importAudioPort		//设置attached设备可用状态
 		}
 	}
 - 
@@ -100,7 +106,7 @@ deserializeAudioPolicyXmlConfig(config)-->serializer.deserialize{
 	//IOProfile mixport 
 	- deserializeCollection<MixPortTraits>(mixPorts)
 	- module->setProfiles(mixPorts)-->addProfile{
-		- addOutputProfile //outputProflie/inputProfile
+		- addOutputProfile 					//outputProflie/inputProfile
 		- addInputProfile
 		}
 	 //DeviceDescriptor devicePorts 
@@ -108,7 +114,7 @@ deserializeAudioPolicyXmlConfig(config)-->serializer.deserialize{
 	- module->setDeclaredDevices(devicePorts)
 	 //AudioRoute route
 	- deserializeCollection<RouteTraits>(routes){
-		- sink->addRoute/source->addRoute //保存route到sink,source中
+		- sink->addRoute/source->addRoute			//保存route到sink,source中
 		}
 	- module->setRoutes(routes){
 		- mRoutes = routes
@@ -116,11 +122,11 @@ deserializeAudioPolicyXmlConfig(config)-->serializer.deserialize{
 		}
 	 //attachedDevices 已连接设备(DeviceDescriptor)
 	- config->addAvailableDevice-->mAvailableOutputDevices.add/mAvailableInputDevices.add 
-	- config->setDefaultOutputDevice-->mDefaultOutputDevices //"defaultOutputDevice"
+	- config->setDefaultOutputDevice-->mDefaultOutputDevices	//"defaultOutputDevice"
 	}
-- config.setHwModules(modules) //加入module
+- config.setHwModules(modules) 						//加入module
 - deserializeCollection<VolumeTraits>(volumes, &config)
-- config.setVolumes(volumes) //volume配置
+- config.setVolumes(volumes)						//volume配置
 }@Serializer.cpp
 
 //audioService接口实现
@@ -135,8 +141,34 @@ AudioPolicyManager::setDeviceConnectionState-->setDeviceConnectionStateInt{
 - mAvailableOutputDevices.add(devDesc)
 - mAvailableInputDevices.add(devDesc)
 }
-=================
-/* output
+/***************************************************
+  audiopolicyservice 命令处理线程AudioCommandThread
+*/
+
+//命令处理
+AudioPolicyService::AudioCommandThread::threadLoop(){
+- sp<AudioCommand> command = mAudioCommands[0]
+- switch (command->mCommand) {
+	- START_TONE{
+		- 		
+		}
+	- 
+	- CREATE_AUDIO_PATCH: {
+		- command->mStatus = af->createAudioPatch(&data->mPatch, &data->mHandle)
+		}
+	}
+}@AudioPolicyService.cpp
+
+//发送命令
+AudioPolicyService::AudioPolicyClient::createAudioPatch-->
+mAudioPolicyService->clientCreateAudioPatch@AudioPolicyClientImpl.cpp-->AudioPolicyService::clientCreateAudioPatch-->
+AudioCommandThread::createAudioPatchCommand(const struct audio_patch *patch,audio_patch_handle_t *handle,int delayMs){
+
+}@AudioPolicyService.cpp
+
+
+/***************************************************
+ output
 
 */
 
@@ -144,8 +176,8 @@ openOutput-->af->openOutput@AudioPolicyClientImpl.cpp-->AudioFlinger::openOutput
 
 //android8.0
 AudioPolicyManager::getOutputForAttr(&output,selectedDeviceId){
-- strategy = getStrategyForAttr //获取策略
-- device = getDeviceForStrategy(strategy)//获取设备
+- strategy = getStrategyForAttr			//获取策略
+- device = getDeviceForStrategy(strategy)	//获取设备
 - getOutputForDevice(device,stream){
 	- 遍历mOutputs查找合适的output返回
 	- outputDesc = new SwAudioOutputDescriptor(profile)
@@ -156,8 +188,8 @@ AudioPolicyManager::getOutputForAttr(&output,selectedDeviceId){
 }
 
 
-=================
-/* input
+/***************************************************
+ input
   
    1,获取设备，打开input
 

@@ -47,8 +47,14 @@ legacy_adev_open{
 - 创建AudioHardwareInterface接口，ladev->hwif=createAudioHardware-->new AudioHardware
 }
 
-============
-//output
+HAL_MODULE_INFO_SYM.common.methods-->hal_module_methods.open-->
+adev_open(const hw_module_t *module, const char *name,hw_device_t **device){
+- 
+}@audio_hw.c
+
+/*
+ output
+*/
 打开流：
 AudioFlinger::openOutput-->open_output_stream-->adev_open_output_stream{
 - 创建out，(legacy_stream_out *)calloc
@@ -69,11 +75,9 @@ standby@AudioHardware.cpp
 
 
 
-=============
-/*input
+/*
 
-
-
+ input
 
 */
 
@@ -82,8 +86,16 @@ struct audio_stream_in stream;
 int device; //当前input打开的设备
 }
 
-open_input_stream-->adev_open_input_stream{
-- 
+open_input_stream-->adev_open_input_stream(struct audio_hw_device *dev,
+                                  UNUSED_ATTR audio_io_handle_t handle,
+                                  audio_devices_t devices,
+                                  struct audio_config *config,
+                                  struct audio_stream_in **stream_in,
+                                  audio_input_flags_t flags,
+                                  const char *address __unused,
+                                  audio_source_t source ){
+- struct audio_control *control = adev->dev_ctl
+- dev_ctl_get_in_pcm_config(control, in->audio_app_type, &pcm_devices, in->config)	//选择合适的设备
 }@audio_hw.c
 
 

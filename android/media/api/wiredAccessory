@@ -1,0 +1,134 @@
+/*
+ 监听耳机，hdmi的连接状态更新
+
+*/
+WiredAccessoryManager(Context context, InputManagerService inputManager){
+- mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE)
+- mInputManager = inputManager
+- mUseDevInputEventForAudioJack
+- WiredAccessoryExtconObserver mExtconObserver = new WiredAccessoryExtconObserver()
+- WiredAccessoryObserver mObserver = new WiredAccessoryObserver()
+}@WiredAccessoryManager.java
+
+//开始监听
+onSystemReady{
+  //使用input获取状态
+- if (mUseDevInputEventForAudioJack) {
+	- mInputManager.getSwitchState
+	}
+- if (ExtconUEventObserver.extconExists()) {	//监测"/sys/class/extcon"
+	- mExtconObserver.init()
+  }else{					
+	- mObserver.init()
+  }
+}@WiredAccessoryManager.java
+
+/*
+ WiredAccessoryExtconObserver
+
+ 监听"/sys/class/extcon"
+*/
+WiredAccessoryExtconObserver(){
+- mExtconInfos = ExtconInfo.getExtconInfos(".*audio.*"){
+	- Pattern p = regex == null ? null : Pattern.compile(".*audio.*")
+	- File file = new File("/sys/class/extcon")
+	- File[] files = file.listFiles()
+	- if (p == null || p.matcher(name).matches()) {
+		- ExtconInfo uei = new ExtconInfo(name)
+		- list.add(uei)
+		}
+	}
+}
+
+WiredAccessoryExtconObserver.init
+
+
+frameworks/base/services/core/java/com/android/server/ExtconStateObserver.java
+frameworks/base/services/core/java/com/android/server/ExtconUEventObserver.java
+/*
+ WiredAccessoryObserver
+*/
+WiredAccessoryObserver-->makeObservedUEventList{
+- UEventInfo uei
+- uei = new UEventInfo(NAME_H2W, BIT_HEADSET, BIT_HEADSET_NO_MIC, BIT_LINEOUT)		//"h2w"
+- uei = new UEventInfo(NAME_USB_AUDIO, BIT_USB_HEADSET_ANLG, BIT_USB_HEADSET_DGTL, 0)	//"usb_audio"
+- uei = new UEventInfo(NAME_HDMI_AUDIO, BIT_HDMI_AUDIO, 0, 0)				//"hdmi_audio"
+- uei = new UEventInfo(NAME_HDMI, BIT_HDMI_AUDIO, 0, 0)					//"hdmi"						
+}
+
+//监听状态
+onSystemReady-->mObserver.init-->WiredAccessoryObserver.init{
+  //遍历读取初始状态
+- for (int i = 0; i < mUEventInfo.size(); ++i) {
+	- UEventInfo uei = mUEventInfo.get(i)
+	- FileReader file = new FileReader(uei.getSwitchStatePath())
+	- file.read(buffer, 0, 1024)
+	- curState = Integer.parseInt((new String(buffer, 0, len)).trim())
+	- updateStateLocked(uei.getDevPath(), uei.getDevName(), curState)
+	}
+  //开始监听UEVENT
+- for (int i = 0; i < mUEventInfo.size(); ++i) {
+	- UEventInfo uei = mUEventInfo.get(i)
+	- startObserving("DEVPATH=" + uei.getDevPath()){
+		- 
+		}@UEventObserver.java
+	}
+}@WiredAccessoryManager.java
+
+//监听到事件
+onUEvent(UEventObserver.UEvent event) {
+- String devPath = event.get("DEVPATH") 
+- int state = Integer.parseInt(event.get("SWITCH_STATE"))
+- updateStateLocked(devPath, name, state){
+	- UEventInfo uei = mUEventInfo.get(i)	//根据devPath获取对应UEventInfo
+	- updateLocked(name, uei.computeNewHeadsetState(mHeadsetState, state))
+	}
+}@WiredAccessoryManager.java
+
+updateLocked(String newName, int newState) {
+- Message msg = mHandler.obtainMessage(MSG_NEW_DEVICE_STATE, headsetState)
+- mHandler.sendMessage(msg)-->mHandler.handleMessage(MSG_NEW_DEVICE_STATE)-->setDevicesState-->setDeviceStateLocked{
+	- mAudioManager.setWiredDeviceConnectionState(outDevice, state, "", headsetName)
+	- mAudioManager.setWiredDeviceConnectionState(inDevice, state, "", headsetName)
+	}
+}@WiredAccessoryManager.java
+
+
+
+//设置连接状态
+setDeviceStateLocked@WiredAccessoryManager.java-->setWiredDeviceConnectionState
+-->queueMsgUnderWakeLock(MSG_SET_WIRED_DEVICE_CONNECTION_STATE)-->onSetWiredDeviceConnectionState
+sendDeviceConnectionIntent-->sendMsg(MSG_REPORT_NEW_ROUTES)-->
+obs.dispatchAudioRoutesChanged@AudioService.java
+
+
+/*
+ 从inputManager获取
+
+ /sys/class/input/input2/name
+*/
+mInputManager.getSwitchState(-1, InputDevice.SOURCE_ANY, SW_HEADPHONE_INSERT)-->@WiredAccessoryManager.java-->
+getSwitchState(int deviceId, int sourceMask, int switchCode)-->nativeGetSwitchState(mPtr, deviceId, sourceMask, switchCode)
+@InputManagerService.java-->nativeGetSwitchState-->im->getInputManager()->getReader()->getSwitchState
+@com_android_server_input_InputManagerService.cpp-->InputReader::getSwitchState-->
+getStateLocked(int32_t deviceId, uint32_t sourceMask, int32_t code,GetStateFunc getStateFunc){
+- if (deviceId >= 0) {
+
+  }else{//遍历设备找到对应设备，获取信息
+	- InputDevice* device = mDevices.valueAt(i)
+	- int32_t currentResult = (device->*getStateFunc)(sourceMask, code)-->InputDevice::getSwitchState
+  } 
+}@InputReader.cpp
+
+notifySwitch@InputManagerService.java-->mWiredAccessoryCallbacks.notifyWiredAccessoryChanged
+
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/WiredAccessoryManager.java
+frameworks/base/core/java/android/os/UEventObserver.java
+frameworks/base/services/core/java/com/android/server/input/InputManagerService.java
+frameworks/base/services/core/jni/com_android_server_input_InputManagerService.cpp
+frameworks/native/services/inputflinger/InputReader.cpp

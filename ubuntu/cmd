@@ -83,3 +83,6 @@ ___________________________
 xxd name.bin > name.hex  //将二进制转换成可读字串
 
 
+sed -i '/words/d' file	//删除文件中包含words这行
+
+

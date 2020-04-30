@@ -7,6 +7,9 @@ kill  -s 3 <pid>
 //android6,
 kill -s 6 pid  //dump core logcat -s DEBUG'
 
+
+
+
 appNotResponding(ProcessRecord app, ActivityRecord activity,
             ActivityRecord parent, boolean aboveSystem, final String annotation) {
 - 
@@ -115,15 +118,27 @@ static final int SERVICE_TIMEOUT = ActivityManager.isLowRamDeviceStatic() ? 40*1
 static final int SERVICE_BACKGROUND_TIMEOUT = SERVICE_TIMEOUT * 10;
 static final int SERVICE_START_FOREGROUND_TIMEOUT = ActivityManager.isLowRamDeviceStatic() ? 10*1000 : 8*1000;
 @ActiveServices.java
-bumpServiceExecutingLocked(开始启动服务)-->
-scheduleServiceTimeoutLocked(ProcessRecord)-->serviceTimeout(SERVICE_TIMEOUT_MSG)@ActiveServices.java
--->serviceTimeout@ActivityManagerService.java-->mAm.appNotResponding
 
-取消超时：
-serviceDoneExecutingLocked-->mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_TIMEOUT_MSG)
+//启动服务
+realStartServiceLocked{
+- bumpServiceExecutingLocked(r, execInFg, "create")-->scheduleServiceTimeoutLocked{	//开始设置启动超时消息
+	-  Message msg = mAm.mHandler.obtainMessage(ActivityManagerService.SERVICE_TIMEOUT_MSG)
+	-  mAm.mHandler.sendMessageDelayed(msg,proc.execServicesFg ? SERVICE_TIMEOUT : SERVICE_BACKGROUND_TIMEOUT)
+	}	
+- app.thread.scheduleCreateService(r, r.serviceInfo...)					//应用进程运行，执行启动流程
+- requestServiceBindingsLocked(r, execInFg)
+}
+-->bumpServiceExecutingLocked(开始启动服务)
+
+//启动完成取消超时：
+scheduleBindService-->sendMessage(H.BIND_SERVICE, s)-->handleBindService-->
+ActivityManager.getService().publishService@ActivityThread.java-->publishService@ActivityManagerService.java-->
+publishServiceLocked-->serviceDoneExecutingLocked{
+-->mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_TIMEOUT_MSG)
+}ActiveService.java
 
 
-start启动服务：
+//start启动服务：
 startService@ActivityManagerService.java-->startServiceLocked-->startServiceInnerLocked-->
 bringUpServiceLocked-->sendServiceArgsLocked@ActivityService.java
 scheduleServiceArgs-->handleServiceArgs{
@@ -131,7 +146,7 @@ scheduleServiceArgs-->handleServiceArgs{
 - serviceDoneExecuting-->mServices.serviceDoneExecutingLocked
 }@ActivityThread.java
 
-bind启动服务:
+//bind启动服务:
 bindService@ActivityManagerService.java-->bindServiceLocked-->requestServiceBindingLocked-->
 r.app.thread.scheduleBindService@ActivityService.java
 scheduleBindService{
@@ -140,7 +155,7 @@ scheduleBindService{
 	mServices.publishServiceLocked-->serviceDoneExecutingLocked
 }@ActivityThread.java
 
-超时处理：
+//超时处理：
 MainHandler.handleMessage(SERVICE_TIMEOUT_MSG)-->mServices.serviceTimeout@ActivityManagerService.java
 
 

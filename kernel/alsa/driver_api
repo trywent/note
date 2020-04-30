@@ -1,5 +1,5 @@
 /***********************
-  一个声卡对应一个control
+  一个card对应一个control
   struct snd_card
   struct snd_device:pcm,mixer,MIDI
 
@@ -10,39 +10,39 @@ struct snd_device_ops {
 	int (*dev_free)(struct snd_device *dev);
 	int (*dev_register)(struct snd_device *dev);
 	int (*dev_disconnect)(struct snd_device *dev);
-};
+}@core.h
 
 struct snd_device {
-	struct snd_card *card;		/* card which holds this device */
-	snd_device_type_t type;		/* device type */
-	void *device_data;		/* device structure */
-	struct snd_device_ops *ops;	/* operations */
-}
+	struct snd_card *card;		
+	snd_device_type_t type;		
+	void *device_data;		
+	struct snd_device_ops *ops;	/* 操作函数 */
+}@core.h
 
 struct snd_card {
-	char driver[16];		/* driver name */
-	char mixername[80];		/* mixer name */
+	char driver[16];		
+	char mixername[80];		
 	char components[128];		/* card components delimited with space */
-	struct list_head devices;	/* 保存struct snd_device*/
+	struct list_head devices;	/* struct snd_device链表*/
 	struct device ctl_dev;		/* control字符设备节点*/
 
-}
+}@core.h
 
 struct snd_minor {
-	int type;			/* SNDRV_DEVICE_TYPE_XXX */
-	int card;			/* card number */
-	int device;			/* device number */
-	const struct file_operations *f_ops;	// pcm设备的操作函数保存在这个位置 
-	struct device *dev;		/* device for sysfs */
-}
+	int type;					/* SNDRV_DEVICE_TYPE_XXX */
+	int card;					/* card number */
+	int device;					/* device number */
+	const struct file_operations *f_ops;		// pcm设备的操作函数保存在这个位置 
+	struct device *dev;				/* device for sysfs */
+}@core.h
 
 static const struct file_operations snd_fops =
 {
 .owner =THIS_MODULE,
 .open =	snd_open(struct inode *inode, struct file *file){
-	- unsigned int minor = iminor(inode) //获取设备号minor
-	- struct snd_minor *mptr = snd_minors[minor] //获取对应的子设备
-	- file->f_op = fops_get(mptr->f_ops) //设置为子设备的操作函数
+	- unsigned int minor = iminor(inode) 		//获取设备号minor
+	- struct snd_minor *mptr = snd_minors[minor] 	//获取对应的子设备
+	- file->f_op = fops_get(mptr->f_ops) 		//设置为子设备的操作函数
 	- file->f_op->open(inode, file)
 	}
 }
@@ -69,7 +69,7 @@ int snd_card_create/snd_card_new(struct device *parent, int idx, const char *xid
 - snd_info_card_create(card)
 }@init.c
 
-//struct snd_card注册
+//struct snd_card注册。创建所有struct snd_device设备节点
 snd_card_register(struct snd_card *card){
 - device_add(&card->card_dev)
 - snd_device_register_all(struct snd_card *card)-->
@@ -81,6 +81,15 @@ snd_card_register(struct snd_card *card){
 - init_info_for_card(card)
 }@init.c
 
+
+include/sound/core.h
+kernel/sound/core/sound.c
+kernel/include/sound/core.h
+kernel/sound/core/init.c
+/***********************
+ struct snd_device
+
+*/
 
 //struct snd_device设备创建
 snd_device_new(struct snd_card *card, enum snd_device_type type,
@@ -102,16 +111,14 @@ snd_register_device(pcm->card, pcm->device,struct file_operations *f_ops,pcm,str
 - device_add(device)
 }@sound.c
 
-kernel/sound/core/sound.c
-kernel/include/sound/core.h
-kernel/sound/core/init.c
+
 kernel/sound/core/device.c
 /***********************
  control接口:"/dev/snd/controlC%u"
 
  每个snd_card对应一个control 
 */
-struct snd_kcontrol {
+struct snd_kcontrol {			//ctl设备结构
 	struct list_head list;		/* list of controls */
 	unsigned int count;		/* count of same elements */
 	snd_kcontrol_info_t *info;
@@ -119,7 +126,7 @@ struct snd_kcontrol {
 	snd_kcontrol_put_t *put;
 }@control.c
 
-struct snd_kcontrol_new {
+struct snd_kcontrol_new {		//ctl设备结构
 	snd_ctl_elem_iface_t iface;	/* interface identifier */
 	unsigned int device;		/* device/client number */
 	const unsigned char *name;	/* ASCII name of item */
@@ -129,6 +136,24 @@ struct snd_kcontrol_new {
 }
 
 
+static const struct file_operations snd_ctl_f_ops =		//默认操作函数
+{
+	.read =		snd_ctl_read,
+	.open =		snd_ctl_open,
+	.unlocked_ioctl = snd_ctl_ioctl
+	.compat_ioctl =	snd_ctl_ioctl_compat,
+}@control.c
+
+
+#define SOC_SINGLE_EXT(xname, xreg, xshift, xmax, xinvert,\	//宏初始化control
+	 xhandler_get, xhandler_put) \
+{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+	.info = snd_soc_info_volsw, \
+	.get = xhandler_get, .put = xhandler_put, \
+	.private_value = SOC_SINGLE_VALUE(xreg, xshift, xmax, xinvert, 0) }
+
+SOC_SINGLE_EXT(xname, FUN_REG(xreg), 0, 1, 0, mixer_get, mixer_set)
+
 //创建control
 struct snd_kcontrol *snd_ctl_new1(const struct snd_kcontrol_new *ncontrol){
 - struct snd_kcontrol *kctl
@@ -137,22 +162,15 @@ struct snd_kcontrol *snd_ctl_new1(const struct snd_kcontrol_new *ncontrol){
 }
 
 int snd_ctl_add(struct snd_card *card, struct snd_kcontrol *kcontrol){
-- snd_ctl_find_id(card, &id) //判断是否已经加入
-- list_add_tail(&kcontrol->list, &card->controls) //加入到card->controls
+- snd_ctl_find_id(card, &id) 				//判断是否已经加入
+- list_add_tail(&kcontrol->list, &card->controls)	//加入到card->controls
 - snd_ctl_notify
 }
 
 _______________________
-//默认操作函数
-static const struct file_operations snd_ctl_f_ops =
-{
-	.read =		snd_ctl_read,
-	.open =		snd_ctl_open,
-	.unlocked_ioctl = snd_ctl_ioctl
-	.compat_ioctl =	snd_ctl_ioctl_compat,
-}@control.c
 
-//control字符设备
+
+//control字符设备节点
 int snd_ctl_create(struct snd_card *card){
 - static struct snd_device_ops ops = {
 	.dev_register =	snd_ctl_dev_register,
@@ -161,23 +179,15 @@ int snd_ctl_create(struct snd_card *card){
 	- device_initialize(dev)
 	- dev->class = sound_class
 	}@init.c
-- dev_set_name(&card->ctl_dev, "controlC%d", card->number) //设置struce device 名controlCX
-- snd_device_new(card, SNDRV_DEV_CONTROL, card, &ops)//创建struct snd_device
+- dev_set_name(&card->ctl_dev, "controlC%d", card->number)	//设置struce device 名controlCX
+- snd_device_new(card, SNDRV_DEV_CONTROL, card, &ops)		//创建struct snd_device
 }@control.c
 
 snd_device->ops->dev_register-->snd_ctl_dev_register{
 - struct snd_card *card = device->device_data
 - snd_register_device(SNDRV_DEVICE_TYPE_CONTROL, &snd_ctl_f_ops, card, &card->ctl_dev)@control.c
 }
-//创建control
-#define SOC_SINGLE_EXT(xname, xreg, xshift, xmax, xinvert,\
-	 xhandler_get, xhandler_put) \
-{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
-	.info = snd_soc_info_volsw, \
-	.get = xhandler_get, .put = xhandler_put, \
-	.private_value = SOC_SINGLE_VALUE(xreg, xshift, xmax, xinvert, 0) }
 
-SOC_SINGLE_EXT(xname, FUN_REG(xreg), 0, 1, 0, mixer_get, mixer_set)
 
 
 kernel/include/sound/control.h
@@ -197,7 +207,7 @@ struct snd_pcm_substream {
 }
 
 struct snd_pcm_str {
-	int stream;				/* stream (direction) */
+	int stream;			/* stream (direction) */
 	struct snd_pcm *pcm;
 	/* -- substreams -- */
 	unsigned int substream_count;
@@ -206,7 +216,7 @@ struct snd_pcm_str {
 }
 
 struct snd_pcm {
-	int device; /* device number */
+	int device;			 /* device number */
 	char id[64];
 	char name[80];
 	struct snd_pcm_str streams[2];
@@ -267,7 +277,7 @@ kernel/sound/core/pcm_lib.c
 /***********************
  ASoC Machine Driver: dai_link(接口信息)将codec_dai,cpu_dai关联起来。
 
- dirver developer设置:
+ dirver 开发者设置:
 	struct snd_soc_dai_link     cpu,codec连接关系
 	struct snd_soc_codec_driver codec驱动
 	struct snd_soc_dai_driver   dai驱动

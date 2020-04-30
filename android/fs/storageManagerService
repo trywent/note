@@ -1,0 +1,35 @@
+/*
+ StorageManagerService mount服务
+*/
+
+//服务启动
+onStart(){
+- mStorageManagerService = new StorageManagerService(getContext())
+- publishBinderService("mount", mStorageManagerService)
+- mStorageManagerService.start()
+}
+
+start()-->connect() {
+- IBinder binder = ServiceManager.getService("storaged")//storage服务
+- mStoraged = IStoraged.Stub.asInterface(binder)
+- binder = ServiceManager.getService("vold")		//vold服务
+- mVold = IVold.Stub.asInterface(binder)
+- mVold.setListener(mListener)
+- onDaemonConnected-->handleDaemonConnected{
+	- 
+	}
+}@StorageManagerService.java
+
+//listener
+IVoldListener mListener = new IVoldListener.Stub() {
+- onDiskCreated
+- onDiskScanned
+- onDiskMetadataChanged
+- onDiskDestroyed
+- onDiskDestroyed
+- onVolumeCreated
+- onSprdVolumeCreated
+}
+
+
+frameworks/base/services/core/java/com/android/server/StorageManagerService.java

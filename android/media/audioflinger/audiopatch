@@ -1,4 +1,7 @@
-//
+/***************************************************
+ audiopatch   audioflinger的一部分
+
+*/
 createAudioPatch@AudioManager.java-->createAudioPatch@AudioSystem.java-->
 android_media_AudioSystem_createAudioPatch(传入AudioPatch的handle值)@android_media_AudioSystem.cpp
 -->aps->createAudioPatch@AudioSystem.cpp-->mAudioPolicyManager->createAudioPatch
@@ -24,7 +27,10 @@ sendCreateAudioPatchConfigEvent-->sendConfigEvent_l(new CreateAudioPatchConfigEv
 createAudioPatch_l@Threads.cpp
 
 
-
+AudioFlinger::createAudioPatch(const struct audio_patch *patch,audio_patch_handle_t *handle)
+-->mPatchPanel->createAudioPatch(patch, handle){
+- 
+}@PatchPanel.cpp
 
 
 

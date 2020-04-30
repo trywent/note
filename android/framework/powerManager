@@ -1,36 +1,51 @@
-/*
+/************************************
   PowerManagerService
 
 */
+PARTIAL_WAKE_LOCK	//cpu运行，屏幕允许关闭
+SCREEN_DIM_WAKE_LOCK	//屏微亮，按键等允许关闭
+SCREEN_BRIGHT_WAKE_LOCK	//屏亮状态，按键等允许关闭
+FULL_WAKE_LOCK		//屏和按键都亮
+DOZE_WAKE_LOCK		//
+
+WAKEFULNESS_ASLEEP	//睡眠状态(要睡眠，可能没有睡着，只能wakeup唤醒。一般先经过dozing状态
+WAKEFULNESS_AWAKE	//唤醒状态，goToSleep可以进入睡眠
+WAKEFULNESS_DREAMING	//浅睡状态，充电时？
+WAKEFULNESS_DOZING	//瞌睡
+
+DIRTY_WAKEFULNESS	//睡眠唤醒状态发生变化
+DIRTY_WAKE_LOCKS	//锁发生变化
+DIRTY_USER_ACTIVITY 	//用户操作发生变化
+DIRTY_SETTINGS		//设置发生变化
+
+//启动
 systemReady{
 - 创建mDisplayPowerController(灯光服务mLightsService)
 - 注册广播接收器，
 - 注册数据库监听器，
 - updateSettingsLocked(读取数据库中的设置值)@PowerManagerService.java
-}
+}@PowerManagerService.java
 
-开始检查是否动画结束：
+//开始检查是否动画结束：
 BootCompletedReceiver(ACTION_BOOT_COMPLETED)-->startWatchingForBootAnimationFinished
-__________________________
-屏幕状态(DIRTY_USER_ACTIVITY | DIRTY_WAKEFULNESS | DIRTY_SETTINGS)：
 
 
 设置超时时间,通过数据库：Settings.System.SCREEN_OFF_TIMEOUT
 
-数据库变化：
+//数据库变化：
 SettingsObserver.onChange-->handleSettingsChangedLocked{
 - 从数据库中获取最新值，updateSettingsLocked
 - 更新状态，updatePowerStateLocked
 }-->
 
-窗口管理器修改休眠时间：
+//窗口管理器修改休眠时间：
 performLayoutAndPlaceSurfacesLockedInner-->mPowerManager.setUserActivityTimeoutOverrideFromWindowManager
 @WindowManagerService.java-->setUserActivityTimeoutOverrideFromWindowManager-->
 setUserActivityTimeoutOverrideFromWindowManagerInternal-->
 mUserActivityTimeoutOverrideFromWindowManager = timeoutMillis@PowerManagerService.java
 
 
-更新状态(亮屏还是黑屏)：
+//更新状态(亮屏还是黑屏)：
 updateUserActivitySummaryLocked{
 - 获取黑屏倒计时值，getScreenOffTimeoutLocked{
 	- 判断是否设置超时黑屏值，isMaximumScreenOffTimeoutFromDeviceAdminEnforcedLocked  	
@@ -39,16 +54,13 @@ updateUserActivitySummaryLocked{
 - 更新屏幕状态值，mUserActivitySummary
 }
 
-_______________________________
-电池状态处理(DIRTY_BATTERY_STATE)：
+//电池状态处理(DIRTY_BATTERY_STATE)：
 BatteryReceiver.onReceive(ACTION_BATTERY_CHANGED)-->handleBatteryStateChangedLocked{
 - 设置标识位，DIRTY_BATTERY_STATE
 - 更新状态updatePowerStateLocked
 }
-_______________________________
-用户操作状态更新(DIRTY_USER_ACTIVITY)：
 
-底层事件(输入事件):
+//用户操作状态更新(DIRTY_USER_ACTIVITY)： 底层事件(输入事件):
 InputDispatcher::pokeUserActivityLocked-->doPokeUserActivityLockedInterruptible-->
 mPolicy->pokeUserActivity@InputDispatcher.cpp-->NativeInputManager::pokeUserActivity
 @com_android_server_input_InputManagerService.cpp-->android_server_PowerManagerService_userActivity
@@ -56,7 +68,6 @@ mPolicy->pokeUserActivity@InputDispatcher.cpp-->NativeInputManager::pokeUserActi
 userActivityInternal@PowerManagerService.java
 
 userActivity-->userActivityInternal
-
 
 userActivityInternal{
 - userActivityNoUpdateLocked{
@@ -73,8 +84,7 @@ userActivityInternal{
 NativeInputManager::interceptMotionBeforeQueueing-->ativeInputManager::handleInterceptActions{
 }@com_android_server_input_InputManagerService.cpp
 
--------------------------------
-处理pwr按键：
+//处理pwr按键：
 NativeInputManager::interceptKeyBeforeQueueing-->NativeInputManager::handleInterceptActions{
 - 进入休眠，android_server_PowerManagerService_goToSleep
 - 唤醒，android_server_PowerManagerService_wakeUp
@@ -98,7 +108,7 @@ goToSleep-->goToSleepInternal{
 - 需要更新状态，则更新updatePowerStateLocked
 }@PowerManagerSerivce.java
 
-唤醒：
+//唤醒：
 wakeUpInternal{
 - 设置状态值,wakeUpNoUpdateLocked{
 	- 若从休眠中唤醒，则发送通知sendPendingNotificationsLocked
@@ -108,7 +118,7 @@ wakeUpInternal{
 }@PowerManagerService.java
 
 
----------------------------------
+
 //更新状态:(更新屏幕状态，决定是否进入休眠)
 updatePowerStateLocked{
 //第零阶段
@@ -119,10 +129,10 @@ updatePowerStateLocked{
 		- 若是无线充电，则发送通知
 	}
 - 是否保持亮屏，更新mStayOn状态，updateStayOnLocked
-//第一阶段
+//第一阶段,获取应用锁的状态？
 - 更新mWakeLockSummary值，updateWakeLockSummaryLocked{
 	- 收集mWakeLocks中所有锁的状态
-	- PARTIAL_WAKE_LOCK类型锁，设置WAKE_LOCK_CPU    ----》这里可以设置睡眠状态下不锁定
+	- PARTIAL_WAKE_LOCK类型锁，设置WAKE_LOCK_CPU    //这里可以设置睡眠状态下不锁定
 	- FULL_WAKE_LOCK类型锁，若不是睡眠状态{
 		- 设置，锁定cpu，打开屏幕背光，按键背光
 		- 若是苏醒状态，设置WAKE_LOCK_STAY_AWAKE
@@ -168,7 +178,7 @@ updatePowerStateLocked{
 
 }
 
-
+frameworks/base/services/core/java/com/android/server/power/PowerManagerService.java
 -----------------------------
 sendNextBroadcast-->sendWakeUpBroadcast
 
@@ -215,20 +225,22 @@ updateSuspendBlockerLocked{
 - 若亮屏则获取锁mDisplaySuspendBlocker.acquire，否则释放mDisplaySuspendBlocker.release
 }
 
-获取锁："PowerManagerService.WakeLocks"
+//获取锁："PowerManagerService.WakeLocks"
 updateSuspendBlockerLocked-->mWakeLockSuspendBlocker.acquire()
 SuspendBlockerImpl.acquire-->nativeAcquireSuspendBlocker@PowerManagerService.java-->
 nativeAcquireSuspendBlocker-->acquire_wake_lock@com_android_server_power_PowerManagerService.cpp
 -->acquire_wake_lock-->write("/sys/power/wake_lock","PowerManagerService.WakeLocks")@power.c
 
-释放锁：
+//释放锁：
 mWakeLockSuspendBlocker.release-->SuspendBlockerImpl.release-->nativeReleaseSuspendBlocker
 @PowerManagerService.java-->release_wake_lock@com_android_server_power_PowerManagerService.cpp-->
 write(g_fds[RELEASE_WAKE_LOCK], id, strlen(id)-->向"/sys/power/wake_unlock"中写数据@power.c
 
 system/core/charger/power.c
 
-=============================
+/************************************
+  
+*/
 开始或停止睡眠：
 autosuspend_enable-->autosuspend_init{
 - autosuspend_earlysuspend_init
@@ -299,9 +311,7 @@ system/core/libsuspend/autosuspend_earlysuspend.c
 system/core/libsuspend/autosuspend_autosleep.c
 
 fyttek:FYTtek54321
-______________________________
-以charger模式启动:
-
+//以charger模式启动:
 main-->event_loop{
 - handle_input_state{
 	- process_key	
@@ -326,7 +336,7 @@ request_suspend{
 
 system/core/charger/charger.c
 
-/*
+/************************************
  重启
 
 */
@@ -405,7 +415,7 @@ property_changed(const std::string& name, const std::string& value) {
 
 frameworks/base/services/core/java/com/android/server/power/PowerManagerService.java
 frameworks/base/services/core/java/com/android/server/power/ShutdownThread.java
-/*
+/************************************
  背光
 */
 initialize-->DisplayPowerState(mLights.getLight(LightsService.LIGHT_ID_BACKLIGHT))

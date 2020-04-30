@@ -60,7 +60,121 @@ system/vold/main.cpp
 system/vold/VolumeManager.cpp
 system/vold/VolumeBase.cpp
 system/vold/EmulatedVolume.cpp
-/**************************
-  android8.0
+/*****************************************************
+  android10
+  
+  /proc/filesystems 获取支持的文件系统
 */
+service vold /system/bin/vold \
+        --blkid_context=u:r:blkid:s0 --blkid_untrusted_context=u:r:blkid_untrusted:s0 \
+        --fsck_context=u:r:fsck:s0 --fsck_untrusted_context=u:r:fsck_untrusted:s0
+@etc/init/vold.rc
+
+main(int argc, char** argv) {
+- parse_args(argc, argv)
+- mkdir("/dev/block/vold", 0755)
+- VolumeManager* vm = VolumeManager::Instance()
+- NetlinkManager* nm = NetlinkManager::Instance()
+- vm->start()					//
+- process_config(vm, &has_adoptable, &has_quota, &has_reserved){
+	- ReadDefaultFstab(&fstab_default)	//读取/vendor/etc/fstab.文件
+	- vm->addDiskSource(std::shared_ptr<VolumeManager::DiskSource>(	//加入标记voldmanaged的块。usb,sdcard
+                new VolumeManager::DiskSource(sysPattern, nickname, flags)			
+	}
+- android::vold::VoldNativeService::start()	//服务启动
+- nm->start()					//监听kernel发出的uevnt
+- coldboot("/sys/block")			//向uevent文件写入add。触发创建字符文件
+}@main.cpp
+
+
+//监听kernel事件
+NetlinkManager::start() {
+- struct sockaddr_nl nladdr
+- nladdr.nl_family = AF_NETLINK			//netlink
+- mSock = socket(PF_NETLINK, SOCK_DGRAM | SOCK_CLOEXEC, NETLINK_KOBJECT_UEVENT)
+- bind(mSock, (struct sockaddr*)&nladdr, sizeof(nladdr)
+- mHandler = new NetlinkHandler(mSock)
+- mHandler->start()-->onEvent(NetlinkEvent* evt){
+	- const char* subsys = evt->getSubsystem()
+	- if (std::string(subsys) == "block"){	//收到block事件
+		- vm->handleBlockEvent(evt)
+		}
+	}@NetlinkHandler.cpp
+}@NetlinkManager.cpp
+
+//处理事件
+VolumeManager::handleBlockEvent(NetlinkEvent* evt) {
+- std::string eventPath(evt->findParam("DEVPATH"))
+- std::string devType(evt->findParam("DEVTYPE"))
+- switch (evt->getAction()) {
+	- NetlinkEvent::Action::kAdd-->		//设备是否在fstab中配置
+		for (const auto& source : mDiskSources) {
+		- auto disk = new android::vold::Disk(eventPath, device, source->getNickname(), flags)
+		- handleDiskAdded(std::shared_ptr<android::vold::Disk>(disk)){
+		    - if (mSecureKeyguardShowing) {//锁屏时不会挂载
+			- mPendingDisks.push_back(disk)
+		    - else{
+			- disk->create()
+			- mDisks.push_back(disk)			
+			}
+		      }
+		}
+	- NetlinkEvent::Action::kChange-->handleDiskChanged(device){
+	
+		}
+	- NetlinkEvent::Action::kRemove-->handleDiskRemoved(device){
+		- 		
+		}
+	}
+}@VolumeManager.cpp
+
+//锁屏状态变化
+onSecureKeyguardStateChanged{
+- mSecureKeyguardShowing = isShowing
+- disk->create()
+- mDisks.push_back(disk)
+}@VolumeManager.cpp
+
+//disk创建
+Disk::create() {
+- auto listener = VolumeManager::Instance()->getListener()
+- listener->onDiskCreated(getId(), mFlags)	//通知listener
+- readMetadata
+- readPartitions{				//读取分区信息
+	- createPublicVolume(partDevice){	//创建volume
+		- auto vol = std::shared_ptr<VolumeBase>(new PublicVolume(device))
+		- vol->setDiskId(getId())
+		- vol->create()
+		}
+	- auto listener = VolumeManager::Instance()->getListener()
+	- listener->onDiskScanned(getId())
+	}
+}@Disk.cpp
+
+system/vold/main.cpp
+system/vold/VolumeManager.cpp
+system/vold/NetlinkManager.cpp
+system/vold/NetlinkHandler.cpp
+system/core/fs_mgr/fs_mgr_fstab.cpp
+system/vold/model/PublicVolume.cpp
+system/vold/model/VolumeBase.cpp
+
+/*
+ voldNatvieService 和上层通信
+*/
+VoldNativeService::start() {
+- IPCThreadState::self()->disableBackgroundScheduling(true)
+- BinderService<VoldNativeService>::publish()	//发布vold服务
+}
+
+//设置listener。。上层storageManagerService
+VoldNativeService::setListener(const android::sp<android::os::IVoldListener>& listener)
+-->VolumeManager::Instance()->setListener(listener)
+
+system/vold/VoldNativeService.cpp
+
+
+
+
+
 

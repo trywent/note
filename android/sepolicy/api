@@ -1,0 +1,76 @@
+/*
+ 接口
+*/
+
+
+
+//
+static struct selabel_handle* sehandle = selinux_android_service_context_handle()
+@android.c
+
+
+/**获取目标文件context
+ * selabel_lookup - Perform labeling lookup operation.
+ * @handle: specifies backend instance to query
+ * @con: returns the appropriate context with which to label the object
+ * @key: string input to lookup operation
+ * @type: numeric input to the lookup operation
+ *
+ */
+int selabel_lookup(struct selabel_handle *handle, char **con,const char *key, int type);
+int selabel_lookup_raw(struct selabel_handle *handle, char **con,const char *key, int type);
+@label.h
+
+
+/* 获取操作进程context
+   Get context of process identified by pid, and
+   set *con to refer to it.  Caller must free via freecon. */
+int getpidcon(pid_t pid, char ** con);
+int getpidcon_raw(pid_t pid, char ** con);
+@selinux.h
+
+/*检查权限
+ *selinux_check_access - Check permissions and perform appropriate auditing.
+ * @scon: source security context
+ * @tcon: target security context
+ * @tclass: target security class string
+ * @perm: requested permissions string, interpreted based on @tclass
+ * @auditdata: auxiliary audit data
+ */
+int selinux_check_access(const char * scon, const char * tcon, const char *tclass, const char *perm, void *auditdata);
+@selinux.h
+
+external/selinux/libselinux/include/selinux/label.h
+external/selinux/libselinux/include/selinux/selinux.h
+
+
+/*
+ android 服务
+*/
+
+static const struct selinux_opt seopts_service_plat[] = {
+    { SELABEL_OPT_PATH, "/system/etc/selinux/plat_service_contexts" },
+    { SELABEL_OPT_PATH, "/plat_service_contexts" }
+};
+
+17static const struct selinux_opt seopts_service_vendor[] = {
+    { SELABEL_OPT_PATH, "/vendor/etc/selinux/vendor_service_contexts" },
+    { SELABEL_OPT_PATH, "/vendor_service_contexts" },
+    // TODO: remove nonplat* when no need to retain backward compatibility.
+    { SELABEL_OPT_PATH, "/vendor/etc/selinux/nonplat_service_contexts" },
+    { SELABEL_OPT_PATH, "/nonplat_service_contexts" }
+};
+
+//获取服务的sepolicy
+struct selabel_handle* selinux_android_service_context_handle(void){
+- struct selinux_opt seopts_service[MAX_FILE_CONTEXT_SIZE]
+- seopts_service[size++] = seopts_service_plat[i]	//遍历平台服务
+- seopts_service[size++] = seopts_service_vendor[i]	//遍历vendor服务
+- selinux_android_service_open_context_handle(const struct selinux_opt* seopts_service, unsigned nopts){
+	- struct selabel_handle* sehandle = selabel_open(SELABEL_CTX_ANDROID_SERVICE, seopts_service, nopts)
+	- return sehandle
+	}
+}@android.c
+
+
+external/selinux/libselinux/src/android/android.c

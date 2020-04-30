@@ -1,8 +1,12 @@
-//soc dts配置
+/******************************
+ 
+ sprd平台4card，"saudio_lte" "saudio_voip" "all-i2s" "sprdphone"(多媒体使用) 
+*/
 
-sprd平台又4card，"saudio_lte" "saudio_voip" "all-i2s" "sprdphone"(多媒体使用) 
-===================
-//注册声卡saudiolte和saudiovoip
+
+/*
+ 注册声卡saudiolte和saudiovoip
+*/
 saudio_lte{
 	compatible = "sprd,saudio";
 };
@@ -17,8 +21,9 @@ snd_saudio_probe-->saudio_ctrl_thread-->saudio_snd_init_card-->snd_card_register
 
 kernel/sound/drivers/saudio.c
 
-______________
-//注册声卡all_i2s_card    i2s-null-codec
+/*
+ 注册声卡all_i2s_card    i2s-null-codec
+*/
 i2s_sound: sound@2 {
 compatible = "sprd,i2s-null-codec";
 sprd,model = "all-i2s";
@@ -27,8 +32,10 @@ sprd,model = "all-i2s";
 late_initcall_sync(sprd_asoc_i2s_init)-->sprd_asoc_i2s_probe-->snd_soc_register_card(all_i2s_card)
 @i2s-r0p0-null-codec.c
 
-_____________
-//注册声卡 vbc_r2p0_codec_card
+
+/*
+  注册声卡struct snd_soc_card vbc_r2p0_codec_card  实际的声卡设备
+*/
 static struct snd_soc_card vbc_r2p0_codec_card = {
 	.name = "sprdphone",
 	.dai_link = vbc_r2p0_codec_dai,       //pcm 
@@ -37,7 +44,7 @@ static struct snd_soc_card vbc_r2p0_codec_card = {
 	.dapm_routes = vbc_r2p0_codec_map,0
 }
 
-//soc设备注册
+//soc设备注册，注册struct snd_soc_card
 vbc_sound0: sound@0 {
             compatible = "sprd,vbc-r2p0-sprd-codec";
 }@kernel/arch/arm/boot/dts/sprd-sound.dtsi
@@ -99,16 +106,45 @@ kernel/sound/soc/sprd/vbc-r2p0-sprd-codec-v4.h
 kernel/sound/soc/sprd/sprd-asoc-card.c
 
 
-//==============
-//platform
+/******************************
+ platform
+
+*/
 sprd_pcm: sprd-pcm-audio {
 	compatible = "sprd,sprd-pcm";
 };
 
-//pcm 的操作，dma函数  platform
-platform_driver_register(&sprd_pcm_driver"sprd-pcm")-->sprd_soc_platform_probe
--->snd_soc_register_platform(sprd_soc_platform)@sprd-pcm.c
+sprd_pcm_driver_init-->platform_driver_register(&sprd_pcm_driver)
+platform_driver sprd_pcm_driver = {
+	.driver = {
+		   .name = "sprd-pcm-audio",
+		   .of_match_table = of_match_ptr(sprd_pcm_of_match),//"sprd,sprd-pcm"
+		   },
 
+	.probe = sprd_soc_platform_probe,
+}
+
+//注册操作函数
+sprd_soc_platform_probe(struct platform_device *pdev)-->
+snd_soc_register_platform(sprd_soc_platform)@sprd-pcm.c
+
+snd_soc_platform_driver sprd_soc_platform = {
+	.ops = &sprd_pcm_ops
+	.pcm_new = sprd_pcm_new,
+	.pcm_free = sprd_pcm_free_dma_buffers,
+}
+
+static struct snd_pcm_ops sprd_pcm_ops = {
+	.open = sprd_pcm_open,
+	.close = sprd_pcm_close,
+	.ioctl = snd_pcm_lib_ioctl,
+	.hw_params = sprd_pcm_hw_params,
+	.hw_free = sprd_pcm_hw_free,
+	.prepare = sprd_pcm_prepare,
+	.trigger = sprd_pcm_trigger,
+	.pointer = sprd_pcm_pointer,
+	.mmap = sprd_pcm_mmap,
+}
 //pointer 返回dma内存中当前帧的偏移值
 sprd_pcm_pointer{
 - 获取声道0的dma偏移值，sprd_pcm_dma_get_addr()-dma_addr
@@ -119,8 +155,15 @@ sprd_pcm_pointer{
 	}
 - 返回dma内存中有效数据位置的偏移值
 }@sprd-pcm.c
-______________
-//codec dai driver.模块7731
+
+/*
+  codec dai driver.模块7731
+*/
+
+//设备
+&sprd_codec {
+	status = "okay";
+}
 
 struct snd_soc_dai_driver sprd_codec_dai{
 	{
@@ -176,11 +219,6 @@ static struct snd_soc_codec_driver soc_codec_dev_sprd_codec = {
 	.controls = sprd_codec_snd_controls,
 }
 
-//设备
-&sprd_codec {
-	status = "okay";
-}
-
 //注册codec
 sprd_codec_codec_driver(sprd_codec_codec_driver"sprd-codec")-->
 sprd_codec_probe{
@@ -195,8 +233,9 @@ sprd_codec_probe{
 //irq
 sci_dma_register_irqhandle(sprd_pcm_dma_irq_ch)@sprd-pcm.c-->snd_pcm_period_elapsed
 snd_pcm_update_hw_ptr0-->substream->ops->pointer@pcm_lib.c
-______________
-//cpu dai driver.vbc模块
+/*
+  cpu dai driver.vbc模块
+*/
 struct snd_soc_dai_driver vbc_dai{
 	{
 	 .name = "vbc-r2p0",
@@ -302,9 +341,10 @@ soc_codec_dev_sprd_codec{
 }@sprd-codec.c
 
 
-=====================
-//dma位置 大小 VBC_BUFFER_BYTES_MAX 		(48* 1024)
-//CONFIG_SND_SOC_SPRD_AUDIO_BUFFER_USE_IRAM not set
+/******************************
+ dma位置 大小 VBC_BUFFER_BYTES_MAX 		(48* 1024)
+ CONFIG_SND_SOC_SPRD_AUDIO_BUFFER_USE_IRAM not set
+*/
 sprd_pcm_new-->sprd_pcm_preallocate_dma_buffer{
 - struct snd_dma_buffer *buf = &substream->dma_buffer
 - 设置buf{
@@ -390,8 +430,8 @@ sprd_pcm_ops.mmap-->sprd_pcm_mmap(substream,vma){
   //dma_area dma_addr dma_bytes 为dma_alloc_attrs请求到的参数
 - dma_mmap_writecombine(dev,vma,runtime->dma_area,dma_addr,dma_bytes)
 	-->dma_mmap_attrs(device){
-	- get_dma_ops(dev)->mmap //device 的操作函数有mmap
-	- dma_common_mmap //木有
+	- get_dma_ops(dev)->mmap//device 的操作函数有mmap
+	- dma_common_mmap 	//没有
 	}
    
 }@sprd-pcm.c

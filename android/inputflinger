@@ -96,6 +96,7 @@ EV_ABS{
 
 /***********************
  eventhub
+
 */
 static const char *DEVICE_PATH = "/dev/input"
 
@@ -314,6 +315,14 @@ void KeyboardInputMapper::process(const RawEvent* rawEvent) {
 
 }@InputReader.cpp
 
+//获取开关状态
+getStateLocked-->InputDevice::getSwitchState-->SwitchInputMapper::getSwitchState-->
+getEventHub()->getSwitchState(getDeviceId(), switchCode)@InputReader.cpp-->
+EventHub::getSwitchState(int32_t deviceId, int32_t sw){
+- Device* device = getDeviceLocked(deviceId)
+- ioctl(device->fd, EVIOCGSW(sizeof(swState)), swState)
+- return test_bit(sw, swState) ? AKEY_STATE_DOWN : AKEY_STATE_UP
+}@EventHub.cpp
 /* 触摸事件 TouchInputMapper 
   事件保存到 mRawStatesPending
 */

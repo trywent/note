@@ -3,6 +3,18 @@
 */
 
 
+usb_add_config: interface 0 = gser/000000009f8f2b40
+g_serial: ready
+usb calibrate configuration timeout,17787,2786,15000
+
+pctool_mode_detect(void){
+- get_mode_from_gpio
+- charger_connected@sprd_battery.c
+- 
+}@calibration_detect.c
+
+bsp/bootloader/u-boot15/drivers/power/battery/sprd_battery.c
+bsp/bootloader/u-boot15/common/loader/calibration_detect.c
 /*
  lcd mipi驱动接口平台提供
  panel的初始化参数客户提供

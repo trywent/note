@@ -1,0 +1,59 @@
+/***********************************
+ aot(ahead-of-time compilation) 
+
+ Dalvik Virtual Machine
+ 
+ 
+ https://www.jianshu.com/p/065e358b9599
+*/
+
+.vdex：其中包含 APK 的未压缩 DEX 代码，另外还有一些旨在加快验证速度的元数据。
+.odex(oat)：其中包含 APK 中已经过 AOT 编译的方法代码,包含的也是oat文件
+.art (optional)：其中包含 APK 中列出的某些字符串和类的 ART 内部表示，用于加快应用启动速度。
+
+/***********************************
+ .dex (Dalvik Executable)
+
+*/
+ 1. File Header
+ 2. String Table
+ 3. Class List
+ 4. Field Table
+ 5. Method Table
+ 6. Class Definition Table
+ 7. Field List
+ 8. Method List
+ 9. Code Header
+10. Local Variable List
+
+class--->dex
+
+dex---> dextooat--->art oat
+/***********************************
+ art(android runtime)
+ 
+*/
+
+/***********************************
+ odex (Optimized DEX) android5.0之后包含oat文件
+ 
+ 优化过的DEX
+*/
+
+
+/***********************************
+ oat 也即是aot
+
+ ART 运行的文件，是一种ELF格式的二进制可运行文件，包含 DEX 文件和编译出的本地机器指令文件
+*/
+
+
+/***********************************
+ vdex dex文件的容器 android8.0新增
+ 
+*/
+
+
+
+
+

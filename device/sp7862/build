@@ -1,7 +1,27 @@
 /*
  7862
 */
+echo 1 > /proc/sys/kernel/printk
 
+echo device > /sys/devices/platform/soc/soc:aon/5fff0000.usb/host_dev
+echo host > /sys/devices/platform/soc/soc:aon/5fff0000.usb/host_dev
+
+#include "sharkl5Pro.dtsi"	//usb,
+@ums512.dtsi
+
+#include "ums512.dtsi"
+#include "sc2730.dtsi"		//usb配置
+#include "sprd-sound-fe-be.dtsi"//sound
+@ums512-1h10.dts
+
+
+lunch ums512_1h10_Natv-userdebug-native
+m audio.primary.ums512
+
+//串口
+mcu spi2/u2  pin脚A16 B16	apuart2
+console 			apuart1
+bt  u1  pin脚H5 J5		apuart0
 
 /* 
  kernel android10的kernel编译从android结构中抽出 
