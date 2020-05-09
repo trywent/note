@@ -1,8 +1,308 @@
-/*
- 进程开始       c库实现：bionic  java实现：libcore/luni
+/*********************************
+ android8.1 android10
 
+ zygote启动系统服务
+ zygote服务监听应用请求，生成新的进程
+ 
 */
-//android 6.0 zygote开始:
+//zygote
+service zygote /system/bin/app_process64 -Xzygote /system/bin --zygote --start-system-server --socket-name=zygote
+socket zygote stream 660 root system
+@init.rc-->main{
+- AppRuntime runtime(argv[0], computeArgBlockSize(argc, argv))	//继承AndroidRuntime
+  //遍历参数
+- runtime.addOption(strdup(argv[i]))
+- zygote = true 	   					//"--zygote"
+- startSystemServer = true					//"--start-system-server"
+  //设置参数
+- Vector<String8> args
+- if (!className.isEmpty()) {
+
+  }else{
+	- args.add(String8("start-system-server"))
+	- 
+  }
+- if(zygote){
+	- runtime.start("com.android.internal.os.ZygoteInit", args, zygote)
+  }else if(className){
+	- runtime.start("com.android.internal.os.RuntimeInit", args, zygote)
+  }
+}@app_main.cpp 
+
+
+AndroidRuntime::start(const char* className, const Vector<String8>& options, bool zygote){
+- const char* rootDir = getenv("ANDROID_ROOT")	//"/system"
+- jni_invocation.Init(NULL)			//初始话启动jvm的接口
+- JNIEnv* env
+  //启动虚拟机
+- startVm(&mJavaVM, &env, zygote){
+	- parseCompilerRuntimeOption("dalvik.vm.image-dex2oat-Xms"...)
+	- parseCompilerRuntimeOption("dalvik.vm.image-dex2oat-Xmx"...)
+	- addOption("--image-classes=/system/etc/preloaded-classes") //预加载的类
+	  //设置语言persist.sys.locale persist.sys.language
+	- const std::string locale = readLocale()
+	- strncat(localeOption, locale.c_str(), PROPERTY_VALUE_MAX),addOption(localeOption)
+	- JNI_CreateJavaVM(pJavaVM, pEnv, &initArgs)-->JNI_CreateJavaVM_@JniInvocation.cpp-->JNI_CreateJavaVM@java_vm_ext.cc
+	}
+- onVmCreated(env)
+  //注册android JNI
+- startReg(env)
+  //调用com.android.internal.os.ZygoteInit类中main方法
+- char* slashClassName = toSlashClassName(className != NULL ? className : "")
+- jclass startClass = env->FindClass(slashClassName)
+- jmethodID startMeth = env->GetStaticMethodID(startClass, "main","([Ljava/lang/String;)V")
+- env->CallStaticVoidMethod(startClass, startMeth, strArray)-->main(String argv[])@ZygoteInit.java
+}@AndroidRuntime.cpp
+
+
+//zygote启动系统服务。启动zygoteServer用于监听启动应用进程
+main(String argv[]){
+- String zygoteSocketName = "zygote"
+- boolean enableLazyPreload = false
+  //获取参数
+- startSystemServer = true	//start-system-server
+- abiList			//arm64-v8a(sp7862)
+- zygoteSocketName		//zygote
+- boolean isPrimaryZygote = zygoteSocketName.equals(Zygote.PRIMARY_SOCKET_NAME)
+  //预加载
+- if (!enableLazyPreload) preload(bootTimingsTraceLog){
+	- beginPreload()
+	- preloadClasses()
+	- cacheNonBootClasspathClassLoaders()
+	- preloadResources()
+	- nativePreloadAppProcessHALs()
+	- maybePreloadGraphicsDriver()
+	}
+- Zygote.initNativeState(isPrimaryZygote)
+  //创建zygoteServer
+- ZygoteServer zygoteServer = new ZygoteServer(isPrimaryZygote){
+	- mUsapPoolEventFD = Zygote.getUsapPoolEventFD()	//usap(unspecialized app process)
+	- mZygoteSocket = Zygote.createManagedSocketFromInitSocket(Zygote.PRIMARY_SOCKET_NAME)			//zygote
+	- mUsapPoolSocket = Zygote.createManagedSocketFromInitSocket(Zygote.USAP_POOL_PRIMARY_SOCKET_NAME)	//usap_pool_primary
+	}
+- if (startSystemServer) {							//创建系统服务进程
+   	- Runnable r = forkSystemServer(abiList, zygoteSocketName, zygoteServer){
+		- pid = Zygote.forkSystemServer()
+		- if (pid == 0) return handleSystemServerProcess(parsedArgs)
+		- return null
+		}
+	- if (r != null)-->r.run-->handleSystemServerProcess			//子进程中启动系统服务
+	}
+- caller = zygoteServer.runSelectLoop(abiList)					//父进程中监听socket
+- zygoteServer.closeServerSocket()
+}@ZygoteInit.java
+
+//监听socket。启动进程
+runSelectLoop(String abiList) {
+- ArrayList<FileDescriptor> socketFDs = new ArrayList<FileDescriptor>()
+- ArrayList<ZygoteConnection> peers = new ArrayList<ZygoteConnection>()
+- socketFDs.add(mZygoteSocket.getFileDescriptor())
+- while (true) {
+  - for (FileDescriptor socketFD : socketFDs) {
+	- pollFDs[pollIndex] = new StructPollfd()
+	- pollFDs[pollIndex].fd = socketFD
+    }
+  - Os.poll(pollFDs, -1)	//获取监听的fd信息
+  - if ((pollFDs[pollIndex].revents & POLLIN) == 0) continue
+  - if (pollIndex == 0) {	//开始接收建立连接
+	- ZygoteConnection newPeer = acceptCommandPeer(abiList)
+	- peers.add(newPeer)
+	- socketFDs.add(newPeer.getFileDescriptor())
+    }else(pollIndex < usapPoolEventFDIndex){			//从zygote socket建立的连接
+	- ZygoteConnection connection = peers.get(pollIndex)
+	- Runnable command = connection.processOneCommand(this)	//处理消息。创建进程
+    }else{
+
+    }
+  }
+}@ZygoteServer.java
+
+//处理zygote soket接收的数据。创建子进程
+Runnable processOneCommand(ZygoteServer zygoteServer) {
+- String[] args = Zygote.readArgumentList(mSocketReader)
+- parsedArgs = new ZygoteArguments(args)
+
+  //forck创建进程
+- pid = Zygote.forkAndSpecialize(parsedArgs.mUid, parsedArgs.mGid, parsedArgs.mGids...)
+- if (pid == 0) {	//child
+	- zygoteServer.setForkChild()
+	- return handleChildProc(parsedArgs, descriptors, childPipeFd..)
+  }else{
+	- handleParentProc(pid, descriptors, serverPipeFd)
+  }
+}@ZygoteConnection.java
+
+
+//初始话启动jvm的接口
+jni_invocation.Init(NULL){			
+- library = GetLibrary(library, buffer)-->{
+	- if (strcmp(debuggable, "1") != 0) {	//ro.debuggable非debug..使用默认库"libart.so"
+		- library = kLibraryFallback
+		- default_library = kLibraryFallback
+	  }else{				//使用persist.sys.dalvik.vm.lib.2定义的库，没有也使用"libart.so"
+		- __system_property_get(kLibrarySystemProperty, buffer)
+		- default_library = buffer
+	  }
+	- return library = default_library
+	}
+- handle_ = dlopen(library, kDlopenFlags)
+- FindSymbol(reinterpret_cast<void**>(&JNI_GetDefaultJavaVMInitArgs_), "JNI_GetDefaultJavaVMInitArgs")
+- FindSymbol(reinterpret_cast<void**>(&JNI_CreateJavaVM_),"JNI_CreateJavaVM")
+- FindSymbol(reinterpret_cast<void**>(&JNI_GetCreatedJavaVMs_),"JNI_GetCreatedJavaVMs")
+}@JniInvocation.cpp
+
+frameworks/base/cmds/app_process/app_main.cpp
+frameworks/base/core/jni/AndroidRuntime.cpp
+frameworks/base/core/java/com/android/internal/os/ZygoteInit.java 
+frameworks/base/core/java/com/android/internal/os/Zygote.java
+frameworks/base/core/java/com/android/internal/os/ZygoteServer.java
+frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
+frameworks/base/core/java/com/android/internal/os/ZygoteConnection.java
+frameworks/base/core/jni/com_android_internal_os_Zygote.cpp
+libcore/dalvik/src/main/java/dalvik/system/ZygoteHooks.java
+dalvik/vm/Native.cpp
+libnativehelper/JNIHelp.cpp
+libnativehelper/JniInvocation.cpp
+frameworks/base/services/jni/Android.mk
+/*
+ 系统进程
+ 普通应用进程
+*/
+SYSTEMSERVERCLASSPATH=/system/framework/services.jar:/system/framework/ethernet-service.jar
+	:/system/framework/wifi-service.jar:/system/framework/com.android.location.provider.jar
+
+//com.android.server.SystemServer
+Zygote.forkSystemServer-->handleSystemServerProcess{
+- String systemServerClasspath = Os.getenv("SYSTEMSERVERCLASSPATH")
+- createSystemServerClassLoader(){
+	- String systemServerClasspath = Os.getenv("SYSTEMSERVERCLASSPATH")
+	- sCachedSystemServerClassLoader = createPathClassLoader(systemServerClasspath)
+	}
+- ClassLoader cl = sCachedSystemServerClassLoader
+- Thread.currentThread().setContextClassLoader(cl)
+- ZygoteInit.zygoteInit(parsedArgs.mTargetSdkVersion,parsedArgs.mRemainingArgs, cl)
+}@ZygoteInit.java
+
+
+//android.app.ActivityThread
+Zygote.forkAndSpecialize-->handleChildProc-->ZygoteInit.zygoteInit(parsedArgs.mTargetSdkVersion,, null)@ZygoteConnection.java
+
+zygoteInit(int targetSdkVersion, String[] argv,ClassLoader classLoader){
+- RuntimeInit.redirectLogStreams()
+- RuntimeInit.commonInit()
+- ZygoteInit.nativeZygoteInit()
+- RuntimeInit.applicationInit(targetSdkVersion, argv, classLoader){
+	- VMRuntime.getRuntime().setTargetSdkVersion(targetSdkVersion)
+	- findStaticMain(args.startClass, args.startArgs, classLoader){	//找到main方法
+		- Class cl = Class.forName(className, true, classLoader)
+		- Method m = cl.getMethod("main", new Class[] { String[].class })
+		- return new MethodAndArgsCaller(m, argv)
+		}
+	}RuntimeInit.java
+}@zygoteInit.java
+
+
+frameworks/base/core/java/com/android/internal/os/ZygoteInit.java
+/*
+ 启动应用进程 android10
+*/
+ZygoteProcess ZYGOTE_PROCESS = new ZygoteProcess()@Process.java
+ZygoteProcess() {
+- mZygoteSocketAddress = new LocalSocketAddress(Zygote.PRIMARY_SOCKET_NAME)
+- mZygoteSecondarySocketAddress = new LocalSocketAddress(Zygote.SECONDARY_SOCKET_NAME)
+- mUsapPoolSocketAddress = new LocalSocketAddress(Zygote.USAP_POOL_PRIMARY_SOCKET_NAME)
+- mUsapPoolSecondarySocketAddress = new LocalSocketAddress(Zygote.USAP_POOL_SECONDARY_SOCKET_NAME)
+}ZygoteProcess.java
+
+start@Process.java-->start-->
+startViaZygote(@NonNull final String processClass, @Nullable final String niceName,...boolean useUsapPool){
+- ArrayList<String> argsForZygote = new ArrayList<>()
+- argsForZygote.add("--runtime-args")
+- zygoteSendArgsAndGetResult(openZygoteSocketIfNeeded(abi),useUsapPool,argsForZygote){
+	- if (useUsapPool && mUsapPoolEnabled && canAttemptUsap(args)) {
+			- return attemptUsapSendArgsAndGetResult(zygoteState, msgStr)
+			}
+	- attemptZygoteSendArgsAndGetResult(zygoteState, msgStr){
+		- final BufferedWriter zygoteWriter = zygoteState.mZygoteOutputWriter
+		- zygoteWriter.write(msgStr)
+		- zygoteWriter.flush()
+		}
+	}
+}@ZygoteProcess.java
+
+openZygoteSocketIfNeeded(String abi){
+- attemptConnectionToPrimaryZygote{
+	- primaryZygoteState = ZygoteState.connect(mZygoteSocketAddress, mUsapPoolSocketAddress){
+		- LocalSocket zygoteSessionSocket = new LocalSocket();
+		- zygoteSessionSocket.connect(zygoteSocketAddress)
+		- zygoteInputStream = new DataInputStream(zygoteSessionSocket.getInputStream())
+		- zygoteOutputWriter = new BufferedWriter(new OutputStreamWriter(zygoteSessionSocket.getOutputStream()))
+		- return new ZygoteState(zygoteSocketAddress, usapSocketAddress,...)
+		}
+	- maybeSetApiBlacklistExemptions(primaryZygoteState, false)
+	}
+- if (primaryZygoteState.matches(abi)) return primaryZygoteState
+}
+
+/*
+ 启动应用进程 android8
+*/
+ZygoteProcess zygoteProcess =new ZygoteProcess(ZYGOTE_SOCKET, SECONDARY_ZYGOTE_SOCKET)@Process.java
+ZygoteProcess{
+- mSocket = primarySocket             //"zygote"
+- mSecondarySocket = secondarySocket  //"zygote_secondary"
+}@ZygoteProcess.java
+
+
+startProcessLocked-->Process.start("android.app.ActivityThread")@ActivityManagerService.java-->
+start(final String processClass,final String niceName,int uid, int gid, int[] gids....)@Process.java-->
+zygoteProcess.start-->startViaZygote(String processClass,String niceName,final int uid,int gid...){
+- argsForZygote.add("--runtime-args")
+- argsForZygote.add("--setuid=" + uid)
+- argsForZygote.add("--setgid=" + gid)
+- argsForZygote.add("--app-data-dir=" + appDataDir)
+- zygoteSendArgsAndGetResult(openZygoteSocketIfNeeded(abi), argsForZygote)
+  //连接socket.  zygote
+- ZygoteState openZygoteSocketIfNeeded{
+	- primaryZygoteState = ZygoteState.connect(mSocket){//zygote
+		- LocalSocket zygoteSocket = new LocalSocket()
+		- zygoteSocket.connect(new LocalSocketAddress(socketAddress,LocalSocketAddress.Namespace.RESERVED))\
+		- zygoteInputStream = new DataInputStream(zygoteSocket.getInputStream())
+		- getAbiList(BufferedWriter writer, DataInputStream inputStream){
+			- 	
+			}
+		}
+	- secondaryZygoteState = ZygoteState.connect(mSecondarySocket)//zygote_secondary
+ 	}
+  //写入参数，等待结果
+- zygoteSendArgsAndGetResult
+}@ZygoteProcess.java
+
+
+frameworks/base/core/java/android/os/Process.java
+frameworks/base/core/java/android/os/ZygoteProcess.java
+===============
+//uncatchException Thread.setDefaultUncaughtExceptionHandler
+UncaughtHandler.uncaughtException-->ActivityManagerNative.getDefault().handleApplicationCrash
+@RunttimeInit.java-->handleApplicationCrash-->handleApplicationCrashInner-->
+crashApplication{
+- makeAppCrashingLocked
+- createAppErrorIntentLocked
+- startActivityAsUser //弹框？
+}@ActivityManagerService.java
+
+
+makeAppCrashingLocked-->handleAppCrashLocked
+
+
+
+
+
+/*********************************
+ 
+ android 6.0 zygote开始 进程开始       c库实现：bionic  java实现：libcore/luni
+*/
+
 service zygote /system/bin/app_process -Xzygote /system/bin --zygote --start-system-server
 
 app_process编译时链接的库包含libandroid_runtime.so，
@@ -13,12 +313,12 @@ service zygote /system/bin/app_proces@init.rc-->main-->runtime.start("com.androi
 - 初始启动startClass //com.android.internal.os.ZygoteInit
 - 查找mian方法并执行，env->CallStaticVoidMethod-->
 	mian{
-	- registerZygoteSocket(socketName)//注册socket "zygote" 用于监听命令启动进程
+	- registerZygoteSocket(socketName)	//注册socket "zygote" 用于监听命令启动进程
 	- startSystemServer-->handleSystemServerProcess-->Zygote.forkAndSpecialize//启动系统服务
-	- runSelectLoop{//接收命令并执行,等待启动app进程
+	- runSelectLoop{			//接收命令并执行,等待启动app进程
 		- acceptCommandPeer
 		- runOnce{
-			- readArgumentList//参数
+			- readArgumentList	//参数
 			- pid==0,Zygote.forkAndSpecialize //fork进程
 			- handleChildProc-->RuntimeInit.zygoteInit
 			}@ZygoneConnction.java
@@ -76,88 +376,6 @@ AndroidRuntime::start-->startReg-->register_jni_procs-->array[i].mProc(env)
 @AndroidRuntime.cpp-->register_android_xxxxx(env)-->
 registerNativeMethods@AndroidRuntime.cpp-->jniRegisterNativeMethods@JNIHelp.cpp
 
-
-
-/*
- android8.1
-*/
-//启动进程。创建socket zygote
-service zygote /system/bin/app_process64 -Xzygote /system/bin --zygote --start-system-server --socket-name=zygote
-socket zygote stream 660 root system
-@init.rc-->main{
-- AppRuntime runtime(argv[0], computeArgBlockSize(argc, argv)) //AndroidRuntime
-  //遍历参数
-- runtime.addOption(strdup(argv[i]))
-- zygote = true 	   //"--zygote"
-- startSystemServer = true //"--start-system-server"
-  //设置参数
-- Vector<String8> args
-- if (!className.isEmpty()) {
-
-  }else{
-	- args.add(String8("start-system-server"))
-	- 
-  }
-- if(zygote){
-	- runtime.start("com.android.internal.os.ZygoteInit", args, zygote)
-  }else if(className){
-	- runtime.start("com.android.internal.os.RuntimeInit", args, zygote)
-  }
-}@app_main.cpp 
-
-
-
-
-AndroidRuntime::start(const char* className, const Vector<String8>& options, bool zygote){
-- const char* rootDir = getenv("ANDROID_ROOT") //"/system"
-- jni_invocation.Init(NULL)
-- JNIEnv* env
-  //启动虚拟机
-- startVm(&mJavaVM, &env, zygote){
-	- parseCompilerRuntimeOption("dalvik.vm.image-dex2oat-Xms"...)
-	- parseCompilerRuntimeOption("dalvik.vm.image-dex2oat-Xmx"...)
-	- addOption("--image-classes=/system/etc/preloaded-classes") //预加载的类
-	  //设置语言persist.sys.locale persist.sys.language
-	- const std::string locale = readLocale()
-	- strncat(localeOption, locale.c_str(), PROPERTY_VALUE_MAX),addOption(localeOption)
-	- JNI_CreateJavaVM(pJavaVM, pEnv, &initArgs)
-	}
-- onVmCreated(env)
-  //注册android JNI
-- startReg(env)
-  //调用类中main方法
-- char* slashClassName = toSlashClassName(className != NULL ? className : "")
-- jclass startClass = env->FindClass(slashClassName)
-- jmethodID startMeth = env->GetStaticMethodID(startClass, "main","([Ljava/lang/String;)V")
-- env->CallStaticVoidMethod(startClass, startMeth, strArray)
-}@AndroidRuntime.cpp
-
-
-
-
-//java层zygote启动
-main(String argv[]){
-- ZygoteServer zygoteServer = new ZygoteServer()
-}@ZygoteInit.java
-
-
-frameworks/base/cmds/app_process/app_main.cpp
-frameworks/base/core/jni/AndroidRuntime.cpp
-frameworks/base/core/java/com/android/internal/os/ZygoteInit.java 
-frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
-frameworks/base/core/java/com/android/internal/os/ZygoteConnection.java
-frameworks/base/core/jni/com_android_internal_os_Zygote.cpp
-libcore/dalvik/src/main/java/dalvik/system/ZygoteHooks.java
-dalvik/vm/Native.cpp
-libnativehelper/JNIHelp.cpp
-frameworks/base/services/jni/Android.mk
-
-/*************************
- 开始应用进程：
-
-*/
-//android6.0
-
 开始应用进程：
 startProcessLocked-->Process.start("android.app.ActivityThread")@ActivityManagerService.java-->
 start-->startViaZygote-->zygoteSendArgsAndGetResult{
@@ -170,59 +388,6 @@ start-->startViaZygote-->zygoteSendArgsAndGetResult{
 - ProcessStartResult
 - inputStream.readInt //启动进程id
 }@Process.java
-
-
-
-
-//android 8.1
-ZygoteProcess zygoteProcess =new ZygoteProcess(ZYGOTE_SOCKET, SECONDARY_ZYGOTE_SOCKET)@Process.java
-ZygoteProcess{
-- mSocket = primarySocket             //"zygote"
-- mSecondarySocket = secondarySocket  //"zygote_secondary"
-}@ZygoteProcess.java
-
-
-startProcessLocked-->Process.start("android.app.ActivityThread")@ActivityManagerService.java-->
-start(final String processClass,final String niceName,int uid, int gid, int[] gids....)@Process.java-->
-zygoteProcess.start-->startViaZygote(String processClass,String niceName,final int uid,int gid...){
-- argsForZygote.add("--runtime-args")
-- argsForZygote.add("--setuid=" + uid)
-- argsForZygote.add("--setgid=" + gid)
-- argsForZygote.add("--app-data-dir=" + appDataDir)
-- zygoteSendArgsAndGetResult(openZygoteSocketIfNeeded(abi), argsForZygote)
-  //连接socket.  zygote
-- ZygoteState openZygoteSocketIfNeeded{
-	- primaryZygoteState = ZygoteState.connect(mSocket){//zygote
-		- LocalSocket zygoteSocket = new LocalSocket()
-		- zygoteSocket.connect(new LocalSocketAddress(socketAddress,LocalSocketAddress.Namespace.RESERVED))\
-		- zygoteInputStream = new DataInputStream(zygoteSocket.getInputStream())
-		- getAbiList(BufferedWriter writer, DataInputStream inputStream){
-			- 	
-			}
-		}
-	- secondaryZygoteState = ZygoteState.connect(mSecondarySocket)//zygote_secondary
- 	}
-  //写入参数，等待结果
-- zygoteSendArgsAndGetResult
-}@ZygoteProcess.java
-
-
-
-
-frameworks/base/core/java/android/os/Process.java
-frameworks/base/core/java/android/os/ZygoteProcess.java
-===============
-//uncatchException Thread.setDefaultUncaughtExceptionHandler
-UncaughtHandler.uncaughtException-->ActivityManagerNative.getDefault().handleApplicationCrash
-@RunttimeInit.java-->handleApplicationCrash-->handleApplicationCrashInner-->
-crashApplication{
-- makeAppCrashingLocked
-- createAppErrorIntentLocked
-- startActivityAsUser //弹框？
-}@ActivityManagerService.java
-
-
-makeAppCrashingLocked-->handleAppCrashLocked
 
 ===============
 //sginal

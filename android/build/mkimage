@@ -42,16 +42,15 @@ mkbootfs dir/root | minigzip > dir/ramdisk.img
 
 //解压bootimg
 mkdir boot  &&  cd boot
-abooting -x  ../boot.img //得到这三个文件 ：bootimg.cfg  initrd.img  zImage
+abootimg -x  ../boot.img //得到这三个文件 ：bootimg.cfg  initrd.img  zImage
 
-//解压ramdisk
+//initrd.img是ramdisk被压缩后。解压ramdisk
 #那么先解压，因为后缀不是.gz，所以用-s 选项
 gunzip -S .img ramdisk.img
 #查看是什么格式
-# file ramdisk
+file ramdisk
 ramdisk: ASCII cpio archive (SVR4 with no CRC)
-
-# cpio -i -F ../ramdisk
+cpio -i -F  ramdisk		//解出文件
 __________________
 mkdir temp_directory && cd temp_directory
 gunzip -c ../ramdisk.img | cpio -idm

@@ -41,7 +41,8 @@ crash日志：
 prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-addr2line
 
 objdump 将库文件中的函数输出地址
-readelf  xxx.so
+readelf  xxx.so	//查看库格式
+nm       xxx.so //查看库符号
 file  xxx.so
 addr2line 将地址转换为库中的函数:
 -f 列出函数名

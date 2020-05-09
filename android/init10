@@ -1,0 +1,144 @@
+/********************************************
+ init android10
+
+ Linux kernel device-Mapper实现用户空间挂载动态分区
+ 
+*/
+
+
+//init_first_stage ramdisk/init
+LOCAL_MODULE := init_first_stage
+LOCAL_MODULE_STEM := init
+LOCAL_MODULE_PATH := $(TARGET_RAMDISK_OUT)
+@Android.mk
+
+main(int argc, char** argv)-->android::init::FirstStageMain(argc, argv){
+-
+  //挂载分区
+- DoFirstStageMount{
+	- if (IsRecoveryMode()) return
+	- std::unique_ptr<FirstStageMount> handle = FirstStageMount::Create()
+	- handle->DoFirstStageMount()
+	}@first_stage_mount.cpp
+  //selinux
+- const char* path = "/system/bin/init"
+- const char* args[] = {path, "selinux_setup", nullptr}
+- SwitchRoot("/system")
+- execv(path, const_cast<char**>(args))
+}@first_stage_init.cpp
+
+/*
+ mount
+
+  androidboot.boot_devices=soc/soc:ap-apb/71400000.sdio
+*/
+
+//读取分区信息，创建FirstStageMount
+FirstStageMount::Create(){
+- auto fstab = ReadFirstStageFstab(){
+	- if (!ReadFstabFromDt(&fstab)) {	//先尝试/proc/device-tree/firmware/android/fstab
+		- ReadDefaultFstab(&fstab){	
+			- ReadFstabFromDt(&dt_fstab, false)
+			- default_fstab_path = "/etc/recovery.fstab"	//是否recovery启动
+			- default_fstab_path = GetFstabPath()		//正常启动 "/odm/etc/fstab.", "/vendor/etc/fstab.", "/fstab."
+			}
+		}
+	}
+-return std::make_unique<FirstStageMountVBootV2>(std::move(fstab)): 
+	FirstStageMount(std::move(fstab)), avb_handle_(nullptr) {
+	- read_android_dt_file("vbmeta/parts", &device_tree_vbmeta_parts)
+	}
+}@first_stage_mount.cpp
+
+FirstStageMount::FirstStageMount(Fstab fstab)
+    : need_dm_verity_(false), fstab_(std::move(fstab)), uevent_listener_(16 * 1024 * 1024) {
+- auto boot_devices = android::fs_mgr::GetBootDevices()		//获取启动设备  androidboot.boot_devices=soc/soc:ap-apb/71400000.sdio
+- device_handler_ = std::make_unique<DeviceHandler>(std::vector<Permissions>{}, std::vector<SysfsPermissions>{},
+	 std::vector<Subsystem>{},std::move(boot_devices), false)
+- super_partition_name_ = fs_mgr_get_super_partition_name()	//"super"分区名字
+}
+
+FirstStageMount::DoFirstStageMount() {
+- InitDevices(){
+	- GetDmLinearMetadataDevice
+	- GetDmVerityDevices
+	- InitRequiredDevices{
+		- 		
+		}
+	}
+}@first_stage_mount.cpp
+
+system/core/init/first_stage_main.cpp
+system/core/init/first_stage_init.cpp
+system/core/init/first_stage_mount.cpp
+system/core/fs_mgr/fs_mgr_fstab.cpp
+/********************************************
+ system/bin/init 挂载完成后执行
+
+ second stage,selinux,uevent
+
+on early-fs 挂载其它分区
+ start vold
+*/
+cc_binary {
+    name: "init_second_stage",
+    stem: "init",
+    symlinks: ["ueventd"],
+}@Android.bp
+
+int main(int argc, char** argv) {
+  //uevent
+- return ueventd_main(argc, argv)
+  //subcontext
+- return SubcontextMain(argc, argv, &function_map)
+  //selinux
+- return SetupSelinux(argv)
+  //second_stage
+- return SecondStageMain(argc, argv)
+  //
+- return FirstStageMain(argc, argv)
+}@main.cpp
+
+system/core/init/main.cpp
+
+/*
+ selinux
+*/
+SetupSelinux(char** argv) {
+- SelinuxInitialize
+- selinux_android_restorecon("/system/bin/init", 0)
+  //second stage
+- const char* path = "/system/bin/init"
+- const char* args[] = {path, "second_stage", nullptr}
+- execv(path, const_cast<char**>(args))
+}@selinux.cpp
+
+system/core/init/selinux.cpp
+
+/*
+ second stage
+ 处理init.rc
+*/
+SecondStageMain(int argc, char** argv) {
+- am.QueueEventTrigger("init")
+- am.QueueBuiltinAction(queue_property_triggers_action, "queue_property_triggers")
+- while (true) {
+	- am.ExecuteOneCommand()
+	}
+}@init.cpp
+
+system/core/init/init.cpp
+
+/*
+ uevent
+
+*/
+ueventd_main(int argc, char** argv) {
+- SelabelInitialize
+- ueventd_configuration = ParseConfig({"/ueventd.rc", "/vendor/ueventd.rc","/odm/ueventd.rc", 
+	"/ueventd." + hardware + ".rc"})
+-  
+}@ueventd.cpp
+
+
+system/core/init/ueventd.cpp

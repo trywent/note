@@ -1,0 +1,87 @@
+/********************************
+ native_loader
+
+ LibraryNamespaces
+*/
+static LibraryNamespaces* g_namespaces = new LibraryNamespaces
+
+//初始化
+InitializeNativeLoader-->g_namespaces->Initialize()-->
+LibraryNamespaces::Initialize() {
+- std::vector<std::string> sonames;									//读取库名保存
+- root_dir = android_root_env != nullptr ? android_root_env : "/system"
+- public_native_libraries_system_config = root_dir + kPublicNativeLibrariesSystemConfigPathFromRoot	// 
+- llndk_native_libraries_system_config = root_dir + kLlndkNativeLibrariesSystemConfigPathFromRoot	// 
+- vndksp_native_libraries_system_config = root_dir + kVndkspNativeLibrariesSystemConfigPathFromRoot	// 
+  //读取/etc/public.libraries.txt 保存system_public_libraries_
+- ReadConfig(public_native_libraries_system_config, &sonames, always_true, &error_msg)	
+- LOG_ALWAYS_FATAL_IF(dlopen(soname.c_str()...)			//遍历打开库，
+- system_public_libraries_ = base::Join(sonames, ':')
+  //读取oem库 /system/etc/public.libraries-<companyname>.txt
+- ReadExtensionLibraries(base::Dirname(public_native_libraries_system_config).c_str(), &sonames)
+- oem_public_libraries_ = base::Join(sonames, ':')
+  //读取/product/etc/public.libraries-<companyname>.txt
+- ReadExtensionLibraries(product_public_native_libraries_dir.c_str(), &sonames)
+- product_public_libraries_ = base::Join(sonames, ':')
+  //读取/etc/llndk.libraries.txt 保存system_llndk_libraries_
+- ReadConfig(llndk_native_libraries_system_config, &sonames, always_true)
+- system_llndk_libraries_ = base::Join(sonames, ':')
+  //读取/etc/vndksp.libraries.txt 保存到system_vndksp_libraries_
+- ReadConfig(vndksp_native_libraries_system_config, &sonames, always_true)				
+- system_vndksp_libraries_ = base::Join(sonames, ':')
+  //读取/vendor/etc/public.libraries.txt 保存到vendor_public_libraries_
+- ReadConfig(kPublicNativeLibrariesVendorConfig, &sonames, always_true, nullptr)			
+- vendor_public_libraries_ = base::Join(sonames, ':')
+}@native_loader.cpp
+
+/*创建命名空间
+
+
+*/
+CreateClassLoaderNamespace(JNIEnv* env, int32_t target_sdk_version, jobject class_loader,
+         bool is_shared, jstring dex_path, jstring library_path,jstring permitted_path)-->
+g_namespaces->Create(env, target_sdk_version, class_loader, is_shared, dex_path...)-->
+Create(JNIEnv* env, uint32_t target_sdk_version, jobject class_loader, bool is_shared, jstring dex_path,
+	 jstring java_library_path,jstring java_permitted_path, std::string* error_msg) {
+  //库的路径
+- if (java_library_path != nullptr) {
+	- ScopedUtfChars library_path_utf_chars(env, java_library_path)
+	- std::string library_path = library_path_utf_chars.c_str()
+	}
+}@native_loader.cpp
+
+
+/*打开库
+
+*/
+OpenNativeLibrary(JNIEnv* env, int32_t target_sdk_version, const char* path,jobject class_loader, 
+	const char* caller_location, jstring library_path, bool* needs_native_bridge, char** error_msg) {
+  //loader为空
+- if (class_loader == nullptr) {
+
+  }
+  //
+- if ((ns = g_namespaces->FindNamespaceByClassLoader(env, class_loader)) == nullptr) {
+	- g_namespaces->Create(env, target_sdk_version, class_loader...)
+	}
+- return OpenNativeLibraryInNamespace(ns, path, needs_native_bridge, error_msg){
+	- if (ns->is_android_namespace()){	//android的命名空间
+		- void* handle = android_dlopen_ext(path, RTLD_NOW, &extinfo)@libdl.cpp-->__loader_android_dlopen_ext@dlfcn.cpp
+		 	-->dlopen_ext
+	  }else{
+		- void* handle = NativeBridgeLoadLibraryExt(path, RTLD_NOW, ns->get_native_bridge_ns())
+		}
+	}
+}@native_loader.cpp
+
+
+dlopen_extconst char* name, int flags,const android_dlextinfo* extinfo,const void* caller_addr){
+- soinfo* const caller = find_containing_library(caller_addr)
+- android_namespace_t* ns = get_caller_namespace(caller)
+}@linker.cpp
+
+system/core/libnativeloader/native_loader.cpp
+system/core/libnativebridge/native_bridge.cc
+bionic/libdl/libdl.cpp
+bionic/linker/dlfcn.cpp
+bionic/linker/linker.cpp

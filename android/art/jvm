@@ -1,0 +1,224 @@
+/***********************************
+ jvm
+
+*/
+
+//开始虚拟机
+AndroidRuntime::start-->startVm(&mJavaVM, &env, zygote)@AnroidRuntime.cpp-->JNI_CreateJavaVM@JniInvocation.cpp-->
+JNI_CreateJavaVM(JavaVM** p_vm, JNIEnv** p_env, void* vm_args) {
+- Runtime::Create(options, ignore_unrecognized
+- android::InitializeNativeLoader()
+- Runtime* runtime = Runtime::Current()
+- runtime->Start()
+- *p_env = Thread::Current()->GetJniEnv()
+- *p_vm = runtime->GetJavaVM()
+}@java_vm_ext.cc
+
+
+/*
+ runtime
+*/
+Runtime::Create(RuntimeArgumentMap&& runtime_options) {
+- instance_ = new Runtime	//创建runtime
+- instance_->Init(std::move(runtime_options)){
+	- 
+	- java_vm_ = JavaVMExt::Create(this, runtime_options, &error_msg){
+		- std::unique_ptr<JavaVMExt> java_vm(new JavaVMExt(runtime, runtime_options, error_msg))
+		}
+	- java_vm_->AddEnvironmentHook(JNIEnvExt::GetEnvHandler)-->env_hooks_.push_back(hook)@java_vm_ext.cc
+	}
+}@runtime.cc
+
+
+Runtime::Start() {
+- Thread* self = Thread::Current()
+- started_ = true
+}
+
+CreateSystemClassLoader(Runtime* runtime) {
+- ScopedObjectAccess soa(Thread::Current())
+- ClassLinker* cl = Runtime::Current()->GetClassLinker()
+  //calssloader
+- StackHandleScope<2> hs(soa.Self())
+- Handle<mirror::Class> class_loader_class(hs.NewHandle(soa.Decode<mirror::Class>(WellKnownClasses::java_lang_ClassLoader)))
+- ArtMethod* getSystemClassLoader = class_loader_class->FindClassMethod("getSystemClassLoader", "()Ljava/lang/ClassLoader;", pointer_size)//systemloader
+- ScopedLocalRef<jobject> system_class_loader(env, soa.AddLocalReference<jobject>(result.GetL()))
+- soa.Self()->SetClassLoaderOverride(system_class_loader.get())
+  //thread类,设置thread中的
+- Handle<mirror::Class> thread_class( hs.NewHandle(soa.Decode<mirror::Class>(WellKnownClasses::java_lang_Thread)))	
+- cl->EnsureInitialized(soa.Self(), thread_class, true, true)
+- ArtField* contextClassLoader = thread_class->FindDeclaredInstanceField("contextClassLoader", "Ljava/lang/ClassLoader;")
+- contextClassLoader->SetObject<false>(soa.Self()->GetPeer(), soa.Decode<mirror::ClassLoader>(system_class_loader.get()).Ptr())
+- return env->NewGlobalRef(system_class_loader.get())
+}
+
+/*
+  JavaVM
+*/
+JavaVMExt::JavaVMExt(Runtime* runtime, const RuntimeArgumentMap& runtime_options, std::string* error_msg){
+  //javaVM的接口函数，获取env
+- unchecked_functions_(&gJniInvokeInterface)
+- functions = unchecked_functions_
+  //
+- SetCheckJniEnabled(runtime_options.Exists(RuntimeArgumentMap::CheckJni))
+}
+
+//thread
+Thread::Init(ThreadList* thread_list, JavaVMExt* java_vm, JNIEnvExt* jni_env_ext) {
+- tlsPtr_.pthread_self = pthread_self()
+- tlsPtr_.jni_env = JNIEnvExt::Create(this, java_vm, &error_msg){
+	- std::unique_ptr<JNIEnvExt> ret(new JNIEnvExt(self_in, vm_in, error_msg))
+	}@jni_env_ext.cc
+}@thread.cc
+
+
+/*
+ env
+*/
+
+//创建env...获取接口
+JNIEnvExt::JNIEnvExt(Thread* self_in, JavaVMExt* vm_in, std::string* error_msg){
+- check_jni_ = vm_in->IsCheckJniEnabled()
+- functions = GetFunctionTable(check_jni_){
+	- if(check_jni) GetCheckJniNativeInterface(){
+		- return &gCheckNativeInterface
+	  }else GetJniNativeInterface(){
+		- return &gJniNativeInterface
+		}
+	}
+}@jni_env_ext.cc
+
+//获取env
+GetEnv(JavaVM* vm, void** env, jint version) {
+- Thread* thread = Thread::Current()
+- JavaVMExt* raw_vm = reinterpret_cast<JavaVMExt*>(vm)
+- raw_vm->HandleGetEnv(env, version)-->for (GetEnvHook hook : env_hooks_)-->hook(this, env, version)
+	-->GetEnvHandler{
+	- Thread* thread = Thread::Current()
+	- *env = thread->GetJniEnv()
+	}@java_env_ext.cc
+}@java_vm_ext.cc
+
+
+/*
+ 加载库
+*/
+JNIEXPORT jstring JVM_NativeLoad(JNIEnv* env,jstring javaFilename,jobject javaLoader,jclass caller) {
+- art::JavaVMExt* vm = art::Runtime::Current()->GetJavaVM()-->java_vm_.get()
+- vm->LoadNativeLibrary(env,filename.c_str(),javaLoader, caller, &error_msg)-->LoadNativeLibrary
+}@OpenjdkJvm.cc
+
+
+JavaVMExt::LoadNativeLibrary(JNIEnv* env,const std::string& path,jobject class_loader,jclass caller_class, std::string* error_msg) {
+- SharedLibrary* library = libraries_->Get(path)	//是否已经加载过库
+- if (library != nullptr) {
+	- 
+	}
+  //打开库
+- const char* path_str = path.empty() ? nullptr : path.c_str()
+- void* handle = android::OpenNativeLibrary(env,runtime_->GetTargetSdkVersion(),path_str,class_loader...)
+- std::unique_ptr<SharedLibrary> new_library(new SharedLibrary(env,self,...)
+- library = new_library.release()
+- libraries_->Put(path, library)
+  //调用jni_onload
+- void* sym = library->FindSymbol("JNI_OnLoad", nullptr)
+- JNI_OnLoadFn jni_on_load = reinterpret_cast<JNI_OnLoadFn>(sym)
+- int version = (*jni_on_load)(this, nullptr)
+}@java_vm_ext.cc
+
+//FindClass env的接口函数
+static jclass FindClass(JNIEnv* env, const char* name) {
+
+}@jni_internal.cc
+
+
+//registerNavite   env的接口函数
+RegisterNatives(JNIEnv* env,jclass java_class, const JNINativeMethod* methods,jint method_count){
+- Handle<mirror::Class> c = hs.NewHandle(soa.Decode<mirror::Class>(java_class))
+- for (jint i = 0; i < method_count; ++i)					//遍历需要注册的方法
+ - const char* name = methods[i].name
+ - const char* sig = methods[i].signature
+ - const void* fnPtr = methods[i].fnPtr
+ - for (current_class = c.Get();current_class = current_class->GetSuperClass())	//遍历当前类，和它的父类
+	- FindMethod<true>(current_class, name, sig){				//查找到匹配的方法
+		- auto pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize()
+		- for (auto& method : c->GetMethods(pointer_size))		//查找method
+			- if (kNative == method.IsNative() && name == method.GetName() && method.GetSignature() == sig) return method
+		}
+	- FindMethod<false>(current_class, name, sig)
+ - const void* final_function_ptr = m->RegisterNative(fnPtr)
+}@jni_internal.cc
+
+
+libnativehelper/JniInvocation.cpp
+art/openjdkjvm/OpenjdkJvm.cc
+art/runtime/runtime.cc
+art/runtime/jni/java_vm_ext.cc
+art/runtime/jni/check_jni.cc
+art/runtime/jni/jni_internal.cc
+art/runtime/parsed_options.cc
+/*
+ jvm接口
+ jni接口
+*/
+//定义JavaVM
+typedef _JavaVM JavaVM
+struct JNIInvokeInterface {
+    void*       reserved0;
+    void*       reserved1;
+    void*       reserved2;
+
+    jint        (*DestroyJavaVM)(JavaVM*);
+    jint        (*AttachCurrentThread)(JavaVM*, JNIEnv**, void*);
+    jint        (*DetachCurrentThread)(JavaVM*);
+    jint        (*GetEnv)(JavaVM*, void**, jint);
+    jint        (*AttachCurrentThreadAsDaemon)(JavaVM*, JNIEnv**, void*);
+}
+
+struct _JavaVM {
+    const struct JNIInvokeInterface* functions;
+    jint DetachCurrentThread()   { return functions->DetachCurrentThread(this); }
+    jint GetEnv(void** env, jint version)   { return functions->GetEnv(this, env, version); }
+	...
+}@jni.h
+
+//定义JNIEnv
+typedef _JNIEnv JNIEnv
+struct JNINativeInterface {
+    void*       reserved0;
+    void*       reserved1;
+    void*       reserved2;
+    void*       reserved3;
+
+    jint        (*GetVersion)(JNIEnv *);
+
+    jclass      (*DefineClass)(JNIEnv*, const char*, jobject, const jbyte*,
+                        jsize);
+    jclass      (*FindClass)(JNIEnv*, const char*);
+	...
+}@jni.h
+struct _JNIEnv {
+    /* do not rename this; it does not seem to be entirely opaque */
+    const struct JNINativeInterface* functions;
+
+#if defined(__cplusplus)
+
+    jint GetVersion()
+	...
+}@jni.h
+
+
+libnativehelper/include_jni/jni.h
+
+
+
+/*
+ log
+
+ 需要设置gLogVerbosity对应的项
+*/
+#define VLOG_IS_ON(module) UNLIKELY(::art::gLogVerbosity.module)
+#define VLOG(module) if (VLOG_IS_ON(module)) LOG(INFO)
+
+art/libartbase/logging.h
+art/libartbase/logging.cc

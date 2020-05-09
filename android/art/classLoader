@@ -1,0 +1,175 @@
+/********************************
+ android10
+*/
+
+
+/*
+ 加载jar
+*/
+
+
+/*
+ android6.0 加载jar
+*/
+createOrUpdateClassLoaderLocked(null){
+- makePaths
+- getClassLoader-->new PathClassLoader(path zip)@ApplicationLoaders.java
+}@LoadedApk.java
+
+//
+public DexClassLoader (String dexPath, String optimizedDirectory, String libraryPath, ClassLoader parent)
+- dexPath 需要装载的APK或者Jar文件的路径。包含多个路径用File.pathSeparator间隔开,在Android上默认是 “:”
+- optimizedDirectory 优化后的dex文件存放目录，不能为null
+- libraryPath 目标类中使用的C/C++库so文件的路径,每个目录用File.pathSeparator间隔开; 可以为null
+- parent 该类装载器的父装载器，一般用当前执行类的装载器
+
+frameworks/base/core/java/android/app/LoadedApk.java
+frameworks/base/core/java/android/app/ApplicationLoaders.java
+
+/*
+  android5.1 加载jar
+*/
+handleBindApplication@ActivityThread.java-->makeApplication-->getClassLoader
+-->ApplicationLoaders.getDefault().getClassLoader@LoadedApk.java-->
+getClassLoader{
+- ClassLoader.getSystemClassLoader().getParent //获取父loader
+- new PathClassLoader(zip, libPath, parent)-->
+}@ApplicationLoaders.java
+
+
+frameworks/base/core/java/android/app/LoadedApk.java
+frameworks/base/core/java/android/app/ApplicationLoaders.java
+
+
+
+/*
+ 加载lib
+*/
+loadLibrary(String libname)--> Runtime.getRuntime().loadLibrary0(Reflection.getCallerClass(), libname)@System.java
+-->loadLibrary0(Class<?> fromClass, String libname) {
+- ClassLoader classLoader = ClassLoader.getClassLoader(fromClass)
+- loadLibrary0(ClassLoader loader, Class<?> callerClass, String libname) {
+	- String filename = loader.findLibrary(libraryName)
+	- nativeLoad(filename, loader)-->Runtime_nativeLoad@Runtime.c
+	}
+}@Runtime.java
+
+//最终由虚拟机加载
+Runtime_nativeLoad(JNIEnv* env, jclass ignored, jstring javaFilename,jobject javaLoader, jclass caller)@Runtime.c-->
+JVM_NativeLoad(env, javaFilename, javaLoader, caller)@OpenjdkJvm.cc
+
+libcore/ojluni/src/main/java/java/lang/System.java
+libcore/ojluni/src/main/java/java/lang/Runtime.java
+libcore/ojluni/src/main/native/Runtime.c
+art/runtime/class_loader_context.cc
+
+/********************************
+ 方法调用
+*/
+
+
+/*
+ 直接调用
+*/
+ResolveMethod{
+- ThrowNoSuchMethodError
+}@class_linker.cc
+
+
+
+//判断是否拒绝调用
+ShouldDenyAccessToMember(T* member,const std::function<AccessContext()>& fn_get_access_context, AccessMethod access_method){
+- const AccessContext caller_context = fn_get_access_context()
+- switch (caller_context.GetDomain()) {
+	- case Domain::kApplication: {
+		- EnforcementPolicy policy = Runtime::Current()->GetHiddenApiEnforcementPolicy()
+		- if (policy == EnforcementPolicy::kDisabled) return false
+		- return detail::ShouldDenyAccessToMemberImpl(member, api_list, access_method)
+		}
+	- case Domain::kPlatform: {
+		- EnforcementPolicy policy = Runtime::Current()->GetHiddenApiEnforcementPolicy()
+		- if (policy == EnforcementPolicy::kDisabled) return false
+		- member = detail::GetInterfaceMemberIfProxy(member)
+		- return detail::HandleCorePlatformApiViolation(member,...)
+		}
+	- 
+	}
+}@hidden_api.h
+
+bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod access_method){
+- Runtime* runtime = Runtime::Current()
+- EnforcementPolicy policy = runtime->GetHiddenApiEnforcementPolicy()
+- const bool deny_access = (policy == EnforcementPolicy::kEnabled) &&
+	IsSdkVersionSetAndMoreThan(runtime->GetTargetSdkVersion(),api_list.GetMaxAllowedSdkVersion())
+- 
+}@hidden_api.cc
+
+art/runtime/class_linker.cc
+art/runtime/hidden_api.cc
+art/runtime/hidden_api.h
+/*
+  反射调用
+*/
+GetDeclaredField
+
+
+art/runtime/native/java_lang_Class.cc
+/*
+  jni调用
+*/
+
+//查找方法的入口
+void* artFindNativeMethod() {
+- Thread* self = Thread::Current()
+- ArtMethod* method = self->GetCurrentMethod(nullptr)
+- void* native_code = soa.Vm()->FindCodeForNativeMethod(method)
+- return method->RegisterNative(native_code)
+}@jni_entrypoints.cc
+
+FindCodeForNativeMethod(ArtMethod* m){
+- libraries_->FindNativeMethod(self, m, detail)-->FindNativeMethod(Thread* self, ArtMethod* m, std::string& detail){
+	- std::string jni_short_name(m->JniShortName())
+	- std::string jni_long_name(m->JniLongName())
+	- void* native_code = FindNativeMethodInternal(self,declaring_class_loader_allocator...){
+		- for (const auto& lib : libraries_) 				//编译lib，找到对应的alloctor
+		- if (library->GetClassLoaderAllocator() != declaring_class_loader_allocator) continue
+		- void* fn = library->FindSymbol(jni_short_name, arg_shorty)	//查找对应的符号
+		}
+	}
+- return native_method
+}@java_vm_ext.cc
+
+
+art/runtime/entrypoints/jni/jni_entrypoints.cc
+
+//=============
+/system/app/KeyChain/KeyChain.apk
+at dalvik.system.DexFile.openDexFileNative(Native Method)
+
+at dalvik.system.DexFile.openDexFile(DexFile.java:295)
+
+at dalvik.system.DexFile.<init>(DexFile.java:80)
+
+at dalvik.system.DexFile.<init>(DexFile.java:59)
+
+at dalvik.system.DexPathList.loadDexFile(DexPathList.java:279)
+
+at dalvik.system.DexPathList.makePathElements(DexPathList.java:248)
+
+at dalvik.system.DexPathList.<init>(DexPathList.java:120)
+
+at dalvik.system.BaseDexClassLoader.<init>(BaseDexClassLoader.java:48)
+
+at dalvik.system.PathClassLoader.<init>(PathClassLoader.java:65)
+
+at android.app.ApplicationLoaders.getClassLoader(ApplicationLoaders.java:58)
+
+at android.app.LoadedApk.getClassLoader(LoadedApk.java:376)
+
+at android.app.LoadedApk.makeApplication(LoadedApk.java:568)
+
+at android.app.ActivityThread.handleBindApplication(ActivityThread.java:4680)
+
+at android.app.ActivityThread.-wrap1(ActivityThread.java)
+
+at android.app.ActivityThread$H.handleMessage(ActivityThread.java:1405)

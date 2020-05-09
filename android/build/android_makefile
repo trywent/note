@@ -1,4 +1,4 @@
-/*********************
+/*******************************************************
   android build
 */
 
@@ -53,9 +53,12 @@ TARGET_GCC_VERSION := 4.9@make/core/config.mk //设置编译器版本
 }@envsetup.sh
 
 
-/*********************
+/*******************************************************
  android makefile的结构
 */
+
+include build/make/core/main.mk
+@Makefile
 
 {
 - BUILD_SYSTEM := $(TOPDIR)build/core
@@ -71,6 +74,8 @@ TARGET_GCC_VERSION := 4.9@make/core/config.mk //设置编译器版本
 		- include $(BUILD_SYSTEM)/product_config.mk				//产品配置
 		}envsetup.mk
 	}@config.mk
+  //BUILD_SYSTEM :=$= build/make/core @config.mk
+- include $(BUILD_SYSTEM)/Makefile							//systemimg recoveryimage bootimage...
 }build/make/core/main.mk
 
 //product设置。查找device下的AndroidProducts.mk
@@ -106,8 +111,8 @@ AndroidBoard.mk{
 
 
 
-/*********************
- 编译目标：systme，recovery，boot,OTA
+/*******************************************************
+ 编译镜像文件：systme，recovery，boot, odm, oem
 */
 droid: droidcore dist_files
 
@@ -123,24 +128,34 @@ files: prebuilt \
         $(modules_to_install) \
         $(modules_to_check) \
         $(INSTALLED_ANDROID_INFO_TXT_TARGET)
-/*********************
+
+
+//生成镜像信息
+/*
+# $(1): the path of the output dictionary file
+# $(2): a subset of "system vendor cache userdata product product_services oem odm"
+# $(3): additional "key=value" pairs to append to the dictionary file.
+*/
+define generate-image-prop-dictionary
+
+
+
+
+/*******************************************************
  编译system:
 */
-@build/core/Makefile
-INSTALLED_SYSTEMIMAGE := $(PRODUCT_OUT)/system.img
-$(INSTALLED_SYSTEMIMAGE): $(BUILT_SYSTEMIMAGE) $(RECOVERY_FROM_BOOT_PATCH) | $(ACP)
+systemimage: $(INSTALLED_SYSTEMIMAGE_TARGET)			//最终目标
+INSTALLED_SYSTEMIMAGE_TARGET := $(PRODUCT_OUT)/system.img
+INSTALLED_SYSTEMIMAGE := $(INSTALLED_SYSTEMIMAGE_TARGET)
+$(INSTALLED_SYSTEMIMAGE_TARGET): $(BUILT_SYSTEMIMAGE) $(RECOVERY_FROM_BOOT_PATCH)
 	@echo "Install system fs image: $@"
 	$(copy-file-to-target)
-	$(hide) $(ACP) -fp $<.lzo $@.lzo
-	$(hide) $(call assert-max-image-size,$@ $(RECOVERY_FROM_BOOT_PATCH),$(BOARD_SYSTEMIMAGE_PARTITION_SIZE),yaffs)
+	$(hide) $(call assert-max-image-size,$@ $(RECOVERY_FROM_BOOT_PATCH),$(BOARD_SYSTEMIMAGE_PARTITION_SIZE))
 
-systemimage: $(INSTALLED_SYSTEMIMAGE)
-|
-$(BUILT_SYSTEMIMAGE): $(FULL_SYSTEMIMAGE_DEPS) $(INSTALLED_FILES_FILE)
-|
+
+
+BUILT_SYSTEMIMAGE := $(systemimage_intermediates)/system.img	//依赖的文件。生成的system.img
 FULL_SYSTEMIMAGE_DEPS := $(INTERNAL_SYSTEMIMAGE_FILES) $(INTERNAL_USERIMAGES_DEPS) $(SELINUX_DEPENDS)
-
-
 INTERNAL_SYSTEMIMAGE_FILES := $(filter $(TARGET_OUT)/%, \
     $(ALL_PREBUILT) \
     $(ALL_COPIED_HEADERS) \
@@ -148,10 +163,25 @@ INTERNAL_SYSTEMIMAGE_FILES := $(filter $(TARGET_OUT)/%, \
     $(ALL_DEFAULT_INSTALLED_MODULES)\
     $(ALL_PDK_FUSION_FILES))
 
-/*********************
+$(BUILT_SYSTEMIMAGE): $(FULL_SYSTEMIMAGE_DEPS) $(INSTALLED_FILES_FILE) $(BUILD_IMAGE_SRCS)
+	$(call build-systemimage-target,$@)
+
+define build-systemimage-target
+  $(call generate-image-prop-dictionary, $(systemimage_intermediates)/system_image_info.txt,system,skip_fsck=true)
+  $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH build/make/tools/releasetools/build_image.py \
+      $(TARGET_OUT) $(systemimage_intermediates)/system_image_info.txt $(1) $(TARGET_OUT) \
+      || ( mkdir -p $${DIST_DIR}; cp $(INSTALLED_FILES_FILE) $${DIST_DIR}/installed-files-rescued.txt; exit 1 )
+endef
+
+
+@build/core/Makefile
+/*******************************************************
  recovery:
 */
 @build/core/Makefile
+
+INSTALLED_RECOVERYIMAGE_TARGET := $(PRODUCT_OUT)/recovery.img
+
 droidcore: INSTALLED_RECOVERYIMAGE_TARGET
 $(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKIMAGE) $(MINIGZIP) \
 		$(INSTALLED_RAMDISK_TARGET) \
@@ -163,7 +193,16 @@ $(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKIMAGE) $(MINIGZIP) \
 		$(recovery_fstab) \
 		$(busybox_binary) \
 		$(RECOVERY_INSTALL_OTA_KEYS)
+		$(call build-recoveryimage-target, $@)
+
 recoveryimage: $(INSTALLED_RECOVERYIMAGE_TARGET)
+
+define build-recoveryimage-target	//创建image命令
+	$(hide) $(foreach item,$(recovery_fstab), \
+		cp -f $(item) $(TARGET_RECOVERY_ROOT_OUT)/system/etc/recovery.fstab)
+	$(hide) $(MKBOOTFS) -d $(TARGET_OUT) $(TARGET_RECOVERY_ROOT_OUT) | $(MINIGZIP) > $(recovery_ramdisk)
+
+endef
 ------------------------------------
 签名密钥：
 @build/core/Makefile
@@ -181,17 +220,21 @@ PRODUCT_DEFAULT_DEV_CERTIFICATE := \
     $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_DEFAULT_DEV_CERTIFICATE))
 
 
-如果定义使用PRODUCT_EXTRA_RECOVERY_KEYS，会将该密钥的位置写入OTA升级包的/META/misc_info.txt文件中。
-/*********************
+如果定义使用PRODUCT_EXTRA_RECOVERY_KEYS，会将该密钥的位置写入OTA升级包的/META/misc_info.txt文件中
+
+@build/core/Makefile
+/*******************************************************
  ramdisk.img:(root目录TARGET_ROOT_OUT)
 */
 BUILT_RAMDISK_TARGET := $(PRODUCT_OUT)/ramdisk.img
 
+INSTALLED_RAMDISK_TARGET := $(BUILT_RAMDISK_TARGET)
+$(INSTALLED_RAMDISK_TARGET): $(MKBOOTFS) $(INTERNAL_RAMDISK_FILES) $(INSTALLED_FILES_FILE_RAMDISK) | $(MINIGZIP)
+	$(call pretty,"Target ram disk: $@")
+	$(hide) $(MKBOOTFS) -d $(TARGET_OUT) $(TARGET_RAMDISK_OUT) | $(MINIGZIP) > $@
 
-
-@@build/core/Makefile
-
-/*********************
+@build/core/Makefile
+/*******************************************************
  boot.img:bootimage
 */
 INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel
@@ -234,50 +277,41 @@ endif
 }@AndroidBoard.mk
 
 
-/*********************
+/*******************************************************
  userdata:
 
 */
-
-INSTALLED_USERDATAIMAGE_TARGET := $(BUILT_USERDATAIMAGE_TARGET)
-
 BUILT_USERDATAIMAGE_TARGET := $(PRODUCT_OUT)/userdata.img
+INSTALLED_USERDATAIMAGE_TARGET := $(BUILT_USERDATAIMAGE_TARGET)
+INSTALLED_USERDATAIMAGE_TARGET_DEPS :=  $(INTERNAL_USERIMAGES_DEPS)  $(INTERNAL_USERDATAIMAGE_FILES) $(BUILD_IMAGE_SRCS)
+$(INSTALLED_USERDATAIMAGE_TARGET): $(INSTALLED_USERDATAIMAGE_TARGET_DEPS)
+	$(build-userdataimage-target)
 
-//OTA:make otapackage
-@build/core/Makefile
-.PHONY: otapackage
-otapackage: $(INTERNAL_OTA_PACKAGE_TARGET)
-$(INTERNAL_OTA_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS) $(SELINUX_DEPENDS)
-$(BUILT_TARGET_FILES_PACKAGE): \
-		$(INSTALLED_BOOTIMAGE_TARGET) \
-		$(INSTALLED_RADIOIMAGE_TARGET) \
-		$(INSTALLED_RECOVERYIMAGE_TARGET) \
-		$(INSTALLED_SYSTEMIMAGE) \
-		$(INSTALLED_USERDATAIMAGE_TARGET) \
-		$(INSTALLED_CACHEIMAGE_TARGET) \
-		$(INSTALLED_ANDROID_INFO_TXT_TARGET) \
-@BoardConfig
-OTA_BOOTLOGO_IMAGE := $(TOP)/image/emmc/logo.bmp
+define build-userdataimage-target
+  $(call generate-image-prop-dictionary, $(userdataimage_intermediates)/userdata_image_info.txt,userdata,skip_fsck=true)
+  $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+      build/make/tools/releasetools/build_image.py \
+      $(TARGET_OUT_DATA) $(userdataimage_intermediates)/userdata_image_info.txt $(INSTALLED_USERDATAIMAGE_TARGET) $(TARGET_OUT)
+endef
 
-签名密钥：
-DEFAULT_KEY_CERT_PAIR := $(DEFAULT_SYSTEM_DEV_CERTIFICATE)@build/core/Makefile
+/*******************************************************
+ cache
+*/
 
-output_ota_package：
-默认使用META/misc_info.txt中 default_system_dev_certificate定义的密钥。如果没有设置，则使用
-build/target/product/security/testkey。
+BUILT_CACHEIMAGE_TARGET := $(PRODUCT_OUT)/cache.img
+INSTALLED_CACHEIMAGE_TARGET := $(BUILT_CACHEIMAGE_TARGET)
+$(INSTALLED_CACHEIMAGE_TARGET): $(INTERNAL_USERIMAGES_DEPS) $(INTERNAL_CACHEIMAGE_FILES) $(BUILD_IMAGE_SRCS)
+	$(build-cacheimage-target)
 
-密钥生成器：/development/tools/make_key
+define build-cacheimage-target
+  $(call generate-image-prop-dictionary, $(cacheimage_intermediates)/cache_image_info.txt,cache,skip_fsck=true)
+  $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+      build/make/tools/releasetools/build_image.py \
+      $(TARGET_OUT_CACHE) $(cacheimage_intermediates)/cache_image_info.txt $(INSTALLED_CACHEIMAGE_TARGET) $(TARGET_OUT)
+  $(hide) $(call assert-max-image-size,$(INSTALLED_CACHEIMAGE_TARGET),$(BOARD_CACHEIMAGE_PARTITION_SIZE))
+endef
 
-
-recovery中调用的工具：
-$(PRODUCT_OUT)/obj/EXECUTABLES/updater
-
-------------------------------------
-updatepackage: $(INTERNAL_UPDATE_PACKAGE_TARGET)
-INTERNAL_UPDATE_PACKAGE_TARGET: BUILT_TARGET_FILES_PACKAGE
-
-
-/*********************
+/*******************************************************
  编译sdk：
 */
 ALL_SDK_TARGETS := $(INTERNAL_SDK_TARGET)
@@ -349,7 +383,7 @@ PRODUCT_DEFAULT_REGION="$(call default-locale-region,$(PRODUCT_LOCALES))"
 　　DEVICE_PACKAGE_OVERLAYS: used several products that share a common device model
 
 
-/*********************
+/*******************************************************
  android soong  android.bp
 */
 

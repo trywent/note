@@ -17,6 +17,9 @@ umw2652 --->i2s0--->arm		//蓝牙声音
 - r_submix_audio_policy_configuration.xml
 }@audio_policy_configuration.xml
 
+//左右声道
+device/sprd/pike2/sp7731e_1h10/rootdir/system/etc/audio_params/tiny_hw.xml@7731
+
 
 /**************************************************
  audio_hw
