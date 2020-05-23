@@ -2,6 +2,34 @@
  HAL接口
 
 */
+typedef struct camera3_device_ops {
+
+    int (*initialize)(const struct camera3_device *,const camera3_callback_ops_t *callback_ops);
+
+    int (*configure_streams)(const struct camera3_device *,camera3_stream_configuration_t *stream_list);
+
+    int (*register_stream_buffers)(const struct camera3_device *, const camera3_stream_buffer_set_t *buffer_set);
+
+    const camera_metadata_t* (*construct_default_request_settings)( const struct camera3_device *, int type);
+
+    int (*process_capture_request)(const struct camera3_device *,camera3_capture_request_t *request);
+
+    void (*get_metadata_vendor_tag_ops)(const struct camera3_device*,vendor_tag_query_ops_t* ops);
+
+    void (*dump)(const struct camera3_device *, int fd);
+ 
+    int (*flush)(const struct camera3_device *);
+    void *reserved[8];
+} camera3_device_ops_t;
+
+typedef struct camera3_device {
+    hw_device_t common;
+    camera3_device_ops_t *ops;
+    void *priv;
+} camera3_device_t;
+@hardware/libhardware/include/hardware/camera3.h
+
+
 HAL_MODULE_INFO_SYM{
 - common = camera_common {
 	- id = CAMERA_HARDWARE_MODULE_ID
@@ -15,45 +43,51 @@ HAL_MODULE_INFO_SYM{
 - set_torch_mode = setTorchMode
 }@SprdCamera3Hal.cpp
 
-/***********************
+/*****
  打开设备
  gSprdCamera3Factory 打开设备的接口函数
  SprdCamera3HWI{ //设备接口
 	- mCameraDevice //设备
 	}
 */
-mModuleMethods.open-->camera_device_open(id,struct hw_device_t **){
-- isSingleIdExposeOnMultiCameraMode
-- gSprdCamera3Wrapper->cameraDeviceOpen //id大于5,一些自定义的东西?
-- gSprdCamera3Factory.cameraDeviceOpen(id, struct hw_device_t **hw_device){
-	- SprdCamera3HWI *hw = new SprdCamera3HWI(id){//创建CameraDevice
-		- mCameraDevice.common
-		- mCameraDevice.ops = &mCameraOps
-		- mCameraDevice.priv = this
-		}
-	- 若是多摄像头模式,hw->setMultiCameraMode 
-	- hw->openCamera(hw_device)
+//打开camera。加载库获取hw_device_t接口
+CameraDevice::open-->CameraModule::open@CameraModule.cpp/*hal层*/-->
+mModuleMethods.open-->camera_device_open(const struct hw_module_t *module,
+           const char *id, struct hw_device_t **hw_device){
+- if (isSingleIdExposeOnMultiCameraMode(atoi(id))) {
+	- gSprdCamera3Wrapper->cameraDeviceOpen //id大于5,一些自定义的东西?
+  else{
+	- gSprdCamera3Factory.cameraDeviceOpen(id, struct hw_device_t **hw_device)
 	}
 }@SprdCamera3Factory.cpp
 
-openCamera(hw_device){
-- openCamera(){
-	- mSetting = new SprdCamera3Setting(mCameraId);
-	- mOEMIf = new SprdCamera3OEMIf(mCameraId, mSetting) //获取oem接口
-	- mOEMIf->camera_ioctrl(CAMERA_IOCTRL_SET_MULTI_CAMERAMODE, &mMultiCameraMode)
-	- mOEMIf->openCamera()
-	- mOEMIf->isIspToolMode()==1{
-		- mOEMIf->ispToolModeInit()
-		- startispserver(mCameraId)
-		- ispvideo_RegCameraFunc
-		}
+SprdCamera3Factory::cameraDeviceOpen(int camera_id,struct hw_device_t **hw_device) {
+  //创建SprdCamera3HWI
+- SprdCamera3HWI *hw = new SprdCamera3HWI(id){
+	- mCameraDevice.common
+	- mCameraDevice.ops = &mCameraOps
+	- mCameraDevice.priv = this
 	}
-- *hw_device = &mCameraDevice.common //返回设备
-}@SprdCamera3HWI.cpp
+- hw->setMultiCameraMode
+  //打开对应id的camera。获取hw_device_t
+- hw->openCamera(hw_device)-->openCamera(struct hw_device_t **hw_device) {
+	- openCamera(){
+		- mSetting = new SprdCamera3Setting(mCameraId);
+		- mOEMIf = new SprdCamera3OEMIf(mCameraId, mSetting) //获取oem接口
+		- mOEMIf->camera_ioctrl(CAMERA_IOCTRL_SET_MULTI_CAMERAMODE, &mMultiCameraMode)
+		- mOEMIf->openCamera()
+		- mOEMIf->isIspToolMode()==1{
+			- mOEMIf->ispToolModeInit()
+			- startispserver(mCameraId)
+			- ispvideo_RegCameraFunc
+			}
+		}
+	- *hw_device = &mCameraDevice.common //返回设备
+	}@SprdCamera3HWI.cpp
+}@SprdCamera3Factory.cpp
 
-//设备操作函数
-volatile uint32_t gHALLogLevel = 4;
 
+//camera设备操作函数，hal的接口。 volatile uint32_t gHALLogLevel = 4
 camera3_device_ops_t SprdCamera3HWI::mCameraOps = {
     .initialize = SprdCamera3HWI::initialize,
     .configure_streams = SprdCamera3HWI::configure_streams,
@@ -65,7 +99,9 @@ camera3_device_ops_t SprdCamera3HWI::mCameraOps = {
     .flush = SprdCamera3HWI::flush,
 }@SprdCamera3HWI.cpp
 
-process_capture_request{//处理请求
+
+//处理请求
+process_capture_request{
 - SprdCamera3HWI *hw = reinterpret_cast<SprdCamera3HWI *>(device->priv)
 - hw->processCaptureRequest(request)-->
 SprdCamera3HWI::processCaptureRequest{
@@ -84,10 +120,15 @@ SprdCamera3HWI::processCaptureRequest{
  OEM接口
 
 */
+{
+- oem_module_t mHalOem
+}@SprdCamera3OEMIf.h
+
+
 SprdCamera3OEMIf::SprdCamera3OEMIf(){
 - setCameraState(SPRD_INIT, STATE_CAMERA)
   //打开oem库文件"libcamoem.so",获取结构体"OMI" OEM_MODULE_INFO_SYM
-- oem_module_t mHalOem = (oem_module_t *)malloc(sizeof(oem_module_t))
+- mHalOem = (oem_module_t *)malloc(sizeof(oem_module_t))
 - void* handle = dlopen(OEM_LIBRARY_PATH, RTLD_NOW)
 - oem_module_t * omi = (oem_module_t *)dlsym(handle, OEM_MODULE_INFO_SYM_AS_STR/*OMI*/)
 - mHalOem->dso = handle
@@ -95,15 +136,40 @@ SprdCamera3OEMIf::SprdCamera3OEMIf(){
 - mSetting->getDefaultParameters(mParameters)
 }@SprdCamera3OEMIf.cpp
 
-
-//
+//oem接口
 static oem_ops_t oem_module_ops = {
-    camera_init, camera_deinit, camera_release_frame, camera_set_param,}
+    camera_init, camera_deinit, camera_release_frame, camera_set_param,
+    camera_start_preview, camera_stop_preview, camera_start_autofocus,
+    camera_cancel_autofocus, camera_cancel_takepicture,
+    // camera_safe_scale_th,
+    NULL, camera_take_picture, camera_get_sn_trim, camera_set_mem_func,
+    camera_get_redisplay_data, camera_is_change_size,
+    camera_get_postprocess_capture_size, camera_get_preview_rect,
+    camera_get_zsl_capability, camera_get_sensor_info_for_raw,
+    camera_get_sensor_trim, camera_get_sensor_trim2,
+    camera_get_preview_rot_angle, camera_fd_enable, camera_flip_enable,
+    camera_fd_start, camera_is_need_stop_preview, camera_takepicture_process,
+    camera_get_size_align_page, camera_fast_ctrl, camera_start_preflash,
+    camera_get_viewangle, camera_get_sensor_exif_info,
+    camera_get_sensor_result_exif_info, camera_get_iommu_status,
+    camera_set_preview_buffer, camera_set_video_buffer, camera_set_zsl_buffer,
+    camera_set_video_snapshot_buffer, camera_set_zsl_snapshot_buffer,
+    camera_zsl_snapshot_need_pause, camera_get_isp_handle, camera_lls_enable,
+    camera_is_lls_enabled, camera_vendor_hdr_enable, camera_is_vendor_hdr,
+    camera_set_lls_shot_mode, camera_get_lls_shot_mode, camera_get_isp_info,
+    camera_start_burst_notice, camera_end_burst_notice,
+    camera_transfer_caf_to_af, camera_transfer_af_to_caf, dump_jpeg_file,
+    camera_get_gain_thrs, camera_set_sensor_info_to_af,
+    camera_get_sensor_max_fps, camera_snapshot_is_need_flash,
+    camera_get_sensor_otp_info, camera_get_sensor_vcm_step,
+    camera_set_sensor_close_flag, camera_set_reprocess_picture_size,
+    camera_start_capture, camera_stop_capture, camera_set_largest_picture_size,
+    camera_ioctrl, camera_reprocess_yuv_for_jpeg,
+    camera_get_rolling_shutter}
 //OMI 结构
 struct oem_module OEM_MODULE_INFO_SYM = {
     .tag = 0, .ops = &oem_module_ops, .dso = NULL
 }@SprdOEMCamera.c
-
 
 
 SprdCamera3OEMIf::openCamera() {
@@ -112,7 +178,7 @@ SprdCamera3OEMIf::openCamera() {
 - mHalOem->ops->camera_set_largest_picture_size
 - startCameraIfNecessary{
 	- 
-	- mHalOem->ops->camera_init-->camera_local_int@cmr_oem.c
+	- mHalOem->ops->camera_init@cmr_oem.c
 	}
 - ZSLMode_monitor_thread_init
 }@SprdCamera3OEMIf.cpp
@@ -121,26 +187,37 @@ camera_init-->
 camera_local_int(cmr_u32 camera_id, camera_cb_of_type callback,cmr_handle *oem_handle){
 - struct camera_context *cxt = (struct camera_context *)malloc(sizeof(struct camera_context))
 - cxt->camera_id = camera_id
-- camera_init_internal((cmr_handle)cxt
+- camera_init_internal((cmr_handle)cxt) {
+	- camera_sensor_init(oem_handle, is_autotest)	//初始化sensor
+	- camera_grab_init(oem_handle)
+	- camera_res_init(oem_handle)
+	- camera_isp_init(oem_handle)
+	- camera_res_init_done(oem_handle)
+	}
 - *oem_handle = (cmr_handle)cxt
 }@cmr_oem.c
 
-/******************************
- senor
-*/
-camera_local_int-->camera_init_internal-->camera_sensor_init-->
-cmr_sensor_init-->cmr_sns_create_thread
+//初始化sensor
+camera_sensor_init(cmr_handle oem_handle, cmr_uint is_autotest) {
+- struct sensor_context *sn_cxt = &cxt->sn_cxt
+- cmr_sensor_init(&init_param, &sensor_handle)@cmr_sensor.c
+- sn_cxt->sensor_handle = sensor_handle
+- cmr_sensor_open(sensor_handle, camera_id_bits)@cmr_sensor.c
+- cmr_sensor_event_reg(sensor_handle, cxt->camera_id, camera_sensor_evt_cb)
+- cmr_sensor_init_static_info(cxt)
+}@cmr_oem.c
 
 
-cmr_sns_open@cmr_sensor.c-->
-sensor_get_entry_by_idx-->sensor_get_regist_table@sensor_cfg.c
+//打开sensor stream
+camera_sensor_streamctrl(cmr_u32 on_off, void *privdata) {
+- cmr_sensor_stream_ctrl(cxt->sn_cxt.sensor_handle, cxt->camera_id,on_off)
+}@cmr_oem.c
 
 
-vendor/sprd/modules/libcamera/sensor/sensor_cfg.c
-vendor/sprd/modules/libcamera/sensor/sensor_drv_u.c
-vendor/sprd/modules/libcamera/oem2v1/src/cmr_sensor.c
-vendor/sprd/modules/libcamera/oem2v1/src/cmr_oem.c
-
+camera_grab_init(cmr_handle oem_handle) {
+- cmr_grab_evt_reg(grab_handle, camera_grab_evt_cb)
+- cmr_grab_stream_cb(grab_handle, camera_sensor_streamctrl)
+}@cmr_oem.c
 
 
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Hal.cpp

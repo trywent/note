@@ -110,18 +110,30 @@ parsePackage{
 
 //运行时权限(runtime)
 requestPermissions(String[] permissions, int requestCode){//请求权限
-- intent = getPackageManager().buildRequestPermissionsIntent
+- Intent intent = getPackageManager().buildRequestPermissionsIntent(permissions){
+	- Intent intent = new Intent(ACTION_REQUEST_PERMISSIONS)
+	- intent.putExtra(EXTRA_REQUEST_PERMISSIONS_NAMES, permissions)
+	- intent.setPackage(getPermissionControllerPackageName())
+	}@PackagerManager.java
   //弹框
 - startActivityForResult(intent)-->GrantPermissionsActivity
 }@Activty.java
 
 onCreate{
- //实际UI。
-- mViewHandler = GrantPermissionsViewHandlerImpl(this).setResultListener(this) 
+  //实际UI
+- mViewHandler = GrantPermissionsViewHandlerImpl(this).setResultListener(this)
+  //请求的权限
+- mRequestedPermissions = getIntent().getStringArrayExtra(PackageManager.EXTRA_REQUEST_PERMISSIONS_NAMES)
+- mAppPermissions = new AppPermissions(this, callingPackageInfo, mRequestedPermissions,...)
 - setContentView(mViewHandler.createView())//设置请求窗口
+  //显示请求窗口
 - showNextPermissionGroupGrantRequest
 }@GrantPermissionsActivity.java
 
+
+grantRuntimePermissions(boolean fixedByTheUser) {
+
+}@AppPermissionGroup.java
 
 //分配权限
 onClick-->mResultListener.onPermissionGrantResult@GrantPermissionsViewHandlerImpl.java-->
@@ -138,6 +150,7 @@ frameworks/base/services/java/com/android/server/pm/PackageManagerService.java
 frameworks/base/services/core/java/com/android/server/pm/Settings.java
 PackageInstaller/src/com/android/packageinstaller/permission/ui/GrantPermissionsActivity.java
 PackageInstaller/src/com/android/packageinstaller/permission/ui/handheld/GrantPermissionsViewHandlerImpl.java
+PackageInstaller/src/com/android/packageinstaller/permission/model/AppPermissionGroup.java
 frameworks/native/libs/binder/PermissionCache.cpp
 frameworks/base/core/java/android/app/AppOpsManager.java
 frameworks/base/services/core/java/com/android/server/AppOpsService.java

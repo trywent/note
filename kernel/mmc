@@ -1,3 +1,7 @@
+/*
+ mmc
+*/
+
 命令类型：
 -广播命令(broadcast command),没有回复。(bc)
 -广播命令有回复。(bcr)

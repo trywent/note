@@ -1,0 +1,67 @@
+/*
+ i2c设备节点
+*/
+
+module_init(i2c_dev_init)-->i2c_dev_init{
+- register_chrdev(I2C_MAJOR, "i2c", &i2cdev_fops)	//设置
+- i2c_dev_class = class_create(THIS_MODULE, "i2c-dev")
+- i2c_dev_class->dev_groups = i2c_groups-->ATTRIBUTE_GROUPS(i2c)
+  //接收adpter加入通知
+- bus_register_notifier(&i2c_bus_type, &i2cdev_notifier)
+  //查找已经存在的设备
+- i2c_for_each_dev(NULL, i2cdev_attach_adapter)
+}@i2c-dev.c
+
+
+//监听到设备加入
+i2cdev_notifier_call(struct notifier_block *nb, unsigned long action, void *data){
+- struct device *dev = data;
+- BUS_NOTIFY_ADD_DEVICE:i2cdev_attach_adapter(dev, NULL){
+	- struct i2c_adapter *adap = to_i2c_adapter(dev)
+	- i2c_dev *i2c_dev = get_free_i2c_dev{				//创建i2c_dev。加入到链表i2c_dev_list
+		- struct i2c_dev *i2c_dev = kzalloc(sizeof(*i2c_dev), GFP_KERNEL)
+		- i2c_dev->adap = adap
+		- list_add_tail(&i2c_dev->list, &i2c_dev_list)
+		}
+	- i2c_dev->dev = device_create(i2c_dev_class, &adap->dev,	//字符设备节点
+		MKDEV(I2C_MAJOR, adap->nr), NULL,"i2c-%d", adap->nr)
+	}
+- BUS_NOTIFY_DEL_DEVICE:i2cdev_detach_adapter(dev, NULL)
+}
+
+//打开
+i2cdev_open(struct inode *inode, struct file *file){
+- int minor = iminor(inode)					//设备号
+- struct i2c_dev *i2c_dev = i2c_dev_get_by_minor(minor)		//获取i2c_dev
+- i2c_adapter *adap = i2c_get_adapter(i2c_dev->adap->nr)	//获取adapter
+- struct i2c_client *client = kzalloc(sizeof(*client), GFP_KERNEL)//创建client
+- file->private_data = client					//关联到文件。文件操作时使用这个接口
+}
+
+//字符节点读操作。读操作发送2个i2c_msg，一个写入寄存器地址，一个设置I2C_M_RD读取数据
+i2cdev_read(struct file *file, char __user *buf, size_t count,loff_t *offset){
+- struct i2c_client *client = file->private_data
+- char *tmp = kmalloc(count, GFP_KERNEL)
+- i2c_master_recv(client, tmp, count)
+  //错误返回值
+- copy_to_user(buf, tmp, count) ? -EFAULT : ret
+}@i2c-dev.c
+
+
+//字符节点写操作。不能超过8192
+i2cdev_write(struct file *file, const char __user *buf,size_t count, loff_t *offset){
+-struct i2c_client *client = file->private_data
+- char *tmp = memdup_user(buf, count)
+- i2c_master_send(client, tmp, count)
+}@i2c-dev.c
+
+//检查某个地址，是否有驱动
+i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
+- I2C_SLAVE,I2C_SLAVE_FORCE{
+	- if (cmd == I2C_SLAVE && i2cdev_check_addr(client->adapter, arg))
+			return -EBUSY
+	}
+}
+
+
+kernel/drivers/i2c/i2c-dev.c

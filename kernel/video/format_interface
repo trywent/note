@@ -72,7 +72,6 @@ HDTV 标准是高品质视频信号标准，720p、1080i、1080p，但目前支�
 
 */
 //第一代CVBS(复合视频广播信号)英文全称(Composite Video Broadcast Signal):模拟YPbPr
-
 一般通过黄色RCA接头来连接的，是全国电视系统委员会（NTSC）电视信号的传统图像数据传输方法，它以模拟波形来传输数据。
 复合视频包含色差（色调和饱和度）和亮度（光亮）信息，并将它们同步在消隐脉冲中，用同一信号传输。清晰度差
 
@@ -90,7 +89,7 @@ HDTV 标准是高品质视频信号标准，720p、1080i、1080p，但目前支�
 //第五代是HDMI(High Definition Multimedia Interface):数字
 DVI升级版，传输视频&音频，带宽最大，最清晰，数字信号
 
-//模拟高清CVI、TVI、AHD
+//CVI、TVI、AHD:模拟高清
 HDCVI——High Definition Composite Video Interface，即高清复合视频接口
 HDTVI ，全称为 High Definition Transport Video Interface，即高清视频传输接口
 AHD(Analog High Definition)，即称之为模拟高清新定义

@@ -1,0 +1,171 @@
+/********************************************
+  ffmpeg 函数接口
+
+*/
+流程：
+0 av_register_all			//初始化
+1 avformat_open_input			//打开文件获取编码信息
+2 avcodec_find_decoder， avcodec_alloc_context3，avcodec_open2	//根据信息获取解码器,打开解码器
+3 av_frame_alloc，av_frame_get_buffer， av_read_frame		//分配空间。储存的读取文件，储存解码后的数据
+4 avcodec_send_packet			//解码	
+5 avcodec_receive_frame			//获取解码数据
+6 sws_scale				//转换数据
+ 
+//多媒体文件结构
+typedef struct AVFormatContext {
+- unsigned int nb_streams	//文件中的流个数。视频流，音频流
+- AVStream **streams		//流结构
+- char *url			//文件名，路径
+}AVFormatContext@avformat.h
+
+//文件中的流
+typedef struct AVStream {
+- int index
+- AVCodecContext *codec		//不再使用。使用codecpar
+- AVCodecParameters *codecpar	//
+}AVStream@avformat.h
+
+//流的编码信息
+typedef struct AVCodecParameters {
+- enum AVMediaType codec_type
+- enum AVCodecID   codec_id
+- int width
+- int height
+- int      channels		//通道
+- int      sample_rate
+}AVCodecParameters@avformat.h
+
+//压缩的数据包。源数据或者录制压缩后的数据。包含一帧视频，或多帧音频
+typedef struct AVPacket {
+- AVBufferRef *buf
+- 
+}AVPacket@avcodec.h
+
+//解码后的音视频数据
+typedef struct AVFrame {
+- uint8_t *data[AV_NUM_DATA_POINTERS]		//解码后的数据
+- int linesize[AV_NUM_DATA_POINTERS]		//audio每个声道的数据大小。yuv每路数据大小
+- AVBufferRef *buf[AV_NUM_DATA_POINTERS]	//源数据
+}AVFrame@frame.h
+
+
+//注册所有格式和解码器
+av_register_all-->ff_thread_once(&av_format_next_init, av_format_init_next)@allformats.c
+
+//register all the input and output devices
+avdevice_register_all()	
+
+//为了使用老的GnuTLS，OpenSSL库。不建议调用
+avformat_network_init
+
+ffmpeg/libavformat/avformat.h
+ffmpeg/libavcodec/avcodec.h
+ffmpeg/libavformat/allformats.c
+/**************************
+ 读取数据，存储数据
+*/
+//分配帧空间
+AVFrame *av_frame_alloc(void)
+void av_frame_free(AVFrame **frame)
+
+//分配AVFrame帧中的buffer用于存储数据
+int av_frame_get_buffer(AVFrame *frame, int align)
+void av_frame_unref(AVFrame *frame)			//释放帧中的buffer
+
+
+ffmpeg/libavutil/frame.h
+ffmpeg/libavutil/frame.c
+
+//获取文件格式，编码信息
+
+//打开一个流文件
+int avformat_open_input(AVFormatContext **ps, const char *url, ff_const59 AVInputFormat *fmt, AVDictionary **options)
+void avformat_close_input(AVFormatContext **ps)
+@util.c
+
+
+int av_read_frame(AVFormatContext *s, AVPacket *pkt)	//读取数据包
+void av_packet_unref(AVPacket *pkt)			//释放数据包
+
+ffmpeg/libavformat/avformat.h
+libavformat/utils.c
+
+/**************************
+  codec libavcodec
+
+  数据编解码
+*/
+//从注册的codec找到对应id的解码器
+AVCodec *avcodec_find_decoder(enum AVCodecID id)	
+AVCodec *avcodec_find_decoder_by_name(const char *name)	
+
+//获取codec的context
+AVCodecContext *avcodec_alloc_context3(const AVCodec *codec)
+void avcodec_free_context(AVCodecContext **avctx)
+
+//初始化AVCodecContext以使用AVCodec
+int avcodec_open2(AVCodecContext *avctx, const AVCodec *codec, AVDictionary **options)
+int avcodec_close(AVCodecContext *avctx)
+
+//解码
+int avcodec_send_packet(AVCodecContext *avctx, const AVPacket *avpkt)	//将数据传入到解码器
+int avcodec_receive_frame(AVCodecContext *avctx, AVFrame *frame)	//读取解码后的数据
+
+
+ffmpeg/libavcodec/avcodec.h
+/**************************
+ 数据处理 swscale
+ 尺寸切换，
+*/
+
+//获取SwsContext
+//设置src大小，格式。dst大小，格式
+struct SwsContext *sws_getContext(int srcW, int srcH, enum AVPixelFormat srcFormat,int dstW, int dstH,
+	enum AVPixelFormat dstFormat,int flags, SwsFilter *srcFilter,SwsFilter *dstFilter, const double *param)
+
+//将解码后的数据转化为期望大小，格式
+int sws_scale(struct SwsContext *c, const uint8_t *const srcSlice[],const int srcStride[], 
+	int srcSliceY, int srcSliceH,uint8_t *const dst[], const int dstStride[])
+
+ffmpeg/libswscale/swscale.h
+
+/**************************
+ 数据处理 AVfilter
+ 尺寸切换，滤镜，
+ 
+*/
+scale filter		//尺寸转换
+overylay filter		//叠加
+buffer filter		//源数据(处理前的数据)
+buffersink filter	//目标数据(处理后的数据)
+
+AVFilterGraph *avfilter_graph_alloc(void)							//创建AVFilterGraph
+AVFilter *avfilter_get_by_name(const char *name)						//创建AVFilter
+int avfilter_graph_create_filter(AVFilterContext **filt_ctx, const AVFilter *filt,		//将AVFilter加入AVFilterGraph
+           const char *name, const char *args, void *opaque,AVFilterGraph *graph_ctx)
+int avfilter_link(AVFilterContext *src, unsigned srcpad,AVFilterContext *dst, unsigned dstpad)	//连接AVFilter
+
+//filter 设置流程
+AVFilterGraph *graph = avfilter_graph_alloc()	//一串filter的集合（代表一个功能）
+AVFilterContext *filt_src			//用于操作source filter
+avfilter_graph_create_filter(&filt_src, avfilter_get_by_name("buffer"), "src",NULL, is, graph)
+AVFilterContext *filt_out			//用于操作sink filter
+ret = avfilter_graph_create_filter(&filt_out, avfilter_get_by_name("buffersink"), "out", NULL, pix_fmts, graph)
+avfilter_link(filt_src, 0, filt_out, 0)		//连接source和sink
+avfilter_graph_config(graph, NULL)		//配置
+
+//filter 处理数据流程。执行以上fliter的配置后就可以往filter填充数据
+int av_buffersrc_add_frame(AVFilterContext *ctx, AVFrame *frame)	//填充数据到buffersrc
+int av_buffersink_get_frame(AVFilterContext *ctx, AVFrame *frame)	//从buffersink获取处理后的数据
+
+//获取/设置参数
+av_dict_get
+av_dict_set
+
+/*
+ 帧数据处理
+*/
+void av_frame_unref(AVFrame *frame)			//释放帧关联的buffer
+int av_frame_ref(AVFrame *dst, const AVFrame *src)
+void av_frame_move_ref(AVFrame *dst, AVFrame *src)	//将src移动到dst,并reset src
+

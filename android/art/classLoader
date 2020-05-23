@@ -75,8 +75,6 @@ ResolveMethod{
 - ThrowNoSuchMethodError
 }@class_linker.cc
 
-
-
 //判断是否拒绝调用
 ShouldDenyAccessToMember(T* member,const std::function<AccessContext()>& fn_get_access_context, AccessMethod access_method){
 - const AccessContext caller_context = fn_get_access_context()

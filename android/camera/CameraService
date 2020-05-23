@@ -4,6 +4,9 @@
  java----cameraService----cameraProvider----hal
  
 */
+class Client : public hardware::BnCamera, public BasicClient
+
+
 //CameraService接口
 {
 - int getNumberOfCameras(int type)
@@ -17,20 +20,21 @@
 - void setTorchMode
 }@ICameraService.aidl
 
-
+//启动CameraService "media.camera"
 service cameraserver@cameraserver.rc-->main{
 - sm = defaultServiceManager()
 - CameraService::instantiate()-->publish-->sm->addService(getServiceName("media.camera"),new CameraService)@BinderService.h
 }@main_cameraserver.cpp
 
-//CameraService
+//CameraService。获取hal层接口CameraProvider
 CameraService::onFirstRef{
 - BatteryNotifier::getInstance //电池
-- enumerateProviders{//获取camera
-	- mCameraProviderManager = new CameraProviderManager()->initialize(this,sHardwareServiceInteractionProxy)
+- enumerateProviders{		//获取camera
+	- mCameraProviderManager = new CameraProviderManager()
+	- mCameraProviderManager->initialize(this,sHardwareServiceInteractionProxy)-->initialize
 	- mCameraProviderManager->getCameraDeviceIds
 	- mCameraProviderManager->getResourceCost,mCameraStates.emplace //获取资源保存
-	- onDeviceStatusChanged(PRESENT)//更新
+	- onDeviceStatusChanged(PRESENT)				//更新
 	}	
 - pingCameraServiceProxy
 }@CameraService.cpp
@@ -38,8 +42,7 @@ CameraService::onFirstRef{
 
 
 
-//------------------------响应client java层
-//获取camerDevice
+//提供给java层的操作接口Client (camerDevice)
 connectDevice{
 - mRemote.transact(Stub.TRANSACTION_connectDevice, _data, _reply, 0)
 - _result = android.hardware.camera2.ICameraDeviceUser.Stub.asInterface(_reply.readStrongBinder())
@@ -65,7 +68,7 @@ connectHelper(callback,id,/* halVersion */CAMERA_HAL_API_VERSION_UNSPECIFIED,/*a
 - handleEvictionsLocked{ //关闭一些配置冲突的client
 	- getCameraState(cameraId)
 	- CameraClientManager::makeClientDescriptor(cameraId)
-	- mActiveClientManager.wouldEvict(clientDescriptor) //查找要关闭的client
+	- mActiveClientManager.wouldEvict(clientDescriptor)	//查找要关闭的client
 	- 遍历要断开的client,clientSp->notifyError(ERROR_CAMERA_DISCONNECTED)
 	- 
 	}
@@ -73,10 +76,33 @@ connectHelper(callback,id,/* halVersion */CAMERA_HAL_API_VERSION_UNSPECIFIED,/*a
 	- mCameraProviderManager->getHighestSupportedVersion(cameraId.string(), &maxVersion)
 	- mCameraProviderManager->getCameraInfo(cameraId.string(), &info)
 	}
-- makeClient(this,cameraCb,&client,halVersion,deviceVersion, effectiveApiLevel)-->new CameraDeviceClient()
+  //创建Client.不同的版本对用不同的client
+- sp<BasicClient> tmp = nullptr
+- makeClient(this,cameraCb,&client,halVersion,deviceVersion, effectiveApiLevel, /*out*/&tmp))-->new CameraDeviceClient()
+- client = static_cast<CLIENT*>(tmp.get())
 - client->initialize(mCameraProviderManager) //初始化client
 - device = client
 }@CameraService.cpp
+
+//创建Client
+connectDevice-->connectHelper-->
+makeClient(const sp<CameraService>& cameraService,const sp<IInterface>& cameraCb,const String16& packageName,
+	const String8& cameraId,int facing, int clientPid, uid_t clientUid,int servicePid, bool legacyMode,
+	int halVersion, int deviceVersion, apiLevel effectiveApiLevel, /*out*/sp<BasicClient>* client) {
+- (halVersion < 0 || halVersion == deviceVersion) {	//新接口，默认流程
+	- CAMERA_DEVICE_API_VERSION_1_0:if(effectiveApiLevel == API_1) client = new CameraClient
+	- CAMERA_DEVICE_API_VERSION_3_0/1/2/3/4:
+		- API_1:*client = new Camera2Client(cameraService, tmp, packageName, cameraIdToInt(cameraId...)
+		- API_2:*client = new CameraDeviceClient(cameraService,cameraId...) //默认
+   }else {						//老接口
+	- sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get())
+  	- CAMERA_DEVICE_API_VERSION_1_0:*client = new CameraClient(cameraService, tmp, packageName, cameraId...)
+   }
+- 
+}@CameraService.cpp
+
+//设置参数
+
 
 /**********************
  CameraProviderManager
@@ -100,6 +126,11 @@ CameraProviderManager::initialize(CameraService listener,ServiceInteractionProxy
 	}@CameraProviderManager.h
   //注册监听器. hidl服务回调onRegistration
 - mServiceProxy->registerForNotifications(this)-->hardware::camera::provider::V2_4::ICameraProvider::registerForNotifications
+    -->onRegistration(const hardware::hidl_string& name){
+	- addProviderLocked(name)
+	- sp<StatusListener> listener = getStatusListener()
+	- listener->onNewProviderRegistered()
+	}
   //加入默认provider
 - addProviderLocked(newProvider/*"legacy/0"*/){//获取camera HAL services :CameraProvider
 	- ICameraProvider inerface = mServiceProxy->getService("legacy/0")-->hardware::camera::provider::V2_4::ICameraProvider::getService

@@ -1,6 +1,7 @@
 /***********************
  host
 
+ 操作节点
  /dev/sprd_sensor
  /dev/sprd_image
  /dev/sprd_jpg
@@ -9,27 +10,43 @@
 
 module_platform_driver-->
 sprd_img_probe{
-- misc_register(&image_dev) //"sprd_image"
+- misc_register(&image_dev)	//"sprd_image"
 - sprd_cam_pw_domain_init
 - sprd_dcam_parse_dt
 - sprd_isp_parse_dt
 - sprd_dcam_drv_init{
-	- dcam_mod_lock //设置各种lock
+	- dcam_mod_lock		//设置各种lock
 	}@dcam_drv.c
 - sprd_isp_drv_init{
-	- isp_mod_lock //各种锁
+	- isp_mod_lock		//各种锁
 	}@isp_drv.c
 }@dcam_core.c
 
 
+kernel/drivers/misc/sprd_camera/dcam/dcam_if_r3p0v2/dcam_core.c
+kernel/drivers/misc/sprd_camera/dcam/dcam_if_r3p0v2/dcam_drv.c
 /***********************
  sensor
+
+ 9853有两个mipi csi接口
 */
+enum SPRD_SENSOR_ID_E {
+	SPRD_SENSOR_MAIN_ID_E,
+	SPRD_SENSOR_SUB_ID_E,
+	SPRD_SENSOR_MAIN2_ID_E,
+	SPRD_SENSOR_SUB2_ID_E,
+	SPRD_SENSOR_ID_MAX
+}@sprd_sensor_core.h
+
+module_init(sprd_sensor_core_module_init)-->
 sprd_sensor_core_module_init{
+- struct sprd_sensor_core_module_tag *p_data = kzalloc(sizeof(*p_data), GFP_KERNEL)
 - sprd_sensor_register_driver
 - csi_api_mipi_phy_cfg
-- misc_register(&sensor_dev) //"sprd_sensor"
-- device_create_file //创建sys文件
+- misc_register(&sensor_dev){	//"sprd_sensor"
+	- 
+	}
+- device_create_file		//创建sys文件
 }@sprd_sensor_core.c
 
 
@@ -41,8 +58,55 @@ sprd_sensor_file_ioctl-->sprd_sensor_io_if_cfg{
 - sprd_sensor_mipi_if_close
 }
 
+//sensor注册
+sprd_sensor_register_driver{
+- i2c_add_driver(&sprd_main_sensor_driver)-->sprd_main_sensor_driver{
+	.driver = {
+		.of_match_table =of_match_ptr(sprd_sensor_main_of_match_table)//"sprd,sensor-main2"
+		}
+	.probe = sprd_sensor_probe
+	}
+- i2c_add_driver(&sprd_sub_sensor_driver)	//"sprd,sensor-sub"
+- i2c_add_driver(&sprd_main2_sensor_driver)	//"sprd,sensor-main2"
+- i2c_add_driver(&sprd_sub2_sensor_driver)	//"sprd,sensor-sub2"
+}@sprd_sensor_drv.c
+
+sprd_sensor_probe(struct i2c_client *client, const struct i2c_device_id *id){
+- struct device *dev = &client->dev
+- struct sprd_sensor_dev_info_tag *pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL)
+- if (of_device_is_compatible(dev->of_node, "sprd,sensor-main")) {
+	- pdata->sensor_id = SPRD_SENSOR_MAIN_ID_E
+	- sprd_sensor_config(dev, pdata){
+		- sprd_sensor_parse_dt(dev, sensor_info)
+		- struct device_node *mipi_phy_node = get_mipi_phy(dev->of_node)
+		- phy_id = csi_api_mipi_phy_cfg_init(mipi_phy_node, sensor_info->sensor_id)
+		- csi_ep_node = get_csi_port_node(mipi_phy_node)
+		- csi_api_dt_node_init(dev, csi_ep_node, sensor_info->sensor_id, phy_id)
+		}
+	- s_sensor_dev_data[SPRD_SENSOR_MAIN_ID_E] = pdata
+  }else if(of_device_is_compatible(dev->of_node, "sprd,sensor-sub"){
+	
+  }else if(of_device_is_compatible(dev->of_node, "sprd,sensor-main2"){
+	
+  }else if(of_device_is_compatible(dev->of_node, "sprd,sensor-sub2"){
+	
+  }
+}@sprd_sensor_drv.c
+
+/******
+ 操作接口
+*/
+SENSOR_IO_SET_MCLK
+SENSOR_IO_IF_CFG
+SENSOR_IO_IF_SWITCH
+
+
+kernel/drivers/misc/sprd_camera/sensor/sprd_sensor_core.c
+kernel/drivers/misc/sprd_camera/sensor/sprd_sensor_drv.c
+kernel/drivers/misc/sprd_camera/sensor/csi2/csi_intel/dwc_host1.11a/csi_api.c
 /***********************
  cpp
+
 */
 module_init(sprd_cpp_init)-->platform_driver_register(&sprd_cpp_driver)
 -->sprd_cpp_probe{
@@ -51,9 +115,8 @@ module_init(sprd_cpp_init)-->platform_driver_register(&sprd_cpp_driver)
 }@cpp_core.c
 
 
-kernel/drivers/misc/sprd_camera/dcam/dcam_if_r3p0v2/dcam_core.c
-kernel/drivers/misc/sprd_camera/dcam/dcam_if_r3p0v2/dcam_drv.c
+
 kernel/drivers/misc/sprd_camera/dcam/isp_r6p10v2/isp_drv.c
-kernel/drivers/misc/sprd_camera/sensor/sprd_sensor_core.c
+
 kernel/drivers/misc/sprd_camera/cpp/lite_r1p0/cpp_core.c
 

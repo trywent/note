@@ -1,5 +1,8 @@
-//====================================
+/******************************************
+  android.hardware.camera
+  camera 老接口
 
+*/
 使用camera流程{
 - public static Camera open (int cameraId)
 - void setParameters (Camera.Parameters params)
@@ -7,25 +10,71 @@
 - public final void startPreview ()
 - public final void release ()
 }
-检测摄像头：
+//检测摄像头：
 context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA) //设备是否有摄像头功能
 
-打开摄像头：
+//打开摄像头：
 open{
-- 获取摄像头个数，getNumberOfCameras{
-
+- getNumberOfCameras-->android_hardware_Camera_getNumberOfCameras{//获取摄像头个数
+	- Camera::getNumberOfCameras()
+	}@android_hardware_Camera.cpp
+- getCameraInfo(i, cameraInfo)				//获取摄像头信息用来判断摄像头前后
+- new Camera(back)-->cameraInitNormal(cameraId)-->	//打开后面摄像头
+	cameraInitVersion(cameraId, CAMERA_HAL_API_VERSION_NORMAL_CONNECT){
+	- mEventHandler = new EventHandler(this, looper)
+	- native_setup(new WeakReference<Camera>(this), cameraId, halVersion..)
 	}
-- 获取摄像头信息用来判断摄像头前后，getCameraInfo(i, cameraInfo)
-- 打开后面摄像头，new Camera(back)
 }@Camera.java
 
-getNumberOfCameras@Camera.java-->android_hardware_Camera_getNumberOfCameras-->
-Camera::getNumberOfCameras@android_hardware_Camera.cpp-->getNumberOfCameras-->
-(获取camera服务)cs->getNumberOfCameras@CameraBase.cpp
+native_setup-->android_hardware_Camera_native_setup(JNIEnv *env, jobject thiz,
+    jobject weak_this, jint cameraId, jint halVersion, jstring clientPackageName){
+  //应用名
+- jsize rawClientNameLen = env->GetStringLength(clientPackageName)
+- String16 clientName(rawClientName, rawClientNameLen)
+  //创建camera.连接到服务端camera
+- sp<Camera> camera = Camera::connect(cameraId, clientName, Camera::USE_CALLING_UID, Camera::USE_CALLING_PID)
+- sp<JNICameraContext> context = new JNICameraContext(env, weak_this, clazz, camera)
+- camera->setListener(context)
+- camera->sendCommand(CAMERA_CMD_SET_DISPLAY_ORIENTATION, defaultOrientation, 0)
+}@android_hardware_Camera.cpp
 
+CameraTraits<Camera>::TCamConnectService CameraTraits<Camera>::fnConnectService =  &::android::hardware::ICameraService::connect;
 
-获取摄像头属性：
-Camera.getParameters(返回值类型为Camera.Parameters)
+Camera::connect(int cameraId, const String16& clientPackageName,int clientUid, int clientPid)@Camera.cpp-->
+connect(int cameraId,const String16& clientPackageName, int clientUid, int clientPid){
+- sp<TCam> c = new TCam(cameraId)
+- sp<::android::hardware::ICameraService> cs = getCameraService()
+- (cs.get()->*fnConnectService)(cl, cameraId, clientPackageName, clientUid,clientPid, /*out*/ &c->mCamera)-->
+	connect@CameraService.cpp
+}@CameraBase.cpp
+
+/*************
+ 属性
+*/
+public class Parameters {
+        // Parameter keys to communicate with the camera driver.
+        private static final String KEY_PREVIEW_SIZE = "preview-size";
+        private static final String KEY_PREVIEW_FORMAT = "preview-format";
+        private static final String KEY_PREVIEW_FRAME_RATE = "preview-frame-rate";
+        private static final String KEY_PREVIEW_FPS_RANGE = "preview-fps-range";
+        private static final String KEY_PICTURE_SIZE = "picture-size";
+        private static final String KEY_PICTURE_FORMAT = "picture-format"
+	......
+}@Camera.java
+
+//设置属性。分辨率设置后不能改变
+setParameters(Parameters params)-->native_setParameters(params.flatten())@Camera.java-->
+android_hardware_Camera_setParameters{
+- sp<Camera> camera = get_native_camera(env, thiz, NULL)
+- String8 params8 = String8(reinterpret_cast<const char16_t*>(str),env->GetStringLength(params))
+- camera->setParameters(params8){
+	- sp <::android::hardware::ICamera> c = mCamera
+	- c->setParameters(params)-->
+	}@camera.cpp
+}@android_hardware_Camera.cpp
+
+//获取摄像头属性：
+Camera.getParameters(返回值类型为Camera.Parameters)-->
 
 
 
@@ -34,20 +83,50 @@ Camera.getParameters(返回值类型为Camera.Parameters)
 
 frameworks/base/core/java/android/hardware/Camera.java
 frameworks/base/core/jni/android_hardware_Camera.cpp
+frameworks/av/camera/CameraBase.cpp
+frameworks/av/camera/Camera.cpp
+
+
+/******************************************
+camera服务开始：
+
+*/
+mediaserver@init.rc-->main-->CameraService::instantiate(加入服务管理器，等待远程调用)-->
+new CameraService@main_mediaserver.cpp-->onFirstRef(获取HAL模块)@CameraService.cpp
+
+CameraService::onFirstRef-->hw_get_module(CAMERA_HARDWARE_MODULE_ID)--mModule->get_number_of_cameras
+@CameraService.cpp-->
+
+
+//相机个数：
+mModule->get_number_of_cameras@CameraService.cpp-->camera_get_number_of_cameras{
+- 查找video设备并打开，获取摄像头信息。open("/dev/videox")
+- 将获取的摄像头信息填充到gCamInfos，ioctl(获取信息)
+- 返回摄像头个数
+}@CameraHal_Module.cpp
+
+CameraService::connect( const sp<ICameraClient>& cameraClient,int cameraId,const String16& clientPackageName,
+	int clientUid,int clientPid, /*out*/sp<ICamera>* device) {
+- sp<Client> client = nullptr
+- connectHelper<ICameraClient,Client>(cameraClient, id,CAMERA_HAL_API_VERSION_UNSPECIFIED, 
+	clientPackageName, clientUid, clientPid, API_1,..client){
+	- 
+	}
+- *device = client
+}@CameraService.cpp
+
+
+frameworks/av/media/mediaserver/main_mediaserver.cpp
+frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
+hardware/xxx/camera/CameraHal_Module.cpp
 frameworks/av/services/camera/libcameraservice/CameraService.cpp
 frameworks/av/services/camera/libcameraservice/CameraHardwareInterface.h
 frameworks/av/include/camera/ICameraService.h
 frameworks/av/camera/ICameraService.cpp
-frameworks/av/camera/CameraBase.cpp
-frameworks/av/camera/Camera.cpp
-frameworks/av/media/mediaserver/main_mediaserver.cpp
-frameworks/av/media/libmediaplayerservice/MediaPlayerService.cpp
 
-hardware/xxx/camera/CameraHal_Module.cpp
-
-
-
-==========================================应用
+/******************************************
+ 应用
+*/
 打开：
 open-->new Camera()-->native_setup@Camera.java-->android_hardware_Camera_native_setup(初始化本地camera)
 -->Camera::connect(cameraId)@android_hardware_Camera.cpp-->cs->connect@Camera.cpp-->connect(连接到服务,
@@ -121,8 +200,10 @@ pref_video_time_lapse_frame_interval_default  0->1s
 
 packages/apps/Camera/src/com/android/camera/Camera.java
 
-======================================
+/******************************************
 camera:
+
+*/
 
 JNI
 所在位置frameworks/base/core/jni/android_hardware_Camera.cpp。调用更底层函数操作摄像头，返回数据。
@@ -141,27 +222,13 @@ Camera service
 HAL
 硬件抽象层，摄像头服务调用的接口，根据硬件实现。
 
-=====================================
-camera服务开始：
-mediaserver@init.rc-->main-->CameraService::instantiate(加入服务管理器，等待远程调用)-->
-new CameraService@main_mediaserver.cpp-->onFirstRef(获取HAL模块)@CameraService.cpp
-
-
-CameraService::onFirstRef-->hw_get_module(CAMERA_HARDWARE_MODULE_ID)--mModule->get_number_of_cameras
-@CameraService.cpp-->
-
-
-相机个数：
-mModule->get_number_of_cameras@CameraService.cpp-->camera_get_number_of_cameras{
-- 查找video设备并打开，获取摄像头信息。open("/dev/videox")
-- 将获取的摄像头信息填充到gCamInfos，ioctl(获取信息)
-- 返回摄像头个数
-}@CameraHal_Module.cpp
 
 
 
-==========================================
+/******************************************
 video:
+
+*/
 配置文件初始化：
 android_media_MediaProfiles_native_init-->MediaProfiles::getInstance@android_media_MediaProfiles.cpp-->
 getInstance(从xml中获取配置或使用默认)-->createDefaultInstance(没有xml,初始每个属性值)-->

@@ -1,8 +1,8 @@
 /***********************
  字符设备 struct cdev
  
- 文件节点只对应设备号。根据设备号查找对应的cdev
-  cdev可以对应多个设备号。cdev包含文件的操作函数
+ 设备节点文件对应设备号。打开函数根据设备号查找kernel中对应的cdev结构
+ cdev可以对应多个设备号。cdev包含文件的操作函数
 */
 //保存所有字符设备
 static struct char_device_struct {
@@ -33,6 +33,21 @@ static struct kobj_type ktype_cdev_dynamic = {
 	.release	= cdev_dynamic_release,
 }
 
+//cdev_map容器。cdev_map中数组存放255个主设备号指针。每个主设备号下链表指到子设备
+chrdev_init(void){
+- cdev_map = kobj_map_init(base_probe, &chrdevs_lock){
+	- struct kobj_map *p = kmalloc(sizeof(struct kobj_map), GFP_KERNEL)
+	- struct probe *base = kzalloc(sizeof(*base), GFP_KERNEL)
+	}@map.c
+}@char_dev.c
+
+//map中的位置。mi2 > mi1 
+cdev_map[ma]: cdev1[ma mi1].next --> cdev[ma mi2]
+
+
+1/*
+ 注册字符设备
+*/
 //注册设备号
 int register_chrdev_region(dev_t first, unsigned int count,char *name){
  //遍历注册从first开始count个设备号（不超过当前major。。255个minor）
@@ -48,27 +63,41 @@ int register_chrdev_region(dev_t first, unsigned int count,char *name){
 	}
 }@char_dev.c
 
-//创建
+//cdev创建
 struct cdev *cdev_alloc(void)
 {
 - struct cdev *p = kzalloc(sizeof(struct cdev), GFP_KERNEL);
 - kobject_init(&p->kobj, &ktype_cdev_dynamic)
 }
-//初始化
+//cdev初始化
 void cdev_init(struct cdev *cdev, const struct file_operations *fops)
 {
 - kobject_init(&cdev->kobj, &ktype_cdev_default);
 - cdev->ops = fops;
 }
 
-//加入设备。字符文件节点的设备号，若在dev+count中。则文件的操作函数都使用这个cdev
+//加入cdev。上层打开的字符文件的设备号若在dev+count中，则文件的操作函数都使用这个cdev
 int cdev_add(struct cdev *p, dev_t dev, unsigned count)
 {
 - p->dev = dev
 - p->count = count
-- kobj_map(cdev_map, dev, count, p) //创建struct kobj_map
+- kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p)//加入cdev_map中
 - kobject_get(p->kobj.parent)
 }@char_dev.c
+
+kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,  struct module *module,
+	 kobj_probe_t *probe, int (*lock)(dev_t, void *), void *data){
+- unsigned n = MAJOR(dev + range - 1) - MAJOR(dev) + 1			//这次增加占用的major数
+- unsigned index = MAJOR(dev)
+- struct probe *p = kmalloc_array(n, sizeof(struct probe), GFP_KERNEL)	//range在一个majar中，创建一个probe
+  //初始化
+- p->get = probe
+- p->dev = dev
+- p->data = data
+  //添加到cdev_map[major]中。子设备号范围小的在前面
+- struct probe **s = &domain->probes[index % 255]
+- *s = p
+}@map.c
 
 //字符设备打开。替换操作函数为cdev_add中设置的操作函数
 //根据设备号查找已经注册的字符设备
@@ -76,14 +105,13 @@ static int chrdev_open(struct inode *inode, struct file *filp){
 - struct cdev *p = inode->i_cdev
   //从cdev_map获取 cdev
 - kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx)
-- if(!p){
-	- struct kobject *kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx)
-	  //根据设备号
-	- struct cdev *new = container_of(kobj, struct cdev, kobj)
+- if(!p){ //inode对应的cdev没有初始化
+	- struct kobject *kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx)	//i_rdev是设备号dev_t。根据设备号找到kobj	  
+	- struct cdev *new = container_of(kobj, struct cdev, kobj)		//根据kobj找到cdev
 	- inode->i_cdev = p = new
 	- cdev_get(p)
 	}
-  //替换操作函数
+  //替换正确的操作函数
 - const struct file_operations *fops = fops_get(p->ops)
 - replace_fops(filp, fops)
 - filp->f_op->open(inode, filp)
@@ -91,6 +119,7 @@ static int chrdev_open(struct inode *inode, struct file *filp){
 
 
 /*
+ 老接口：
  注册设备，只是获取设备号的范围.major==0自动分配设备号...
  name不是/dev下的名字
 */
@@ -105,3 +134,18 @@ __register_chrdev
 
 kernel/include/linux/cdev.h
 kernel/fs/char_dev.c
+kernel/drivers/base/map.c
+
+2/*
+ class创建字符设备方法
+*/
+class_register-->__class_register(struct class *cls, struct lock_class_key *key)
+
+struct device *device_create(struct class *class, struct device *parent,
+			     dev_t devt, void *drvdata, const char *fmt, ...)
+
+3/*
+ misc创建字符设备方法
+*/
+
+misc_register(struct miscdevice * misc)

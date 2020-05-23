@@ -1,0 +1,190 @@
+/*******************************************
+ i2c bus
+ SMBus（System Management Bus) 更省电？ 
+ PEC (packet error checking)
+
+ i2c tools:列出i2c设备:i2c -r  bus_num
+ 实际发送的地址：addr<<1 + 读写位
+*/
+postcore_initcall(i2c_init)-->i2c_init{
+  //设置可用id编号
+- int retval = of_alias_get_highest_id("i2c")
+- __i2c_first_dynamic_bus_num = retval + 1
+  //注册bus
+- bus_register(&i2c_bus_type)
+- i2c_add_driver(&dummy_driver)
+- 
+}@i2c-core.c
+
+/*************
+  i2c adapter设备 
+  dts中设备和平台驱动匹配后，加入i2c adapter
+*/
+struct i2c_adapter {
+- const struct i2c_algorithm *algo
+- int nr 	//编号
+- char name[48] //名字
+}
+//加入adapter, 使用指定编号
+int i2c_add_numbered_adapter(struct i2c_adapter *adap)-->
+__i2c_add_numbered_adapter(adap){
+- id = idr_alloc(&i2c_adapter_idr, adap, adap->nr, adap->nr + 1,GFP_KERNEL)
+- return i2c_register_adapter(adap)
+}@i2c-core.c
+
+//加入adapter,动态编号
+int i2c_add_adapter(struct i2c_adapter *adapter){
+- struct device *dev = &adapter->dev
+  //有devicetree节点
+- if (dev->of_node) {
+	- id = of_alias_get_id(dev->of_node, "i2c")
+	- adapter->nr = id
+	- return __i2c_add_numbered_adapter(adapter)
+	}
+  //没有设备树。动态设置编号
+- id = idr_alloc(&i2c_adapter_idr, adapter, __i2c_first_dynamic_bus_num, 0, GFP_KERNEL)
+- return i2c_register_adapter(adapter)
+}@i2c-core.c
+
+//将设备加入到总线
+static int i2c_register_adapter(struct i2c_adapter *adap){
+- rt_mutex_init(&adap->bus_lock)
+- mutex_init(&adap->userspace_clients_lock
+  //注册设备
+- dev_set_name(&adap->dev, "i2c-%d", adap->nr)
+- adap->dev.bus = &i2c_bus_type
+- adap->dev.type = &i2c_adapter_type
+- device_register(&adap->dev)
+  //设置了bus恢复操作。。i2c卡死？
+- if (adap->bus_recovery_info) {
+	- struct i2c_bus_recovery_info *bri = adap->bus_recovery_info
+	-if (bri->recover_bus == i2c_generic_gpio_recovery) {	//gpio方式恢复。一般soc不使用这种方式
+		- bri->get_scl = get_scl_gpio_value
+		- bri->set_scl = set_scl_gpio_value
+		}
+	}
+  //配置了CONFIG_OF ，遍历设置i2c adapter下的设备
+- of_i2c_register_devices(adap)
+  //没有CONFIG_ACPI(Advanced Configuration and Power Management Interface)
+  //处理新加设备
+- bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter)
+}@i2c-core.c
+
+
+
+
+/*************
+ i2c设备
+*/
+//遍历adapter的设备树，查找i2c设备
+of_i2c_register_devices(adap){
+- struct device_node *node
+- for_each_available_child_of_node(adap->dev.of_node, node) 
+	- of_i2c_register_device(adap, node)
+}@i2c-core.c
+
+static struct i2c_client *of_i2c_register_device(struct i2c_adapter *adap,struct device_node *node){
+  //i2c信息
+- struct i2c_board_info info = {}
+- addr_be = of_get_property(node, "reg", &len)
+- addr = be32_to_cpup(addr_be)
+- info.addr = addr
+- i2c_new_device(adap, &info)	
+}@i2c-core.c
+
+struct i2c_client *i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info){
+  //创建i2c_client
+- struct i2c_client *client = kzalloc(sizeof *client, GFP_KERNEL)
+- client->adapter = adap
+- client->dev.bus = &i2c_bus_type
+- device_register(&client->dev)
+}@i2c-core.c
+
+
+void i2c_unregister_device(struct i2c_client *)
+
+//用户空间创建i2c设备
+static ssize_t i2c_sysfs_new_device(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+
+/*************
+ i2c设备驱动
+
+*/
+#define i2c_add_driver(#define i2c_add_driver(driver) i2c_register_driver(THIS_MODULE, driver))
+int i2c_register_driver(struct module *owner, struct i2c_driver *driver){
+- driver->driver.bus = &i2c_bus_type
+- driver_register(&driver->driver)
+- i2c_for_each_dev(driver, __process_new_driver)-->bus_for_each_dev(&i2c_bus_type, NULL, data, fn)	//遍历adapter
+	-->__process_new_driver(struct device *dev, void *data)-->
+	i2c_do_add_adapter(struct i2c_driver *driver,struct i2c_adapter *adap){
+	- i2c_detect(adap, driver)			//探测总线上的设备。若驱动中设置了地址会探测对应地址的设备
+	}
+}@i2c-core.c
+
+
+int i2c_register_driver(struct module *, struct i2c_driver *)
+void i2c_del_driver(struct i2c_driver *)
+
+kernel/include/linux/i2c.h
+/*************
+ i2c卡死后恢复
+*/
+
+//恢复
+i2c_generic_scl_recovery(struct i2c_adapter *adap)-->
+i2c_generic_recovery(struct i2c_adapter *adap){
+- 
+}@i2c-core.c
+
+//bus超时一段时间后，由soc驱动主动调用
+i2c_recover_bus-->adap->bus_recovery_info->recover_bus(adap)@i2c-core.c
+
+
+/*************
+ 读写接口
+*/
+
+//读
+i2c_master_recv(const struct i2c_client *client, char *buf, int count){
+- struct i2c_adapter *adap = client->adapter;
+- struct i2c_msg msg;
+- msg.addr = client->addr;
+- msg.flags = client->flags & I2C_M_TEN;
+- msg.flags |= I2C_M_RD;
+- msg.len = count;
+- msg.buf = buf;
+- ret = i2c_transfer(adap, &msg, 1)
+}
+//写
+i2c_master_send(const struct i2c_client *client, char *buf, int count){
+- struct i2c_adapter *adap = client->adapter;
+- struct i2c_msg msg;
+- msg.addr = client->addr;
+- msg.flags = client->flags & I2C_M_TEN;
+- msg.len = count;
+- msg.buf = (char *)buf;
+- i2c_transfer(adap, &msg, 1)
+}
+
+i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num){
+  //有i2c控制器的传输函数(soc实现)
+- if (adap->algo->master_xfer) {
+	- if (in_atomic() || irqs_disabled()) i2c_trylock_adapter(adap)	//获取i2c_adapter的锁
+	  else i2c_lock_adapter(adap)
+	- ret = __i2c_transfer(adap, msgs, num)
+	- i2c_unlock_adapter(adap)
+	}
+}@i2c-crore.c
+
+kernel/drivers/i2c/i2c-core.c
+
+/*******************************************
+ gpio模拟i2c
+*/
+
+
+kernel/drivers/i2c/busses/i2c-gpio.c
+
+
+
+

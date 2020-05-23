@@ -1,0 +1,53 @@
+/*
+ i2c
+*/
+//接口设备i2c0 - i2c5 
+i2c0: i2c@e7d00000 {
+ compatible = "sprd,r8p0-i2c";
+ reg = <0 0xe7d00000 0 0x1000>;
+ interrupts = <I2C0_IRQ 2>;
+ clock-names = "i2c", "source","enable";
+ clock-frequency = <100000>;
+ #address-cells = <1>;
+ #size-cells = <0>;
+ status = "disabled";
+}@iwhale2.dtsi
+
+//驱动注册
+arch_initcall_sync(sprd_i2c_init)-->sprd_i2c_init(void)-->
+platform_driver_register(&sprd_i2c_driver)-->
+platform_driver sprd_i2c_driver = {
+	.probe = sprd_i2c_probe,
+	.driver = {
+		   .name = "sprd-i2c-v2",
+		   .of_match_table = of_match_ptr(sprd_i2c_of_match),//"sprd,r8p0-i2c"
+	},
+}
+
+sprd_i2c_probe(struct platform_device *pdev){
+- struct sprd_i2c *pi2c = devm_kzalloc(&pdev->dev, sizeof(struct sprd_i2c), GFP_KERNEL)
+- pi2c->bus_freq = 100000
+- pi2c->adap.retries = 3
+- pi2c->adap.algo = &sprd_i2c_algo
+- pi2c->adap.algo_data = pi2c
+- sprd_i2c_clk_init(pi2c)
+  //i2c接口
+- i2c_add_numbered_adapter(&pi2c->adap)
+}
+
+//i2c传输函数
+static const struct i2c_algorithm sprd_i2c_algo = {
+	.master_xfer = sprd_i2c_master_xfer,{
+		- struct sprd_i2c *pi2c = i2c_adap->algo_data
+		- for (im = 0; ret >= 0 && im != num; im++)
+			- sprd_i2c_handle_msg(i2c_adap, &msgs[im], im == num - 1)
+		}
+	.functionality = sprd_i2c_func,
+}@i2c-sprd-v2.c
+
+sprd_i2c_handle_msg(struct i2c_adapter *i2c_adap,struct i2c_msg *pmsg, int is_last_msg){
+- 
+- 
+}@i2c-sprd-v2.c
+
+kernel/drivers/i2c/busses/i2c-sprd-v2.c

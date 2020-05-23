@@ -11,6 +11,13 @@ isten(PhoneStateListener listener, int events){
 
 frameworks/base/telephony/java/android/telephony/TelephonyManager.java
 
+
+//默认网络类型
+
+PREFERRED_NETWORK_MODE      = SystemProperties.getInt("ro.telephony.default_network",NETWORK_MODE_WCDMA_PREF)
+frameworks/base/telephony/java/com/android/internal/telephony/RILConstants.java
+
+
 /*
 　telephony管理处
 

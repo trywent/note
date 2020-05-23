@@ -1,0 +1,17 @@
+/*
+ 视频流的格式
+ https://blog.csdn.net/knowledgebao/article/details/84326649
+*/
+
+//视频文件中并不是压缩每一帧完整的画面。视频中的画面帧分为了不同的类别：I 帧、P 帧、B 帧
+I帧(Intra coded frames):完整的一帧数据
+P帧(Predicted frames):P帧依赖前一帧的数据
+B帧(Bi-directional predicted frames):依赖前面和后面的帧数据。因此 MPEG-2 编码码流中图像帧的传输顺序和显示顺序是不同的。
+
+GOP(Group of picture):两个I frame之间形成一个图像组GOP
+
+//DTS、PTS 是用于指导播放端的行为，但它们是在编码的时候由编码器生成的
+DTS（Decoding Time Stamp）：即解码时间戳，这个时间戳的意义在于告诉播放器该在什么时候解码这一帧的数据。
+PTS（Presentation Time Stamp）：即显示时间戳，这个时间戳用来告诉播放器该在什么时候显示这一帧的数据。
+
+时间 = pts/*时间粒度个数*/ * av_q2d(time_base)/*基本时间粒度*/

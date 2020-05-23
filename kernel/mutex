@@ -1,0 +1,69 @@
+/***************************
+ spinlock
+
+*/
+void __lockfunc _raw_spin_lock(raw_spinlock_t *lock)-->
+static inline void __raw_spin_lock(raw_spinlock_t *lock){
+
+}@spinlock.c
+
+
+kernel/kernel/locking/spinlock.c
+
+
+/***************************
+ mutex
+*/
+
+//获取mutex
+void __sched rt_mutex_lock(struct rt_mutex *lock){
+- might_sleep								//若在原子上下文中，会打印警告信息
+- rt_mutex_fastlock(lock, TASK_UNINTERRUPTIBLE, rt_mutex_slowlock)
+}
+
+//
+int __sched rt_mutex_lock_interruptible(struct rt_mutex *lock)
+
+rt_mutex_fastlock(struct rt_mutex *lock, int state,
+	int (*slowfn)(struct rt_mutex *lock, int state,struct hrtimer_sleeper *timeout,enum rtmutex_chainwalk chwalk)){
+- if (likely(rt_mutex_cmpxchg_acquire(lock, NULL, current))) {	//应该是原子指令，获取
+	- return 0
+  } else							//没有获取成功
+	- return slowfn(lock, state, NULL, RT_MUTEX_MIN_CHAINWALK)-->rt_mutex_slowlock
+}
+
+rt_mutex_slowlock(struct rt_mutex *lock, int state,struct hrtimer_sleeper *timeout,enum rtmutex_chainwalk chwalk){
+- raw_spin_lock(&lock->wait_lock)
+- if (try_to_take_rt_mutex(lock, current, NULL)) {			//尝试是否能获取到mutex
+	- raw_spin_unlock(&lock->wait_lock)
+	- return 0
+	}
+- set_current_state(state)						//设置当前进程的状态TASK_UNINTERRUPTIBLE，TASK_INTERRUPTIBLE
+- task_blocks_on_rt_mutex(lock, &waiter, current, chwalk)		//
+- if (likely(!ret))__rt_mutex_slowlock(lock, state, timeout, &waiter){	//会进入睡眠等待
+	- 
+	}
+- raw_spin_unlock(&lock->wait_lock)
+}@rtmutex.c
+
+//线程中调用，不能在中断中使用。立即返回
+int __sched rt_mutex_trylock(struct rt_mutex *lock){
+- rt_mutex_fasttrylock(lock, rt_mutex_slowtrylock){
+	- if (likely(rt_mutex_cmpxchg_acquire(lock, NULL, current))){
+		- return 0
+		}
+	- slowfn(lock)-->rt_mutex_slowtrylock
+	}
+}
+
+rt_mutex_slowtrylock(struct rt_mutex *lock){
+- if (rt_mutex_owner(lock)) return
+- raw_spin_lock(&lock->wait_lock)
+- try_to_take_rt_mutex(lock, current, NULL)
+- raw_spin_unlock(&lock->wait_lock)
+}
+
+
+
+kernel/locking/rtmutex.c
+

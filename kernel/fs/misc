@@ -1,0 +1,40 @@
+/******************
+ misc
+*/
+
+struct miscdevice  {
+	int minor;
+	const char *name;
+	const struct file_operations *fops;
+	struct list_head list;
+	struct device *parent;
+	struct device *this_device;
+	const struct attribute_group **groups;
+	const char *nodename;
+	umode_t mode;
+}
+
+
+misc_register(struct miscdevice * misc){
+  //设置设备号
+- bool is_dynamic = (misc->minor == MISC_DYNAMIC_MINOR)
+- if (is_dynamic) {	//动态分配。查找可用设备号
+	- int i = find_first_zero_bit(misc_minors, DYNAMIC_MINORS)
+	- misc->minor = DYNAMIC_MINORS - i - 1
+  }else{		//指定设备号。检查是否冲突
+	- list_for_each_entry(c, &misc_list, list)if (c->minor == misc->minor){goto out}
+  }
+- dev = MKDEV(MISC_MAJOR, misc->minor)
+- misc->this_device = device_create_with_groups(misc_class, misc->parent, dev, misc, misc->groups, "%s", misc->name)
+- list_add(&misc->list, &misc_list)
+}@misc.c
+
+
+device *device_create_with_groups(struct class *class, struct device *parent, dev_t devt,void *drvdata,
+		const struct attribute_group **groups,const char *fmt, ...)-->
+device_create_groups_vargs(class, parent, devt, drvdata, groups,fmt, vargs)
+
+
+include/linux/miscdevice.h
+drivers/char/misc.c
+drivers/base/core.c

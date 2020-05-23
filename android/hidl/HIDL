@@ -9,9 +9,12 @@ Ixxx.hal{
 - 新定义的硬件设备操作接口，通过服务调用
 }
 
-xxx.h{
-- 原来的硬件设备的操作接口，hal服务端调用这些接口（原来是client直接调用）
-}
+//操作接口
+struct Ixxx : public ::android::hidl::base::V1_0::IBase {{
+- static ::android::sp<Ixxx> getService(bool getStub) { return getService("default", getStub); }//获取hidl服务
+- static bool registerForNotifications(const std::string &serviceName,				//最终调用hidl serviceManager.registerForNotifications
+            const ::android::sp<::android::hidl::manager::V1_0::IServiceNotification> &notification)
+}xxx.h
 
 /* hwservicemanager
   

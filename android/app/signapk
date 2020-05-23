@@ -1,0 +1,12 @@
+/*
+ apk 签名
+*/
+
+//签名
+java -jar signapk.jar  platform.x509.pem platform.pk8　app-origin.apk app-signed.apk
+
+
+//https://github.com/getfatday/keytool-importkeypair
+//生成keystore
+./keytool-importkeypair -k ./release.keystore -p youPassword -pk8 platform.pk8 -cert platform.x509.pem -alias youAlias
+

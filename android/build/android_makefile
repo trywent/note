@@ -114,21 +114,43 @@ AndroidBoard.mk{
 /*******************************************************
  编译镜像文件：systme，recovery，boot, odm, oem
 */
-droid: droidcore dist_files
 
-droidcore: files \
-	systemimage \
-	$(INSTALLED_BOOTIMAGE_TARGET) \
-	$(INSTALLED_RECOVERYIMAGE_TARGET) \
-	$(INSTALLED_USERDATAIMAGE_TARGET) \
-	$(INSTALLED_CACHEIMAGE_TARGET) \
-	$(INSTALLED_FILES_FILE)
+//第一个目标
+.PHONY: droid
+DEFAULT_GOAL := droid
+$(DEFAULT_GOAL): droid_targets
+@main.mk	
 
-files: prebuilt \
-        $(modules_to_install) \
-        $(modules_to_check) \
-        $(INSTALLED_ANDROID_INFO_TXT_TARGET)
+ifneq ($(TARGET_BUILD_APPS),)
+ droid_targets: apps_only
+else # TARGET_BUILD_APPS
+ droid_targets: droidcore dist_files
+endif
 
+.PHONY: droidcore
+droidcore: $(filter $(HOST_OUT_ROOT)/%,$(modules_to_install)) \
+    $(INSTALLED_SYSTEMIMAGE_TARGET) \
+    $(INSTALLED_RAMDISK_TARGET) \
+    $(INSTALLED_CHIPRAM_TARGET) \
+    $(INSTALLED_UBOOT_TARGET) \
+    $(INSTALLED_SML_TARGET) \
+    $(INSTALLED_TEECFG_TARGET) \
+    $(INSTALLED_TRUSTY_TARGET) \
+    $(INSTALLED_BOOTIMAGE_TARGET) \
+    $(INSTALLED_DTBOIMAGE_TARGET) \
+    $(INSTALLED_DEBUG_RAMDISK_TARGET) \
+    $(INSTALLED_DEBUG_BOOTIMAGE_TARGET) \
+    $(INSTALLED_RECOVERYIMAGE_TARGET) \
+    $(INSTALLED_VBMETAIMAGE_TARGET) \
+    $(INSTALLED_USERDATAIMAGE_TARGET) \
+    $(INSTALLED_CACHEIMAGE_TARGET) \
+    $(INSTALLED_PRODNVIMAGE_TARGET) \
+    $(INSTALLED_BPTIMAGE_TARGET) \
+    $(INSTALLED_VENDORIMAGE_TARGET) \
+    $(INSTALLED_ODMIMAGE_TARGET) \
+    $(INSTALLED_SUPERIMAGE_EMPTY_TARGET) \
+    $(INSTALLED_PRODUCTIMAGE_TARGET) \
+    $(INSTALLED_SYSTEMOTHERIMAGE_TARGET) 
 
 //生成镜像信息
 /*
@@ -144,7 +166,7 @@ define generate-image-prop-dictionary
 /*******************************************************
  编译system:
 */
-systemimage: $(INSTALLED_SYSTEMIMAGE_TARGET)			//最终目标
+systemimage: $(INSTALLED_SYSTEMIMAGE_TARGET)			
 INSTALLED_SYSTEMIMAGE_TARGET := $(PRODUCT_OUT)/system.img
 INSTALLED_SYSTEMIMAGE := $(INSTALLED_SYSTEMIMAGE_TARGET)
 $(INSTALLED_SYSTEMIMAGE_TARGET): $(BUILT_SYSTEMIMAGE) $(RECOVERY_FROM_BOOT_PATCH)
@@ -223,6 +245,17 @@ PRODUCT_DEFAULT_DEV_CERTIFICATE := \
 如果定义使用PRODUCT_EXTRA_RECOVERY_KEYS，会将该密钥的位置写入OTA升级包的/META/misc_info.txt文件中
 
 @build/core/Makefile
+/*******************************************************
+ root目录TARGET_ROOT_OUT
+*/
+//创建root下目录
+LOCAL_POST_INSTALL_CMD := mkdir -p $(addprefix $(TARGET_ROOT_OUT)/, \
+    sbin dev proc sys system data odm oem acct config storage mnt apex debug_ramdisk $(BOARD_ROOT_EXTRA_FOLDERS)); 
+@system/core/rootdir/Android.mk
+
+
+
+
 /*******************************************************
  ramdisk.img:(root目录TARGET_ROOT_OUT)
 */

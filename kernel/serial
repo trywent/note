@@ -1,5 +1,10 @@
 /*
  stty -F /dev/ttySx
+
+ CTS  clear to send
+ DSR  data set ready
+ DTR  data terminal ready
+ RTS  request to send
 */
 
 

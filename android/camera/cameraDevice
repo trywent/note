@@ -1,35 +1,59 @@
 /**********************
+ CameraDevice
+
  camera3Device{
 	- HalInterface mInterface //hal层接口,ICameraDeviceSession
 	}
  ICameraDeviceUserWrapper封装ICameraDeviceUser
 */
 
+{
+    oneway void onDeviceError(int errorCode, in CaptureResultExtras resultExtras);
+    oneway void onDeviceIdle();
+    oneway void onCaptureStarted(in CaptureResultExtras resultExtras, long timestamp);
+    oneway void onResultReceived(in CameraMetadataNative result, in CaptureResultExtras resultExtras);
+    oneway void onPrepared(int streamId);
+    oneway void onRepeatingRequestError(in long lastFrameNumber,in int repeatingRequestId);
+    oneway void onRequestQueueEmpty();
+}ICameraDeviceCallbacks.aidl
+
+{
+    SubmitInfo submitRequest(in CaptureRequest request, boolean streaming);
+    SubmitInfo submitRequestList(in CaptureRequest[] requestList, boolean streaming);
+
+    long cancelRequest(int requestId)
+    void beginConfigure()
+    void endConfigure(int operatingMode)
+    void deleteStream(int streamId)
+    int createStream(in OutputConfiguration outputConfiguration)
+    int createInputStream(int width, int height, int format)
+    Surface getInputSurface()
+
+    CameraMetadataNative createDefaultRequest(int templateId)
+    CameraMetadataNative getCameraInfo()
+    void waitUntilIdle()
+    long flush()
+    void prepare(int streamId)
+    void tearDown(int streamId)
+    void prepare2(int maxCount, int streamId)
+    void finalizeOutputConfigurations(int streamId, in OutputConfiguration outputConfiguration)
+}@ICameraDeviceUser.aidl
+
+
+//CameraDeviceClient接口
+struct CameraDeviceClientBase : public CameraService::BasicClient, public hardware::camera2::BnCameraDeviceUser
+CameraDeviceClient : Camera2ClientBase<CameraDeviceClientBase>
 {//cameraDevice接口
 - beginConfigure/endConfigure
 - createDefaultRequest
 - createStream/deleteStream
 - submitRequest/cancelRequest
 - disconnect
-}@ICameraDeviceUser.aidl
+}CameraDeviceClient.cpp
 
 
 //CameraDevice 创建
-connectDevice-->connectHelper(callback,id,/* halVersion */CAMERA_HAL_API_VERSION_UNSPECIFIED,/*apiLevel*/API_2
-	/*legacyMode*/ false, /*shimUpdateOnly*/ false,/*out*/client)-->
-makeClient(cameraId,halVersion,deviceVersion,effectiveApiLevel){
-- (halVersion < 0 || halVersion == deviceVersion) { //默认流程
-	- CAMERA_DEVICE_API_VERSION_1_0:if(effectiveApiLevel == API_1) client = new CameraClient
-	- CAMERA_DEVICE_API_VERSION_3_0/1/2/3/4:
-		- API_1:*client = new Camera2Client
-		- API_2:*client = new CameraDeviceClient(cameraService,cameraId) //默认
-   }else {
-  	- CAMERA_DEVICE_API_VERSION_1_0:*client = new CameraClient
-   }
-- 
-}@CameraService.cpp
-
-connectHelper-->makeClient@CameraService.cpp-->new CameraDeviceClient//CameraDeviceClient:Camera2ClientBase
+new CameraDeviceClient//CameraDevice 创建  CameraDeviceClient:Camera2ClientBase
 -->Camera2ClientBase{
 - TClientBase(cameraService, remoteCallback, clientPackageName,cameraId)
 - mSharedCameraCallbacks(remoteCallback)
@@ -38,21 +62,22 @@ connectHelper-->makeClient@CameraService.cpp-->new CameraDeviceClient//CameraDev
 - mDevice = new Camera3Device(cameraId)
 }@Camera2ClientBase.cpp
 
-//初始化cameraDevice,
+//创建cameraDevice。初始化cameraDevice,并创建ICameraDeviceSession
 connectHelper-->client->initialize(mCameraProviderManager)@CamersService.cpp-->initialize-->initializeImpl-->
 Camera2ClientBase::initialize@CameraDeviceClient.cpp-->initialize-->initializeImpl
 @Camera2ClientBase.cpp-->mDevice->initialize(providerPtr)-->
 initialize(manager){
+  //创建ICameraDeviceSession。通过hal层的CameraProvider
 - sp<ICameraDeviceSession> session
-  //HAL
 - manager->openSession(mId.string(), /*out*/ &session){ //session
 	- deviceInfo = findDeviceInfoLocked(id)-->从mProviders中device查找
-	- deviceInfo3->mInterface->open(callback)-->ICameraDevice.open //返回session
+	- deviceInfo3->mInterface->open(callback)-->ICameraDevice.open	//返回session
 	}@CameraProviderManager.cpp
-- manager->getCameraCharacteristics(mId.string(), &mDeviceInfo) //info
+- manager->getCameraCharacteristics(mId.string(), &mDeviceInfo)		//info
 - std::shared_ptr<RequestMetadataQueue> queue
 - session->getCaptureRequestMetadataQueue
 - session->getCaptureResultMetadataQueue
+  //hal层接口
 - HalInterface mInterface = new HalInterface(session, queue){
 	- mHidlSession(session)
 	}
@@ -183,3 +208,22 @@ frameworks/av/services/camera/libcameraservice/api2/CameraDeviceClient.cpp
 frameworks/av/services/camera/libcameraservice/common/Camera2ClientBase.cpp
 frameworks/av/services/camera/libcameraservice/device3/Camera3Device.cpp
 frameworks/av/camera/aidl/android/hardware/camera2/ICameraDeviceUser.aidl
+
+
+/*******************
+ Camera 老接口
+
+
+*/
+
+
+//设置参数
+CameraClient::setParameters(const String8& params) {
+- CameraParameters p(params)
+- mHardware->setParameters(p)
+}@CameraClient.cpp
+
+
+frameworks/av/services/camera/libcameraservice/api1/CameraClient.cpp
+
+

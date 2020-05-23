@@ -14,4 +14,92 @@
 }
 
 
-dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-ahb/c0c00000.sdio/by-name/boot bs=1024 count=16000
+
+/* camera
+
+   sp9853i-1h10.dts
+*/
+
+//rk1608
+&spi2 {
+	status = "okay";
+	spi_rk_preisp@00 {
+		compatible =  "rockchip,spi_rk_preisp";
+		reg = <0>;
+		//16000000 is 22M;12000000 is 16M
+		spi-max-frequency = <16000000>;
+		spi-min-frequency = <12000000>;
+		reset-gpio = <&ap_gpio 124 0>;
+		irq-gpio = <&ap_gpio 86 3>;
+	};
+}
+
+
+//sensor
+&i2c0 {
+	status = "okay";
+	clock-frequency = <50000>;
+		sensor_main: sensor-main@45 {
+			compatible = "sprd,sensor-main";
+			reg = <0x45>;
+			host = "dcam0";
+			port {
+				sensor_main_0: endpoint {
+				remote-endpoint = <&phy0_out>;
+				};
+			};
+	};
+
+	sensor_sub: sensor-sub@44 {
+		compatible = "sprd,sensor-sub";
+		reg = <0x44>;
+			host = "dcam0";
+			port {
+				sensor_sub_0: endpoint {
+				remote-endpoint = <&phy1_out>;
+				};
+			};
+	};
+}
+
+//tp2854
+&i2c5 {
+	status = "okay";
+        ch7026@76{
+                       compatible = "lsec,i2c5ch7026";
+                       reg = <0x76>;			
+	};
+
+	sensor_main2: sensor-main2@44 {
+		compatible = "sprd,sensor-main2";
+		reg = <0x44>;
+		host = "dcam0";
+		port {
+			sensor_main_2: endpoint {
+			remote-endpoint = <&phy0_out>;
+			};
+		};
+	};
+}
+
+&mipi_csi_phy0 {
+	status = "okay";
+	sprd,phyid = <0>;
+	sprd,csi = <&csi0>;
+	port {
+	phy0_out: endpoint {
+		remote-enpoint = <&sensor_main_0>,<&sensor_main_2>;
+		};
+	};
+};
+
+&mipi_csi_phy1 {
+	status = "okay";
+	sprd,phyid = <1>;
+	sprd,csi = <&csi1>;
+	port {
+	phy1_out: endpoint {
+		remote-enpoint = <&sensor_sub_0>;
+		};
+	};
+}@sp9853i-1h10.dts

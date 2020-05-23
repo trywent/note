@@ -1,12 +1,8 @@
-/*数据结构*/
+/**********************
+ android8.0 HAL Service
 
-struct CaptureRequest {
-    uint32_t frameNumber;
-    uint64_t fmqSettingsSize;
-    CameraMetadata settings;
-    StreamBuffer inputBuffer;
-    vec<StreamBuffer> outputBuffers;
-};
+ api，farmework到hal的接口发生变化。。针对库的接口还是保留
+*/
 
 struct CaptureResult {
     uint32_t frameNumber;
@@ -15,15 +11,15 @@ struct CaptureResult {
     vec<StreamBuffer> outputBuffers;
     StreamBuffer inputBuffer;
     uint32_t partialResult;
-
 };
 
 hardware/interfaces/camera/device/3.2/type.hal
-/**********************
- HAL Service
 
+/**********************
+    CameraProvider接口
+    用于获取CameraDevice
 */
-interface ICameraProvider {//provider接口
+interface ICameraProvider {
 - setCallback(ICameraProviderCallback callback)
 - getVendorTags()
 - getCameraIdList()
@@ -37,10 +33,10 @@ service vendor.camera-provider-2-4 /vendor/bin/hw/android.hardware.camera.provid
 @android.hardware.camera.provider@2.4-service_64.rc-->main-->
 defaultPassthroughServiceImplementati on<ICameraProvider>("legacy/0")@service.cpp
 
-
+//获取camera库的接口
 HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
-- hw_get_module(CAMERA_HARDWARE_MODULE_ID, &rawModule) //加载HAL库
-- mModule = new CameraModule(rawModule) //将module封装
+- hw_get_module(CAMERA_HARDWARE_MODULE_ID, &rawModule)	//加载HAL库
+- mModule = new CameraModule(rawModule) 		//将module封装
 - mModule->init()-->CameraModule::init()-->mModule->init@CameraModule.cpp
 - mModule->setCallbacks(this)
 - mNumberOfLegacyCameras = mModule->getNumberOfCameras-->mModule->get_number_of_cameras@CameraModule.cpp//获取camera个数
@@ -48,11 +44,27 @@ HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
 	- mModule->getCameraInfo(i)-->mModule->get_camera_info@CameraModule.cpp
 	- mModule->openLegacy-->mModule->open_legacy@CameraModule.cpp
 	- mOpenLegacySupported[cameraIdStr] = true
-	- mCameraDeviceNames.add//保存设备名
+	- mCameraDeviceNames.add			//保存设备名
 	}
 }@CameraProvider.cpp
 
-//hal和camera接口
+//获取CameraDevice
+getCameraDeviceInterface_V3_x(cameraDeviceName){
+- matchDeviceName(cameraDeviceName, &deviceVersion, &cameraId) //检查名字,获取cameraid
+- index = mCameraDeviceNames.indexOf(cameraDeviceName)
+- CameraDevice deviceImpl = new CameraDevice(mModule, cameraId, mCameraDeviceNames)
+}@CameraProvider.cpp
+
+//获取CameraDevice name
+getCameraIdList{
+- 遍历mCameraDeviceNames,deviceNamePair
+- deviceNameList.push_back(deviceNamePair.second
+}@CameraProvider.cpp
+
+/******
+  module
+  camera库接口。用于操作原来的接口
+*/
 CameraModule{
 - getCameraInfo
 - getDeviceVersion
@@ -61,21 +73,19 @@ CameraModule{
 - setCallbacks(const camera_module_callbacks_t *callbacks)
 }@CameraProvider.cpp
 
-//获取CameraDevice name
-getCameraIdList{
-- 遍历mCameraDeviceNames,deviceNamePair
-- deviceNameList.push_back(deviceNamePair.second
-}@CameraProvider.cpp
-//获取CameraDevice interface
-getCameraDeviceInterface_V3_x(cameraDeviceName){
-- matchDeviceName(cameraDeviceName, &deviceVersion, &cameraId) //检查名字,获取cameraid
-- index = mCameraDeviceNames.indexOf(cameraDeviceName)
-- CameraDevice deviceImpl = new CameraDevice(mModule, cameraId, mCameraDeviceNames)
-}@CameraProvider.cpp
+//hw_device_t
+CameraModule::open(const char* id, struct hw_device_t** device) {
+- mModule->common.methods->open(&mModule->common, id, device)
+}@CameraModule.cpp
 
+
+
+hardware/interfaces/camera/common/1.0/default/CameraModule.cpp
 /**********************
- ICameraDevice
+ CameraDevice
 
+ 获取CameraDeviceSession
+ 操作camera的接口。open时才获取实际的camera的操作接口
 */
 interface ICameraDevice {
 - getResourceCost
@@ -83,13 +93,21 @@ interface ICameraDevice {
 - open(ICameraDeviceCallback callback) //返回ICameraDeviceSession
 }@3.2::ICameraDevice.hal
 
-//打开设备,返回session
-CameraDevice::open(sp<ICameraDeviceCallback>& callback){
+//创建CameraDevice
+getCameraDeviceInterface_V3_x-->new CameraDevice@CameraProvider.cpp-->
+CameraDevice::CameraDevice(p<CameraModule> module, const std::string& cameraId,
+    const SortedVector<std::pair<std::string, std::string>>& cameraDeviceNames){
+- mModule(module)
+- mCameraId(cameraId)
+}@CameraDevice.cpp
+
+//打开设备,获取hw_device_t，hal接口。返回ICameraDeviceSession
+CameraDevice::open(const sp<ICameraDeviceCallback>& callback, open_cb _hidl_cb){
+  //hw_device_t 库中实现的接口
 - camera3_device_t *device
 - mModule->open(mCameraIdInt,&device)
 - mModule->getCameraInfo(mCameraIdInt, &info)
-- sp<CameraDeviceSession> session = createSession(device, callback)-->
-	new CameraDeviceSession
+- sp<CameraDeviceSession> session = createSession(device, callback)-->new CameraDeviceSession
 - mSession = session
 }@CameraDevice.cpp
 
@@ -125,15 +143,73 @@ CameraDeviceSession(camera3_device_t* device,const camera_metadata_t* deviceInfo
 
 //处理请求
 processCaptureRequest(hidl_vec<CaptureRequest>& requests){
-- 遍历requests,processOneCaptureRequest(requests[i]){
+  //遍历requests
+- processOneCaptureRequest(requests[i]){
 	- 
 	- mDevice->ops->process_capture_request(mDevice, &halRequest)
 	}
 - mResultBatcher.registerBatch(requests)
 }@CameraDeviceSession.cpp
 
+
 hardware/interfaces/camera/provider/2.4/default/service.cpp
 hardware/interfaces/camera/provider/2.4/default/CameraProvider.cpp
 hardware/interfaces/camera/device/3.3/default/CameraDevice.cpp
 hardware/interfaces/camera/device/3.3/default/CameraDeviceSession.cpp
-hardware/interfaces/camera/common/1.0/default/CameraModule.cpp
+/**********************
+ 原来的hal接口
+
+ 当前也使用。本地库实现的接口。由hal服务调用
+*/
+
+typedef struct camera3_capture_result {
+    uint32_t frame_number;
+    const camera_metadata_t *result;
+    uint32_t num_output_buffers;
+    const camera3_stream_buffer_t *output_buffers;
+    const camera3_stream_buffer_t *input_buffer;
+    uint32_t partial_result;
+
+} camera3_capture_result_t;
+
+
+typedef struct camera3_callback_ops {
+   
+    void (*process_capture_result)(const struct camera3_callback_ops *,const camera3_capture_result_t *result);
+
+    void (*notify)(const struct camera3_callback_ops *,const camera3_notify_msg_t *msg);
+
+} camera3_callback_ops_t;
+
+
+
+typedef struct camera3_device_ops {
+
+    int (*initialize)(const struct camera3_device *,const camera3_callback_ops_t *callback_ops);
+
+    int (*configure_streams)(const struct camera3_device *,camera3_stream_configuration_t *stream_list);
+
+    int (*register_stream_buffers)(const struct camera3_device *, const camera3_stream_buffer_set_t *buffer_set);
+
+    const camera_metadata_t* (*construct_default_request_settings)( const struct camera3_device *, int type);
+
+    int (*process_capture_request)(const struct camera3_device *,camera3_capture_request_t *request);
+
+    void (*get_metadata_vendor_tag_ops)(const struct camera3_device*,vendor_tag_query_ops_t* ops);
+
+    void (*dump)(const struct camera3_device *, int fd);
+ 
+    int (*flush)(const struct camera3_device *);
+    void *reserved[8];
+} camera3_device_ops_t;
+
+
+//hal Service获取设备，包含设备操作函数
+typedef struct camera3_device {
+    hw_device_t common;
+    camera3_device_ops_t *ops;
+    void *priv;
+} camera3_device_t;
+
+
+hardware/libhardware/include/hardware/camera3.h

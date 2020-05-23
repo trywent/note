@@ -93,8 +93,8 @@ struct device *device_create(struct class *class, struct device *parent,
 //加入设备
 int device_add(struct device *dev){
 - dev = get_device(dev)
-- dev_set_name //设置kobject name
-- kobject_add(&dev->kobj, dev->kobj.parent)  //加入kobj
+- dev_set_name					//设置kobject name
+- kobject_add(&dev->kobj, dev->kobj.parent) 	//加入kobj
 - device_create_file(dev, &dev_attr_uevent)-->sysfs_create_file //创建device属性文件,包含字符设备编号
 - device_add_attrs
 - bus_add_device(dev)
@@ -109,16 +109,16 @@ int device_add(struct device *dev){
 //设备注册：
 device_register(struct device *dev){
 - device_initialize(dev){
-	- dev->kobj.kset = devices_kset //kset
-	- kobject_init(&dev->kobj, &device_ktype)//kobject
+	- dev->kobj.kset = devices_kset 		//kset
+	- kobject_init(&dev->kobj, &device_ktype)	//kobject
 	- device_pm_init(dev)
 	}
 - device_add(dev){
 	- kobject_add(&dev->kobj, dev->kobj.parent)
 	- device_create_file(dev, &dev_attr_uevent)
 	- device_add_attrs(dev)
-	- kobject_uevent(&dev->kobj, KOBJ_ADD) //设备时间
-	- bus_probe_device //探测设备驱动
+	- kobject_uevent(&dev->kobj, KOBJ_ADD)		//设备时间
+	- bus_probe_device				//探测设备驱动
 	}
 
 }@core.c
@@ -130,7 +130,11 @@ __device_attach(struct device *dev, bool allow_async){
 - if (dev->driver) {//已经绑定了驱动
 	- device_bind_driver(dev)
  }else{
-	- bus_for_each_drv(dev->bus, NULL, &data,__device_attach_driver)
+	- bus_for_each_drv(dev->bus, NULL, &data,__device_attach_driver){
+		- klist_iter_init_node(&bus->p->klist_drivers, &i,start ? &start->p->knode_bus : NULL)
+		- while ((drv = next_driver(&i)) && !error)	//遍历__device_attach_driver中驱动，和data是否匹配
+			- error = fn(drv, data)
+		}@bus.c
  }
 }@dd.c
 

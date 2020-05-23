@@ -1,8 +1,20 @@
 /*
  MIPI（移动行业处理器接口）是Mobile Industry Processor Interfac
 */
+
+//协议
 DCS (DisplayCommandSet)：DCS是一个标准化的命令集，用于命令模式的显示模组。
 DSI, CSI (DisplaySerialInterface, CameraSerialInterface)
 DSI 定义了一个位于处理器和显示模组之间的高速串行接口。
-CSI 定义了一个位于处理器和摄像模组之间的高速串行接口。
-D-PHY：提供DSI和CSI的物理层定义
+CSI 定义了一个位于处理器和摄像模组之间的高速串行接口
+
+/*******
+  硬件接口
+*/
+//C-PHY   3线
+3相D-PHY，3线串行接口
+
+//D-PHY	2线 CSI2 DSI
+4个数据差分对和一个时钟差分对,总共10根线
+
+//M-PHY	

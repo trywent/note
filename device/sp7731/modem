@@ -1,0 +1,28 @@
+/*
+ modem
+
+ logcat -s MODEM_CTRL
+ am start com.sprd.engineermode/.EngineerModeActivity
+*/
+main(int argc, char *argv[]) {
+- ret = modem_ctrl_is_reserve_root()	//是否使用root权限
+- switchUserToSystem			//切换到system权限
+- pthread_create(&t1, NULL, detect_sipc_modem, g_modem)
+- pthread_create(&t2, NULL, parm_modem_monitor, NULL)
+- while(1)sleep(100000)
+}@main.c
+
+
+parm_modem_monitor(void* param) {
+- fd_set rfds
+- int fd = open(PMIC_MONITOR_PATH, O_RDWR, 0)		//打开"/dev/sctl_pm"
+- for(;;) {
+	- FD_SET(fd, &rfds)
+	- select(fd + 1, &rfds, NULL, NULL, NULL)
+	- modem_ctl_enable_wake_lock(1, __FUNCTION__)	//防止休眠
+	- num_read = read(fd, buf, sizeof(buf)
+	}
+}@modem_control.c
+
+vendor/sprd/proprietories-source/modem_control/main.c
+vendor/sprd/proprietories-source/modem_control/modem_control.c

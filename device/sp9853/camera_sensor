@@ -1,0 +1,310 @@
+/******************************
+ senor
+ 
+操作接口：
+ /dev/sprd_sensor
+ /dev/sprd_image
+ /dev/sprd_jpg
+ /dev/sprd_cpp
+
+
+  libcamsensor
+  DreamCamera2
+
+  out/target/product/sp9853i_1h10/vendor/lib/libcamsensor.so
+*/
+
+//sensor的操作接口
+struct sensor_ic_ops {
+    cmr_int (*create_handle)(struct sensor_ic_drv_init_para *init_param, cmr_handle *sns_ic_drv_handle);
+    cmr_int (*delete_handle)(cmr_handle handle, void *param);
+    cmr_int (*get_data)(cmr_handle handle, cmr_uint cmd, void **param);
+
+    /**
+     *  Some common control interfaces
+     */
+    cmr_int (*power)(cmr_handle handle, cmr_uint param);
+    cmr_int (*identify)(cmr_handle handle, cmr_uint param);
+    cmr_int (*write_exp)(cmr_handle handle, cmr_uint param);
+    cmr_int (*ex_write_exp)(cmr_handle handle, cmr_uint param);
+    cmr_int (*write_gain_value)(cmr_handle handle, cmr_uint param);
+    cmr_int (*write_ae_value)(cmr_handle handle, cmr_uint param);
+    cmr_int (*read_aec_info)(cmr_handle handle, void *param);
+
+    /*expend ops */
+    struct sensor_ic_ioctl_func_tag ext_ops[SENSOR_IOCTL_MAX];
+    cmr_int (*ioctl)(cmr_handle handle, int cmd, void *param);
+}
+
+
+typedef struct sensor_info_tag {
+    cmr_u16 source_width_max;
+    cmr_u16 source_height_max;
+    const cmr_s8 *name;
+    SENSOR_IMAGE_FORMAT image_format			//数据格式
+    struct sensor_res_tab_info *resolution_tab_info_ptr	//宽高
+    struct sensor_ic_ops *sns_ops;			//sensor操作函数
+    struct sensor_raw_info **raw_info_ptr		//
+    struct sensor_module_info *module_info_tab		//sensor的地址，电压，角度
+} SENSOR_INFO_T;
+
+
+
+
+
+/*
+ CameraID
+*/
+typedef enum {
+    SENSOR_MAIN = 0,	back_sensor_infor_tab		//后置主
+    SENSOR_SUB,		front_sensor_infor_tab		//前置主
+    SENSOR_DEVICE2,	back_ext_sensor_infor_tab	//后置副
+    SENSOR_DEVICE3	front_ext_sensor_infor_tab	//前置副
+}
+
+/******************************
+ 操作接口
+ oem--->sensor---drv
+ 对sensor的操作都是基于消息队列
+*/
+
+//初始化sensor
+camera_init_internal@cmr_oem.c-->
+cmr_sensor_init(struct sensor_init_param *init_param_ptr,cmr_handle *sensor_handle) {
+- struct cmr_sensor_handle *handle = (struct cmr_sensor_handle *)malloc(sizeof(struct cmr_sensor_handle))
+- handle->sensor_bits = init_param_ptr->sensor_bits
+  //创建操作线程，处理sensor的操作
+- cmr_sns_create_thread(handle){
+	- cmr_thread_create(&handle->thread_cxt.thread_handle, SENSOR_MSG_QUEUE_SIZE, cmr_sns_thread_proc,(void *)handle)
+	- cmr_thread_set_name(handle->thread_cxt.thread_handle, "sensor")
+	}
+  //返回给oem句柄
+- *sensor_handle = (cmr_handle)handle
+}@cmr_sensor.c
+
+
+//打开sensor
+cmr_sensor_open(cmr_handle sensor_handle, cmr_u32 sensor_id_bits) {
+  //创建消息
+- message.msg_type = CMR_SENSOR_EVT_OPEN
+- message.data = (void *)((unsigned long)sensor_id_bits)
+  //发送消息到thread_cxt
+- ret = cmr_thread_msg_send(handle->thread_cxt.thread_handle, &message)
+}@cmr_sensor.c
+
+//打开stream
+cmr_sensor_stream_ctrl(cmr_handle sensor_handle, cmr_uint sensor_id,cmr_uint on_off) {
+- message.msg_type = CMR_SENSOR_EVT_STREAM
+- cmr_thread_msg_send(handle->thread_cxt.thread_handle, &message)
+}@cmr_sensor.c
+
+/*****
+  sensor线程处理sensor操作
+*/
+cmr_sns_thread_proc(struct cmr_msg *message, void *p_data) {	
+- CMR_SENSOR_EVT_OPEN{
+	- cmr_sns_open(handle, ops_param)
+	}
+- CMR_SENSOR_EVT_CLOSE{
+	- cmr_sns_close(handle, ops_param)
+	}
+- CMR_SENSOR_EVT_IOCTL{
+	- sensor_set_cxt_common(&handle->sensor_cxt[camera_id])
+	- cmr_sns_ioctl(&handle->sensor_cxt[camera_id], p_ioctl_param->cmd,p_ioctl_param->arg)
+	}
+- CMR_SENSOR_EVT_STREAM{
+	- sensor_stream_ctrl_common(&handle->sensor_cxt[camera_id], ops_param)
+	}
+}@cmr_sensor.c
+
+//打开sensor
+cmr_sns_open(struct cmr_sensor_handle *handle, cmr_u32 sensor_id_bits) {
+  //打开所有有效的cameraid
+- sensor_open_common(&handle->sensor_cxt[cameraId], cameraId, handle->is_autotest)
+  //sensor检测线程
+- cmr_sns_create_monitor_thread(handle){
+	- pthread_create(&sensor_handle->monitor_thread_cxt.thread_handle, &attr, 
+		(void *(*)(void *))cmr_sns_monitor_proc,(void *)sensor_handle)	
+	}
+- cmr_sns_create_fmove_thread(handle)
+}@cmr_sensor.c
+
+
+
+//设置参数
+
+//ioctl
+cmr_sns_ioctl(struct sensor_drv_context *sensor_cxt, cmr_uint cmd, cmr_uint arg){
+- SENSOR_MATCH_T *module = sensor_cxt->current_module
+  //获取操作命令
+- cmr_sns_get_ioctl_cmd(&sns_cmd, cmd){
+	- SENSOR_STREAM_ON:*sns_cmd = SENSOR_IOCTL_STREAM_ON
+	- 
+	- 
+	}
+  //操作
+- struct sensor_ic_ops *sns_ops = sensor_cxt->sensor_info_ptr->sns_ops
+- SENSOR_IOCTL_FUNC_PTR func_ptr = sns_ops->ext_ops[sns_cmd].ops
+- sns_ops->ext_ops[sns_cmd].ops(sensor_cxt->sns_ic_drv_handle, arg)
+}@cmr_sensor.c
+
+
+
+
+
+vendor/sprd/modules/libcamera/sensor/sensor_cfg.c
+vendor/sprd/modules/libcamera/oem2v1/src/cmr_sensor.c
+vendor/sprd/modules/libcamera/oem2v1/src/cmr_oem.c
+vendor/sprd/modules/libcamera/common/src/cmr_msg.c
+/******************************
+ sensor 控制接口
+
+*/
+
+sensor_open_common(struct sensor_drv_context *sensor_cxt, cmr_u32 sensor_id, cmr_uint is_autotest) {
+- sensor_context_init(sensor_cxt, sensor_id, is_autotest)
+- sensor_create_ctrl_thread(sensor_cxt){
+	- cmr_thread_create(&sensor_cxt->ctrl_thread_cxt.thread_handle,SENSOR_CTRL_MSG_QUEUE_SIZE,
+                                sensor_ctrl_thread_proc, (void *)sensor_cxt)
+	- sensor_cxt->ctrl_thread_cxt.is_inited = 1
+	}
+  //sensor操作接口/dev/sprd_sensor
+- cmr_int fd_sensor = hw_sensor_drv_create(&input_ptr, &hw_drv_handle){
+	- struct hw_drv_cxt *hw_drv_cxt = *hw_drv_handle =(struct hw_drv_cxt *)malloc(sizeof(struct hw_drv_cxt))
+	- _hw_sensor_dev_init(*hw_drv_handle, input_ptr->sensor_id){
+		- hw_drv_cxt->fd_sensor = open(HW_SENSOR_DEV_NAME, O_RDWR, 0)	//打开"/dev/sprd_sensor"
+		- ioctl(hw_drv_cxt->fd_sensor, SENSOR_IO_SET_ID, &sensor_id)	//设置sensorId
+		}
+	- return hw_drv_cxt->fd_sensor
+	}
+- sensor_cxt->fd_sensor = fd_sensor
+  //是否已经有sensor的识别信息。加载
+- sensor_load_idx_inf_file(sensor_cxt){
+	- FILE *fp = fopen(SENSOR_PARA, "rb+")		//"/data/misc/cameraserver/sensor.file"
+	- fread(sensor_idx, 1, SENSOR_PARAM_NUM, fp)
+	- sensor_cxt->sensor_identified = SCI_TRUE
+	- sensor_cxt->sensor_index[i] = sensor_idx	//设置sensor_idx。初始值为0xFF	
+	}
+  //获取对应sensor的信息
+- if (sensor_cxt->sensor_identified) {
+	- sns_load_drv(sensor_cxt, SENSOR_MAIN){	//后置主射
+	   	- sensor_get_match_info(sensor_cxt, sensor_id)
+		}
+	- sns_load_drv(sensor_cxt, SENSOR_SUB)		//前置副射
+	- sns_load_drv(sensor_cxt, SENSOR_DEVICE2)	//2射
+	- sns_load_drv(sensor_cxt, SENSOR_DEVICE3)
+	- sensor_open(sensor_cxt, sensor_id)		 //打开sensor
+	}
+  //没有识别信息，执行sensor识别
+- if ((!sensor_cxt->sensor_identified) || (ret_val != SENSOR_SUCCESS)) {
+	- sensor_identify(sensor_cxt, SENSOR_MAIN){
+		- sensor_set_cxt_common(sensor_cxt)
+		- sensor_identify_search(sensor_cxt, sensor_id)
+		}
+	- sensor_identify(sensor_cxt, SENSOR_SUB)
+	- sensor_identify(sensor_cxt, SENSOR_DEVICE2)
+	- sensor_identify(sensor_cxt, SENSOR_DEVICE3)
+	- sensor_open(sensor_cxt, sensor_id)
+	}
+- sensor_save_idx_inf_file(sensor_cxt)			//保存识别信息"/data/misc/cameraserver/sensor.file"
+}@sensor_drv_u.c
+
+//sensor_id  0 1 2 3前后主副摄
+//识别sensor。遍历sensor表项，读取sensor信息。查找当前平台sensor在表项中的位置
+sensor_identify_search(struct sensor_drv_context *sensor_cxt, SENSOR_ID_E sensor_id) {
+  //获取sensor表。sensor_index=0开始遍历其中的子项(对应不同的sensor)
+- SENSOR_MATCH_T *sns_module = sensor_get_entry_by_idx(sensor_id, sensor_index){
+	- SENSOR_MATCH_T *sns_reg_tab_ptr = sensor_get_regist_table(sensor_id){
+		- case SENSOR_MAIN{	//后置主摄
+			- sensor_reg_tab_ptr = (SENSOR_MATCH_T *)back_sensor_infor_tab
+			}
+		- case SENSOR_SUB{	//前置主摄
+			- sensor_reg_tab_ptr = (SENSOR_MATCH_T *)front_sensor_infor_tab
+			}
+		- case SENSOR_DEVICE2{	//后置副摄
+			- sensor_reg_tab_ptr = (SENSOR_MATCH_T *)back_ext_sensor_infor_tab
+			}
+		- case SENSOR_DEVICE3{	//前置副摄
+			- sensor_reg_tab_ptr = (SENSOR_MATCH_T *)front_ext_sensor_infor_tab
+			}
+		}
+	- return sns_reg_tab_ptr += idx
+	}
+  //检查获取的sensor中名字是否与对应id匹配。CAMERA_SENSOR_TYPE_BACK := "ov8856"@sp9853i_1h10/BoardConfig.mk
+- sensor_check_name(sensor_id, sns_module)
+  //设置值
+- sensor_cxt->sensor_info_ptr = sns_module->sensor_info
+- sensor_cxt->current_module = (void *)sns_module
+  //识别sensor。读取sensor中的pid,vid
+- retValue = sensor_ic_identify(sensor_cxt, sensor_id)	//识别成功返回 SENSOR_SUCCESS
+- if (SENSOR_SUCCESS == retValue) sensor_cxt->sensor_index[sensor_id] = sensor_index	//记录表中index
+}@sensor_drv_u.c
+
+//读取当前表项中信息，判断sersor型号
+sensor_ic_identify(struct sensor_drv_context *sensor_cxt,cmr_u32 sensor_id) {
+- sensor_get_module_cfg_info(sensor_cxt, sensor_id, &mod_cfg_info)
+  //sensor地址
+- sensor_cxt->i2c_addr = mod_cfg_info->major_i2c_addr
+- sensor_ic_create(sensor_cxt, sensor_id)
+}@sensor_drv_u.c
+
+//根据识别的sensor的表项的index，获取表项
+sensor_get_match_info(sensor_cxt, sensor_id){
+  //根据表索引index,获取对应的表项
+- cmr_u32 drv_idx = sensor_cxt->sensor_index[sensor_id]
+- SENSOR_MATCH_T *sns_module = sensor_get_entry_by_idx(sensor_id, drv_idx)
+  //获取后初始化
+- sensor_cxt->sensor_info_ptr = sns_module->sensor_info
+}@sensor_drv_u.c
+
+
+sensor_open(struct sensor_drv_context *sensor_cxt,cmr_u32 sensor_id) {
+- 
+}@sensor_drv_u.c
+
+
+//打开关闭stream
+sensor_stream_ctrl_common(struct sensor_drv_context *sensor_cxt, cmr_u32 on_off) {
+- message.msg_type = SENSOR_CTRL_EVT_STREAM_CTRL
+- message.sub_msg_type = on_off
+- cmr_thread_msg_send(sensor_cxt->ctrl_thread_cxt.thread_handle,&message)
+}@sensor_drv_u.c
+
+/*****
+ sensor_ctrl_thread_proc线程处理sensor操作
+
+*/
+sensor_ctrl_thread_proc(struct cmr_msg *message, void *p_data) {
+- SENSOR_CTRL_EVT_SETMODE{
+	- cmr_u32 mode = (cmr_u32)message->sub_msg_type
+	- sensor_set_mode(sensor_cxt, mode, is_inited)
+	}
+- SENSOR_CTRL_EVT_CFGOTP{
+	- otp_ctrl_data = (otp_ctrl_cmd_t *)message->data
+	- sensor_otp_process(sensor_cxt, otp_ctrl_data->cmd,...)
+	}
+- SENSOR_CTRL_EVT_STREAM_CTRL{
+	- on_off = (cmr_u32)message->sub_msg_type
+	- sensor_stream_ctrl(sensor_cxt, on_off)
+	}
+}@sensor_drv_u.c
+
+//打开关闭stream
+sensor_stream_ctrl(struct sensor_drv_context *sensor_cxt, cmr_u32 on_off){
+- if (on_off == 1) {
+	- hw_sensor_mipi_init(sensor_cxt->hw_drv_handle, init_param)
+	- sensor_stream_on(struct sensor_drv_context *sensor_cxt) {
+		- struct sensor_ic_ops *sns_ops = sensor_cxt->sensor_info_ptr->sns_ops
+		- stream_on_func = sns_ops->ext_ops[SENSOR_IOCTL_STREAM_ON].ops
+		- stream_on_func(sensor_cxt->sns_ic_drv_handle, param)
+		}
+  }else if(on_off == 2){
+
+  }else{
+	- 
+  }
+}@sensor_drv_u.c
+
+
+vendor/sprd/modules/libcamera/sensor/sensor_drv_u.c
+vendor/sprd/modules/libcamera/sensor/hw_drv/hw_sensor_drv.c
