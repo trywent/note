@@ -1,0 +1,35 @@
+/************************************
+ 背光 backlight
+ 
+ android10通过displayManager设置背光 。之前通过powerManager设置背光
+*/
+LIGHT_ID_BACKLIGHT = Type.BACKLIGHT
+LIGHT_ID_KEYBOARD = Type.KEYBOARD
+LIGHT_ID_BUTTONS = Type.BUTTONS
+LIGHT_ID_BATTERY = Type.BATTERY
+LIGHT_ID_NOTIFICATIONS = Type.NOTIFICATIONS
+LIGHT_ID_ATTENTION = Type.ATTENTION
+LIGHT_ID_BLUETOOTH = Type.BLUETOOTH
+
+mSystemServiceManager.startService(LightsService.class)@SystemServer.java-->
+LightsService(Context context) {
+- super(context)
+- for (int i = 0; i < LightsManager.LIGHT_ID_COUNT; i++) {
+	- mLights[i] = new LightImpl(context, i)
+	}
+}@LightsService.java
+
+onStart-->publishLocalService(LightsManager.class, mService)
+
+
+//设置背光。通过powerManager,displaymanager设置
+setBrightness(int brightness)
+
+
+
+HAL:
+LIGHTS_HARDWARE_MODULE_ID //背光模块
+
+frameworks/base/services/core/java/com/android/server/lights/LightsManager.java
+frameworks/base/services/java/com/android/server/LightsService.java
+frameworks/base/services/jni/com_android_server_LightsService.cpp

@@ -1,0 +1,63 @@
+/********************************
+ 用户组定义
+*/
+#define AID_ROOT 0 /* traditional unix root user */
+/* The following are for LTP and should only be used for testing */
+#define AID_DAEMON 1 /* traditional unix daemon owner */
+#define AID_BIN 2    /* traditional unix binaries owner */
+
+#define AID_SYSTEM 1000 	 /* system server */
+#define AID_RADIO 1001           /* telephony subsystem, RIL */
+#define AID_BLUETOOTH 1002       /* bluetooth subsystem */
+#define AID_GRAPHICS 1003        /* graphics devices */
+#define AID_INPUT 1004           /* input devices */
+#define AID_AUDIO 1005           /* audio devices */
+#define AID_CAMERA 1006          /* camera devices */
+#define AID_LOG 1007             /* log devices */
+#define AID_COMPASS 1008         /* compass device */
+#define AID_MOUNT 1009           /* mountd socket */
+#define AID_WIFI 1010            /* wifi subsystem */
+#define AID_ADB 1011             /* android debug bridge (adbd) */
+#define AID_INSTALL 1012         /* group for installing packages */
+#define AID_MEDIA 1013           /* mediaserver process */
+@android_filesystem_config.h
+
+/*******
+ 文件设置UID,GID
+*/
+static const struct fs_path_config android_files[] = {
+    { 00644, AID_SYSTEM,    AID_SYSTEM,    0, "data/app/*" },
+    { 00644, AID_SYSTEM,    AID_SYSTEM,    0, "data/app-ephemeral/*" },
+	...
+}@fs_config.cpp
+
+
+
+/*******
+ 服务进程设置UID,GID
+*/
+service xxx /system/bin/xxx
+    user root
+    group root
+
+system/core/libcutils/fs_config.cpp
+system/core/libcutils/include/private/android_filesystem_config.h
+
+/*******
+ 应用进程设置UID,GID  应该是请求权限后设置
+*/
+//解析permission.xml中group 根据权限字符串获取GID：
+Process.getGidForName("media_rw")@Process.java-->android_os_Process_getGidForName{
+- struct group* grp = getgrnam(str)
+- return grp->gr_gid			//库接口。根据名字获取group
+}@android_util_Process.cpp
+
+
+//shareduid
+若AndoridManifest.xml中定义了android:sharedUserId="string"
+readSharedUserLPw-->addSharedUserLPw(name.intern(), userId, pkgFlags))@Settings.java
+
+
+frameworks/base/core/java/android/os/Process.java
+frameworks/base/core/jni/android_util_Process.cpp
+frameworks/base/services/java/com/android/server/am/ActivityManagerService.java

@@ -1,19 +1,30 @@
-/*
+/**************************************
  保存应用信息
 */
 
 PackageManagerService{
-- mSettings = new Settings(mPackages){
+- mSettings = new Settings(File dataDir, PermissionSettings permission, Object lock){
+	- mPermissions = permission
 	- mSystemDir = new File(dataDir, "system")
 	- mSettingsFilename = new File(mSystemDir, "packages.xml");
         - mBackupSettingsFilename = new File(mSystemDir, "packages-backup.xml");
         - mPackageListFilename = new File(mSystemDir, "packages.list");
 	}
-- mSettings.readLPw(sUserManager.getUsers(false))
+  //读取应用信息
+- mFirstBoot = !mSettings.readLPw(sUserManager.getUsers(false))
 }@PakcageManagerService.java
 
 
-/* 加载配置。所有用户
+//加入应用信息
+scanDirLI-->addForInitLI-->commitReconciledScanResultLocked-->commitPackageSettings
+@PackageManagerService.java-->insertPackageSettingLPw(PackageSetting p, PackageParser.Package pkg)-->
+addPackageSettingLPw(PackageSetting p, SharedUserSetting sharedUser) {
+- mPackages.put(p.name, p)
+}@Settings.java
+
+
+/*********
+ 加载配置。所有用户
 
 */
 readLPw(List<UserInfo> users) {
@@ -57,7 +68,16 @@ readPackageLPw(XmlPullParser parser){
 - 
 }@Settings.java
 
-/* 保存应用信息
+//运行时权限
+RuntimePermissionPersistence.readStateForUserSyncLPr(int userId) {
+  //runtime permission /data/system/user0/runtime-permissions.xml
+- File permissionsFile = getUserRuntimePermissionsFile(userId)
+- 
+}@Settings.java
+
+
+/*********
+  保存应用信息
  
 */
 writeLPr() {
@@ -71,6 +91,7 @@ writeLPr() {
   //打开packages.xml文件
 - FileOutputStream fstr = new FileOutputStream(mSettingsFilename)
 - BufferedOutputStream str = new BufferedOutputStream(fstr)
+- mPermissions.writePermissionTrees(serializer)
   //写入package
 - for (final PackageSetting pkg : mPackages.values()) {
 	- writePackageLPr(serializer, pkg)
@@ -83,6 +104,11 @@ writeLPr() {
 - 
 }@Settings.java
 
+//package
+writePackageLPr(XmlSerializer serializer, final PackageSetting pkg){
+- writeChildPackagesLPw(serializer, pkg.childPackageNames) 
+- writePermissionsLPr(serializer, pkg.getPermissionsState().getInstallPermissionStates())
+}@Settings.java
 
 
 isEnabledAndMatchLPr(ComponentInfo componentInfo, int flags, int userId){

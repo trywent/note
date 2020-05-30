@@ -1,4 +1,6 @@
-/*多媒体服务启动：
+/******************************
+
+ 多媒体服务启动：
 
 */
 service media /system/bin/mediaserver@init.rc-->
@@ -25,7 +27,9 @@ BinderService::instantiate-->publish{
 frameworks/av/media/mediaserver/main_mediaserver.cpp
 frameworks/native/include/binder/BinderService.h
 
-/* android8.1
+/******************************
+  Android8
+  Android10
 
 */
 LOCAL_SHARED_LIBRARIES := \
@@ -33,9 +37,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libaudioflinger \
 	libaudiopolicyservice \
 
-int main(int argc __unused, char **argv)
-{
-- AudioFlinger::instantiate()
+int main(int argc __unused, char **argv){
+- AudioFlinger::instantiate()			//只启动声音相关服务
 - AudioPolicyService::instantiate()
 
 }@main_audioserver.cpp

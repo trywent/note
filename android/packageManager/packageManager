@@ -1,4 +1,4 @@
-/*
+/**************************************
  SystemConfig 配置，功能，权限
  mSetting 保存应用信息
 
@@ -16,13 +16,13 @@ main(Context context, Installer installer,boolean factoryTest, boolean onlyCore)
 - ServiceManager.addService("package", m)
 }@PackageManagerService.java
 
-
 //PackageManagerService
-final ArrayMap<String, PackageParser.Package> mPackages = new ArrayMap<String, PackageParser.Package>
-
-PackageManagerService(Context context, Installer installer,
-            boolean factoryTest, boolean onlyCore){
-- mSettings = new Settings(mPackages)
+PackageManagerService(Context context, Installer installer,boolean factoryTest, boolean onlyCore){
+  //settings  mPackages保存应用
+- mPermissionManager = PermissionManagerService.create(context,mPackages /*externalLock*/)
+- mDefaultPermissionPolicy = mPermissionManager.getDefaultPermissionGrantPolicy()
+- mSettings = new Settings(Environment.getDataDirectory(),mPermissionManager.getPermissionSettings(), mPackages)
+  //installer
 - mInstaller = installer
 - mPackageDexOptimizer = new PackageDexOptimizer(installer)
 - mDexManager = new DexManager(this, mPackageDexOptimizer, installer)
@@ -38,19 +38,83 @@ PackageManagerService(Context context, Installer installer,
 - mHandlerThread = new ServiceThread(TAG,Process.THREAD_PRIORITY_BACKGROUND)
 - mHandlerThread.start()
 - sUserManager = new UserManagerService(context, this,new UserDataPreparer(mInstaller, mInstallLock, mContext, mOnlyCore))
- //读取用户设置 
+ //读取应用信息 
 - mFirstBoot = !mSettings.readLPw(sUserManager.getUsers(false))
 - requestCopyPreoptedFiles //copy files
+- mCacheDir = preparePackageParserCache()		//
   //扫描应用
-- scanDirTracedLI
-  //应用安装
+- int scanFlags = SCAN_BOOTING | SCAN_INITIAL
+- if (mIsUpgrade || mFirstBoot) {
+	- scanFlags = scanFlags | SCAN_FIRST_BOOT_OR_UPGRADE
+	}
+- scanDirTracedLI(new File(VENDOR_OVERLAY_DIR)...)	//overlay
+- scanDirTracedLI(frameworkDir...)			//framework下jar
+  //等待应用准备好
+- mPrepareAppDataFuture = SystemServerInitThreadPool.get().submit(() -> {
+	- for (String pkgName : deferPackages) {
+		- prepareAppDataAndMigrateLIF
+		}
+	}
+  //应用安装服务
 - mInstallerService = new PackageInstallerService(context, this)
+  //写入设置信息
+- mSettings.writeLPr()
 }@PackageManagerService.java
 
 
+//扫描应用。parallelPackageParser的线程池中执行扫描，并等待处理扫描结果
+scanDirTracedLI(File scanDir, final int parseFlags, int scanFlags, long currentTime)-->
+scanDirLI(scanDir, parseFlags, scanFlags, currentTime)-->
+scanDirLI(File scanDir, int parseFlags, int scanFlags, long currentTime) {
+  //扫描apk中AndroidManifest.xml
+- ParallelPackageParser parallelPackageParser = new ParallelPackageParser(mSeparateProcesses, mOnlyCore...
+	mParallelPackageParserCallback)
+- final File[] files = scanDir.listFiles()
+- parallelPackageParser.submit(file, parseFlags){
+	- mService.submit(() -> {
+		- ParseResult pr = new ParseResult()
+		- PackageParser pp = new PackageParser()
+		- pp.setCacheDir(mCacheDir)				//存放缓存
+		- pr.pkg = parsePackage(pp, scanFile, parseFlags)
+		- mQueue.put(pr)
+		}
+	}@ParallelPackageParser.java
+  //处理扫描结果。会一直处理完成
+- ParallelPackageParser.ParseResult parseResult = parallelPackageParser.take()	//BlockingQueue回去阻塞等待数据
+- scanPackageChildLI(parseResult.pkg, parseFlags, scanFlags...){
+	- PackageParser.Package scannedPkg = addForInitLI(pkg, parseFlags, scanFlags, currentTime, user)
+	}
+}@PackageManagerService.java
+
+ //扫描完应用，加入应用信息。可被查询，权限检查
+PackageParser.Package addForInitLI(PackageParser.Package pkg,@ParseFlags int parseFlags,
+	@ScanFlags int scanFlags, long currentTime,@Nullable UserHandle user){
+- 
+- ScanResult scanResult = scanPackageNewLI(pkg, parseFlags, scanFlags| SCAN_UPDATE_SIGNATURE, currentTime, user)
+  //创建package信息。保存到settings
+- final Map<String, ReconciledPackage> reconcileResult = reconcilePackagesLocked(new ReconcileRequest())
+- commitReconciledScanResultLocked(reconcileResult.get(pkgName)){
+	- ScanResult result = reconciledPkg.scanResult
+	- pkgSetting = request.pkgSetting
+	- commitPackageSettings(pkg, oldPkg, pkgSetting, scanFlags,...)-->mSettings.insertPackageSettingLPw(pkgSetting, pkg)
+	}
+}@PackageManagerService.java
 
 
+//系统已经准备好
+systemReady(){
+- 
+  //分配默认权限
+- for (int userId : grantPermissionsUserIds) {
+	- mDefaultPermissionPolicy.grantDefaultPermissions(userId)
+	}
+}@PackageManagerService.java
 
+
+frameworks/base/services/core/java/com/android/server/pm/ParallelPackageParser.java
+/**************************************
+ 解析intent
+*/
 resolveIntent(Intent intent, String resolvedType,int flags, int userId)-->
 resolveIntentInternal{
   //更新flag
@@ -139,7 +203,7 @@ installPackageTracedLI-->installPackageLI(InstallArgs args, PackageInstalledInfo
   }
 }@PackageManagerService.java
 
-/*
+/**************************************
  安装应用前传输apk文件到packageManagerServices
 */
 

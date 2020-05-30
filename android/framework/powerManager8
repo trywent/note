@@ -1,5 +1,5 @@
 /************************************
-  PowerManagerService
+  PowerManagerService android8.0
 
 */
 PARTIAL_WAKE_LOCK	//cpu运行，屏幕允许关闭
@@ -412,18 +412,14 @@ property_changed(const std::string& name, const std::string& value) {
 	}
 }@init.cpp
 
-
-frameworks/base/services/core/java/com/android/server/power/PowerManagerService.java
-frameworks/base/services/core/java/com/android/server/power/ShutdownThread.java
-/************************************
- 背光
+/**********************************
+ 背光 backlight
 */
 initialize-->DisplayPowerState(mLights.getLight(LightsService.LIGHT_ID_BACKLIGHT))
 @DisplayPowerController.java
 
-
-背光设置：
-SettingsObserver(监听设置SCREEN_BRIGHTNESS){
+//背光设置：监听设置SCREEN_BRIGHTNESS
+SettingsObserver(){
 - 设置亮度值，handleSettingsChangedLocked-->updateSettingsLocked-->mScreenBrightnessSetting
 - 设置亮度，updatePowerStateLocked-->mDisplayPowerController.requestPowerState-->
 	updatePowerState-->animateScreenBrightness-->mScreenBrightnessRampAnimator.animateTo
@@ -434,13 +430,11 @@ SettingsObserver(监听设置SCREEN_BRIGHTNESS){
 	devices->lights[light]->set_light@com_android_server_LightsService.cpp
 }PowerManagerService.java
 
-HAL:
-LIGHTS_HARDWARE_MODULE_ID //背光模块
 
-
+frameworks/base/services/core/java/com/android/server/power/PowerManagerService.java
+frameworks/base/services/core/java/com/android/server/power/ShutdownThread.java
 frameworks/base/policy/src/com/android/internal/policy/impl/PhoneWindowManager.java
 frameworks/base/services/java/com/android/server/power/DisplayPowerController.java
 frameworks/base/services/java/com/android/server/power/RampAnimator.java
 frameworks/base/services/java/com/android/server/power/DisplayPowerState.java
-frameworks/base/services/java/com/android/server/LightsService.java
-frameworks/base/services/jni/com_android_server_LightsService.cpp
+

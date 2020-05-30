@@ -1,8 +1,12 @@
-//android4.1
+/****************************
+ android4.1
+*/
 main-->system_init@system_main.cpp-->system_init-->(JNI调用)init2@system_init.cpp-->
 init2-->new ServerThread-->thr.start-->ServerThread.run(启动服务)@SystemServer.java
 
-//android6.0
+/****************************
+ android6.0
+*/
 startSystemServer-->Zygote.forkSystemServer-->/*pid=0*/handleSystemServerProcess{
   //类/system/framework/services.jar:/system/framework/ethernet-service.jar:/system/framework/wifi-service.jar
 - systemServerClasspath = Os.getenv("SYSTEMSERVERCLASSPATH") 
@@ -23,7 +27,56 @@ main-->SystemServer().run{
 - startOtherServices
 }@SystemServer.java
 
+//
+startBootstrapServices(){
+- SystemServerInitThreadPool.get().submit(SystemConfig::getInstance)//加载系统配置/system/etc/permissions
+- mSystemServiceManager.startService(Installer.class)
+- mSystemServiceManager.startService(ActivityManagerService.Lifecycle.class)
+- mSystemServiceManager.startService(DisplayManagerService.class)
+- startSensorService
+  //packageManager
+- mPackageManagerService = PackageManagerService.main(mSystemContext, installer,...)
+}
 
+startCoreServices{
+- 
+}
+
+startOtherServices(){
+  //窗口服务, input服务
+- InputManagerService inputManager = new InputManagerService(context)	
+- WindowManagerService wm = WindowManagerService.main(context, inputManager) 
+- ServiceManager.addService(Context.WINDOW_SERVICE, wm)
+- ServiceManager.addService(Context.INPUT_SERVICE, inputManager...)
+- wm.onInitReady()
+- inputManager.setWindowManagerCallbacks(wm.getInputManagerCallback())
+- inputManager.start()
+  //开始启动应用进程
+- mSystemServiceManager.startBootPhase(SystemService.PHASE_LOCK_SETTINGS_READY)
+- mSystemServiceManager.startBootPhase(SystemService.PHASE_SYSTEM_SERVICES_READY)
+  //ready
+- mSystemServiceManager.startService(PermissionPolicyService.class)
+- mPackageManagerService.systemReady()
+ //activtiyService ready
+- mActivityManagerService.systemReady(() -> {
+	- mActivityManagerService.startObservingNativeCrashes()
+	- mPackageManagerService.waitForAppDataPrepared()	//等待应用准备完成
+	}
+}
+
+
+//关闭非核心服务
+config.disable_noncore@SystemServer.java
+
+frameworks/base/cmds/system_server/system_main.cpp
+frameworks/base/cmds/system_server/library/system_init.cpp
+frameworks/base/services/java/com/android/server/SystemServer.java
+frameworks/base/services/core/java/com/android/server/SystemService.java
+frameworks/base/services/core/jni/com_android_server_SystemServer.cpp
+
+/*******
+ 服务启动
+*/
 startService(serviceClass){
 - name = serviceClass.getName()
 - constructor = serviceClass.getConstructor(Context.class)
@@ -37,42 +90,32 @@ startService(serviceClass){
 	}
 }SystemServiceManager.java
 
-//
-startBootstrapServices{
-- SystemServerInitThreadPool.get().submit(SystemConfig::getInstance)//加载系统配置/system/etc/permissions
-- mSystemServiceManager.startService(Installer.class)
-- mSystemServiceManager.startService(ActivityManagerService.Lifecycle.class)
-- mSystemServiceManager.startService(DisplayManagerService.class)
-- startSensorService
-}
-
-startCoreServices{
-- 
-}
-
-startOtherServices{
-- wm = WindowManagerService.main(context, inputManager)//窗口服务
-- ServiceManager.addService(Context.WINDOW_SERVICE, wm)
-}
 
 //将服务注册到serviceManager（publish）
-publishBinderService-->ServiceManager.addService@SystemService.java
+publishBinderService(String name, IBinder service,boolean allowIsolated, int dumpPriority-->
+ServiceManager.addService@SystemService.java
 
 
-//关闭非核心服务
-config.disable_noncore@SystemServer.java
 
-frameworks/base/cmds/system_server/system_main.cpp
-frameworks/base/cmds/system_server/library/system_init.cpp
-frameworks/base/services/java/com/android/server/SystemServer.java
+
+//启动阶段回调
+startBootPhase(final int phase) {
+- mCurrentPhase = phase
+- for (int i = 0; i < mServices.size(); i++) {
+	- SystemService service = mServices.get(i)
+	- service.onBootPhase(mCurrentPhase)
+	}
+}@SystemServiceManager.java
+
+
 frameworks/base/services/core/java/com/android/server/SystemServiceManager.java
-frameworks/base/services/core/java/com/android/server/SystemService.java
-frameworks/base/services/core/jni/com_android_server_SystemServer.cpp
-
-/*
+/*******
  本地服务LocalServices
 
 */
+//local
+publishLocalService(Class<T> type, T service)-->LocalServices.addService(type, service)@SystemService.java
+
 addService-->sLocalServiceObjects.put(type, service)@LocalServices.java
 
 getService-->sLocalServiceObjects.get(type)@LocalServices.java

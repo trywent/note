@@ -1,4 +1,4 @@
-/*
+/********************************
   systemimg
 */
 file xxxx.img //查看文件格式
@@ -54,3 +54,7 @@ cpio -i -F  ramdisk		//解出文件
 __________________
 mkdir temp_directory && cd temp_directory
 gunzip -c ../ramdisk.img | cpio -idm
+
+
+
+

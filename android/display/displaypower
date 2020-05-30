@@ -1,0 +1,119 @@
+/****************************
+ 背光控制
+
+*/
+
+mDisplayManagerInternal.initPowerManagement@PowerManagerService.java--
+initPowerManagement(final DisplayPowerCallbacks callbacks, Handler handler,SensorManager sensorManager){
+  //blanker背光控制器
+- DisplayBlanker blanker = new DisplayBlanker() {
+	- requestDisplayState(int state, int brightness) {
+		- requestGlobalDisplayStateInternal(state, brightness)
+		}
+	- mDisplayPowerController = new DisplayPowerController(mContext, callbacks, handler, sensorManager, blanker)
+	}
+- mHandler.sendEmptyMessage(MSG_LOAD_BRIGHTNESS_CONFIGURATION)
+}@DisplayManagerService.java
+
+//设置power状态
+updateDisplayPowerStateLocked@PowerManagerService.java-->
+DisplayManagerInternal.requestPowerState@@DisplayManagerService.java-->
+requestPowerState(DisplayPowerRequest request,boolean waitForNegativeProximity) {
+- mPendingRequestLocked = new DisplayPowerRequest(request)
+- change = true
+- sendUpdatePowerStateLocked
+}@DisplayPowerController
+
+//更新状态，更新背光
+updatePowerState() {
+- mPowerRequest = new DisplayPowerRequest(mPendingRequestLocked)	//当前要设置的状态
+- initialize() {
+	- mPowerState = new DisplayPowerState(mBlanker...)
+  	//渐变设置背光接口
+	- mScreenBrightnessRampAnimator =  new RampAnimator<DisplayPowerState>(mPowerState, DisplayPowerState.SCREEN_BRIGHTNESS)
+	- float brightness = convertToNits(mPowerState.getScreenBrightness())
+	- mBrightnessTracker.start(brightness)
+	}
+- 
+}@DisplayPowerController.java
+
+
+//设置背光
+updatePowerState-->animateScreenBrightness-->
+mScreenBrightnessRampAnimator.animateTo@DisplayPowerController.java-->
+animateTo(int target, int rate) {
+  //立即设置	
+- if (mFirstTime || rate <= 0) {	
+	- mCurrentValue = target
+	- mProperty.setValue(mObject, target)-->SCREEN_BRIGHTNESS.setValue@DisplayPowerState.java
+	}
+  //渐变设置
+- postAnimationCallback()-->mChoreographer.postCallback(Choreographer.CALLBACK_ANIMATION, mAnimationCallback, null)
+	-->mAnimationCallback{
+	- mCurrentValue = Math.round(mAnimatedValue)
+	- mProperty.setValue(mObject, mCurrentValue)
+	}
+}@RampAnimator.java
+
+
+/*****
+ DisplayPowerState
+
+*/
+initialize@DisplayPowerController.java-->
+DisplayPowerState(DisplayBlanker blanker, ColorFade colorFade){
+- mBlanker = blanker
+- mPhotonicModulator = new PhotonicModulator()
+  //更新背光
+- mPhotonicModulator.start()-->PhotonicModulator.run{
+	- backlight = mPendingBacklight
+	- mBlanker.requestDisplayState(state, backlight)
+	}
+}DisplayPowerState.java
+
+//设置背光值
+SCREEN_BRIGHTNESS.setValue-->
+setScreenBrightness(int brightness){
+- mScreenBrightness = brightness
+- scheduleScreenUpdate-->postScreenUpdateThreadSafe{
+	- mHandler.removeCallbacks(mScreenUpdateRunnable)
+	- mHandler.post(mScreenUpdateRunnable)
+	}
+}@DisplayPowerState.java
+
+mScreenUpdateRunnable.run{
+- brightness = mScreenState != Display.STATE_OFF && mColorFadeLevel > 0f ? mScreenBrightness : 0
+- mPhotonicModulator.setState(mScreenState, brightness)--
+	PhotonicModulator.setState(int state, int backlight){
+	- mPendingState = state
+	- mPendingBacklight = backlight
+	} 
+}@DisplayPowerState.java
+
+
+//blanker设置背光
+requestGlobalDisplayStateInternal(int state, int brightness){
+- mGlobalDisplayState = state
+- mGlobalDisplayBrightness = brightness
+- applyGlobalDisplayStateLocked(mTempDisplayStateWorkQueue){
+	  //遍历display,更新状态
+	- Runnable runnable = updateDisplayStateLocked(device)
+	- workQueue.add(runnable)	
+	}
+}@DisplayManagerService.java
+
+updateDisplayStateLocked(DisplayDevice device)-->device.requestDisplayStateLocked(mGlobalDisplayState, mGlobalDisplayBrightness)
+@DisplayManagerService.java-->requestDisplayStateLocked(final int state, final int brightness)-->Runnable.run(){
+- setVrMode
+- setDisplayBrightness
+- setDisplayState
+}@LocalDisplayAdapter.java
+
+
+
+frameworks/base/services/core/java/com/android/server/display/DisplayManagerService.java
+frameworks/base/services/core/java/com/android/server/display/LocalDisplayAdapter.java
+frameworks/base/services/core/java/com/android/server/display/DisplayPowerController.java
+frameworks/base/services/core/java/com/android/server/display/AutomaticBrightnessController.java
+frameworks/base/services/core/java/com/android/server/display/DisplayPowerState.java
+frameworks/base/services/core/java/com/android/server/display/RampAnimator.java

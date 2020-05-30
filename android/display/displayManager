@@ -1,4 +1,6 @@
 /****************************
+ displayManager
+
  display信息
 */
 mDisplayManagerService = mSystemServiceManager.startService(DisplayManagerService.class)@SystemServer.java-->s
@@ -135,6 +137,7 @@ getDisplayInfo(int displayId)-->getDisplayInfoInternal(displayId, callingUid){
 	}
 - return inof
 }@DisplayManangerService.java
+
 
 /****************************
  设置输入事件窗口大小方位

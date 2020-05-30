@@ -107,3 +107,18 @@ main{
 
 system/core/logcat/logcat.cpp
 system/core/liblog/logprint.c
+
+/***********************
+ logcat -b events
+
+ debug.atrace.tags.enableflags
+*/
+
+nativeGetEnabledTags@Trace.java-->android_os_Trace_nativeGetEnabledTags@android_os_Trace.cpp
+atrace_get_enabled_tags-->atrace_init-->atrace_setup-->pthread_once(&atrace_once_control, atrace_init_once)
+
+
+frameworks/base/core/java/android/os/Trace.java
+frameworks/base/core/jni/android_os_Trace.cpp
+system/core/include/cutils/trace.h
+system/core/libcutils/trace-dev.cpp

@@ -1,0 +1,21 @@
+/********************************
+ 运行环境
+ 
+*/
+
+//PATH
+
+
+//库的搜索路径
+/system/etc/ld.config.txt
+
+
+init_default_namespaces(const char* executable_path){
+- ld_config_file_path = get_ld_config_file_path(executable_path)
+- Config::read_binary_config(ld_config_file_path.c_str(),executable_path...)
+}@linker.cpp
+
+
+bionic/linker/linker.cpp
+
+

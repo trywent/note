@@ -1,0 +1,22 @@
+/*******************************************
+
+*/
+
+
+
+/*
+ 弹旧版android框
+  targetSdkVersion < ro.build.version.min_supported_target_sdk //android10最小为23
+ "此应用专为旧版 Android 打造，因此可能无法正常运行"
+*/
+
+realStartActivityLocked-->mService.getAppWarningsLocked().onStartActivity@ActivityStackSupervisor.java-->
+onStartActivity-->showDeprecatedTargetDialogIfNeeded-->showDeprecatedTargetDialog-->
+showDeprecatedTargetSdkDialogUiThread(ActivityRecord ar) {
+- mDeprecatedTargetSdkVersionDialog = new DeprecatedTargetSdkVersionDialog(AppWarnings.this, mUiContext, ar.info.applicationInfo)
+- mDeprecatedTargetSdkVersionDialog.show()
+}@AppWarnings.java
+
+
+
+frameworks/base/services/core/java/com/android/server/am/AppWarnings.java

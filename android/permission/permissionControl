@@ -1,0 +1,33 @@
+/**************************************
+
+*/
+
+/**************************************
+ android8 用户分配权限 PackageInstaller响应分配权限
+
+*/
+onCreate{
+  //实际UI
+- mViewHandler = GrantPermissionsViewHandlerImpl(this).setResultListener(this)
+  //请求的权限
+- mRequestedPermissions = getIntent().getStringArrayExtra(PackageManager.EXTRA_REQUEST_PERMISSIONS_NAMES)
+- mAppPermissions = new AppPermissions(this, callingPackageInfo, mRequestedPermissions,...)
+- setContentView(mViewHandler.createView())//设置请求窗口
+  //显示请求窗口
+- showNextPermissionGroupGrantRequest
+}@GrantPermissionsActivity.java
+
+
+grantRuntimePermissions(boolean fixedByTheUser) {
+
+}@AppPermissionGroup.java
+
+onClick-->mResultListener.onPermissionGrantResult@GrantPermissionsViewHandlerImpl.java-->
+onPermissionGrantResult-->groupState.mGroup.grantRuntimePermissions@GrantPermissionsActivity.java
+grantSignaturePermission@PackageManagerService.java
+
+
+
+PackageInstaller/src/com/android/packageinstaller/permission/ui/GrantPermissionsActivity.java
+PackageInstaller/src/com/android/packageinstaller/permission/ui/handheld/GrantPermissionsViewHandlerImpl.java
+PackageInstaller/src/com/android/packageinstaller/permission/model/AppPermissionGroup.java

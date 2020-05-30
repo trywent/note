@@ -5,6 +5,8 @@ echo 1 > /proc/sys/kernel/printk
 
 echo device > /sys/devices/platform/soc/soc:aon/5fff0000.usb/host_dev
 echo host > /sys/devices/platform/soc/soc:aon/5fff0000.usb/host_dev
+dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-apb/71400000.sdio/by-name/boot
+
 
 #include "sharkl5Pro.dtsi"	//usb,
 @ums512.dtsi

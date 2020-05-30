@@ -89,18 +89,21 @@ adev_create_audio_patch(struct audio_hw_device *dev,unsigned int num_sources,con
 - adev_in_devices_check(adev,sources_device_type){
 	- 
 	}
--->select_devices_new
+- select_devices_new
 }@audio_hw.cpp
 
 /**************************************************
  设置route
 */
+
+//route设置线程。等待命令
 stream_routing_manager_create(struct audio_control *actl)-->
 pthread_create(&actl->routing_mgr.routing_switch_thread, &attr, stream_routing_thread_entry, (void *)actl)
 -->stream_routing_thread_entry(void *param){
 - while(!actl->routing_mgr.is_exit){
 	- item = list_head(&actl->switch_device_cmd_list)
-	- struct switch_device_cmd *cmd = node_to_item(item, struct switch_device_cmd, node)
+	  //获取切换命令。切换设备
+	- struct switch_device_cmd *cmd = node_to_item(item, struct switch_device_cmd, node)	  
 	- SWITCH_DEVICE:do_select_device(actl,cmd->audio_app_type,cmd->device,cmd->is_in,cmd->update_param,cmd->is_force)
 	- SET_FM_VOLUME:set_audioparam(actl,PARAM_FM_VOLUME_CHANGE, &cmd->param1,false)
 	}

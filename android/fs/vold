@@ -77,7 +77,7 @@ main(int argc, char** argv) {
 - NetlinkManager* nm = NetlinkManager::Instance()
 - vm->start()					//
 - process_config(vm, &has_adoptable, &has_quota, &has_reserved){
-	- ReadDefaultFstab(&fstab_default)	//读取/vendor/etc/fstab.文件
+	- ReadDefaultFstab(&fstab_default)	//读取/vendor/etc/fstab.文件	挂载比较晚
 	- vm->addDiskSource(std::shared_ptr<VolumeManager::DiskSource>(	//加入标记voldmanaged的块。usb,sdcard
                 new VolumeManager::DiskSource(sysPattern, nickname, flags)			
 	}

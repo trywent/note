@@ -1,0 +1,13 @@
+/****************************
+ powerManager
+
+*/
+
+updateDisplayPowerStateLocked(int dirty) {
+- mDisplayPowerRequest.policy = getDesiredScreenPolicyLocked()
+}@PowerManagerService.java
+
+
+
+
+frameworks/base/services/core/java/com/android/server/power/PowerManagerService.java

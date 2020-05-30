@@ -1,5 +1,12 @@
 /***************************************************
- audiopatch   audioflinger的一部分
+
+*/
+
+
+
+frameworks/base/media/java/android/media/AudioPatch.java
+/***************************************************
+ audiopatch   实现部分AudioFlinger.h的接口，属于AudioFlinger。
 
 */
 createAudioPatch@AudioManager.java-->createAudioPatch@AudioSystem.java-->
@@ -20,6 +27,10 @@ createAudioPatch{
 }@AudioPolicyManager.cpp
 
 
+AudioFlinger::createAudioPatch(const struct audio_patch *patch,audio_patch_handle_t *handle)
+-->mPatchPanel->createAudioPatch(patch, handle){
+- 
+}@PatchPanel.cpp
 
 createAudioPatch@PatchPanel.cpp-->
 sendCreateAudioPatchConfigEvent-->sendConfigEvent_l(new CreateAudioPatchConfigEvent)
@@ -27,10 +38,7 @@ sendCreateAudioPatchConfigEvent-->sendConfigEvent_l(new CreateAudioPatchConfigEv
 createAudioPatch_l@Threads.cpp
 
 
-AudioFlinger::createAudioPatch(const struct audio_patch *patch,audio_patch_handle_t *handle)
--->mPatchPanel->createAudioPatch(patch, handle){
-- 
-}@PatchPanel.cpp
+
 
 
 

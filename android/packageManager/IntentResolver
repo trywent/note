@@ -1,5 +1,11 @@
-/*
- 解析intent
+/*************************************
+ android10解析intent
+
+*/
+
+
+/*************************************
+ android8.0解析intent
 
  ActivityIntentResolver，ActivityIntentResolver，ServiceIntentResolver，ProviderIntentResolver
 
@@ -19,8 +25,9 @@ queryIntent(Intent intent, String resolvedType, boolean defaultOnly,int userId){
 }@IntentResolver.java
 
 
-/*
+/*****
  ActivityIntentResolver
+
 */
 
 //类名和Activity

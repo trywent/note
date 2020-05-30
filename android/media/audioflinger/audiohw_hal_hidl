@@ -1,4 +1,39 @@
-//服务启动
+/***************************
+ 接口
+*/
+{
+Return<Result> setMasterVolume(float volume) override
+Return<void> getMasterVolume(getMasterVolume_cb _hidl_cb) override
+Return<Result> setMicMute(bool mute) override
+Return<void> getMicMute(getMicMute_cb _hidl_cb) override
+Return<Result> setMasterMute(bool mute) override
+Return<void> getMasterMute(getMasterMute_cb _hidl_cb) override
+
+Return<void> getInputBufferSize(const AudioConfig& config,getInputBufferSize_cb _hidl_cb) override
+std::tuple<Result, sp<IStreamOut>> openOutputStreamImpl
+std::tuple<Result, sp<IStreamIn>> openInputStreamImpl
+Return<void> openOutputStream
+Return<void> openInputStream
+
+Return<bool> supportsAudioPatches() override;
+Return<void> createAudioPatch
+Return<Result> releaseAudioPatch(int32_t patch) override;
+Return<void> getAudioPort(const AudioPort& port, getAudioPort_cb _hidl_cb) override;
+Return<Result> setAudioPortConfig(const AudioPortConfig& config) override;
+
+Return<void> getParameters
+Return<Result> setParameters(const hidl_vec<ParameterValue>& context,const hidl_vec<ParameterValue>& parameters) override;
+Return<void> getMicrophones(getMicrophones_cb _hidl_cb) override;
+Return<Result> setConnectedState(const DeviceAddress& address, bool connected) override
+void closeInputStream(audio_stream_in_t* stream);
+void closeOutputStream(audio_stream_out_t* stream)
+}@Device.h
+
+
+hardware/interfaces/audio/core/all-versions/default/include/core/default/Device.h
+/***************************
+ 服务启动
+*/
 service audio-hal-2-0 /vendor/bin/hw/android.hardware.audio@2.0-service@android.hardware.audio@2.0-service.rc
 -->int main{
 - registerPassthroughServiceImplementation<IDevicesFactory> //IDevicesFactory

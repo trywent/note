@@ -1,7 +1,6 @@
-/*解析apk
-
-//应用默认比例1.86
-DEFAULT_PRE_O_MAX_ASPECT_RATIO@PackageParser.java
+/**************************************
+ 解析apk 中AndroidManifest.xml
+ 应用默认比例1.86 DEFAULT_PRE_O_MAX_ASPECT_RATIO@PackageParser.java
 */
 parsePackage(File packageFile){
 - parseClusterPackage{//目录文件
@@ -23,47 +22,47 @@ parseBaseApk(File apkFile, AssetManager assets, int flags){
 	- sa = res.obtainAttributes(com.android.internal.R.styleable.AndroidManifest)//AndroidManifest
 	- parseBaseApkCommon
 	}
-}
+}@PackageParser.java
 
 parseBaseApkCommon{
-- TAG_APPLICATION{//"application"
+- TAG_APPLICATION{	//"application"
 	- parseBaseApplication 
 	}
-- TAG_OVERLAY{//"overlay"
+- TAG_OVERLAY{		//"overlay"
 	- 
 	}
-- TAG_PERMISSION_GROUP{//"permission-group"
+- TAG_PERMISSION_GROUP{	//"permission-group"
 	- parsePermissionGroup 
 	}
-- TAG_PERMISSION{//"permission"
+- TAG_PERMISSION{	//"permission"
 	- parsePermission 
 	}
-- TAG_USES_PERMISSION{//"uses-permission"
+- TAG_USES_PERMISSION{	//"uses-permission"
 	- parseUsesPermission-->pkg.requestedPermissions.add(name.intern())//加入到 requestedPermissions
 	}
-- TAG_USES_FEATURE{//"uses-feature"
+- TAG_USES_FEATURE{	//"uses-feature"
 	- pkg.reqFeatures 
 	}
-}
+}@PackageParser.java
 
 
+//获取解析后的信息
+PackageInfo generatePackageInfo(PackageParser.Package p, int gids[], int flags, long firstInstallTime, long lastUpdateTime,
+            Set<String> grantedPermissions, PackageUserState state, int userId) {
+- PackageInfo pi = new PackageInfo()
+- pi.packageName = p.packageName
+  //activity
+- if ((flags & PackageManager.GET_ACTIVITIES) != 0) {
+	- 
+	}
+  //获取权限信息
+- if ((flags&PackageManager.GET_PERMISSIONS) != 0) {
+	- pi.requestedPermissions = new String[N]
+	- pi.requestedPermissionsFlags = new int[N]
+	- pi.requestedPermissions[i] = p.requestedPermissions.get(i)
+	}
+}@PackageParser.java
 
-=====================
-//权限
-
-//分配安装时权限
-grantInstallPermission-->grantPermission@PermissionsState.java
-//撤销权限
-revokeInstallPermission-->revokePermission@PermissionsState.java
-
-//运行时权限分配
-grantRuntimePermission-->grantPermission@PermissionsState.java
-
-revokeRuntimePermission
-
-
-
-frameworks/base/services/core/java/com/android/server/pm/PermissionsState.java
 
 //dumpsys package
 dump{
@@ -80,8 +79,15 @@ dumpPackagesLPr(packageName){
 - 查找mPackages中packageName
 - dumpPackageLPr(ps)
 }
-=====================
-//application
+frameworks/base/core/java/android/content/pm/PackageParser.java
+frameworks/base/core/java/android/app/ApplicationPackageManager.java
+frameworks/base/core/java/android/content/pm/PackageManager.java
+frameworks/base/core/java/android/content/pm/PackageItemInfo.java
+frameworks/base/services/core/java/com/android/server/pm/PackageSetting.java
+frameworks/base/services/core/java/com/android/server/pm/Settings.java
+/**************************************
+ application
+*/
 
 
 
@@ -93,13 +99,47 @@ parseActivity{
 }
 
 
+/**************************************
+ 权限
+*/
+//自定义权限
+parsePermission(Package owner, Resources res, XmlResourceParser parser, String[] outError){
+- TypedArray sa = res.obtainAttributes(parser, com.android.internal.R.styleable.AndroidManifestPermission)
+  //设置权限
+- Permission perm = new Permission(owner, backgroundPermission)
+- perm.info.protectionLevel = sa.getInt(styleable.AndroidManifestPermission_protectionLevel,PermissionInfo.PROTECTION_NORMAL)	//普通，危险
+- perm.info.flags
+- owner.permissions.add(perm)			//保存到permissions
+}@PackageParser.java
+
+//申请使用的权限.requestedPermissions
+parseUsesPermission(Package pkg, Resources res, XmlResourceParser parser){
+- TypedArray sa = res.obtainAttributes(parser...)
+- String name = sa.getNonResourceString(com.android.internal.R.styleable.AndroidManifestUsesPermission_name)	//权限名
+- pkg.requestedPermissions.add(name.intern())	//保存到requestedPermissions
+}@PackageParser.java
+
+
+//分配安装时权限
+grantInstallPermission-->grantPermission@PermissionsState.java
+//撤销权限
+revokeInstallPermission-->revokePermission@PermissionsState.java
+
+//运行时权限分配
+grantRuntimePermission-->grantPermission@PermissionsState.java
+
+revokeRuntimePermission
 
 
 
-frameworks/base/core/java/android/content/pm/PackageParser.java
-frameworks/base/core/java/android/app/ApplicationPackageManager.java
-frameworks/base/core/java/android/content/pm/PackageManager.java
-frameworks/base/core/java/android/content/pm/PackageItemInfo.java
-frameworks/base/services/core/java/com/android/server/pm/PackageSetting.java
-frameworks/base/services/core/java/com/android/server/pm/Settings.java
+frameworks/base/services/core/java/com/android/server/pm/PermissionsState.java
+
+
+
+
+
+
+
+
+
 

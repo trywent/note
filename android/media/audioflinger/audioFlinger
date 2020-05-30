@@ -1,4 +1,36 @@
 /***************************************************
+ AudioFlinger 提供的接口。patch相关接口在PatchPanel中实现
+
+*/
+sp<IAudioTrack> createTrack(const CreateTrackInput& input, CreateTrackOutput& output,status_t *status);
+sp<media::IAudioRecord> createRecord(const CreateRecordInput& input, CreateRecordOutput& output,status_t *status)
+status_t    setStreamVolume(audio_stream_type_t stream, float value,audio_io_handle_t output)	//stream
+status_t    setStreamMute(audio_stream_type_t stream, bool muted)
+status_t    setMicMute(bool state)								//mic
+bool        getMicMute() const
+status_t openOutput(audio_module_handle_t module,audio_io_handle_t *output...)			//output
+audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1, audio_io_handle_t output2)
+status_t closeOutput(audio_io_handle_t output)
+status_t openInput(audio_module_handle_t module,audio_io_handle_t *input....)			//input		
+status_t closeInput(audio_io_handle_t input)
+
+status_t queryEffect(uint32_t index, effect_descriptor_t *descriptor) const			//effect
+status_t getEffectDescriptor(const effect_uuid_t *pUuid,const effect_uuid_t *pTypeUuid,...)
+sp<IEffect> createEffect(effect_descriptor_t *pDesc,const sp<IEffectClient>& effectClient,..)
+status_t moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,audio_io_handle_t dstOutput)
+setEffectSuspended(int effectId,audio_session_t sessionId,bool suspended) override
+
+status_t listAudioPorts(unsigned int *num_ports, struct audio_port *ports)			//audioport
+status_t getAudioPort(struct audio_port *port)
+status_t createAudioPatch(const struct audio_patch *patch,audio_patch_handle_t *handle)		//patch在PatchPanel中实现
+status_t releaseAudioPatch(audio_patch_handle_t handle)
+status_t listAudioPatches(unsigned int *num_patches, struct audio_patch *patches)
+status_t setAudioPortConfig(const struct audio_port_config *config)
+
+frameworks/av/services/audioflinger/AudioFlinger.h
+frameworks/av/media/libaudioclient/include/media/IAudioFlinger.h
+frameworks/av/services/audioflinger/PatchPanel.cpp
+/***************************************************
  AudioFlinger 操作hal层接口
 
 */
@@ -22,7 +54,7 @@ AudioFlinger::instantiate-->publish{
 }@BinderService.h
 
 /***************************************************
- 获取hal接口.
+ hal接口
  原来的,获取模块:hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID),
 	获取设备接口:audio_hw_device_open 
 */

@@ -1,4 +1,77 @@
 /***************************************************
+ audiopolicyService接口和数据结构
+
+*/
+//接口
+setPhoneState(audio_mode_t state)
+audio_io_handle_t getOutput(audio_stream_type_t stream)					//output接口
+status_t getOutputForAttr(const audio_attributes_t *attr,audio_io_handle_t *output,...)
+status_t startOutput(audio_port_handle_t portId);
+status_t stopOutput(audio_port_handle_t portId)
+void releaseOutput(audio_port_handle_t portId)
+status_t getInputForAttr(const audio_attributes_t *attr,audio_io_handle_t *input...)	//input接口
+status_t startInput(audio_port_handle_t portId);
+status_t stopInput(audio_port_handle_t portId);
+void releaseInput(audio_port_handle_t portId)
+status_t setStreamVolumeIndex(audio_stream_type_tstream,intindex,audio_devices_t device)//音量接口
+status_t getStreamVolumeIndex(audio_stream_type_t stream,int *index,audio_devices_t device)
+status_t registerEffect(const effect_descriptor_t *desc,audio_io_handle_t io,...)	//音效
+status_t unregisterEffect(int id)
+status_t setEffectEnabled(int id, bool enabled)
+audio_devices_t getDevicesForStream(audio_stream_type_t stream)				//获取设备device
+status_t listAudioPorts(audio_port_role_t role,audio_port_type_t type,...)		//ports
+status_t getAudioPort(struct audio_port *port)
+status_t createAudioPatch(const struct audio_patch *patch,audio_patch_handle_t *handle..)//patch
+status_t releaseAudioPatch(audio_patch_handle_t handle, uid_t uid);
+status_t listAudioPatches(unsigned int *num_patches,struct audio_patch *patches,unsigned int *generation)
+status_t setAudioPortConfig(const struct audio_port_config *config)
+status_t startAudioSource(const struct audio_port_config *source...)			//源
+status_t stopAudioSource(audio_port_handle_t portId)
+
+
+//结构
+module{
+  //mixport
+- IOProfile{
+	- name
+	- role		//sink source
+	- flags		//AUDIO_OUTPUT_FLAG_PRIMARY AUDIO_OUTPUT_FLAG_DEEP_BUFFER
+	- AudioProfile
+	}
+  //deviceport
+- DeviceDescriptor {
+	- name
+	- type
+	- role		//sink source
+	- AudioProfile
+	}
+  //route
+- AudioRoute{
+    - AudioPort sink	//只有一个sink. 将route加入sink
+    - AudioPort source  //多个source 将route加入source
+   }
+}
+
+//module实例
+HwModule{
+  //mixport
+- mOutputProfiles
+- mInputProfiles
+  //deviceport
+- DeviceVector mDeclaredDevices
+  //route
+- AudioRouteVector mRoutes 
+  //包含mixport ,deviceport
+- AudioPortVector mPorts  
+}
+
+AudioOutputDescriptor //output
+
+
+frameworks/av/services/audiopolicy/AudioPolicyInterface.h
+frameworks/av/services/audiopolicy/managerdefault/AudioPolicyManager.h
+frameworks/av/media/libaudioclient/include/media/IAudioPolicyService.h
+/***************************************************
  AudioPolicyService	
  AudioPolicyManager	audioSystem操作的接口
  AudioPolicyClient	操作audioflinger的接口
@@ -9,46 +82,6 @@
  9853：vendor/sprd/modules/audio/normal/newapm/O.x/AudioPolicyManagerSPRD.cpp
 
 */
-
-
-//结构
-module{
-//mixport
-- IOProfile{
-	- name
-	- role //sink source
-	- flags //AUDIO_OUTPUT_FLAG_PRIMARY AUDIO_OUTPUT_FLAG_DEEP_BUFFER
-	- AudioProfile
-	}
-//deviceport
-- DeviceDescriptor {
-	- name
-	- type
-	- role //sink source
-	- AudioProfile
-	}
-//route
-- AudioRoute{
-    - AudioPort sink //只有一个sink. 将route加入sink
-    - AudioPort source  //多个source 将route加入source
-   }
-}
-
-//实例结构
-HwModule{
-//mixport
-- mOutputProfiles
-- mInputProfiles
-//deviceport
-- DeviceVector mDeclaredDevices
-//route
-- AudioRouteVector mRoutes 
-//包含mixport ,deviceport
-- AudioPortVector mPorts  
-}
-
-AudioOutputDescriptor //output
-
 //AudioPolicyService启动
 main(int argc __unused, char **argv)-->AudioPolicyService::instantiate()@main_audioserver.cpp-->
 AudioPolicyService::onFirstRef{

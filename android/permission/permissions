@@ -1,0 +1,257 @@
+/**************************************
+  系统加载定义的权限
+
+  adb shell pm list permissions -d -g 查看运行时权限
+*/
+
+//系统加载权限,功能配置/system/etc/permissions
+startBootstrapServices--> SystemServerInitThreadPool.get().submit(SystemConfig::getInstance,)@SystemServer.java
+getInstance()-->new SystemConfig(){				//加载system,vendor,oem,odm,product
+- readPermissions("/system/ect/sysconfig",ALLOW_ALL)		//rootdir
+- readPermissions("/system/ect/permissions",ALLOW_ALL)-->readPermissions(File libraryDir, int permissionFlag){
+	- for (File f : libraryDir.listFiles()) {
+		- if (f.getPath().endsWith("etc/permissions/platform.xml"))
+			- platformFile = f
+		- readPermissionsFromXml(f, permissionFlag)	//读取	
+		}
+	- readPermissionsFromXml(platformFile, permissionFlag)	//最后读取platform
+	}
+}@SystemConfig.java
+
+
+readPermissionsFromXml(File permFile, int permissionFlag) {	//读取xml的配置
+- "group"{							//process中有对应group名字和值
+	- gid = android.os.Process.getGidForName(gidStr)
+	- appendInt(mGlobalGids, gid)
+	}
+- "permission"{							//保存权限，GID
+	- readPermission-->mPermissions.put(name, perm)
+	}
+- "assign-permission"{						//预分配的权限
+	- mSystemPermissions.put(uid, perms)
+	- perms.add(perm)
+	}
+- "library"{
+	- mSharedLibraries.put(lname, lfile)
+	}
+- "feature"{							//功能
+	- addFeature-->mAvailableFeatures.put(name, fi)
+	}
+- "system-user-whitelisted-app"{				//白名单
+	- mSystemUserWhitelistedApps.add(pkgname)
+	}
+- "privapp-permissions"{					//特权应用权限，systemui,settings
+	- readPrivAppPermissions-->mPrivAppPermissions.put(packageName, permissions)
+	}
+- addFeature(PackageManager.FEATURE_RAM_LOW/PackageManager.FEATURE_RAM_NORMAL)
+- mUnavailableFeatures,removeFeature				//移除不可用功能
+}@SystemConfig.java
+
+frameworks/base/core/java/com/android/server/SystemConfig.java
+
+/**************************************
+ PermissionManagerService
+ 
+ 运行时权限和userid绑定。没有绑定的都是普通权限
+ ro.control_privapp_permissions  关闭priv app的权限检查
+ mGrantExceptions  默认权限分配
+*/
+PermissionManagerService(Context context, @NonNull Object externalLock) {
+  //mSettings存放所有权限
+- PermissionSettings mSettings = new PermissionSettings(mLock)
+- mDefaultPermissionGrantPolicy = new DefaultPermissionGrantPolicy(context, mHandlerThread.getLooper(), this){
+	- mPermissionManager = permissionManager
+	}@DefaultPermissionGrantPolicy.java
+  //设置权限值
+- ArrayMap<String, SystemConfig.PermissionEntry> permConfig =  SystemConfig.getInstance().getPermissions()
+- for (int i=0; i<permConfig.size(); i++) {
+	- SystemConfig.PermissionEntry perm = permConfig.valueAt(i)
+	- BasePermission bp = new BasePermission(perm.name, "android", BasePermission.TYPE_BUILTIN)
+	- mSettings.putPermissionLocked(perm.name, bp)
+	- bp.setGids(perm.gids, perm.perUser)
+	}
+}@PermissionManagerService.java
+
+
+//ready。分配权限只在第一次启动时执行一次
+systemReady()-->mDefaultPermissionPolicy.grantDefaultPermissions(userId)@PakcageManagerService.java-->
+grantDefaultPermissions{
+  //分配系统应用权限
+- grantPermissionsToSysComponentsAndPrivApps(int userId){
+	- List<PackageInfo> packages = mContext.getPackageManager().getInstalledPackagesAsUser(UserHandle.USER_SYSTEM)
+	- for (PackageInfo pkg : packages) 
+		- if(!isSysComponentOrPersistentPlatformSignedPrivApp)	//非特权应用，非persistent应用不分配
+			- continue
+		- grantRuntimePermissionsForSystemPackage(userId, pkg)-->
+		  grantRuntimePermissions(pkg, permissions, true /*systemFixed*/, userId)-->
+		  grantRuntimePermissions(pkg, permissions, systemFixed, false,true /*whitelistRestrictedPermissions*/, userId)
+	}
+  //分配系统默认应用的权限。camera,maps,music,recorder
+- grantDefaultSystemHandlerPermissions(int userId){
+	- 
+	}
+  //etc/default-permissions中分配的权限
+- grantDefaultPermissionExceptions(int userId){
+	- 
+	}
+}
+  //分配权限
+grantRuntimePermissions(PackageInfo pkg, Set<String> permissionsWithoutSplits, boolean systemFixed,
+	 boolean ignoreSystemPackage,boolean whitelistRestrictedPermissions, int userId){
+- 
+  //分配
+- if (pm.checkPermission(permission, pkg.packageName) != PackageManager.PERMISSION_GRANTED) {
+	- mContext.getPackageManager().grantRuntimePermission(pkg.packageName, permission, user)
+	}
+}@DefaultPermissionGrantPolicy.java
+
+
+//
+restorePermissionState(PackageParser.Package pkg, boolean replace, String packageOfInterest,PermissionCallback callback){
+- PackageSetting ps = (PackageSetting) pkg.mExtras
+- PermissionsState permissionsState = ps.getPermissionsState()
+  //
+- int N = pkg.requestedPermissions.size()
+- for (int i = 0; i < N; i++) {
+	- String permName = pkg.requestedPermissions.get(i)
+	- BasePermission bp = mSettings.getPermissionLocked(permName)
+	- boolean appSupportsRuntimePermissions = pkg.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.M
+	}
+}@PermissionManagerService.java
+
+
+
+
+frameworks/base/services/core/java/com/android/server/pm/permission/PermissionManagerService.java
+frameworks/base/services/core/java/com/android/server/pm/permission/DefaultPermissionGrantPolicy.java
+/**************************************
+ 权限检查 
+*/
+
+//应用检查
+checkPermission(String permission, int pid, int uid, IBinder callerToken)@ContextImpl.java-->
+ActivityManager.getService().checkPermissionWithToken(permission, pid, uid, callerToken)-->
+checkComponentPermission-->ActivityManager.checkComponentPermission@ActivityManagerService.java-->
+AppGlobals.getPackageManager().checkUidPermission(permission, uid)@ActivityManager-->
+AppGlobals.getPackageManager().checkUidPermission(permission,uid)-->
+checkUidPermission(String permName, int uid){
+- obj= mSettings.getUserIdLPr(UserHandle.getAppId(uid))
+- SettingBase settingBase = (SettingBase) obj
+- permissionsState = settingBase.getPermissionsState()
+- permissionsState.hasPermission(permName, userId)
+}@PackageManagerService.java
+
+
+//native
+checkCallingPermission-->checkCallingPermission-->
+checkPermission{
+- PermissionCache::getInstance()	//创建cache
+- pc.check(&granted, permission, uid)	//从cache中检查
+- cache中不存在{
+	- android::checkPermission
+	- pc.cache(permission, uid, granted)
+	}
+}@PermissionCache.cpp
+
+
+
+//应用状态权限
+//判断权限
+hasPermission@UsageStatsService.java
+
+
+frameworks/base/services/usage/java/com/android/server/usage/UsageStatsService.java
+//有权查看使用情况的应用 (Context.USAGE_STATE_SERVICE).getAllPkgUsageStats
+onPreferenceChange-->setHasAccess-->mAppOpsManager.setMode@UsageAccessDetails.java
+-->
+
+packages/apps/Settings/src/com/android/settings/applications/UsageAccessDetails.java
+
+/*****
+ android10 应用启动时重新检查权限
+*/
+startActivity{
+- Intent newIntent = new Intent(Intent.ACTION_REVIEW_PERMISSIONS)
+- 
+}@ActivityStarter.java
+
+
+//priv 特权应用的权限检查
+privappPermissionsDisable@PermissionManagerService.java
+
+
+//
+addWhitelistedRestrictedPermission-->setWhitelistedRestrictedPermissions
+
+
+frameworks/base/services/core/java/com/android/server/pm/permission/PermissionManagerService.java
+/**************************************
+ 权限请求
+ 应用中权限必须都在AndroidManifest中列出
+
+*/
+PROTECTION_NORMAL  普通权限，申请并分配
+PROTECTION_DANGEROUS 危险权限，申请但是并没有分配
+PROTECTION_SIGNATURE
+@PermissionInfo.java
+//安装权限(intall)
+parsePackage{
+- if (tagName.equals("uses-permission"))-->parseUsesPermission
+- 
+}@PackageParser.java
+
+
+//检查权限
+checkSelfPermission
+
+//运行时权限(runtime)
+requestPermissions(String[] permissions, int requestCode){//请求权限
+- Intent intent = getPackageManager().buildRequestPermissionsIntent(permissions){
+	- Intent intent = new Intent(ACTION_REQUEST_PERMISSIONS)
+	- intent.putExtra(EXTRA_REQUEST_PERMISSIONS_NAMES, permissions)
+	- intent.setPackage(getPermissionControllerPackageName())
+	}@PackagerManager.java
+  //弹框
+- startActivityForResult(intent)-->GrantPermissionsActivity
+}@Activty.java
+
+
+
+
+frameworks/base/core/java/android/widget/AppSecurityPermissions.java
+frameworks/base/core/java/android/content/pm/PackageParser.java
+frameworks/base/services/java/com/android/server/pm/PackageManagerService.java
+frameworks/base/services/core/java/com/android/server/pm/Settings.java
+frameworks/native/libs/binder/PermissionCache.cpp
+frameworks/base/core/java/android/app/AppOpsManager.java
+frameworks/base/services/core/java/com/android/server/AppOpsService.java
+
+frameworks/base/services/core/java/com/android/server/pm/permission/PermissionSettings.java
+frameworks/base/core/java/android/content/pm/PermissionInfo.java
+/**************************************
+ 权限分配
+
+ android10 中pria-app目录下会自动分配权限
+ 
+
+*/
+
+
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/pm/permission/DefaultPermissionGrantPolicy.java
+
+
+/**************************************
+  ops
+
+*/
+
+
+
+
+frameworks/base/core/java/android/app/AppOpsManager.java
+frameworks/base/services/core/java/com/android/server/AppOpsService.java

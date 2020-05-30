@@ -418,7 +418,28 @@ PRODUCT_DEFAULT_REGION="$(call default-locale-region,$(PRODUCT_LOCALES))"
 
 /*******************************************************
  android soong  android.bp
+
 */
 
 mk和bp装换工具out/soong/host/linux-x86/bin/androidmk
+
+
+/*******************************************************
+ 预置apk
+*/
+
+priv-app //有特权的app PRIVATE_FLAG_PRIVILEGED
+
+//px5 将当前目录下preinstall中apk,编译到目标app
+python auto_generator.py ./ preinstall app
+
+# Prebuild apps
+ifeq ($(fytpp),y)
+    $(shell python $(LOCAL_PATH)/auto_generator.py $(LOCAL_PATH) preinstall bundled_persist-app)
+    $(shell python $(LOCAL_PATH)/auto_generator.py $(TARGET_DEVICE_DIR) preinstall_del bundled_uninstall_back-app)
+    $(shell python $(LOCAL_PATH)/auto_generator.py $(TARGET_DEVICE_DIR) preinstall_del_forever bundled_uninstall_gone-app)
+    -include $(TARGET_DEVICE_DIR)/preinstall/preinstall.mk
+    -include $(TARGET_DEVICE_DIR)/preinstall_del/preinstall.mk
+    -include $(TARGET_DEVICE_DIR)/preinstall_del_forever/preinstall.mk
+endif
 
