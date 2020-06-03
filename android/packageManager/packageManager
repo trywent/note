@@ -79,8 +79,8 @@ scanDirLI(File scanDir, int parseFlags, int scanFlags, long currentTime) {
 		- mQueue.put(pr)
 		}
 	}@ParallelPackageParser.java
-  //处理扫描结果。会一直处理完成
-- ParallelPackageParser.ParseResult parseResult = parallelPackageParser.take()	//BlockingQueue回去阻塞等待数据
+  //处理扫描结果。会一直处理完成。BlockingQueue阻塞等待
+- ParallelPackageParser.ParseResult parseResult = parallelPackageParser.take()	//BlockingQueue会去阻塞等待数据
 - scanPackageChildLI(parseResult.pkg, parseFlags, scanFlags...){
 	- PackageParser.Package scannedPkg = addForInitLI(pkg, parseFlags, scanFlags, currentTime, user)
 	}

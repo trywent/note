@@ -1,35 +1,116 @@
 /***************************************************
+ AudioPatch 当前一个patch只支持一个sink一个source
 
 */
+register_android_media_AudioSystem(JNIEnv *env){
+- jclass audioHandleClass = FindClassOrDie(env, "android/media/AudioHandle")
+- gAudioHandleFields.mId = GetFieldIDOrDie(env, audioHandleClass, "mId", "I")
+- gAudioPatchFields.mHandle = GetFieldIDOrDie(env, audioPatchClass, "mHandle","Landroid/media/AudioHandle;")
+}@android_media_AudioSystem.cpp
+
+//创建audiopatch
+createAudioPatch(AudioPatch[] patch,AudioPortConfig[] sources,AudioPortConfig[] sinks)-->
+AudioSystem.createAudioPatch(patch, sources, sinks)@AudioManager.java-->
+android_media_AudioSystem_createAudioPatch(JNIEnv *env, jobject clazz,jobjectArray jPatches, jobjectArray jSources, jobjectArray jSinks){
+- jobject jPatch = env->GetObjectArrayElement(jPatches, 0)				//AudioPatch
+- jobject jPatchHandle = env->GetObjectField(jPatch, gAudioPatchFields.mHandle)		//AudioPatch中AudioHandle
+- handle = (audio_patch_handle_t)env->GetIntField(jPatchHandle, gAudioHandleFields.mId)	//AudioHandle中mId
+  //创建natvie audio_patch
+- struct audio_patch nPatch = { .id = handle }
+- convertAudioPortConfigToNative(env, &nPatch.sources[i], jSource, false)
+- convertAudioPortConfigToNative(env, &nPatch.sinks[i], jSink, false)
+- AudioSystem::createAudioPatch(&nPatch, &handle)
+  //传入参数AudioPatch为空。创建上层的AudioPatch
+- jPatchHandle = env->NewObject(gAudioHandleClass, gAudioHandleCstor,handle)
+- jPatch = env->NewObject(gAudioPatchClass, gAudioPatchCstor, jPatchHandle, jSources, jSinks)
+- env->SetObjectArrayElement(jPatches, 0, jPatch)
+}@android_media_AudioSystem.cpp
 
 
+//native audio_patch。。讲一个src流关联到sink设备（输出）。或者将一个src设备关联到sink流（输入）。或者src设备关联到sink设备
+AudioSystem::createAudioPatch(&nPatch, &handle)-->aps->createAudioPatch(patch, handle)@AudioSystem.cpp-->
+-->mAudioPolicyManager->createAudioPatch@AudioPolicyInterfaceImpl.cpp-->
+createAudioPatch(const struct audio_patch *patch, audio_patch_handle_t *handle, uid_t uid){
+- mAudioPatches.valueAt(index)//是否已经存在patch
+- if (patch->sources[0].type == AUDIO_PORT_TYPE_MIX) {			//source是流
+	- sp<SwAudioOutputDescriptor> outputDesc = mOutputs.getOutputFromId(patch->sources[0].id)		//获取source
+	- for (size_t i = 0; i < patch->num_sinks; i++) {
+		- sp<DeviceDescriptor> devDesc = mAvailableOutputDevices.getDeviceFromId(patch->sinks[i].id)	//查找匹配sink
+		- devices.add(devDesc)
+		}
+	- setOutputDevices(outputDesc, devices, true, 0, handle)
+  }else if (patch->sources[0].type == AUDIO_PORT_TYPE_DEVICE) {		//source是设备
+	- if (patch->sinks[0].type == AUDIO_PORT_TYPE_MIX) {		//sink是流
+		- sp<AudioInputDescriptor> inputDesc = mInputs.getInputFromId(patch->sinks[0].id)
+		- sp<DeviceDescriptor> device = mAvailableInputDevices.getDeviceFromId(patch->sources[0].id)
+		- setInputDevice(inputDesc->mIoHandle, device, true, handle)
+	}else if (patch->sinks[0].type == AUDIO_PORT_TYPE_DEVICE) {	//sink是设备
+		- sp<DeviceDescriptor> srcDevice = mAvailableInputDevices.getDeviceFromId(patch->sources[0].id)
+		- for (size_t i = 0; i < patch->num_sinks; i++) {
+			- sp<DeviceDescriptor> sinkDevice = mAvailableOutputDevices.getDeviceFromId(patch->sinks[i].id)
+			- SortedVector<audio_io_handle_t> outputs = getOutputsForDevices(DeviceVector(sinkDevice), mOutputs)	
+			}
+		- installPatch(__func__, index, handle, &newPatch, 0, uid, &patchDesc)
+	}
+  }
 
+}@AudioPolicyManager.cpp
+
+//设置output。正常播放也会走这个流程
+setOutputDevices(const sp<SwAudioOutputDescriptor>& outputDesc,const DeviceVector &devices,bool force,
+       int delayMs,audio_patch_handle_t *patchHandle, bool requiresMuteCheck){
+- DeviceVector filteredDevices = outputDesc->filterSupportedDevices(devices)
+- installPatch(__func__, patchHandle, outputDesc.get(), patchBuilder.patch(), delayMs)
+- applyStreamVolumes(outputDesc, filteredDevices.types(), delayMs)
+}@AudioPolicyManager.cpp
+
+
+//设置input
+setInputDevice(audio_io_handle_t input, const sp<DeviceDescriptor> &device,bool force,audio_patch_handle_t *patchHandle){
+- sp<AudioInputDescriptor> inputDesc = mInputs.valueFor(input)
+- inputDesc->setDevice(device)
+- if (mAvailableInputDevices.contains(device)) {
+	- installPatch(__func__, patchHandle, inputDesc.get(), patchBuilder.patch(), 0)
+	}
+}@AudioPolicyManager.cpp
+
+
+//创建AudioPatch，执行到audioflinger
+AudioPolicyManager::installPatch(const char *caller,ssize_t index,audio_patch_handle_t *patchHandle,
+         const struct audio_patch *patch,int delayMs,uid_t uid,sp<AudioPatch> *patchDescPtr){
+  //通过audioflinger设置到hal
+- mpClientInterface->createAudioPatch(patch, &afPatchHandle, delayMs)-->mAudioPolicyService->clientCreateAudioPatch
+	-->mAudioCommandThread->createAudioPatchCommand@AudioPolciyService.cpp-->af->createAudioPatch(&data->mPatch, &data->mHandle)
+  //保存
+- patchDesc = new AudioPatch(patch, uid)
+- addAudioPatch(patchDesc->mHandle, patchDesc)-->mAudioPatches.addAudioPatch(handle, patch)
+- mpClientInterface->onAudioPatchListUpdate()
+}
+
+frameworks/base/media/java/android/media/AudioManager.java
 frameworks/base/media/java/android/media/AudioPatch.java
+frameworks/base/media/java/android/media/AudioSystem.java
+frameworks/base/core/jni/android_media_AudioSystem.cpp
+frameworks/av/media/libaudioclient/AudioSystem.cpp
 /***************************************************
  audiopatch   实现部分AudioFlinger.h的接口，属于AudioFlinger。
 
 */
-createAudioPatch@AudioManager.java-->createAudioPatch@AudioSystem.java-->
-android_media_AudioSystem_createAudioPatch(传入AudioPatch的handle值)@android_media_AudioSystem.cpp
--->aps->createAudioPatch@AudioSystem.cpp-->mAudioPolicyManager->createAudioPatch
-@AudioPolicyInterfaceImpl.cpp-->
-createAudioPatch{
-- mAudioPatches.valueAt(index)//是否已经存在patch
-- AUDIO_PORT_TYPE_MIX{
-	- 获取source，mOutputs.getOutputFromId
-	- 获取sink，
-	}
-
-- AUDIO_PORT_TYPE_DEVICE{
-
-	}
-
-}@AudioPolicyManager.cpp
-
 
 AudioFlinger::createAudioPatch(const struct audio_patch *patch,audio_patch_handle_t *handle)
 -->mPatchPanel->createAudioPatch(patch, handle){
-- 
+  //已有的patch要销毁
+- if (*handle != AUDIO_PATCH_HANDLE_NONE) {
+	- mPatches.erase(iter)
+	}
+- switch (patch->sources[0].type) {
+  - AUDIO_PORT_TYPE_DEVICE: {
+	- 
+	}
+  -AUDIO_PORT_TYPE_MIX:{
+
+	}
+  }
 }@PatchPanel.cpp
 
 createAudioPatch@PatchPanel.cpp-->

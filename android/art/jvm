@@ -18,6 +18,16 @@ JNI_CreateJavaVM(JavaVM** p_vm, JNIEnv** p_env, void* vm_args) {
 /*
  runtime
 */
+Create(const RuntimeOptions& raw_options, bool ignore_unrecognized) {
+- ParseOptions(raw_options, ignore_unrecognized, &runtime_options)-->
+  -->ParsedOptions::Parse(raw_options, ignore_unrecognized, runtime_options){
+	- ParsedOptions parser
+	- parser.DoParse(options, ignore_unrecognized, runtime_options)
+	}@ParsedOptions.cc
+- Create(std::move(runtime_options)
+}@runtime.cc
+
+
 Runtime::Create(RuntimeArgumentMap&& runtime_options) {
 - instance_ = new Runtime	//创建runtime
 - instance_->Init(std::move(runtime_options)){
@@ -213,10 +223,25 @@ libnativehelper/include_jni/jni.h
 
 
 /*
+ jvm启动参数
  log
 
  需要设置gLogVerbosity对应的项
 */
+//解析参数
+ParsedOptions::DoParse(const RuntimeOptions& options,bool ignore_unrecognized,
+                            RuntimeArgumentMap* runtime_options) {
+- parser = MakeParser(ignore_unrecognized){
+	- parser_builder->Define("-Xzygote").IntoKey(M::Zygote)
+	- parser_builder->Build()
+	}
+- ProcessSpecialOptions(options, nullptr, &argv_list)
+- CmdlineResult parse_result = parser->Parse(argv_list)
+- M = RuntimeArgumentMap
+- RuntimeArgumentMap args = parser->ReleaseArgumentsMap()
+}@ParsedOptions.cc
+
+//log
 #define VLOG_IS_ON(module) UNLIKELY(::art::gLogVerbosity.module)
 #define VLOG(module) if (VLOG_IS_ON(module)) LOG(INFO)
 

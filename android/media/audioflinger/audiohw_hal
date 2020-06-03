@@ -1,109 +1,107 @@
-/*audio hw
-
-
-
+/*audio hal接口
+  
 */
-struct tiny_audio_device {
- struct audio_hw_device hw_device;
-//当前设备
- int out_devices;
- int in_devices;
-//当前设备状态
- struct tiny_stream_in *active_input;
- struct tiny_stream_out *active_output;
- struct tiny_stream_out *active_deepbuffer_output;
- struct tiny_stream_out *active_offload_output;
-}
 
+//流
+struct audio_stream {
 
-//hal提供接口
-{
-- getSupportedDevices
-- setVoiceVolume
-- setMasterVolume/getMasterVolume
-- setParameters/getParameters
-- getInputBufferSize
-- openOutputStream
-- openInputStream
-- supportsAudioPatches/createAudioPatch/releaseAudioPatch
-}@DeviceHalInterface.h
+    uint32_t (*get_sample_rate)(const struct audio_stream *stream)
+    int (*set_sample_rate)(struct audio_stream *stream, uint32_t rate)
+    size_t (*get_buffer_size)(const struct audio_stream *stream)
+    audio_channel_mask_t (*get_channels)(const struct audio_stream *stream)
+    audio_format_t (*get_format)(const struct audio_stream *stream)
+    int (*set_format)(struct audio_stream *stream, audio_format_t format)
+    int (*standby)(struct audio_stream *stream)
+    int (*dump)(const struct audio_stream *stream, int fd)
+    audio_devices_t (*get_device)(const struct audio_stream *stream)
+    int (*set_device)(struct audio_stream *stream, audio_devices_t device)
+    int (*set_parameters)(struct audio_stream *stream, const char *kv_pairs)
+    char * (*get_parameters)(const struct audio_stream *stream,const char *keys);
+    int (*add_audio_effect)(const struct audio_stream *stream,effect_handle_t effect);
+    int (*remove_audio_effect)(const struct audio_stream *stream,effect_handle_t effect);
+}@audio.h
 
-//local hal接口(真正实现接口库文件)
+struct audio_stream_out {
+    struct audio_stream common
+    uint32_t (*get_latency)(const struct audio_stream_out *stream)
+    int (*set_volume)(struct audio_stream_out *stream, float left, float right)
+    ssize_t (*write)(struct audio_stream_out *stream, const void* buffer, size_t bytes)
+    int (*set_callback)(struct audio_stream_out *stream,stream_callback_t callback, void *cookie)
+    int (*pause)(struct audio_stream_out* stream)
+    int (*resume)(struct audio_stream_out* stream)
+    int (*drain)(struct audio_stream_out* stream, audio_drain_type_t type )
+    int (*flush)(struct audio_stream_out* stream)
+    int (*get_presentation_position)(const struct audio_stream_out *stream, uint64_t *frames, struct timespec *timestamp)
+
+    int (*start)(const struct audio_stream_out* stream)
+    int (*stop)(const struct audio_stream_out* stream)
+    int (*create_mmap_buffer)(const struct audio_stream_out *stream,int32_t min_size_frames,struct audio_mmap_buffer_info *info)
+    int (*get_mmap_position)(const struct audio_stream_out *stream,struct audio_mmap_position *position)
+    void (*update_source_metadata)(struct audio_stream_out *stream,const struct source_metadata* source_metadata);
+}@audio.h
+
+struct audio_stream_in {
+    struct audio_stream common
+    int (*set_gain)(struct audio_stream_in *stream, float gain)
+    ssize_t (*read)(struct audio_stream_in *stream, void* buffer,size_t bytes)
+    uint32_t (*get_input_frames_lost)(struct audio_stream_in *stream)
+    int (*get_capture_position)(const struct audio_stream_in *stream,int64_t *frames, int64_t *time)
+    int (*start)(const struct audio_stream_in* stream)
+    int (*stop)(const struct audio_stream_in* stream)
+    int (*create_mmap_buffer)(const struct audio_stream_in *stream,int32_t min_size_frames,struct audio_mmap_buffer_info *info);
+    int (*get_mmap_position)(const struct audio_stream_in *stream,struct audio_mmap_position *position);
+    int (*get_active_microphones)(const struct audio_stream_in *stream,struct audio_microphone_characteristic_t *mic_array,size_t *mic_count)
+    int (*set_microphone_direction)(const struct audio_stream_in *stream,audio_microphone_direction_t direction)
+    int (*set_microphone_field_dimension)(const struct audio_stream_in *stream,float zoom)
+    void (*update_sink_metadata)(struct audio_stream_in *stream, const struct sink_metadata* sink_metadata);
+}@audio.h
+
+//模块，设备
+struct audio_module {
+    struct hw_module_t common;
+}@audio.h
+
 struct audio_hw_device {
-- get_supported_devices
-- set_voice_volume
-- set_master_volume/get_master_volume
-- set_parameters/get_parameters
-- get_input_buffer_size
-- open_output_stream/close_output_stream
-- open_input_stream/close_input_stream
-}
+    struct hw_device_t common
+    uint32_t (*get_supported_devices)(const struct audio_hw_device *dev)
+    int (*init_check)(const struct audio_hw_device *dev)
+    int (*set_voice_volume)(struct audio_hw_device *dev, float volume)
+    int (*set_master_volume)(struct audio_hw_device *dev, float volume)
+    int (*get_master_volume)(struct audio_hw_device *dev, float *volume)
+    int (*set_mode)(struct audio_hw_device *dev, audio_mode_t mode);
 
-声音设备:AUDIO_HARDWARE_MODULE_ID
-legacy_adev_open{
-- 创建ladev，(struct legacy_audio_device *)calloc
-- 初始化设备函数，ladev->device.xxx
-- 返回设备，*device = &ladev->device.common
-- 创建AudioHardwareInterface接口，ladev->hwif=createAudioHardware-->new AudioHardware
-}
+    /* mic mute */
+    int (*set_mic_mute)(struct audio_hw_device *dev, bool state);
+    int (*get_mic_mute)(const struct audio_hw_device *dev, bool *state);
 
-HAL_MODULE_INFO_SYM.common.methods-->hal_module_methods.open-->
-adev_open(const hw_module_t *module, const char *name,hw_device_t **device){
-- 
-}@audio_hw.c
+    /* set/get global audio parameters */
+    int (*set_parameters)(struct audio_hw_device *dev, const char *kv_pairs)
+    char * (*get_parameters)(const struct audio_hw_device *dev, const char *keys)
+    size_t (*get_input_buffer_size)(const struct audio_hw_device *dev, const struct audio_config *config)
+    int (*open_output_stream)(struct audio_hw_device *dev, audio_io_handle_t handle,audio_devices_t devices,audio_output_flags_t flags,
+                              struct audio_config *config,struct audio_stream_out **stream_out,const char *address);
 
-/*
- output
-*/
-打开流：
-AudioFlinger::openOutput-->open_output_stream-->adev_open_output_stream{
-- 创建out，(legacy_stream_out *)calloc
-- 转换设备，convert_audio_device
-- 打开流，ladev->hwif->openOutputStream-->AudioHardware::openOutputStream-->
-	new AudioStreamOutALSA@@AudioHardware.cpp
-- 设置out->legacy_out为,AudioStreamOutALSA
-- 封装AudioStreamOutALSA的方法到，out->stream.xxx
-}@audio_hw_hal.cpp
+    void (*close_output_stream)(struct audio_hw_device *dev,struct audio_stream_out* stream_out)
+    int (*open_input_stream)(struct audio_hw_device *dev,audio_io_handle_t handle,audio_devices_t devices,struct audio_config *config,
+                             struct audio_stream_in **stream_in,audio_input_flags_t flags,const char *address,audio_source_t source);
 
-写数据：
-AudioFlinger::PlaybackThread::threadLoop-->threadLoop_write@Threads.cpp-->write@AudioHardware.cpp
+    void (*close_input_stream)(struct audio_hw_device *dev,struct audio_stream_in *stream_in)
+    int (*get_microphones)(const struct audio_hw_device *dev,struct audio_microphone_characteristic_t *mic_array,size_t *mic_count)
+    int (*dump)(const struct audio_hw_device *dev, int fd);
+    int (*set_master_mute)(struct audio_hw_device *dev, bool mute)
+    int (*get_master_mute)(struct audio_hw_device *dev, bool *mute)
+    int (*create_audio_patch)(struct audio_hw_device *dev,unsigned int num_sources,const struct audio_port_config *sources,
+                               unsigned int num_sinks,const struct audio_port_config *sinks, audio_patch_handle_t *handle)
+    int (*release_audio_patch)(struct audio_hw_device *dev,audio_patch_handle_t handle)
+    int (*get_audio_port)(struct audio_hw_device *dev, struct audio_port *port)
+    int (*set_audio_port_config)(struct audio_hw_device *dev,const struct audio_port_config *config);
 
-停止：
-AudioFlinger::PlaybackThread::threadLoop-->mOutput->stream->common.standby@Threads.cpp-->
-standby@AudioHardware.cpp
+}@audio.h
 
 
 
 
-/*
-
- input
-
-*/
-
-struct tiny_stream_in {
-struct audio_stream_in stream;
-int device; //当前input打开的设备
-}
-
-open_input_stream-->adev_open_input_stream(struct audio_hw_device *dev,
-                                  UNUSED_ATTR audio_io_handle_t handle,
-                                  audio_devices_t devices,
-                                  struct audio_config *config,
-                                  struct audio_stream_in **stream_in,
-                                  audio_input_flags_t flags,
-                                  const char *address __unused,
-                                  audio_source_t source ){
-- struct audio_control *control = adev->dev_ctl
-- dev_ctl_get_in_pcm_config(control, in->audio_app_type, &pcm_devices, in->config)	//选择合适的设备
-}@audio_hw.c
 
 
-in_read-->start_input_stream
-
-
-
-
+hardware/libhardware/include/hardware/audio.h
 frameworks/av/media/libaudiohal/include/media/audiohal/DeviceHalInterface.h
-hardware/rk29/audio/audio_hw_hal.cpp
-hardware/rk29/audio/AudioHardware.cpp

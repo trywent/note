@@ -10,7 +10,7 @@ dumping_callstack
 
 //c++
 LOCAL_SHARED_LIBRARIES += libutils
-
+LOCAL_SHARED_LIBRARIES += libutilscallstack //android10
 #include <utils/CallStack.h>
  
 CallStack stack;

@@ -29,23 +29,26 @@ status_t startAudioSource(const struct audio_port_config *source...)			//源
 status_t stopAudioSource(audio_port_handle_t portId)
 
 
-//结构
+class AudioPort
+class IOProfile : public AudioPort
+class DeviceDescriptor : public AudioPort, public AudioPortConfig
+//结构。输入设备---路径---流---路径---输出设备
 module{
-  //mixport
+  //mixport 流
 - IOProfile{
 	- name
 	- role		//sink source
 	- flags		//AUDIO_OUTPUT_FLAG_PRIMARY AUDIO_OUTPUT_FLAG_DEEP_BUFFER
 	- AudioProfile
 	}
-  //deviceport
+  //deviceport 设备
 - DeviceDescriptor {
 	- name
 	- type
 	- role		//sink source
 	- AudioProfile
 	}
-  //route
+  //route 路径
 - AudioRoute{
     - AudioPort sink	//只有一个sink. 将route加入sink
     - AudioPort source  //多个source 将route加入source
@@ -114,14 +117,14 @@ AudioPolicyManager(AudioPolicyClientInterface *clientInterface){
 - 遍历,mHwModules{
 	- mHwModules[i]->mHandle = mpClientInterface->loadHwModule(name)--> 
 	  AudioPolicyService::AudioPolicyClient::loadHwModule-->af->loadHwModule(name)
-	  //将当前可用的设备关联到audiohw
+	  //将当前可用的流关联到audiohw
 	- 遍历,mOutputProfiles{
 		- profileType = outProfile->getSupportedDeviceForType(outputDeviceTypes)//找对对应存在的设备
 		- outputDesc = new SwAudioOutputDescriptor(outprofile)			//创建当前设备的outputStream
 		- outputDesc->mDevice = profileType
 		- mpClientInterface->openOutput(&output)
 		- mAvailableOutputDevices[index]->attach 				//设置attached设备可用状态
-		- addOutput(output, outputDesc)						//保存到mOutputs
+		- addOutput(output, outputDesc)						//保存到mOutputs 
 		- setOutputDevice							//设置route,patch
 		}
 	- 遍历,mInputProfiles{
@@ -133,21 +136,21 @@ AudioPolicyManager(AudioPolicyClientInterface *clientInterface){
 - 
 }@AudioPolicyManager.cpp
 
-//解析xml。初始化profile
+//解析audio_policy_configuration.xml。初始化流，设备，路径
 deserializeAudioPolicyXmlConfig(config)-->serializer.deserialize{
 - deserializeCollection<ModuleTraits>(modules,&config)-->ModuleTraits::deserialize{
 	//IOProfile mixport 
 	- deserializeCollection<MixPortTraits>(mixPorts)
-	- module->setProfiles(mixPorts)-->addProfile{
-		- addOutputProfile 					//outputProflie/inputProfile
+	- module->setProfiles(mixPorts)-->addProfile{			//模块加入流
+		- addOutputProfile 					
 		- addInputProfile
 		}
 	 //DeviceDescriptor devicePorts 
 	- deserializeCollection<DevicePortTraits>(devicePorts)
-	- module->setDeclaredDevices(devicePorts)
+	- module->setDeclaredDevices(devicePorts)			//模块加入设备
 	 //AudioRoute route
 	- deserializeCollection<RouteTraits>(routes){
-		- sink->addRoute/source->addRoute			//保存route到sink,source中
+		- sink->addRoute/source->addRoute			//保存route到AudioPort sink,source中
 		}
 	- module->setRoutes(routes){
 		- mRoutes = routes
