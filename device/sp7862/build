@@ -20,10 +20,10 @@ dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-apb/71400000.sdio/by-na
 lunch ums512_1h10_Natv-userdebug-native
 m audio.primary.ums512
 
+setprop sys.fyt.bluetooth_type ""
 
-oem   1024 M
-lsec  32 M
 
+//lesc
 dd if=/dev/zero of=temp.img bs=1M count=32
 mkfs.ext4 -F temp.img
 //串口

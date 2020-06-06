@@ -1,4 +1,4 @@
-/*
+/******************************
  audio接口
 */
 {
@@ -33,11 +33,25 @@
 JNIAudioPortCallback::sendEvent(int event)-->
 env->CallStaticVoidMethod(mClass, gAudioPortEventHandlerMethods.postEventFromNative, mObject, event)@android_media_AudioSystem.cpp
 
+/***************
+ audiopolicy
+
+*/
+AudioSystem::get_audio_policy_service(){
+- sp<IServiceManager> sm = defaultServiceManager()
+- sp<IBinder> binder = sm->getService(String16("media.audio_policy"))
+- sp<AudioSystem::AudioPolicyServiceClient> gAudioPolicyService = interface_cast<IAudioPolicyService>(binder)
+- sp<AudioPolicyServiceClient> apc = gAudioPolicyServiceClient
+- sp<IAudioPolicyService> ap = gAudioPolicyService
+
+- ap->registerClient(apc)
+}@AudioSystem.cpp
+
 
 frameworks/base/media/java/android/media/AudioSystem.java
 frameworks/base/core/jni/android_media_AudioSystem.cpp
 frameworks/av/media/libmedia/AudioSystem.cpp
-/*
+/***************
  audio端口状态
 
  AudioFlinger将状态信息更新到client(每个client通过AudioSystem注册到AudioFlinger)

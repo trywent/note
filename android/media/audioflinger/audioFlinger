@@ -328,3 +328,49 @@ frameworks/av/services/audioflinger/Tracks.cpp
 frameworks/native/libs/binder/MemoryDealer.cpp
 frameworks/native/libs/binder/MemoryHeapBase.cpp
 frameworks/native/libs/binder/IMemory.cpp
+
+/**********
+ android10
+
+*/
+//AudioTrack
+sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
+               CreateTrackOutput& output,status_t *status){
+- audio_attributes_t localAttr = input.attr
+- output.outputId = AUDIO_IO_HANDLE_NONE
+- AudioSystem::getOutputForAttr(&localAttr, &output.outputId, sessionId, &streamType,...)
+- 
+}@AudioFlinger.cpp
+
+
+//AudioRecord
+sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& input,
+               CreateRecordOutput& output, status_t *status){
+
+}AudioFlinger.cpp
+
+//AudioPolicy中getInputForAttr打开
+AudioFlinger::openInput(audio_module_handle_t module,audio_io_handle_t *input...)--
+AudioFlinger::openInput_l(audio_module_handle_t module,audio_io_handle_t *input,audio_config_t *config,
+       audio_devices_t devices,const String8& address, audio_source_t source,audio_input_flags_t flags,
+       audio_devices_t outputDevice,const String8& outputDeviceAddress){
+- AudioHwDevice *inHwDev = findSuitableHwDev_l(module, devices)
+- *input = nextUniqueId(AUDIO_UNIQUE_ID_USE_INPUT)
+- sp<DeviceHalInterface> inHwHal = inHwDev->hwDevice()
+  //hal,调用到open_input_stream
+- inHwHal->openInputStream(*input, devices, &halconfig, flags, address.string(), source...)
+- AudioStreamIn *inputStream = new AudioStreamIn(inHwDev, inStream, flags)
+- if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
+	- sp<MmapCaptureThread> thread = new MmapCaptureThread(this, *input,inHwDev, inputStream...)
+	- mMmapThreads.add(*input, thread)
+	return thread
+  }else{
+	- sp<RecordThread> thread = new RecordThread(this, inputStream, *input,...)
+	- mRecordThreads.add(*input, thread)
+	- return thread
+  }
+}@AudioFlinger.cpp
+
+
+frameworks/av/services/audioflinger/AudioFlinger.cpp
+

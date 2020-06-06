@@ -49,6 +49,7 @@ scp root@192.168.1.12:/usr/local/src/ *.log /root/
 scp root@192.168.1.11:/usr/local/src/ *.log /root/
 
 
+sshpass -p password scp file bsp_王波@//192.168.1.95/bsp组升级文件_正式生产用/android/王波android/7862/userdebug/
 
 =======
 tmate远程登录

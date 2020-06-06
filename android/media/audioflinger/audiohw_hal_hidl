@@ -61,6 +61,21 @@ openDevice{
 }@DevicesFactory.cpp
 
 
+//打开stream
+Return<void> Device::openInputStream(int32_t ioHandle, const DeviceAddress& device, const AudioConfig& config,
+	 AudioInputFlagBitfield flags,AudioSource source, openInputStream_cb _hidl_cb) {
+- auto [result, streamIn] = openInputStreamImpl(ioHandle, device, config, flags, source, &suggestedConfig);
+- _hidl_cb(result, streamIn, suggestedConfig)
+}@Device.cpp
+
+std::tuple<Result, sp<IStreamIn>> Device::openInputStreamImpl(int32_t ioHandle, const DeviceAddress& device, 
+	const AudioConfig& config,AudioInputFlagBitfield flags, AudioSource source, AudioConfig* suggestedConfig) {
+- mDevice->open_input_stream
+}@Device.cpp
+
+
+
 hardware/interfaces/audio/2.0/default/service.cpp
 frameworks/av/media/libaudiohal/DevicesFactoryHalHidl.cpp
 hardware/interfaces/audio/2.0/default/DevicesFactory.cpp
+hardware/interfaces/audio/core/all-versions/default/Device.cpp

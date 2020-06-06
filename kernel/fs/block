@@ -1,5 +1,27 @@
 /***********************
- fat
+ block
+*/
+
+//创建disk
+alloc_disk-->alloc_disk_node{
+- 
+- disk_expand_part_tbl
+}
+
+
+add_disk
+
+
+
+//
+add_disk-->register_disk-->blkdev_get
+
+
+block/genhd.c
+
+
+/***********************
+ emmc block
 */
 
 驱动注册：
@@ -22,23 +44,6 @@ dev->bus->probe@dd.c-->mmc_bus_probe-->drv->probe@/mmc/bus.c-->mmc_blk_probe{
 }@block.c
 
 drivers/mmc/card/block.c
-=================
-//创建disk
-alloc_disk-->alloc_disk_node{
-- 
-- disk_expand_part_tbl
-}
-
-
-add_disk
-
-
-
-//
-add_disk-->register_disk-->blkdev_get
-
-
-block/genhd.c
 
 
 

@@ -38,8 +38,14 @@ LOCAL_SHARED_LIBRARIES := \
 	libaudiopolicyservice \
 
 int main(int argc __unused, char **argv){
-- AudioFlinger::instantiate()			//只启动声音相关服务
-- AudioPolicyService::instantiate()
+  //只启动声音相关服务
+- AudioFlinger::instantiate(){			//getServiceName() ANDROID_API { return "media.audio_flinger"; }
+	- defaultServiceManager()
+	- addService(String16(SERVICE::getServiceName()),new SERVICE(), allowIsolated)
+	}
+- AudioPolicyService::instantiate()		//getServiceName() ANDROID_API { return "media.audio_policy"; }
 
 }@main_audioserver.cpp
+
+
 frameworks/av/media/audioserver/main_audioserver.cpp

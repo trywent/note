@@ -1,10 +1,151 @@
-/*
+/*****************************************
  audiopolicy
 
+*/
+
+createAudioPolicyManager-->new AudioPolicyManager(clientInterface)@AudioPolicyFactory.cpp-->
+AudioPolicyManager(AudioPolicyClientInterface *clientInterface){
+- mpClientInterface = clientInterface							// 操作audioflinger的接口
+- mVolumeCurves = new VolumeCurvesCollection()
+- AudioPolicyConfig config(mHwModules, mAvailableOutputDevices, mAvailableInputDevices)
+  //解析odm/vendor/system下"audio_policy_configuration.xml"。。创建AudioPolicyConfig
+- deserializeAudioPolicyXmlConfig(config)-->serializer.deserialize{
+	- 
+	}
+  //使用 enginedefault
+- engineInstance = audio_policy::EngineInstance::getInstance
+- mEngine = engineInstance->queryInterface<AudioPolicyManagerInterface>()-->Engine{
+	- ManagerInterfaceImpl mManagerInterface(this)
+	}
+- mEngine->initializeVolumeCurves 							//初始化音量
+  //根据mHwModules的名字,加载prmary,usb,a2dp库
+- 遍历,mHwModules{
+	- mHwModules[i]->mHandle = mpClientInterface->loadHwModule(name)--> 
+	  AudioPolicyService::AudioPolicyClient::loadHwModule-->af->loadHwModule(name)
+	  //将当前可用的流关联到audiohw
+	- 遍历,mOutputProfiles{
+		- profileType = outProfile->getSupportedDeviceForType(outputDeviceTypes)//找对对应存在的设备
+		- outputDesc = new SwAudioOutputDescriptor(outprofile)			//创建当前设备的outputStream
+		- outputDesc->mDevice = profileType
+		- mpClientInterface->openOutput(&output)
+		- mAvailableOutputDevices[index]->attach 				//设置attached设备可用状态
+		- addOutput(output, outputDesc)						//保存到mOutputs 
+		- setOutputDevice							//设置route,patch
+		}
+	- 遍历,mInputProfiles{
+		- sp<AudioInputDescriptor> inputDesc = new AudioInputDescriptor
+		- mpClientInterface->openInput
+		- devDesc->attach(mHwModules[i])/devDesc->importAudioPort		//设置attached设备可用状态
+		}
+	}
+- 
+}@AudioPolicyManager.cpp
+
+//解析audio_policy_configuration.xml。初始化流，设备，路径
+deserializeAudioPolicyXmlConfig(config)-->serializer.deserialize{
+- deserializeCollection<ModuleTraits>(modules,&config)-->ModuleTraits::deserialize{
+	//IOProfile mixport 
+	- deserializeCollection<MixPortTraits>(mixPorts)
+	- module->setProfiles(mixPorts)-->addProfile{			//模块加入流
+		- addOutputProfile 					
+		- addInputProfile
+		}
+	 //DeviceDescriptor devicePorts 
+	- deserializeCollection<DevicePortTraits>(devicePorts)
+	- module->setDeclaredDevices(devicePorts)			//模块加入设备
+	 //AudioRoute route
+	- deserializeCollection<RouteTraits>(routes){
+		- sink->addRoute/source->addRoute			//保存route到AudioPort sink,source中
+		}
+	- module->setRoutes(routes){
+		- mRoutes = routes
+		- refreshSupportedDevices-->stream->setSupportedDevices // 设置profile支持的设备
+		}
+	 //attachedDevices 已连接设备(DeviceDescriptor)
+	- config->addAvailableDevice-->mAvailableOutputDevices.add/mAvailableInputDevices.add 
+	- config->setDefaultOutputDevice-->mDefaultOutputDevices	//"defaultOutputDevice"
+	}
+- config.setHwModules(modules) 						//加入module
+- deserializeCollection<VolumeTraits>(volumes, &config)
+- config.setVolumes(volumes)						//volume配置
+}@Serializer.cpp
+
+/************
+ AudioPolicyConfig
+
+*/
+
+
+/************
+ engine
+
+*/
+//使用 engineconfigurable
+USE_CONFIGURABLE_AUDIO_POLICY := 1@ums512_1h10/ums512_1h10_Base.mk
+
+ifeq ($(USE_CONFIGURABLE_AUDIO_POLICY), 1)
+LOCAL_SHARED_LIBRARIES += libaudiopolicyengineconfigurable
+else
+LOCAL_SHARED_LIBRARIES += libaudiopolicyenginedefault
+endif 
+@audiopolicy/managerdefault/Android.mk
+
+
+
+
+/************
+ output
+*/
+AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,audio_io_handle_t *output,audio_session_t session,
+        audio_stream_type_t *stream,uid_t uid,const audio_config_t *config, audio_output_flags_t *flags,
+        audio_port_handle_t *selectedDeviceId,audio_port_handle_t *portId,std::vector<audio_io_handle_t> *secondaryOutputs){
+  //请求的设备。一般不会设置
+- audio_port_handle_t requestedPortId = *selectedDeviceId
+- sp<DeviceDescriptor> requestedDevice = mAvailableOutputDevices.getDeviceFromId(requestedPortId)
+  //获取output
+- std::vector<sp<SwAudioOutputDescriptor>> secondaryOutputDescs
+- getOutputForAttrInt(&resultAttr, output, session, attr, stream, uid,...){
+	- sp<DeviceDescriptor> requestedDevice = mAvailableOutputDevices.getDeviceFromId(requestedPortId)	//一般requestedPortId没有设置，为空
+	- getAudioAttributes(resultAttr, attr, *stream)
+	  //获取output设备。mPolicyMixes一般是由AudioService设置下来。一般不会设置，为空
+	- sp<SwAudioOutputDescriptor> policyDesc
+	- mPolicyMixes.getOutputForAttr(*resultAttr, uid, *flags, policyDesc, secondaryDescs)
+	- return 
+	  //获取output。正常流程
+	- outputDevices = mEngine->getOutputDevicesForAttributes(*resultAttr, requestedDevice, false)
+	- *output = getOutputForDevices(outputDevices, session, *stream, config..)
+	- *selectedDeviceId = getFirstDeviceId(outputDevices)
+	}
+- sp<TrackClientDescriptor> clientDesc = new TrackClientDescriptor
+- sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(*output)
+- outputDesc->addClient(clientDesc)
+}@AudioPolicyManager.cpp
+
+Engine::getOutputDevicesForAttributes(const audio_attributes_t &attributes,
+		const sp<DeviceDescriptor> &preferredDevice, bool fromCache, bool ignoreFM) const{
+- product_strategy_t strategy = getProductStrategyForAttributes(attributes)
+- DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices()	//device
+- SwAudioOutputCollection &outputs = getApmObserver()->getOutputs()			//output
+  //从当前已经在播放的设备中查找
+- sp<DeviceDescriptor> device = findPreferredDevice(outputs, strategy, availableOutputDevices)
+- return DeviceVector(device)
+  //没有找到，按照策略查找。fromCache=false
+- getDevicesForProductStrategy(strategy,ignoreFM){
+	- DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices()
+	- SwAudioOutputCollection &outputs = getApmObserver()->getOutputs()
+	}
+}@Engine.cpp
+
+//打开output
+
+
+/************
+ input
 */
 status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr, audio_io_handle_t *input,
       audio_unique_id_t riid,audio_session_t session,uid_t uid, const audio_config_base_t *config,
       audio_input_flags_t flags,audio_port_handle_t *selectedDeviceId,input_type_t *inputType,audio_port_handle_t *portId){
+  //是否指定设备
 - sp<DeviceDescriptor> explicitRoutingDevice = mAvailableInputDevices.getDeviceFromId(*selectedDeviceId)
   //使用现成的input
 - if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) == AUDIO_INPUT_FLAG_MMAP_NOIRQ &&*input != AUDIO_IO_HANDLE_NONE) {
@@ -14,15 +155,49 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr, aud
 - if (attributes.source == AUDIO_SOURCE_REMOTE_SUBMIX && strncmp(attributes.tags, "addr=", strlen("addr=")) == 0) {
 	- device = mAvailableInputDevices.getDevice(AUDIO_DEVICE_IN_REMOTE_SUBMIX...)
   else{
-	- device = mEngine->getInputDeviceForAttributes(attributes, &policyMix)
+	- if (explicitRoutingDevice != nullptr) {
+        	- device = explicitRoutingDevice
+	  else{
+		- device = mEngine->getInputDeviceForAttributes(attributes, &policyMix)
+	  }
   }
+  //打开input
+- *input = getInputForDevice(device, session, attributes, config, flags, policyMix)
 }@AudioPolicyManager.cpp
 
 
 
 Engine::getInputDeviceForAttributes(const audio_attributes_t &attr,sp<AudioPolicyMix> *mix) const{
 - sp<DeviceDescriptor> device = findPreferredDevice(inputs, attr.source, availableInputDevices)
+- 
 }
+
+//打开iuput
+AudioPolicyManager::getInputForDevice(const sp<DeviceDescriptor> &device,audio_session_t session,const audio_attributes_t &attributes,
+               const audio_config_base_t *config,audio_input_flags_t flags,const sp<AudioPolicyMix> &policyMix){
+- audio_io_handle_t input = AUDIO_IO_HANDLE_NONE
+- if (attributes.source == AUDIO_SOURCE_HOTWORD) {
+	- input = mSoundTriggerSessions.valueFor(session)
+  }else if (attributes.source == AUDIO_SOURCE_VOICE_COMMUNICATION && audio_is_linear_pcm(config->format)) {{
+	- 
+  }
+  //变化profileFlags，获取合适的ioprofile
+- sp<IOProfile> profile = getInputProfile(device, profileSamplingRate, profileFormat, profileChannelMask,profileFlags){
+	- for (const auto& hwModule : mHwModules) {
+		- for (const auto& profile : hwModule->getInputProfiles()) {
+			- if(profile->isCompatibleProfile(DeviceVector(device), samplingRate...))
+				- return profile
+			}
+		}
+	}
+  //创建AudioInputDescriptor。再通过AudioFlinger接口打开input
+- sp<AudioInputDescriptor> inputDesc = new AudioInputDescriptor(profile, mpClientInterface)
+- inputDesc->open(&lConfig, device, halInputSource, profileFlags, &input){
+	- mDevice = device
+	-  mClientInterface->openInput(mProfile->getModuleHandle(),input...)	//AudioFlinger接口
+	}@AudioInputDescriptor.cpp
+- addInput(input, inputDesc)
+}@AudioPolicyManager.cpp
 
 
 frameworks/av/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
