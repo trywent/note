@@ -329,10 +329,11 @@ frameworks/native/libs/binder/MemoryDealer.cpp
 frameworks/native/libs/binder/MemoryHeapBase.cpp
 frameworks/native/libs/binder/IMemory.cpp
 
-/**********
+/***********************************************
  android10
 
 */
+
 //AudioTrack
 sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                CreateTrackOutput& output,status_t *status){
@@ -371,6 +372,17 @@ AudioFlinger::openInput_l(audio_module_handle_t module,audio_io_handle_t *input,
   }
 }@AudioFlinger.cpp
 
-
 frameworks/av/services/audioflinger/AudioFlinger.cpp
 
+/************
+  device接口
+*/
+
+
+/************
+  stream接口
+*/
+
+
+frameworks/av/services/audioflinger/AudioStreamOut.h
+frameworks/av/include/media/audiohal/StreamHalInterface.h

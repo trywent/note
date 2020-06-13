@@ -1,0 +1,32 @@
+/******************
+ adb debug
+
+*/
+onStart(){
+- mAdbService = new AdbService(getContext())
+- publishBinderService(Context.ADB_SERVICE, mAdbService)
+}@AdbService.java
+
+AdbService(Context context) {
+- mDebuggingManager = new AdbDebuggingManager(context){
+	- mHandler = new AdbDebuggingHandler(FgThread.get().getLooper())
+	- mContext = context
+	}@AdbDebuggingManager.java
+- mHandler = new AdbHandler(FgThread.get().getLooper())
+}@AdbService.java
+
+
+//adb调试授权弹框
+listenToSocket-->mHandler.sendMessage(MESSAGE_ADB_CONFIRM)-->AdbDebuggingHandler.handleMessage(MESSAGE_ADB_CONFIRM)
+-->startConfirmation(String key, String fingerprints)@AdbDebuggingManager.java-->UsbDebugingActivity.java
+
+//授权
+service.allowDebugging(alwaysAllow, mKey)@UsbDebugingActivity.java-->
+allowDebugging(boolean alwaysAllow, String publicKey)-->mDebuggingManager.allowDebugging(alwaysAllow, publicKey)
+@AdbService.java-->mHandler.sendMessage(MESSAGE_ADB_ALLOW)@UsbDebuggingActivity.java
+
+
+
+frameworks/base/services/core/java/com/android/server/adb/AdbService.java
+frameworks/base/services/core/java/com/android/server/adb/AdbDebuggingManager.java
+frameworks/base/packages/SystemUI/src/com/android/systemui/usb/UsbDebuggingActivity.java

@@ -24,7 +24,7 @@ device/sprd/pike2/sp7731e_1h10/rootdir/system/etc/audio_params/tiny_hw.xml@7731
 /**************************************************
  audio_hw
 
-
+ adb logcat -s audio_hw_primary audio_hw_control
  不使用tiny_hw.xml
 */
 
@@ -71,7 +71,7 @@ parse_audio_route(struct audio_control *control){
 
 //解析AUDIO_PCM_FILE  "/vendor/etc/audio_pcm.xml"
 parse_audio_pcm_config(struct pcm_handle_t *pcm){
-- parse_pcm_config(pcm->play, pcm->playback_devices,pcm_tmp){		//playback节点
+- parse_pcm_config(pcm->play, pcm->playback_devices,pcm_tmp){		//playback节点.voip使用pcm6.音乐使用pcm3
 	- 
 	}
 - parse_recordpcm_config(pcm->record,pcm->record_devices, pcm_tmp){	//record节点
@@ -172,3 +172,59 @@ vendor/sprd/modules/audio/whale/audio_hw.c
 vendor/sprd/modules/audio/whale/audio_control.cpp
 vendor/sprd/modules/audio/whale/audio_parse.cpp
 vendor/sprd/modules/audio/whale/debug/audio_debug.cpp
+
+
+
+/**************************************************
+ 测试工具 
+
+ proprietories-source/factorytest
+ proprietories-source/autotest
+*/
+adev_open-->ext_control_init(adev)@audio_hw-->
+ext_control_init(struct tiny_audio_device *adev){
+- create_audio_pipe(AUDIO_EXT_DATA_CONTROL_PIPE){	//创建"/data/vendor/local/media/mmi.audio.ctrl"
+	- mkfifo(pipe_name,S_IFIFO|0666)
+	- chmod(pipe_name, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP| S_IROTH|S_IWOTH)
+	- stat(pipe_name, &buf)
+	- chmod(pipe_name, S_IRUSR|S_IWUSR|S_IRGRP| S_IWGRP|S_IROTH|S_IWOTH)
+	}
+- create_audio_pipe(MMI_DEFAULT_PCM_FILE)		//创建"/data/vendor/local/media/aploopback.pcm"
+- pthread_t control_audio_loop;
+- pthread_create(&control_audio_loop, NULL, control_audio_loop_process, (void *)adev)-->
+	control_audio_loop_process(void *arg){
+	- int pipe_fd = open(AUDIO_EXT_CONTROL_PIPE, O_RDWR)
+	- fcntl(pipe_fd,F_SETFL,O_NONBLOCK)
+	- while(false==adev->pipe_process_exit){
+		- FD_ZERO(&fds_read)
+		- FD_SET(pipe_fd,&fds_read)
+		- select(max_fd,&fds_read,NULL,NULL,NULL)
+		- read_noblock_l(pipe_fd,data,1024)
+		- ext_contrtol_process(adev,data)	//处理命令
+		}
+	}
+- pthread_detach(pthread_self())
+}@ext_control.c
+
+//dump数据
+audiohal_pcmdump(void *ctl,int flag,void *buffer,int size,int dumptype){
+- char file_name[128]={0}
+- snprintf(file_name,sizeof(file_name)-1,"%s_%d.pcm",audiopcmdumpname[dumptype],flag)
+- dev_ctl->pcmdumpfd[dumptype]=open(file_name, O_RDWR | O_CREAT |O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+- write(dev_ctl->pcmdumpfd[dumptype],buffer,size)
+}@audio_debug.cpp
+
+set_audiohal_musicpcmdump(UNUSED_ATTR void *dev,UNUSED_ATTR struct str_parms *parms, int opt, UNUSED_ATTR char * val){
+- 
+- 
+}@audio_debug.cpp
+
+
+
+vendor/sprd/modules/audio/whale/debug/ext_control.c
+vendor/sprd/modules/audio/whale/debug/audio_debug.cpp
+
+
+
+
+

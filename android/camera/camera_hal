@@ -33,7 +33,7 @@ service vendor.camera-provider-2-4 /vendor/bin/hw/android.hardware.camera.provid
 @android.hardware.camera.provider@2.4-service_64.rc-->main-->
 defaultPassthroughServiceImplementati on<ICameraProvider>("legacy/0")@service.cpp
 
-//获取camera库的接口
+//获取camera库的接口,获取camera信息
 HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
 - hw_get_module(CAMERA_HARDWARE_MODULE_ID, &rawModule)	//加载HAL库
 - mModule = new CameraModule(rawModule) 		//将module封装
@@ -56,7 +56,7 @@ getCameraDeviceInterface_V3_x(cameraDeviceName){
 }@CameraProvider.cpp
 
 //获取CameraDevice name
-getCameraIdList{
+getCameraIdList(){
 - 遍历mCameraDeviceNames,deviceNamePair
 - deviceNameList.push_back(deviceNamePair.second
 }@CameraProvider.cpp
@@ -113,7 +113,7 @@ CameraDevice::open(const sp<ICameraDeviceCallback>& callback, open_cb _hidl_cb){
 
 /**********************
  ICameraDeviceSession
- device接口 session
+ 处理请求的接口 session
 */
 interface ICameraDeviceSession{
 - constructDefaultRequestSettings(RequestTemplate type)
@@ -141,6 +141,21 @@ CameraDeviceSession(camera3_device_t* device,const camera_metadata_t* deviceInfo
 - initialize-->mDevice->ops->initialize
 }@CameraDeviceSession.cpp
 
+//configure stream
+CameraDeviceSession::configureStreams_3_3(const StreamConfiguration& requestedConfiguration,
+        ICameraDeviceSession::configureStreams_3_3_cb _hidl_cb)  {
+- camera3_stream_configuration_t stream_list
+- stream_list.operation_mode = (uint32_t) requestedConfiguration.operationMode
+- stream_list.num_streams = requestedConfiguration.streams.size()
+- for (uint32_t i = 0; i < stream_list.num_streams; i++) {
+	- mStreamMap[id] = stream
+	- 
+	- streams[i] = &mStreamMap[id]
+	}
+- status_t ret = mDevice->ops->configure_streams(mDevice, &stream_list)
+}@CameraDeviceSession.cpp
+
+
 //处理请求
 processCaptureRequest(hidl_vec<CaptureRequest>& requests){
   //遍历requests
@@ -161,7 +176,54 @@ hardware/interfaces/camera/device/3.3/default/CameraDeviceSession.cpp
 
  当前也使用。本地库实现的接口。由hal服务调用
 */
+module,device stream
 
+
+/********
+ mamera moduel
+*/
+typedef struct camera_module {
+    hw_module_t common{			
+	- uint32_t tag;
+    	- const char *id;
+    	- const char *name;
+	- struct hw_module_methods_t* methods	//methods.open 打开device的接口
+	}
+    int (*get_number_of_cameras)(void)
+    int (*get_camera_info)(int camera_id, struct camera_info *info)
+    int (*set_callbacks)(const camera_module_callbacks_t *callbacks)
+    void (*get_vendor_tag_ops)(vendor_tag_ops_t* ops)
+    int (*open_legacy)(const struct hw_module_t* module, const char* id,uint32_t halVersion, struct hw_device_t** device)
+    int (*set_torch_mode)(const char* camera_id, bool enabled)
+    int (*init)();
+    void* reserved[5];
+} camera_module_t;
+
+
+hardware/libhardware/include/hardware/camera_common.h
+/********
+ camera device
+*/
+//camera设备操作函数
+typedef struct camera3_device_ops {
+    int (*initialize)(const struct camera3_device *,const camera3_callback_ops_t *callback_ops);
+    int (*configure_streams)(const struct camera3_device *,camera3_stream_configuration_t *stream_list);
+    int (*register_stream_buffers)(const struct camera3_device *, const camera3_stream_buffer_set_t *buffer_set);
+    const camera_metadata_t* (*construct_default_request_settings)( const struct camera3_device *, int type);
+    int (*process_capture_request)(const struct camera3_device *,camera3_capture_request_t *request);
+    void (*get_metadata_vendor_tag_ops)(const struct camera3_device*,vendor_tag_query_ops_t* ops);
+    void (*dump)(const struct camera3_device *, int fd); 
+    int (*flush)(const struct camera3_device *);
+    void *reserved[8];
+} camera3_device_ops_t;
+
+//操作后回调
+typedef struct camera3_callback_ops {   
+    void (*process_capture_result)(const struct camera3_callback_ops *,const camera3_capture_result_t *result);
+    void (*notify)(const struct camera3_callback_ops *,const camera3_notify_msg_t *msg);
+} camera3_callback_ops_t;
+
+//操作结果
 typedef struct camera3_capture_result {
     uint32_t frame_number;
     const camera_metadata_t *result;
@@ -169,42 +231,9 @@ typedef struct camera3_capture_result {
     const camera3_stream_buffer_t *output_buffers;
     const camera3_stream_buffer_t *input_buffer;
     uint32_t partial_result;
-
 } camera3_capture_result_t;
 
-
-typedef struct camera3_callback_ops {
-   
-    void (*process_capture_result)(const struct camera3_callback_ops *,const camera3_capture_result_t *result);
-
-    void (*notify)(const struct camera3_callback_ops *,const camera3_notify_msg_t *msg);
-
-} camera3_callback_ops_t;
-
-
-
-typedef struct camera3_device_ops {
-
-    int (*initialize)(const struct camera3_device *,const camera3_callback_ops_t *callback_ops);
-
-    int (*configure_streams)(const struct camera3_device *,camera3_stream_configuration_t *stream_list);
-
-    int (*register_stream_buffers)(const struct camera3_device *, const camera3_stream_buffer_set_t *buffer_set);
-
-    const camera_metadata_t* (*construct_default_request_settings)( const struct camera3_device *, int type);
-
-    int (*process_capture_request)(const struct camera3_device *,camera3_capture_request_t *request);
-
-    void (*get_metadata_vendor_tag_ops)(const struct camera3_device*,vendor_tag_query_ops_t* ops);
-
-    void (*dump)(const struct camera3_device *, int fd);
- 
-    int (*flush)(const struct camera3_device *);
-    void *reserved[8];
-} camera3_device_ops_t;
-
-
-//hal Service获取设备，包含设备操作函数
+//camera deivce设备操作函数
 typedef struct camera3_device {
     hw_device_t common;
     camera3_device_ops_t *ops;
@@ -213,3 +242,118 @@ typedef struct camera3_device {
 
 
 hardware/libhardware/include/hardware/camera3.h
+
+/********
+ stream和request数据类型
+
+*/
+//设置stream。调用configure_streams获取。发送请求前的执行操作
+typedef struct camera3_stream_configuration {
+    uint32_t num_streams;
+    camera3_stream_t **streams;
+    uint32_t operation_mode;
+} camera3_stream_configuration_t;
+
+//获取默认参数。调用construct_default_request_settings获取
+struct camera_metadata {
+    metadata_size_t          size;
+    uint32_t                 version;
+    uint32_t                 flags;
+    metadata_size_t          entry_count;
+    metadata_size_t          entry_capacity;
+    metadata_uptrdiff_t      entries_start; // Offset from camera_metadata
+    metadata_size_t          data_count;
+    metadata_size_t          data_capacity;
+    metadata_uptrdiff_t      data_start; // Offset from camera_metadata
+    uint32_t                 padding;    // padding to 8 bytes boundary
+    metadata_vendor_id_t     vendor_id;
+}
+
+
+//stream
+typedef struct camera3_stream {
+    int stream_type;
+    uint32_t width;
+    uint32_t height;
+    int format;
+    uint32_t usage;		//producer,consumer
+    uint32_t max_buffers;
+    void *priv;
+    android_dataspace_t data_space;
+    int rotation;
+    void *reserved[7];
+} camera3_stream_t;
+
+
+//buffer
+typedef struct camera3_stream_buffer {
+    camera3_stream_t *stream;
+    buffer_handle_t *buffer;
+    int status;
+    int acquire_fence;
+    int release_fence;
+} camera3_stream_buffer_t;
+
+//请求
+typedef struct camera3_capture_request {
+    uint32_t frame_number;
+    const camera_metadata_t *settings;
+    camera3_stream_buffer_t *input_buffer;
+    uint32_t num_output_buffers;
+    const camera3_stream_buffer_t *output_buffers;
+
+} camera3_capture_request_t;
+
+
+hardware/libhardware/include/hardware/camera3.h
+/* 一般操作步骤
+  
+
+*/
+1 framework调用camera_module_t->common.open()，获取hardware_device_t
+2 framework检查hardware_device_t->version，创建对应的设备。如camera3_device_t(CAMERA_DEVICE_API_VERSION_3_0)
+3 framework调用camera3_device_t->ops->initialize()，传入回调函数
+4 framework调用camera3_device_t->ops->configure_streams()，出入input/output streamlist
+5 <= CAMERA_DEVICE_API_VERSION_3_1:
+	调用camera3_device_t->ops->register_stream_buffers()
+  >= CAMERA_DEVICE_API_VERSION_3_2:
+	不调用camera3_device_t->ops->register_stream_buffers()
+6 framework调用camera3_device_t->ops->construct_default_request_settings()，创建默认设置
+7 根据当前的设置，output steam创建capture request，调用camera3_device_t->ops->process_capture_request()发送到hal。
+  >= CAMERA_DEVICE_API_VERSION_3_2:
+	buffer_handle_t@camera3_stream_buffer_t@camera3_capture_request_t,必须没有被使用过
+8 继续发送请求
+  <= CAMERA_DEVICE_API_VERSION_3_1:
+	调用register_stream_buffers注册没有注册的stream
+9 开始抓取数据时，camera3_callback_ops_t->notify()发送SHUTTER事件，包含timestamp,frame number信息
+  <= CAMERA_DEVICE_API_VERSION_3_1:
+	notify在process_capture_result()之前调用
+  >= CAMERA_DEVICE_API_VERSION_3_2:
+	camera3_callback_ops_t->notify()尽可能早的调用。framework只在收到notify后，将gralloc buffer传回上层
+10 hal调用camera3_callback_ops_t->process_capture_result()发送结果给framework。结果返回顺序和请求一样，也可以一次返回结果。
+   >= CAMERA_DEVICE_API_VERSION_3_2:
+	当buffer@camera3_stream_buffer_t返回后，hal不能再操作buffer
+11 停止提交request后，framework可以再次调用configure_streams配置stream，再重复执行步骤 7
+12 framework调用camera3_device_t->common->close()返回后，hal层不能执行camera3_callback_ops_t操作
+13 出错后hal层调用camera3_callback_ops_t->notify()通知上层。通知后hal层状态相当于已经关闭
+/********
+ 接口实现
+ 
+ camera.v4l2 示例
+*/
+const camera3_device_ops_t Camera::sOps = {
+    .initialize = default_camera_hal::initialize,
+    .configure_streams = default_camera_hal::configure_streams,
+    .register_stream_buffers = nullptr,
+    .construct_default_request_settings = default_camera_hal::construct_default_request_settings,
+    .process_capture_request = default_camera_hal::process_capture_request,
+    .get_metadata_vendor_tag_ops = nullptr,
+    .dump = default_camera_hal::dump,
+    .flush = default_camera_hal::flush,
+    .reserved = {0},
+}@camera.cpp
+
+
+
+
+hardware/libhardware/modules/camera/3_4/camera.cpp

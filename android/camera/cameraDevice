@@ -107,21 +107,8 @@ CameraDeviceClient::createStream(
 - mStreamInfoMap[streamId] = streamInfo
 }@CameraDeviceClient.cpp
 
-createStream(sp<Surface>& consumers,uint32_t width, uint32_t height, int format,int streamSetId){
-- format == HAL_PIXEL_FORMAT_BLOB{
-	- ssize_t blobBufferSize = getJpegBufferSize(width, height)
-	- newStream = new Camera3OutputStream
-	}
-- HAL_PIXEL_FORMAT_RAW_OPAQUE{
-	- newStream = new Camera3OutputStream	
-	}
-- share{
-	- newStream = new Camera3SharedOutputStream
-	}
-- newStream->setStatusTracker(mStatusTracker)
-- newStream->setBufferManager(mBufferManager)
-- mOutputStreams.add(mNextStreamId, newStream)
-}Camera3Device.cpp
+
+
 
 //创建默认请求. 创建一个容器让上层填写图像数据的参数
 createDefaultRequest(int templateId,/*out*/CameraMetadataNative* request){
@@ -159,6 +146,45 @@ submitRequestList(vector<hardware::camera2::CaptureRequest>& requests,bool strea
 
 
 */
+
+//创建stream
+createStream(sp<Surface>& consumers,uint32_t width, uint32_t height, int format,int streamSetId){
+- format == HAL_PIXEL_FORMAT_BLOB{
+	- ssize_t blobBufferSize = getJpegBufferSize(width, height)
+	- newStream = new Camera3OutputStream
+	}
+- HAL_PIXEL_FORMAT_RAW_OPAQUE{
+	- newStream = new Camera3OutputStream	
+	}
+- share{
+	- newStream = new Camera3SharedOutputStream
+	}
+- newStream->setStatusTracker(mStatusTracker)
+- newStream->setBufferManager(mBufferManager)
+- mOutputStreams.add(mNextStreamId, newStream)
+}Camera3Device.cpp
+
+//config stream
+Camera3Device::HalInterface::configureStreams(camera3_stream_configuration *config) {
+- for (size_t i = 0; i < config->num_streams; i++) {
+	- 
+	}
+  //配置stream
+- sp<device::V3_3::ICameraDeviceSession> hidlSession_3_3
+- auto castResult = device::V3_3::ICameraDeviceSession::castFrom(mHidlSession)
+- hidlSession_3_3 = castResult
+- if(hidlSession_3_3 != nullptr){
+	- idlSession_3_3->configureStreams_3_3(requestedConfiguration...)
+  }else{
+	- mHidlSession->configureStreams(requestedConfiguration,...)
+  }
+  //
+- for (size_t i = 0; i < config->num_streams; i++) {
+
+	}
+}@Camera3Device.cpp
+
+
 Camera3Device::initializeCommonLocked{
 - mBufferManager = new Camera3BufferManager
 - mRequestThread = new RequestThread

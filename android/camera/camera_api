@@ -72,9 +72,9 @@ CameraCharacteristics getCameraCharacteristics (String cameraId)@CameraManager.j
 CameraCharacteristics.get(Key<T> key)
 
 //key
-SENSOR_INFO_ACTIVE_ARRAY_SIZE <Rect>				//sensor最大的分辨率
-SCALER_STREAM_CONFIGURATION_MAP <StreamConfigurationMap>	//流的配置，分辨率。返回
-INFO_SUPPORTED_HARDWARE_LEVEL <Integer>				//
+SENSOR_INFO_ACTIVE_ARRAY_SIZE	<Rect>				//sensor最大的分辨率
+SCALER_STREAM_CONFIGURATION_MAP <StreamConfigurationMap>	//流的配置，分辨率
+INFO_SUPPORTED_HARDWARE_LEVEL	<Integer>			//
 
 
 

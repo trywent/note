@@ -27,7 +27,7 @@ unix extensions = no
 //重启samba:
 sudo service smbd restart
 
-//共享home目录 需要修改下面的注释
+//共享home目录 需要修改下面的注释。从win10访问\\192.16.1.115\bsp passwd:bsp
 [homes]
    comment = Home Directories
    browseable = yes

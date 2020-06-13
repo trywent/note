@@ -229,9 +229,6 @@ btu_task_start_up{//新线程中启动
 
 
 
-
-
-
 system/bt/btif/src/bluetooth.c
 system/bt/btif/src/stack_manager.c
 system/bt/main/bte_main.c

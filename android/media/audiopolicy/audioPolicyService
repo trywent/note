@@ -99,11 +99,13 @@ AudioPolicyService::onFirstRef{
 - mAudioPolicyEffects = new AudioPolicyEffects
 }
 
-//devices状态
-AudioPolicyManager::setDeviceConnectionState-->setDeviceConnectionStateInt{
-- mAvailableOutputDevices.add(devDesc)
-- mAvailableInputDevices.add(devDesc)
-}
+
+
+//更新权限。前台app,语音助手允许录音
+updateUidStates-->updateUidStates_l{
+
+}@AudioPolicyService.cpp
+
 /***************
  接口 AudioPolicyInterfaceImpl --- AudioPolicyManager
 */

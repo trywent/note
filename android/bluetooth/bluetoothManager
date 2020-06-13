@@ -9,12 +9,12 @@ startOtherServices-->mSystemServiceManager.startService(BluetoothService.class)@
 
 mSystemServiceManager.startBootPhase@SystemServer.java-->startBootPhase-->
 service.onBootPhase@SystemServiceManager.java-->onBootPhase(int phase){
-- PHASE_SYSTEM_SERVICES_READY: //发布服务
+- PHASE_SYSTEM_SERVICES_READY:									//发布服务
 	publishBinderService(BluetoothAdapter.BLUETOOTH_MANAGER_SERVICE,mBluetoothManagerService)
-- PHASE_ACTIVITY_MANAGER_READY:	mBluetoothManagerService.handleOnBootPhase--> //bluetoothServiceManager
+- PHASE_ACTIVITY_MANAGER_READY:	mBluetoothManagerService.handleOnBootPhase-->			//bluetoothServiceManager
 	handleOnBootPhase{
-	- sendEnableMsg(mQuietEnableExternal)-->handleEnable-->doBind(IBluetooth)//启动时打开蓝牙
-	- getNameAndAddress-->handleMessage(MESSAGE_GET_NAME_AND_ADDRESS)-->doBind(IBluetooth) //获取完成会自动关闭蓝牙
+	- sendEnableMsg(mQuietEnableExternal)-->handleEnable-->doBind(IBluetooth)		//启动时打开蓝牙
+	- getNameAndAddress-->handleMessage(MESSAGE_GET_NAME_AND_ADDRESS)-->doBind(IBluetooth)	//获取完成会自动关闭蓝牙
 	}@BluetoothManagerService.java
 }@BluetoothService.java
 
@@ -25,13 +25,13 @@ enable@BluetoothAdapter.java-->mManagerService.enable-->enable{
 }@BluetoothManagerService.java
 
 handleEnable{
-- mBluetooth==null{ //还没连接到蓝牙服务adapterService
-	- sendMessageDelayed(MESSAGE_TIMEOUT_BIND) //发送连接超时广播
+- mBluetooth==null{									//还没连接到蓝牙服务adapterService
+	- sendMessageDelayed(MESSAGE_TIMEOUT_BIND)					//发送连接超时广播
 	- Intent i = new Intent(IBluetooth.class.getName()
 	- mConnection = new BluetoothServiceConnection
-	- doBind(i,mConnection)-->mContext.bindServiceAsUser(intent, mConnection) //连接服务 "android.bluetooth.IBluetooth"
+	- doBind(i,mConnection)-->mContext.bindServiceAsUser(intent, mConnection)	//连接服务 "android.bluetooth.IBluetooth"
 	}
-- mBluetooth!=null{//已经连接到adapterService
+- mBluetooth!=null{									//已经连接到adapterService
 	- mBluetooth.enable()
 	}
 }@BluetoothManagerService.java
@@ -54,13 +54,13 @@ disable(boolean persist){
 
 //消息处理
 BluetoothHandler.handleMessage{
-- MESSAGE_REGISTER_ADAPTER{ //BlutoothAdapter注册回调
+- MESSAGE_REGISTER_ADAPTER{								//BlutoothAdapter注册回调
 	- mCallbacks.register(callback)
 	}
-- MESSAGE_BLUETOOTH_SERVICE_CONNECTED{//连接到AdapterService
+- MESSAGE_BLUETOOTH_SERVICE_CONNECTED{							//连接到AdapterService
 	- IBinder service = (IBinder) msg.obj
 	- mBluetoothBinder = service
-	- mBluetooth = IBluetooth.Stub.asInterface(Binder.allowBlocking(service)) //蓝牙服务
+	- mBluetooth = IBluetooth.Stub.asInterface(Binder.allowBlocking(service))	//蓝牙服务
 	- sendBluetoothServiceUpCallback
 	}
 }
@@ -72,9 +72,9 @@ BluetoothHandler.handleMessage{
 
 BluetoothManager-->getDefaultAdapter{
 - IBinder b = ServiceManager.getService(BLUETOOTH_MANAGER_SERVICE)
-- IBluetoothManager managerService = IBluetoothManager.Stub.asInterface(b) //BluetoothManagerService
+- IBluetoothManager managerService = IBluetoothManager.Stub.asInterface(b)		//BluetoothManagerService
 - new BluetoothAdapter(managerService){
-	- mService = managerService.registerAdapter(mManagerCallback) //设置回调,返回蓝牙服务adapterService接口
+	- mService = managerService.registerAdapter(mManagerCallback)			//设置回调,返回蓝牙服务adapterService接口
 	- mManagerService = managerService
 	}
 }@BluetoothAdapter.java
@@ -103,22 +103,35 @@ sendBluetoothServiceDownCallback-->mCallbacks.getBroadcastItem(i).onBluetoothSer
 -->mStateChangeCallback.onBluetoothServiceDown@BluetoothDevice.java
 
 
-//蓝牙状态
+//注册回调
 mBluetooth.registerCallback(mBluetoothCallback)@BluetoothManagerService.java
 
+//回调通知，蓝牙状态
 updateAdapterState-->onBluetoothStateChange@AdapterService.java-->
 mBluetoothCallback.onBluetoothStateChange-->sendMessage(MESSAGE_BLUETOOTH_STATE_CHANGE)
 handleMessage(MESSAGE_BLUETOOTH_STATE_CHANGE){ //状态变化
-- bluetoothStateChangeHandler{
-	- STATE_OFF{
-		- sendBluetoothServiceDownCallback
-		- unbindAndFinish
-		}
-	- 	
-	}
-
+- bluetoothStateChangeHandler
 - recoverBluetoothServiceFromError //错误状态回复
 }@BluetoothManagerService.java
+
+
+bluetoothStateChangeHandler(int prevState, int newState) {
+  //蓝牙关闭打开，都会走BLE_ON
+- if (newState == BluetoothAdapter.STATE_BLE_ON || newState == BluetoothAdapter.STATE_OFF) {
+	- boolean intermediate_off = (prevState == BluetoothAdapter.STATE_TURNING_OFF && newState == BluetoothAdapter.STATE_BLE_ON)//正在关闭蓝牙
+	- if (newState == BluetoothAdapter.STATE_OFF) {
+		- 
+	  }else if (!intermediate_off) {
+		- 
+  	  }else if (intermediate_off){
+	  	- sendBluetoothStateCallback(false)
+		- sendBrEdrDownCallback()-->mBluetooth.onBrEdrDown()
+	  }
+  }else if (newState == BluetoothAdapter.STATE_ON) {
+
+  }
+- 
+}
 
 
 frameworks/base/services/core/java/com/android/server/BluetoothService.java

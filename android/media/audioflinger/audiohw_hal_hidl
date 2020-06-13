@@ -29,10 +29,100 @@ void closeInputStream(audio_stream_in_t* stream);
 void closeOutputStream(audio_stream_out_t* stream)
 }@Device.h
 
+struct Stream : public IStream, public ParametersUtil {
+    Return<uint64_t> getFrameSize() override;
+    Return<uint64_t> getFrameCount() override;
+    Return<uint64_t> getBufferSize() override;
+    Return<uint32_t> getSampleRate() override
+    Return<void> getSupportedSampleRates(AudioFormat format, getSupportedSampleRates_cb _hidl_cb);
+    Return<void> getSupportedChannelMasks(AudioFormat format, getSupportedChannelMasks_cb _hidl_cb);
+    Return<Result> setSampleRate(uint32_t sampleRateHz) override;
+    Return<AudioChannelBitfield> getChannelMask() override;
+    Return<Result> setChannelMask(AudioChannelBitfield mask) override;
+    Return<AudioFormat> getFormat() override;
+    Return<void> getSupportedFormats(getSupportedFormats_cb _hidl_cb) override;
+    Return<Result> setFormat(AudioFormat format) override;
+    Return<void> getAudioProperties(getAudioProperties_cb _hidl_cb) override;
+    Return<Result> addEffect(uint64_t effectId) override;
+    Return<Result> removeEffect(uint64_t effectId) override;
+    Return<Result> standby() override;
+
+    Return<void> getDevices(getDevices_cb _hidl_cb) override;
+    Return<Result> setDevices(const hidl_vec<DeviceAddress>& devices) override;
+    Return<void> getParameters(const hidl_vec<ParameterValue>& context,
+                               const hidl_vec<hidl_string>& keys,getParameters_cb _hidl_cb) override;
+    Return<Result> setParameters(const hidl_vec<ParameterValue>& context,
+                                 const hidl_vec<ParameterValue>& parameters) override
+    Return<Result> setHwAvSync(uint32_t hwAvSync) override;
+    Return<Result> start() override;
+    Return<Result> stop() override;
+    Return<void> createMmapBuffer(int32_t minSizeFrames, createMmapBuffer_cb _hidl_cb) override;
+    Return<void> getMmapPosition(getMmapPosition_cb _hidl_cb) override;
+    Return<Result> close() override
+    static Result analyzeStatus(const char* funcName, int status);
+    static Result analyzeStatus(const char* funcName, int status,
+                                const std::vector<int>& ignoreErrors)
+    char* halGetParameters(const char* keys) override;
+    int halSetParameters(const char* keysAndValues) override;
+}
+
+struct StreamOut : public IStreamOut {
+    Return<uint64_t> getFrameSize() override;
+    Return<uint64_t> getFrameCount() override;
+    Return<uint64_t> getBufferSize() override;
+    Return<uint32_t> getSampleRate() override
+    Return<void> getSupportedSampleRates(AudioFormat format, getSupportedSampleRates_cb _hidl_cb);
+    Return<void> getSupportedChannelMasks(AudioFormat format, getSupportedChannelMasks_cb _hidl_cb);
+    Return<Result> setSampleRate(uint32_t sampleRateHz) override;
+    Return<AudioChannelBitfield> getChannelMask() override;
+    Return<Result> setChannelMask(AudioChannelBitfield mask) override;
+    Return<AudioFormat> getFormat() override;
+    Return<void> getSupportedFormats(getSupportedFormats_cb _hidl_cb) override;
+    Return<Result> setFormat(AudioFormat format) override;
+    Return<void> getAudioProperties(getAudioProperties_cb _hidl_cb) override;
+    Return<Result> addEffect(uint64_t effectId) override;
+    Return<Result> removeEffect(uint64_t effectId) override;
+    Return<Result> standby() override
+    Return<void> getDevices(getDevices_cb _hidl_cb) override;
+    Return<Result> setDevices(const hidl_vec<DeviceAddress>& devices) override;
+    Return<void> getParameters(const hidl_vec<ParameterValue>& context,
+                               const hidl_vec<hidl_string>& keys, getParameters_cb _hidl_cb) override;
+    Return<Result> setParameters(const hidl_vec<ParameterValue>& context,
+                                 const hidl_vec<ParameterValue>& parameters) override;
+    Return<Result> setHwAvSync(uint32_t hwAvSync) override;
+    Return<Result> close() override;
+
+    Return<uint32_t> getLatency() override;
+    Return<Result> setVolume(float left, float right) override;
+    Return<void> prepareForWriting(uint32_t frameSize, uint32_t framesCount,
+                                   prepareForWriting_cb _hidl_cb) override;
+    Return<void> getRenderPosition(getRenderPosition_cb _hidl_cb) override;
+    Return<void> getNextWriteTimestamp(getNextWriteTimestamp_cb _hidl_cb) override;
+    Return<Result> setCallback(const sp<IStreamOutCallback>& callback) override;
+    Return<Result> clearCallback() override;
+    Return<void> supportsPauseAndResume(supportsPauseAndResume_cb _hidl_cb) override;
+    Return<Result> pause() override;
+    Return<Result> resume() override;
+    Return<bool> supportsDrain() override;
+    Return<Result> drain(AudioDrain type) override;
+    Return<Result> flush() override;
+    Return<void> getPresentationPosition(getPresentationPosition_cb _hidl_cb) override;
+    Return<Result> start() override;
+    Return<Result> stop() override;
+    Return<void> createMmapBuffer(int32_t minSizeFrames, createMmapBuffer_cb _hidl_cb) override;
+    Return<void> getMmapPosition(getMmapPosition_cb _hidl_cb) override;
+    Return<void> updateSourceMetadata(const SourceMetadata& sourceMetadata) override;
+    Return<Result> selectPresentation(int32_t presentationId, int32_t programId) override;
+
+    static Result getPresentationPositionImpl(audio_stream_out_t* stream, uint64_t* frames,
+                                              TimeSpec* timeStamp)
+}
+
 
 hardware/interfaces/audio/core/all-versions/default/include/core/default/Device.h
+hardware/interfaces/audio/core/all-versions/default/include/core/default/Stream.h
 /***************************
- 服务启动
+ 服务启动 device操作
 */
 service audio-hal-2-0 /vendor/bin/hw/android.hardware.audio@2.0-service@android.hardware.audio@2.0-service.rc
 -->int main{
@@ -40,8 +130,6 @@ service audio-hal-2-0 /vendor/bin/hw/android.hardware.audio@2.0-service@android.
 - registerPassthroughServiceImplementation<IEffectsFactory>
 - registerPassthroughServiceImplementation<ISoundTriggerHw>
 }@service.cpp
-
-
 
 //获取服务
 AudioFlinger-->mDevicesFactoryHal = DevicesFactoryHalInterface::create()-->
@@ -61,7 +149,7 @@ openDevice{
 }@DevicesFactory.cpp
 
 
-//打开stream
+//打开inputstream
 Return<void> Device::openInputStream(int32_t ioHandle, const DeviceAddress& device, const AudioConfig& config,
 	 AudioInputFlagBitfield flags,AudioSource source, openInputStream_cb _hidl_cb) {
 - auto [result, streamIn] = openInputStreamImpl(ioHandle, device, config, flags, source, &suggestedConfig);
@@ -74,8 +162,86 @@ std::tuple<Result, sp<IStreamIn>> Device::openInputStreamImpl(int32_t ioHandle, 
 }@Device.cpp
 
 
-
 hardware/interfaces/audio/2.0/default/service.cpp
 frameworks/av/media/libaudiohal/DevicesFactoryHalHidl.cpp
 hardware/interfaces/audio/2.0/default/DevicesFactory.cpp
 hardware/interfaces/audio/core/all-versions/default/Device.cpp
+/***************************
+  stream操作接口
+*/
+
+//out
+class AudioStreamOut {
+    AudioHwDevice * const audioHwDev;
+    sp<StreamOutHalInterface> stream;
+    sp<DeviceHalInterface> hwDev() const
+    virtual status_t open(audio_io_handle_t handle,audio_devices_t devices,
+            struct audio_config *config,const char *address);
+    status_t getRenderPosition(uint32_t *frames)
+    virtual status_t getRenderPosition(uint64_t *frames)
+    virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp)
+    virtual ssize_t write(const void *buffer, size_t bytes)
+    virtual size_t getFrameSize() const { return mHalFrameSize; }
+    virtual audio_format_t getFormat() const
+    virtual uint32_t getSampleRate() const
+    virtual audio_channel_mask_t getChannelMask() const;
+    virtual status_t flush();
+    virtual status_t standby()
+}@AudioStreamOut.h
+
+
+class StreamOutHalInterface : public virtual StreamHalInterface {
+    virtual status_t getLatency(uint32_t *latency) = 0;
+    virtual status_t setVolume(float left, float right) = 0;
+    virtual status_t selectPresentation(int presentationId, int programId) = 0;
+    virtual status_t write(const void *buffer, size_t bytes, size_t *written) = 0;
+    virtual status_t getRenderPosition(uint32_t *dspFrames) = 0;
+    virtual status_t getNextWriteTimestamp(int64_t *timestamp) = 0;
+    virtual status_t setCallback(wp<StreamOutHalInterfaceCallback> callback) = 0;
+    virtual status_t supportsPauseAndResume(bool *supportsPause, bool *supportsResume) = 0;
+    virtual status_t pause() = 0;
+    virtual status_t resume() = 0;
+    virtual status_t supportsDrain(bool *supportsDrain) = 0;
+    virtual status_t drain(bool earlyNotify) = 0;
+    virtual status_t flush() = 0;
+    virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp) = 0;
+}@StreamHalInterface.h
+
+
+class StreamHalLocal : public virtual StreamHalInterface
+{   virtual status_t getSampleRate(uint32_t *rate);
+    virtual status_t getBufferSize(size_t *size);
+    virtual status_t getChannelMask(audio_channel_mask_t *mask);
+    virtual status_t getFormat(audio_format_t *format);
+    virtual status_t getAudioProperties(
+            uint32_t *sampleRate, audio_channel_mask_t *mask, audio_format_t *format);
+    virtual status_t setParameters(const String8& kvPairs);
+    virtual status_t getParameters(const String8& keys, String8 *values);
+    virtual status_t addEffect(sp<EffectHalInterface> effect);
+    virtual status_t removeEffect(sp<EffectHalInterface> effect);
+    virtual status_t standby();
+    virtual status_t dump(int fd);
+    virtual status_t start() = 0;
+    virtual status_t stop() = 0;
+    virtual status_t createMmapBuffer(int32_t minSizeFrames,struct audio_mmap_buffer_info *info) = 0;
+    virtual status_t getMmapPosition(struct audio_mmap_position *position) = 0;
+    virtual status_t setHalThreadPriority(int priority);
+    sp<DeviceHalLocal> mDevice;
+    audio_stream_t *mStream;
+}
+
+
+//input
+class StreamInHalInterface : public virtual StreamHalInterface {
+    virtual status_t setGain(float gain) = 0;
+    virtual status_t read(void *buffer, size_t bytes, size_t *read) = 0;
+    virtual status_t getInputFramesLost(uint32_t *framesLost) = 0;
+    virtual status_t getCapturePosition(int64_t *frames, int64_t *time) = 0;
+    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
+    virtual status_t setPreferredMicrophoneDirection(audio_microphone_direction_t) = 0;
+    virtual status_t setPreferredMicrophoneFieldDimension(float zoom) = 0;
+    virtual status_t updateSinkMetadata(const SinkMetadata& sinkMetadata) = 0;
+}@StreamHalInterface.h
+
+frameworks/av/include/media/audiohal/StreamHalInterface.h
+frameworks/av/media/libaudiohal/impl/StreamHalLocal.h

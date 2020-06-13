@@ -1,39 +1,28 @@
 /***********************
- HAL接口
+ HAL接口。当前版本CAMERA_DEVICE_API_VERSION_3_2
 
 */
-typedef struct camera3_device_ops {
+module操作函数实现:
+SprdCamera3Hal.cpp
+SprdCameraFactory.cpp
 
-    int (*initialize)(const struct camera3_device *,const camera3_callback_ops_t *callback_ops);
+device操作函数实现:
+SprdCamera3HWI.cpp
 
-    int (*configure_streams)(const struct camera3_device *,camera3_stream_configuration_t *stream_list);
+/*******
+ module操作函数
 
-    int (*register_stream_buffers)(const struct camera3_device *, const camera3_stream_buffer_set_t *buffer_set);
-
-    const camera_metadata_t* (*construct_default_request_settings)( const struct camera3_device *, int type);
-
-    int (*process_capture_request)(const struct camera3_device *,camera3_capture_request_t *request);
-
-    void (*get_metadata_vendor_tag_ops)(const struct camera3_device*,vendor_tag_query_ops_t* ops);
-
-    void (*dump)(const struct camera3_device *, int fd);
- 
-    int (*flush)(const struct camera3_device *);
-    void *reserved[8];
-} camera3_device_ops_t;
-
-typedef struct camera3_device {
-    hw_device_t common;
-    camera3_device_ops_t *ops;
-    void *priv;
-} camera3_device_t;
-@hardware/libhardware/include/hardware/camera3.h
-
-
+ SprdCamera3Hal.cpp
+ SprdCameraFactory.cpp
+*/
 HAL_MODULE_INFO_SYM{
 - common = camera_common {
-	- id = CAMERA_HARDWARE_MODULE_ID
-	- methods = mModuleMethods
+	- .module_api_version = CAMERA_MODULE_API_VERSION_2_4, // CAMERA_MODULE_API_VERSION_2_0,
+    	- .hal_api_version = HARDWARE_HAL_API_VERSION,
+    	- .id = CAMERA_HARDWARE_MODULE_ID,
+    	- .name = "Sprd Camera HAL3",
+	- .author = "Spreadtrum Corporation",
+    	- .methods = &sprdcamera::SprdCamera3Factory::mModuleMethods,
 	}
 - get_number_of_cameras =get_number_of_cameras
 - get_camera_info = get_camera_info
@@ -43,26 +32,25 @@ HAL_MODULE_INFO_SYM{
 - set_torch_mode = setTorchMode
 }@SprdCamera3Hal.cpp
 
-/*****
- 打开设备
- gSprdCamera3Factory 打开设备的接口函数
- SprdCamera3HWI{ //设备接口
-	- mCameraDevice //设备
-	}
-*/
-//打开camera。加载库获取hw_device_t接口
+//device open函数
+struct hw_module_methods_t SprdCamera3Factory::mModuleMethods = {
+    .open = SprdCamera3Factory::camera_device_open,
+}@SprdCameraFactory.cpp
+
+
+//打开camera device。加载库获取hw_device_t接口
 CameraDevice::open-->CameraModule::open@CameraModule.cpp/*hal层*/-->
 mModuleMethods.open-->camera_device_open(const struct hw_module_t *module,
            const char *id, struct hw_device_t **hw_device){
 - if (isSingleIdExposeOnMultiCameraMode(atoi(id))) {
-	- gSprdCamera3Wrapper->cameraDeviceOpen //id大于5,一些自定义的东西?
+	- gSprdCamera3Wrapper->cameraDeviceOpen				//id大于5,一些自定义的东西?
   else{
 	- gSprdCamera3Factory.cameraDeviceOpen(id, struct hw_device_t **hw_device)
 	}
 }@SprdCamera3Factory.cpp
 
 SprdCamera3Factory::cameraDeviceOpen(int camera_id,struct hw_device_t **hw_device) {
-  //创建SprdCamera3HWI
+  //创建CameraDevice SprdCamera3HWI
 - SprdCamera3HWI *hw = new SprdCamera3HWI(id){
 	- mCameraDevice.common
 	- mCameraDevice.ops = &mCameraOps
@@ -70,24 +58,15 @@ SprdCamera3Factory::cameraDeviceOpen(int camera_id,struct hw_device_t **hw_devic
 	}
 - hw->setMultiCameraMode
   //打开对应id的camera。获取hw_device_t
-- hw->openCamera(hw_device)-->openCamera(struct hw_device_t **hw_device) {
-	- openCamera(){
-		- mSetting = new SprdCamera3Setting(mCameraId);
-		- mOEMIf = new SprdCamera3OEMIf(mCameraId, mSetting) //获取oem接口
-		- mOEMIf->camera_ioctrl(CAMERA_IOCTRL_SET_MULTI_CAMERAMODE, &mMultiCameraMode)
-		- mOEMIf->openCamera()
-		- mOEMIf->isIspToolMode()==1{
-			- mOEMIf->ispToolModeInit()
-			- startispserver(mCameraId)
-			- ispvideo_RegCameraFunc
-			}
-		}
-	- *hw_device = &mCameraDevice.common //返回设备
-	}@SprdCamera3HWI.cpp
+- hw->openCamera(hw_device)
 }@SprdCamera3Factory.cpp
 
+/*******
+ device操作函数 
 
-//camera设备操作函数，hal的接口。 volatile uint32_t gHALLogLevel = 4
+ SprdCamera3HWI.cpp
+*/
+volatile uint32_t gHALLogLevel = 4
 camera3_device_ops_t SprdCamera3HWI::mCameraOps = {
     .initialize = SprdCamera3HWI::initialize,
     .configure_streams = SprdCamera3HWI::configure_streams,
@@ -99,12 +78,103 @@ camera3_device_ops_t SprdCamera3HWI::mCameraOps = {
     .flush = SprdCamera3HWI::flush,
 }@SprdCamera3HWI.cpp
 
+//打开设备
+openCamera(struct hw_device_t **hw_device) {
+- openCamera(){
+	- mSetting = new SprdCamera3Setting(mCameraId);
+	- mOEMIf = new SprdCamera3OEMIf(mCameraId, mSetting)	//获取oem接口
+	- mOEMIf->camera_ioctrl(CAMERA_IOCTRL_SET_MULTI_CAMERAMODE, &mMultiCameraMode)
+	- mOEMIf->openCamera()
+	- mOEMIf->isIspToolMode()==1{
+		- mOEMIf->ispToolModeInit()
+		- startispserver(mCameraId)
+		- ispvideo_RegCameraFunc
+		}
+	}
+- *hw_device = &mCameraDevice.common				//返回设备
+}@SprdCamera3HWI.cpp
 
-//处理请求
-process_capture_request{
+/******
+ 配置流,被request使用
+*/
+int SprdCamera3HWI::configure_streams(const struct camera3_device *device, 
+	camera3_stream_configuration_t *stream_list) {
 - SprdCamera3HWI *hw = reinterpret_cast<SprdCamera3HWI *>(device->priv)
-- hw->processCaptureRequest(request)-->
-SprdCamera3HWI::processCaptureRequest{
+- hw->configureStreams(stream_list)
+}@SprdCamera3HWI.cpp
+
+int SprdCamera3HWI::configureStreams(camera3_stream_configuration_t *streamList) {
+  //
+- mMetadataChannel = new SprdCamera3MetadataChannel(mOEMIf, captureResultCb, mSetting, this)
+- mRegularChan = new SprdCamera3RegularChannel(mOEMIf, captureResultCb, mSetting, mMetadataChannel,CAMERA_CHANNEL_TYPE_REGULAR, this)
+- mPicChan = new SprdCamera3PicChannel(mOEMIf, captureResultCb, mSetting,mMetadataChannel,CAMERA_CHANNEL_TYPE_PICTURE, this)
+- mCallbackChan = new SprdCamera3RegularChannel(mOEMIf, captureResultCb, mSetting, mMetadataChannel,CAMERA_CHANNEL_TYPE_RAW_CALLBACK, this)
+  //oem初始
+- mOEMIf->initialize()
+  //设置stream 
+- for (size_t i = 0; i < streamList->num_streams; i++) {
+	- camera3_stream_t *newStream = streamList->streams[i]
+	- tranStreamAndChannelType(newStream, &stream_type, &channel_type)	//获取stream,channel类型
+	- switch (channel_type) {
+		- CAMERA_CHANNEL_TYPE_REGULAR{
+			- mRegularChan->addStream(stream_type, newStream)
+			- preview_size.width = newStream->width			//根据不同类型设置preview_size,video_size,raw_size
+			- preview_size.height = newStream->height
+			- newStream->priv = mRegularChan
+			}
+		- CAMERA_CHANNEL_TYPE_PICTURE{
+			- mPicChan->addStream(stream_type, newStream)
+			- capture_size.width = newStream->width
+			- capture_size.height = newStream->height
+			- newStream->priv = mPicChan
+			}
+		- CAMERA_CHANNEL_TYPE_RAW_CALLBACK{
+			- mRegularChan->addStream(CAMERA_STREAM_TYPE_CALLBACK, newStream)
+			- mPicChan->addStream(CAMERA_STREAM_TYPE_PICTURE_CALLBACK,newStream)
+			- raw_size.width = newStream->width
+			- raw_size.height = newStream->height
+			}
+		}
+	}
+- mOEMIf->SetChannelHandle(mRegularChan, mPicChan)
+- mOEMIf->SetDimensionPreview(preview_size)
+- mOEMIf->SetDimensionVideo(video_size)
+- mOEMIf->setCameraConvertCropRegion()
+  //setting
+- mSetting->setPreviewSize(preview_size)
+- mSetting->setVideoSize(video_size)
+- mSetting->setPictureSize(capture_size)
+}@SprdCamera3HWI.cpp
+/******
+ 获取设置参数，被request使用
+*/
+camera_metadata_t *SprdCamera3HWI::construct_default_request_settings(
+   const struct camera3_device *device, int type) {
+- SprdCamera3HWI *hw = reinterpret_cast<SprdCamera3HWI *>(device->priv)
+- camera_metadata_t *fwk_metadata = hw->constructDefaultMetadata(type)
+- return fwk_metadata
+}@SprdCamera3HWI.cpp
+
+camera_metadata_t *SprdCamera3HWI::constructDefaultMetadata(int type) {
+- camera_metadata_t *metadata = NULL
+  //非常多的信息
+- mSetting->constructDefaultMetadata(type, &metadata)
+- return metadata
+}@SprdCamera3HWI.cpp
+
+int SprdCamera3Setting::constructDefaultMetadata(int type, camera_metadata_t **metadata) {
+- 
+}@SprdCamera3Setting.cpp
+
+/******
+ 处理请求
+*/
+int SprdCamera3HWI::process_capture_request(const struct camera3_device *device, camera3_capture_request_t *request) {{
+- SprdCamera3HWI *hw = reinterpret_cast<SprdCamera3HWI *>(device->priv)
+- hw->processCaptureRequest(request)
+}@SprdCamera3HWI.cpp
+
+SprdCamera3HWI::processCaptureRequest(camera3_capture_request_t *request) {
 - mFrameNum = request->frame_number
 - meta = request->settings
 - mMetadataChannel->request(meta)
@@ -114,8 +184,11 @@ SprdCamera3HWI::processCaptureRequest{
 	}
 - mOldCapIntent = capturePara.cap_intent
 }
-}@SprdCamera3HWI.cpp
 
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Hal.cpp
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Factory.cpp
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3HWI.cpp
+vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Setting.cpp
 /***********************
  OEM接口
 
@@ -220,9 +293,7 @@ camera_grab_init(cmr_handle oem_handle) {
 }@cmr_oem.c
 
 
-vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Hal.cpp
-vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Factory.cpp
-vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3HWI.cpp
+
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3OEMIf.cpp
 vendor/sprd/modules/libcamera/hal3_2v1/SprdCamera3Channel.cpp
 vendor/sprd/modules/libcamera/oem2v1/src/SprdOEMCamera.c

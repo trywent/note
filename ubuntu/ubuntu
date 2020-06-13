@@ -1,22 +1,23 @@
-/*
+/**************
   用户管理
 */
 gedit /etc/passwd
 gedit  /etc/shadow
 
 
-chage -l username	//查看用户
+chage -l username			//查看用户
 cat /etc/passwd
 more /etc/passwd
+groupmod <TAB 3次>			//查看组
 
-sudo adduser username	//增加用户
-groupmod <TAB 3次>	//查看组
+sudo adduser username			//增加用户
+sudo passwd username			//修改密码
+sudo usermod -s /bin/bash username	//指定解释程序
+sudo usermod -d /home/xxx username	//指定home
 
-sudo passwd username	//修改密码
-
-sudo adduser username sudo 	//设置超级用户权限
-adduser username group 		//添加用户到组group
-/*
+sudo adduser username sudo 		//设置超级用户权限
+adduser username group 			//添加用户到组group
+/**************
  应用安装
 */
 
@@ -45,9 +46,8 @@ dpkg -i --recursive /path/to/dir/name/with/lots/of/dot-deb-files/
 //有依赖问题时使用下面命令：
 sudo apt-get -f install
 
-/*
+/**************
  安装nvidia显卡驱动，切换显卡驱动
-
 
 */
 
@@ -64,7 +64,7 @@ sudo prime-select nvidia	//选择nvidia驱动
 prime-select query		//查看当前使用的驱动
 sudo apt purge nvidia-*		//卸载nvidia驱动
 
-/*
+/**************
  vmware player
  
  安装vmware tool后屏幕才会变化。之前使用tab
@@ -78,7 +78,9 @@ sudo apt-get install open-vm-tools-desktop
 minicom 
 cutecom
 
-/*
+
+
+/**************
  移除老内核
 */
 # List linux kernel package

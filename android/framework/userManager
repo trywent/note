@@ -1,4 +1,4 @@
-/*
+/********************************
  userManagerService
 */
 PER_USER_RANGE = 100000 //每个user可分配的uid(每个进程都有一个uid)
@@ -49,7 +49,7 @@ isUserUnlocked@UserManager.java-->isUserUnlocked-->LocalService.isUserUnlockingO
 - state == UserState.STATE_RUNNING_UNLOCKED
 }@UserManagerService.java
 
-/*
+/********************************
  UserContoler
 
 */

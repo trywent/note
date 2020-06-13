@@ -70,6 +70,13 @@ deserializeAudioPolicyXmlConfig(config)-->serializer.deserialize{
 - config.setVolumes(volumes)						//volume配置
 }@Serializer.cpp
 
+
+
+//devices状态
+AudioPolicyManager::setDeviceConnectionState-->setDeviceConnectionStateInt{
+- mAvailableOutputDevices.add(devDesc)
+- mAvailableInputDevices.add(devDesc)
+}
 /************
  AudioPolicyConfig
 

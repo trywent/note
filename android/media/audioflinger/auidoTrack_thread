@@ -42,11 +42,11 @@ AudioFlinger::PlaybackThread::onFirstRef-->run-->threadLoop{
 	- if (shouldStandby_l()) threadLoop_standby()
 	- clearOutputTracks
 	}
-- prepareTracks_l-->AudioFlinger::MixerThread::prepareTracks_l //准备工作
-- mBytesRemaining==0{//更新字节数
-	- if (mMixerStatus == MIXER_TRACKS_READY) {//当前有数据，执行混音，设置可用数据量
+- prepareTracks_l-->AudioFlinger::MixerThread::prepareTracks_l 					//准备工作
+- mBytesRemaining==0{										//更新字节数
+	- if (mMixerStatus == MIXER_TRACKS_READY) {						//当前有数据，执行混音，设置可用数据量
 		- threadLoop_mix
-	  else if((mMixerStatus != MIXER_DRAIN_TRACK)&& (mMixerStatus != MIXER_DRAIN_ALL)){//没有数据处理，计算睡眠时间
+	  else if((mMixerStatus != MIXER_DRAIN_TRACK)&& (mMixerStatus != MIXER_DRAIN_ALL)){	//没有数据处理，计算睡眠时间
 		- threadLoop_sleepTime	
 		}
 	  //混音buffer有效，将mMixerBuffer数据拷贝到mEffectBuffer或者mSinkBuffer

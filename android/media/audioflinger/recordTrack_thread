@@ -7,7 +7,7 @@ RecordThread({
 - AudioStreamIn                       *mInput
 - SortedVector < sp<RecordTrack> >    mTracks
 - ActiveTracks<RecordTrack>           mActiveTracks
-- void                               *mRsmpInBuffer;  // size = mRsmpInFramesOA
+- void                               *mRsmpInBuffer;  			// size = mRsmpInFramesOA
   //non-blocking
 - sp<NBAIO_Source>                    mInputSource
 - sp<NBAIO_Source>                    mNormalSource
@@ -20,7 +20,7 @@ openInput_l-->new RecordThread@AudioFlinger.cpp-->
 RecordThread(const sp<AudioFlinger>& audioFlinger,AudioStreamIn *input,audio_io_handle_t id,
          audio_devices_t outDevice, audio_devices_t inDevice)){
 - ThreadBase(audioFlinger, id, outDevice, inDevice)
-- AudioStreamIn mInput(input) //AudioStreamIn
+- AudioStreamIn mInput(input) 						//AudioStreamIn
   //根据参数,分配mRsmpInBuffer保存录音数据
 - readInputParameters_l{
 	- mInput->stream->getAudioProperties(&mSampleRate, &mChannelMask, &mHALFormat)
@@ -47,7 +47,7 @@ RecordThread::onFirstRef-->run-->threadLoop{
 	- switch (activeTrackState){
 		- case TrackBase::PAUSING:mActiveTracks.remove(activeTrack)
 		}
-	- mStartStopCond.broadcast() //通知处理了PAUSING,STARTING_2
+	- mStartStopCond.broadcast() 					//通知处理了PAUSING,STARTING_2
 	}
   //读取数据保存到RecordThread中mRsmpInBuffer
 - if(mPipeSource){
@@ -56,7 +56,7 @@ RecordThread::onFirstRef-->run-->threadLoop{
 	- mInput->stream->read(mRsmpInBuffer + rear * mFrameSize, mBufferSize)-->
 		StreamInHalLocal::read(void *buffer, size_t bytes, size_t *read/*读取结果*/)
 		-->mStream->read(mStream, buffer)
-	- framesRead = bytesRead / mFrameSize//读取帧数
+	- framesRead = bytesRead / mFrameSize				//读取帧数
 	}
   //遍历activeTracks,填充RecordThread数据到RecordTrack
  {
@@ -65,6 +65,12 @@ RecordThread::onFirstRef-->run-->threadLoop{
  }
 }@Threads.cpp
 
+
+//获取数据，ResamplerBufferProvider提供数据
+AudioFlinger::RecordThread::ResamplerBufferProvider::getNextBuffer(){
+- 
+- 
+}Threads.cpp
 
 
 /****************
@@ -76,7 +82,8 @@ RecordThread::onFirstRef-->run-->threadLoop{
 */
 RecordTracks{
 - AudioBufferProvider::Buffer mSink
-- ResamplerBufferProvider  *mResamplerBufferProvider
+- ResamplerBufferProvider  *mResamplerBufferProvider			//数据提供
+- RecordBufferConverter    *mRecordBufferConverter			//转换器，重采样之类
 }
 
 
@@ -97,11 +104,12 @@ AudioFlinger::RecordThread::createRecordTrack_l(const sp<AudioFlinger::Client>& 
 	- TrackBase(ThreadBase *thread,const sp<Client>& client,ALLOC_CBLK){
 		- mThread(thread)
 		- mClient(client)
-		- mCblkMemory = client->heap()->allocate(size) //分配内存,设置mCblkMemory
+		- mCblkMemory = client->heap()->allocate(size) 				//分配内存,设置mCblkMemory
 		- mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->pointer()))
-		- new(mCblk) audio_track_cblk_t() //将回调函数结构放到mCblk内存中
-		- ALLOC_CBLK:mBuffer = (char*)mCblk + sizeof(audio_track_cblk_t) //mBuffer
+		- new(mCblk) audio_track_cblk_t() 					//将回调函数结构放到mCblk内存中
+		- ALLOC_CBLK:mBuffer = (char*)mCblk + sizeof(audio_track_cblk_t) 	//mBuffer
 		}
+	  //转换器，重采样
 	- mRecordBufferConverter = new RecordBufferConverter
 	  //创建buffer分配管理
 	- mServerProxy = new AudioRecordServerProxy(mCblk, mBuffer, frameCount)
@@ -150,8 +158,8 @@ RecordTrack::getNextBuffer(AudioBufferProvider::Buffer* buffer){
 RecordBufferConverter::convert(void *dst,AudioBufferProvider *provider, size_t frames){
 - if (mResampler == NULL){
 	- AudioBufferProvider::Buffer buffer
-	- provider->getNextBuffer(&buffer)-->ResamplerBufferProvider::getNextBuffer //从RecordThread中获取数据
-	- convertNoResampler(dst, buffer.raw, buffer.frameCount){//将数据保存到Track中buffer
+	- provider->getNextBuffer(&buffer)-->ResamplerBufferProvider::getNextBuffer 	//从RecordThread中获取数据
+	- convertNoResampler(dst, buffer.raw, buffer.frameCount){			//将数据保存到Track中buffer
 		- 
 		}
 	- dst = (int8_t*)dst + buffer.frameCount * mDstFrameSize
@@ -168,8 +176,8 @@ AudioFlinger::RecordThread::RecordTrack::stop{
 - RecordThread *recordThread = (RecordThread *)mThread.promote().get()
 - recordThread->stop(this)-->RecordThread::stop{
 	- recordTrack->mState = TrackBase::PAUSING
-	- mWaitWorkCV.broadcast() //通知ThreadLoop
-	- mStartStopCond.wait(mLock) //等待停止状态
+	- mWaitWorkCV.broadcast() 	//通知ThreadLoop
+	- mStartStopCond.wait(mLock) 	//等待停止状态
 	}
 - AudioSystem::stopInput-->aps->stopInput
 }@Tracks.cpp
@@ -179,3 +187,75 @@ AudioFlinger::RecordThread::RecordTrack::stop{
 frameworks/av/services/audioflinger/Threads.cpp
 frameworks/av/services/audioflinger/Tracks.cpp
 frameworks/av/media/libaudioprocessing/RecordBufferConverter.cpp
+
+
+/****************
+ android 10
+*/
+
+AudioFlinger::RecordThread::threadLoop(){
+- acquireWakeLock_l()
+- int64_t lastLoopCountRead = -2
+- for (int64_t loopCount = 0;; ++loopCount) {
+- Vector< sp<EffectChain> > effectChains
+  //获取当前的actvieTrack,fastTrack
+- Vector< sp<RecordTrack> > activeTracks;
+- sp<RecordTrack> fastTrack
+- for (size_t i = 0; i < size; ) {
+	- activeTrack = mActiveTracks[i]
+	- if (activeTrack->isTerminated()) {
+		- removeTrack_l(activeTrack)
+		- mActiveTracks.remove(activeTrack)
+		- continue
+		}
+	- activeTracks.add(activeTrack)
+	}
+- updateMetadata_l()
+- lockEffectChains_l(effectChains)
+  //执行effect
+- for (size_t i = 0; i < effectChains.size(); i++) {
+	- effectChains[i]->process_l()
+	}
+  //fastcapture
+- if (mFastCapture != 0) {
+
+	}
+  //从hal读取录音数据到mRsmpInBuffer
+- if (mPipeSource != 0) {
+	- size_t framesToRead = min(mRsmpInFramesOA - rear, mRsmpInFramesP2 / 2)
+	-  framesRead = mPipeSource->read((uint8_t*)mRsmpInBuffer + rear * mFrameSize, framesToRead)
+  }else{
+	- status_t result = mInput->stream->read((uint8_t*)mRsmpInBuffer + rear * mFrameSize, mBufferSize, &bytesRead)
+  }
+  //将数据填充到active track
+- for (size_t i = 0; i < size; i++) {
+	- activeTrack = activeTracks[i]
+	- status_t status = activeTrack->getNextBuffer(&activeTrack->mSink)
+	- if (activeTrack->isDirect()) {
+		- status_t status = activeTrack->mResamplerBufferProvider->getNextBuffer(&buffer)
+	  }else{
+		- framesOut = activeTrack->mRecordBufferConverter->convert(activeTrack->mSink.raw,
+                            activeTrack->mResamplerBufferProvider,framesOut)
+	  }
+	  //是否需要丢弃数据
+	- if (activeTrack->mFramesToDrop == 0) {
+		- if (activeTrack->isSilenced()) {	//是否强制静音，不让录制数据。前台app,语音识别app可以录音
+			- memset(activeTrack->mSink.raw, 0, framesOut * activeTrack->frameSize())
+			}
+		- activeTrack->releaseBuffer(&activeTrack->mSink)
+	  }else{
+		- 
+	  }	
+	}
+- unlockEffectChains(effectChains)
+- }//loopCount
+  //停止
+- standbyIfNotAlreadyInStandby
+- track->invalidate()
+- mActiveTracks.clear()
+}@Threads.cpp
+
+
+
+
+frameworks/av/services/audioflinger/Threads.cpp
