@@ -33,22 +33,23 @@ service vendor.camera-provider-2-4 /vendor/bin/hw/android.hardware.camera.provid
 @android.hardware.camera.provider@2.4-service_64.rc-->main-->
 defaultPassthroughServiceImplementati on<ICameraProvider>("legacy/0")@service.cpp
 
-//获取camera库的接口,获取camera信息
+//获取camera库的接口,获取camera个数信息
 HIDL_FETCH_ICameraProvider-->CameraProvider-->initialize{
 - hw_get_module(CAMERA_HARDWARE_MODULE_ID, &rawModule)	//加载HAL库
 - mModule = new CameraModule(rawModule) 		//将module封装
 - mModule->init()-->CameraModule::init()-->mModule->init@CameraModule.cpp
 - mModule->setCallbacks(this)
-- mNumberOfLegacyCameras = mModule->getNumberOfCameras-->mModule->get_number_of_cameras@CameraModule.cpp//获取camera个数
+- mNumberOfLegacyCameras = mModule->getNumberOfCameras-->mModule->get_number_of_cameras@CameraModule.cpp	//获取camera个数
 - 遍历,mNumberOfLegacyCameras{
 	- mModule->getCameraInfo(i)-->mModule->get_camera_info@CameraModule.cpp
-	- mModule->openLegacy-->mModule->open_legacy@CameraModule.cpp
-	- mOpenLegacySupported[cameraIdStr] = true
-	- mCameraDeviceNames.add			//保存设备名
+	- snprintf(cameraId, sizeof(cameraId), "%d", i)	//cameraID
+	- std::string cameraIdStr(cameraId)
+	- int deviceVersion = mModule->getDeviceVersion(i)
+	- mCameraDeviceNames.add(std::make_pair(cameraIdStr, getHidlDeviceName(cameraIdStr, deviceVersion)))	//保存设备名
 	}
 }@CameraProvider.cpp
 
-//获取CameraDevice
+//获取CameraDevice个数
 getCameraDeviceInterface_V3_x(cameraDeviceName){
 - matchDeviceName(cameraDeviceName, &deviceVersion, &cameraId) //检查名字,获取cameraid
 - index = mCameraDeviceNames.indexOf(cameraDeviceName)
@@ -56,9 +57,10 @@ getCameraDeviceInterface_V3_x(cameraDeviceName){
 }@CameraProvider.cpp
 
 //获取CameraDevice name
-getCameraIdList(){
-- 遍历mCameraDeviceNames,deviceNamePair
-- deviceNameList.push_back(deviceNamePair.second
+CameraProvider::getCameraIdList(getCameraIdList_cb _hidl_cb){
+- for (auto const& deviceNamePair : mCameraDeviceNames) {
+	- deviceNameList.push_back(deviceNamePair.second)
+	}
 }@CameraProvider.cpp
 
 /******
@@ -155,6 +157,11 @@ CameraDeviceSession::configureStreams_3_3(const StreamConfiguration& requestedCo
 - status_t ret = mDevice->ops->configure_streams(mDevice, &stream_list)
 }@CameraDeviceSession.cpp
 
+//获取默认参数配置。上层创建请求
+CameraDeviceSession::constructDefaultRequestSettings(RequestTemplate type, 
+	ICameraDeviceSession::constructDefaultRequestSettings_cb _hidl_cb)  {
+- camera_metadata_t *rawRequest = mDevice->ops->construct_default_request_settings(mDevice, (int) type)
+}@CameraDeviceSession.cpp
 
 //处理请求
 processCaptureRequest(hidl_vec<CaptureRequest>& requests){

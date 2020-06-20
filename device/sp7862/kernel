@@ -1,4 +1,18 @@
 /*
+ dts
+*/
+
+#include "sharkl5Pro.dtsi"	//usb,
+@ums512.dtsi
+
+
+#include "ums512-mach.dtsi"
+#include "ums512.dtsi"
+#include "sc2730.dtsi"		//usb配置
+#include "sprd-sound-fe-be.dtsi"//sound
+@ums512-1h10.dts
+
+/*
  kernel
 */
 export BSP_KERNEL_DEFCONFIG="sprd_sharkl5Pro_defconfig"

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+##定义相关目录和用户密码
+FTP_USER=bsp_王波                		#ftp用户名
+FTP_PASS=fytwangbo                        	#ftp密码
+FTP_IP=192.168.1.95                  	 	#ftp地址,注意下面连接时候的99是该ftp的端口
+DATA_DIR=\\192.168.1.95\Bsp组升级文件_正式生产用\android\王波android
+
+ 
+#上传到FTP空间,删除FTP空间7天前的数据
+ftp -v -n $FTP_IP 99 << END
+user $FTP_USER $FTP_PASS
+type binary
+cd $DATA_DIR
+put ${TIME}_192.168.100.4.tar.gz
+bye
+END

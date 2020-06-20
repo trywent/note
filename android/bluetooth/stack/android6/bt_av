@@ -1,0 +1,120 @@
+/***********************************
+ 提供的上层接口
+*/
+typedef struct {
+    size_t          size;
+    bt_status_t (*init)( btav_callbacks_t* callbacks );
+    bt_status_t (*connect)( bt_bdaddr_t *bd_addr );
+    bt_status_t (*disconnect)( bt_bdaddr_t *bd_addr );
+    void  (*cleanup)( void );
+} btav_interface_t;
+
+//初始化
+btif_av_init(){
+  //创建线程处理消息
+- btif_a2dp_start_media_task{
+	- btif_media_cmd_msg_queue = fixed_queue_new(SIZE_MAX)
+	- worker_thread = thread_new("media_worker")
+	- fixed_queue_register_dequeue(btif_media_cmd_msg_queue,thread_get_reactor(worker_thread),btif_media_thread_handle_cmd..)
+	- thread_post(worker_thread, btif_media_thread_init, NULL)
+	}@btif_media_task.c
+  //创建状态机
+- btif_av_cb.sm_handle = btif_sm_init((const btif_sm_handler_t*)btif_av_state_handlers, BTIF_AV_STATE_IDLE)
+- btif_enable_service(BTA_A2DP_SINK_SERVICE_ID)
+- btif_enable_service(BTA_A2DP_SOURCE_SERVICE_ID)
+- btif_a2dp_on_init
+}@btif_av.c
+
+//关闭
+cleanup(void){
+- btif_a2dp_stop_media_task(){
+	- fixed_queue_free(btif_media_cmd_msg_queue, NULL)		//结束队列
+	- thread_post(worker_thread, btif_media_thread_cleanup, NULL)	//结束线程
+	- thread_free(worker_thread)
+	}@btif_media_task.c
+- btif_disable_service(BTA_A2DP_SINK_SERVICE_ID)			//sink
+- btif_disable_service(BTA_A2DP_SOURCE_SERVICE_ID)			//src
+- btif_sm_shutdown(btif_av_cb.sm_handle)
+}@btif_av.c
+
+/*******
+ a2dpsrc 提供给上层接口
+*/
+btav_interface_t bt_av_src_interface = {
+    sizeof(btav_interface_t),
+    init_src,
+    src_connect_sink,
+    disconnect,
+    cleanup_src,
+}
+
+init_src(btav_callbacks_t* callbacks){
+- btif_av_init
+- bt_av_src_callbacks = callbacks
+}@btif_av.c
+
+/*******
+ a2dpsink 提供给上层接口
+*/
+btav_interface_t bt_av_sink_interface = {
+    sizeof(btav_interface_t),
+    init_sink,
+    sink_connect_src,
+    disconnect,
+    cleanup_sink,
+}@btif_av.c
+
+
+init-->init_sink(btav_callbacks_t* callbacks){
+- btif_av_init
+- bt_av_sink_callbacks = callbacks
+}@btif_av.c
+
+
+cleanup@A2dpSinkStateMachine.java-->cleanupNative-->sBluetoothA2dpInterface->cleanup()
+@com_android_bluetooth_a2dp_sink.cpp-->cleanup_sink-->cleanup(void)@btif_av.c
+
+/***********************************
+ 初始化
+*/
+
+
+//状态机的状态
+btif_sm_handler_t btif_av_state_handlers[] =
+{
+    btif_av_state_idle_handler,
+    btif_av_state_opening_handler,
+    btif_av_state_opened_handler,
+    btif_av_state_started_handler,
+    btif_av_state_closing_handler
+}@btif_av.c
+
+//状态切换
+btif_sm_change_state(btif_sm_handle_t handle, btif_sm_state_t state)btif_sm.c
+
+//消息处理
+btif_av_handle_event(UINT16 event, char* p_param)-->btif_sm_dispatch(btif_av_cb.sm_handle, event, (void*)p_param)
+-->btif_av_state_handlers[state]
+
+//idle state处理
+btif_av_state_idle_handler(btif_sm_event_t event, void *p_data){
+- BTIF_SM_ENTER_EVT{
+	- btif_a2dp_on_idle()
+	}
+}@btif_av.c
+
+btif_a2dp_on_idle{
+- bta_av_co_init()	//执行完成
+  //大概率卡死
+- if (btif_media_cb.peer_sep == AVDT_TSEP_SRC){
+	- btif_media_cb.rx_flush = TRUE;
+        btif_media_task_aa_rx_flush_req();
+        btif_media_task_aa_handle_stop_decoding();
+        btif_media_task_clear_track();
+        APPL_TRACE_DEBUG("Stopped BT track")
+	}	
+}
+
+
+bt/btif/src/btif_av.c
+bt/btif/src/btif_media_task.c

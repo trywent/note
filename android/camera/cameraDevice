@@ -1,9 +1,6 @@
 /**********************
- CameraDevice
+ CameraDeviceClient(响应java层的接口)  ---> Camera3Device
 
- camera3Device{
-	- HalInterface mInterface //hal层接口,ICameraDeviceSession
-	}
  ICameraDeviceUserWrapper封装ICameraDeviceUser
 */
 
@@ -52,8 +49,8 @@ CameraDeviceClient : Camera2ClientBase<CameraDeviceClientBase>
 }CameraDeviceClient.cpp
 
 
-//CameraDevice 创建
-new CameraDeviceClient//CameraDevice 创建  CameraDeviceClient:Camera2ClientBase
+//创建CameraDeviceClient  CameraDevice中调用CameraDeviceClient:Camera2ClientBase
+makeClient-->new CameraDeviceClient@CameraService.cpp
 -->Camera2ClientBase{
 - TClientBase(cameraService, remoteCallback, clientPackageName,cameraId)
 - mSharedCameraCallbacks(remoteCallback)
@@ -65,30 +62,11 @@ new CameraDeviceClient//CameraDevice 创建  CameraDeviceClient:Camera2ClientBas
 //创建cameraDevice。初始化cameraDevice,并创建ICameraDeviceSession
 connectHelper-->client->initialize(mCameraProviderManager)@CamersService.cpp-->initialize-->initializeImpl-->
 Camera2ClientBase::initialize@CameraDeviceClient.cpp-->initialize-->initializeImpl
-@Camera2ClientBase.cpp-->mDevice->initialize(providerPtr)-->
-initialize(manager){
-  //创建ICameraDeviceSession。通过hal层的CameraProvider
-- sp<ICameraDeviceSession> session
-- manager->openSession(mId.string(), /*out*/ &session){ //session
-	- deviceInfo = findDeviceInfoLocked(id)-->从mProviders中device查找
-	- deviceInfo3->mInterface->open(callback)-->ICameraDevice.open	//返回session
-	}@CameraProviderManager.cpp
-- manager->getCameraCharacteristics(mId.string(), &mDeviceInfo)		//info
-- std::shared_ptr<RequestMetadataQueue> queue
-- session->getCaptureRequestMetadataQueue
-- session->getCaptureResultMetadataQueue
-  //hal层接口
-- HalInterface mInterface = new HalInterface(session, queue){
-	- mHidlSession(session)
-	}
-- initializeCommonLocked{
-	- mBufferManager = new Camera3BufferManager
-	- mRequestThread = new RequestThread
-	- mPreparerThread = new PreparerThread
-	}
-}@Camera3Device.cpp
+@Camera2ClientBase.cpp-->mDevice->initialize(providerPtr)@Camera3Device.cpp
+
 
 //创建stream,返回StreamId  对应CameraCaptureSession
+mRemoteDevice.createStream@CameraDeviceImpl.java-->
 CameraDeviceClient::createStream(
         const hardware::camera2::params::OutputConfiguration){
   //bufferProducers
@@ -107,8 +85,11 @@ CameraDeviceClient::createStream(
 - mStreamInfoMap[streamId] = streamInfo
 }@CameraDeviceClient.cpp
 
-
-
+//配置stream
+mRemoteDevice.endConfigure(operatingMode)@CameraDeviceImpl.java-->
+CameraDeviceClient::endConfigure(int operatingMode) {
+- mDevice->configureStreams(operatingMode)
+}@CameraDeviceClient.cpp
 
 //创建默认请求. 创建一个容器让上层填写图像数据的参数
 createDefaultRequest(int templateId,/*out*/CameraMetadataNative* request){
@@ -142,10 +123,40 @@ submitRequestList(vector<hardware::camera2::CaptureRequest>& requests,bool strea
 
 
 /*******************
- camera3Device
+ camera3Device ---> HalInterface
 
-
+ camera3Device{
+	- HalInterface mInterface //hal层接口,ICameraDeviceSession
+	}
 */
+Camera3Device(const String8 &id):
+        mId(id),
+        mOperatingMode(NO_MODE),
+        mIsConstrainedHighSpeedConfiguration(false),
+        mStatus(STATUS_UNINITIALIZED),
+
+//初始化个
+initialize(manager){
+  //创建ICameraDeviceSession。通过hal层的CameraProvider
+- sp<ICameraDeviceSession> session
+- manager->openSession(mId.string(), /*out*/ &session){ //session
+	- deviceInfo = findDeviceInfoLocked(id)-->从mProviders中device查找
+	- deviceInfo3->mInterface->open(callback)-->ICameraDevice.open	//返回session
+	}@CameraProviderManager.cpp
+- manager->getCameraCharacteristics(mId.string(), &mDeviceInfo)		//info
+- std::shared_ptr<RequestMetadataQueue> queue
+- session->getCaptureRequestMetadataQueue
+- session->getCaptureResultMetadataQueue
+  //hal层接口
+- HalInterface mInterface = new HalInterface(session, queue){
+	- mHidlSession(session)
+	}
+- initializeCommonLocked{
+	- mBufferManager = new Camera3BufferManager
+	- mRequestThread = new RequestThread
+	- mPreparerThread = new PreparerThread
+	}
+}@Camera3Device.cpp
 
 //创建stream
 createStream(sp<Surface>& consumers,uint32_t width, uint32_t height, int format,int streamSetId){
@@ -164,26 +175,32 @@ createStream(sp<Surface>& consumers,uint32_t width, uint32_t height, int format,
 - mOutputStreams.add(mNextStreamId, newStream)
 }Camera3Device.cpp
 
-//config stream
-Camera3Device::HalInterface::configureStreams(camera3_stream_configuration *config) {
-- for (size_t i = 0; i < config->num_streams; i++) {
-	- 
+//配置stream
+Camera3Device::configureStreams(int operatingMode)-->configureStreamsLocked(operatingMode)-->
+Camera3Device::configureStreamsLocked(int operatingMode) {
+- Vector<camera3_stream_t*> streams
+  //inputStream
+- camera3_stream_t *inputStream = mInputStream->startConfiguration()
+- streams.add(inputStream)
+  //outputSteam
+- for (size_t i = 0; i < mOutputStreams.size(); i++) {
+	- camera3_stream_t *outputStream = mOutputStreams.editValueAt(i)->startConfiguration()
+	- streams.add(outputStream)
 	}
   //配置stream
-- sp<device::V3_3::ICameraDeviceSession> hidlSession_3_3
-- auto castResult = device::V3_3::ICameraDeviceSession::castFrom(mHidlSession)
-- hidlSession_3_3 = castResult
-- if(hidlSession_3_3 != nullptr){
-	- idlSession_3_3->configureStreams_3_3(requestedConfiguration...)
-  }else{
-	- mHidlSession->configureStreams(requestedConfiguration,...)
-  }
-  //
-- for (size_t i = 0; i < config->num_streams; i++) {
+- config.streams = streams.editArray()
+- mInterface->configureStreams(&config)
+}
 
-	}
-}@Camera3Device.cpp
 
+//创建默认配置
+Camera3Device::createDefaultRequest(int templateId, CameraMetadata *request) {
+- camera_metadata_t *rawRequest
+- mInterface->constructDefaultRequestSettings((camera3_request_template_t) templateId, &rawRequest)
+- set_camera_metadata_vendor_id(rawRequest, mVendorTagId)
+- mRequestTemplateCache[templateId].acquire(rawRequest)
+- *request = mRequestTemplateCache[templateId]
+}
 
 Camera3Device::initializeCommonLocked{
 - mBufferManager = new Camera3BufferManager
@@ -213,6 +230,7 @@ Camera3Device::RequestThread::threadLoop() {
 	}
 }
 
+//发送处理请求
 Camera3Device::HalInterface::processCaptureRequest(camera3_capture_request_t)-->
 processBatchCaptureRequests(std::vector<camera3_capture_request_t*>& requests){
 - hardware::hidl_vec<device::V3_2::CaptureRequest> captureRequests //hal使用的request
@@ -229,13 +247,52 @@ RequestThread::setRepeatingRequests(RequestList &requests){
 - mRepeatingRequests.insert(requests.begin(), requests.end())
 }
 
+/*******************
+ HalInterface Camera3Device中hidl接口
+
+ 所有调用最终通过hidl接口，执行到hidl
+*/
+HalInterface(sp<ICameraDeviceSession> &session,std::shared_ptr<RequestMetadataQueue> queue) :
+        mHidlSession(session),
+        mRequestMetadataQueue(queue)
+
+//config stream
+Camera3Device::HalInterface::configureStreams(camera3_stream_configuration *config) {
+- for (size_t i = 0; i < config->num_streams; i++) {
+	- 
+	}
+  //配置stream
+- sp<device::V3_3::ICameraDeviceSession> hidlSession_3_3
+- auto castResult = device::V3_3::ICameraDeviceSession::castFrom(mHidlSession)
+- hidlSession_3_3 = castResult
+- if(hidlSession_3_3 != nullptr){
+	- idlSession_3_3->configureStreams_3_3(requestedConfiguration...)
+  }else{
+	- mHidlSession->configureStreams(requestedConfiguration,...)
+  }
+  //
+- for (size_t i = 0; i < config->num_streams; i++) {
+
+	}
+}@Camera3Device.cpp
+
+//创建默认请求
+Camera3Device::HalInterface::constructDefaultRequestSettings(camera3_request_template_t templateId,
+        /*out*/ camera_metadata_t **requestTemplate) {
+- mHidlSession->constructDefaultRequestSettings(id,...
+}@Camera3Device.cpp
+
+//提交请求
+Camera3Device::HalInterface::processCaptureRequest(camera3_capture_request_t *request)-->
+processBatchCaptureRequests(std::vector<camera3_capture_request_t*>& requests,/*out*/uint32_t* numRequestProcessed){
+- 
+- mHidlSession->processCaptureRequest(captureRequests, cachesToRemove,...)
+}
 
 frameworks/av/services/camera/libcameraservice/api2/CameraDeviceClient.cpp
 frameworks/av/services/camera/libcameraservice/common/Camera2ClientBase.cpp
 frameworks/av/services/camera/libcameraservice/device3/Camera3Device.cpp
 frameworks/av/camera/aidl/android/hardware/camera2/ICameraDeviceUser.aidl
-
-
 /*******************
  Camera 老接口
 

@@ -1,6 +1,9 @@
 /***********************
  HAL接口。当前版本CAMERA_DEVICE_API_VERSION_3_2
 
+特殊用途ID范围
+#define MIN_MULTI_CAMERA_FAKE_ID 5
+#define MAX_MULTI_CAMERA_FAKE_ID 50
 */
 module操作函数实现:
 SprdCamera3Hal.cpp
@@ -8,6 +11,9 @@ SprdCameraFactory.cpp
 
 device操作函数实现:
 SprdCamera3HWI.cpp
+
+camera信息：
+SprdCamera3Setting.cpp
 
 /*******
  module操作函数
@@ -24,13 +30,44 @@ HAL_MODULE_INFO_SYM{
 	- .author = "Spreadtrum Corporation",
     	- .methods = &sprdcamera::SprdCamera3Factory::mModuleMethods,
 	}
-- get_number_of_cameras =get_number_of_cameras
-- get_camera_info = get_camera_info
-- set_callbacks = set_callbacks
-- get_vendor_tag_ops = get_vendor_tag_ops
+- get_number_of_cameras =sprdcamera::SprdCamera3Factory::get_number_of_cameras
+- get_camera_info = sprdcamera::SprdCamera3Factory::get_camera_info,
+- set_callbacks = sprdcamera::SprdCamera3Factory::set_callbacks
+- get_vendor_tag_ops = sprdcamera::SprdCamera3Factory::get_vendor_tag_ops
 - open_legacy = HAL_open_legacy
-- set_torch_mode = setTorchMode
+- set_torch_mode = sprdcamera::SprdCamera3Factory::setTorchMode
 }@SprdCamera3Hal.cpp
+
+//factory初始
+SprdCamera3Factory::SprdCamera3Factory() {
+- mNumOfCameras = SprdCamera3Setting::getNumberOfCameras(){	//获取camera个数
+	- if (kCameraInfo[i].orientation != -1) num++		//
+	- return num
+	}@SprdCamera3Setting.cpp
+- SprdCamera3Wrapper::getCameraWrapper(&gSprdCamera3Wrapper)
+- mStaticMetadata = NULL;
+}
+
+//获取camera个数，个数和id号一致
+SprdCamera3Factory::get_number_of_cameras()-->gSprdCamera3Factory.getNumberOfCameras()
+-->return mNumOfCameras@SprdCamera3Factory.cpp
+
+//获取camera信息
+sprdcamera::SprdCamera3Factory::get_camera_info((int camera_id,struct camera_info *info){
+- if (isSingleIdExposeOnMultiCameraMode(camera_id)){// 5<= id <= 50之间
+	- gSprdCamera3Wrapper->getCameraInfo(camera_id, info)
+  }else{
+	- gSprdCamera3Factory.getCameraInfo(multiCameraModeIdToPhyId(camera_id), info){
+		- SprdCamera3Setting::getSensorStaticInfo(camera_id)
+		- SprdCamera3Setting::initDefaultParameters(camera_id)
+		- SprdCamera3Setting::getStaticMetadata(camera_id, &mStaticMetadata)
+		- SprdCamera3Setting::getCameraInfo(camera_id, info)
+		- info->device_version = CAMERA_DEVICE_API_VERSION_3_2
+		- info->static_camera_characteristics = mStaticMetadata
+		}
+  }
+}
+
 
 //device open函数
 struct hw_module_methods_t SprdCamera3Factory::mModuleMethods = {
@@ -145,6 +182,7 @@ int SprdCamera3HWI::configureStreams(camera3_stream_configuration_t *streamList)
 - mSetting->setVideoSize(video_size)
 - mSetting->setPictureSize(capture_size)
 }@SprdCamera3HWI.cpp
+
 /******
  获取设置参数，被request使用
 */

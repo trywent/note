@@ -4,6 +4,8 @@ import os
 import re
 import zipfile
 import shutil
+import time
+import struct
 
 templet = """include $(CLEAR_VARS)
 LOCAL_MODULE := %s
@@ -44,6 +46,88 @@ def unpackApp():
 	os.system('rm -rf preinstall/*so')
 	return
 
+SIGNATURE_INFO = 0x53514C42
+BOARDCFG_ADDR = 0x238
+TOUCH_ADDR= 0x600
+GAMMA_ADDR= 0x1000
+T132_ADDR= 0x2000
+APPTIME_ADDR= 0x100400
+CFGFILESIZE = 0x1c8
+NAVICOPY_FLAG=0X101000
+SIMFLAG_ADDR =0X101C00
+
+SIG_UPDATE_CLEAR=0x55434c52
+SIG_NEEDUBOOTUSB=0X42555342
+NEEDUBOOTUSB_CNT=5
+UCLEAR_ADDR=0x6000
+
+PANCFG_ADDR = 0x70
+PANCFGSIZE  = 0X1C8
+
+pad_data = [0x00 for i in range(0x200000)] 
+def lsecconf(argv):
+    cur_dir = './'
+    unpack_dir = cur_dir+ 'config'
+
+    packagefile_path = cur_dir + '/Allapp.pkg'    
+    partitionfile = cur_dir + 'sql_config.pkg'
+    
+    tchfile = unpack_dir + '/gtsql_config'
+    boardcfgfile = unpack_dir + '/6315boardcfg.cfg'
+    panelcfgfile = unpack_dir + '/6315lcdconfig.cfg'
+ 
+    statinfo=os.stat(packagefile_path)
+
+
+    thislocal=time.localtime(statinfo.st_mtime)
+    if os.path.exists(partitionfile):
+        os.remove(partitionfile)
+
+    f=open(partitionfile,"wb+")
+    f.write(bytearray(pad_data)) 
+    f.seek(0)   
+    f.write(struct.pack("i", SIGNATURE_INFO))
+
+
+    if not os.path.isfile(panelcfgfile):
+        print("ERROR: %s is not a valid file." % (panelcfgfile))
+    else:
+        print("write %s ." % (panelcfgfile))
+        s=open(panelcfgfile,"rb")
+        data = s.read(PANCFGSIZE)
+        s.close()
+        f.seek(PANCFG_ADDR)
+        f.write(data) 
+
+
+    if not os.path.isfile(boardcfgfile):
+        print("ERROR: %s is not a valid file." % (boardcfgfile))
+    else: 
+        print("write %s ." % (boardcfgfile))  
+        b=open(boardcfgfile,"rb")
+        data = b.read(CFGFILESIZE)
+        b.close()
+        f.seek(BOARDCFG_ADDR)
+        f.write(data)
+
+    f.seek(APPTIME_ADDR)
+    f.write(struct.pack("i", 0x66556655))  
+    f.write(struct.pack("6B", 0x00,thislocal.tm_min,thislocal.tm_hour,thislocal.tm_mday,thislocal.tm_mon,thislocal.tm_year-1900))
+    print("arg "+str(sys.argv))
+    if  str(sys.argv[1])=='1':  
+	f.seek(UCLEAR_ADDR)
+	f.write(struct.pack("i", SIG_UPDATE_CLEAR))  
+	f.write(struct.pack("i", SIG_NEEDUBOOTUSB))  
+	f.write(struct.pack("i", NEEDUBOOTUSB_CNT))  
+	 	
+        f.seek(NAVICOPY_FLAG)
+        f.write("needcopynavi")  
+
+    f.close()
+    os.remove('../'+partitionfile)
+    shutil.move(partitionfile,'../')
+    return
+
 #SystemUI Settings comiple to 	/oem/priv-app/
 #ResHolder copy to 		/oem/res/
 #config.txt copy to 		/oem/app/
@@ -52,6 +136,7 @@ def unpackApp():
 #python auto_generator.py ./ preinstall
 def main(argv):
     unpackApp()
+    lsecconf(0)
     preinstall_dir = os.path.join(argv[1],argv[2])
     appdir='app'
     vital = 'vital-app'
@@ -194,7 +279,7 @@ def main(argv):
             for filename in files:
 		print(filename)
 		if filename!='Android.mk' and filename!='preinstall.mk':
-	                includefile.write('PRODUCT_COPY_FILES +=$(CUR_PATH)/syu/preinstall/%s:oem/app/%s \n' % (filename, filename))
+	                includefile.write('PRODUCT_COPY_FILES +=$(CUR_PATH)/syu/product/preinstall/%s:oem/app/%s \n' % (filename, filename))
             break
         includefile.close()
 

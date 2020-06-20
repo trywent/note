@@ -1,0 +1,138 @@
+/*******************************************
+  profile的调用接口:
+  每个profile的通过调用bta_sys_register,将接口注册到bta_sys_cb
+  当上层btif调用接口后,会切换线程执行到bta上下文.bta将调用对应profile函数
+
+  btif_xxx -->bta_sys_sendmsg-->profile提供的接口
+
+*******************************************/
+{
+#define BTA_ID_SYS          0            /* system manager */
+/* BLUETOOTH PART - from 0 to BTA_ID_BLUETOOTH_MAX */
+#define BTA_ID_DM           1            /* device manager */
+#define BTA_ID_DM_SEARCH    2            /* device manager search */
+#define BTA_ID_DM_SEC       3            /* device manager security */
+#define BTA_ID_DG           4            /* data gateway */
+#define BTA_ID_AG           5            /* audio gateway */
+...
+#define BTA_ID_HS 27            /* Headset */   
+...
+}@bta_sys.h
+
+
+
+
+/***************
+  接口注册
+
+  1-stack中profile中注册一个接口处理函数。保存到bta_sys_cb.reg
+  2-上层调用，btifxxx-->bta_sys_sendmsg(event)-->bta_sys_cb.reg[id]->evt_hdlr
+ 
+*/
+//注册提供给上层的接口
+bta_sys_register(UINT8 id, const tBTA_SYS_REG *p_reg){
+- bta_sys_cb.reg[id] = (tBTA_SYS_REG *) p_reg
+- bta_sys_cb.is_reg[id] = TRUE
+}@bta_sys_main.c
+
+bta_sys_hw_register( tBTA_SYS_HW_MODULE module, tBTA_SYS_HW_CBACK *cback){
+- bta_sys_cb.sys_hw_cback[module]=cback
+}@bta_sys_main.c
+
+bta_sys_cb{					//将id和回调保存到bta_sys_cb
+- reg[BTA_ID_SYS]= bta_sys_hw_reg		//bta_sys_main.c
+- reg[BTA_ID_DM] = bta_dm_reg			//bta_dm_api.c
+- reg[BTA_ID_DM_SEARCH] = bta_dm_search_reg	//bta_dm_api.c
+}
+
+
+
+/***************
+ 线程bt_workqueue_thread
+ 处理上层接口调用
+*/
+btu_task_start_up{
+- fixed_queue_register_dequeue(btu_bta_msg_queue,thread_get_reactor(bt_workqueue_thread),btu_bta_msg_ready,NULL)
+}@btu_task.c
+
+//发送消息
+bta_sys_sendmsg(pmsg/*设置对应id*/){
+- fixed_queue_enqueue(btu_bta_msg_queue, p_msg)
+}@bta_sys_main.c
+
+//处理消息
+btu_bta_msg_ready(fixed_queue_t *queue, UNUSED_ATTR void *context) {
+- BT_HDR *p_msg = (BT_HDR *)fixed_queue_dequeue(queue)
+- bta_sys_event(p_msg){
+	- UINT8       id = (UINT8) (p_msg->event >> 8)		//左移8位，查找到bta_sys_cb对应的状态处理函数
+	- freebuf = (*bta_sys_cb.reg[id]->evt_hdlr)(p_msg)
+	}@bta_sys_main.c
+}@btu_task
+/***************
+ bta hw_reg接口
+
+ 通过上面reg接口实现的接口
+*/
+三种hw接口，通过BTA_ID_SYS接口调用:
+BTA_SYS_HW_BLUETOOTH=0
+BTA_SYS_HW_RT
+BTA_SYS_MAX_HW_MODULES
+
+
+bta_sys_action[] ={
+    /* device manager local device API events - cf bta_sys.h for events */
+    bta_sys_hw_api_enable,             	/* 0  BTA_SYS_HW_API_ENABLE_EVT    */
+    bta_sys_hw_evt_enabled,           	/* 1  BTA_SYS_HW_EVT_ENABLED_EVT */
+    bta_sys_hw_evt_stack_enabled,       /* 2  BTA_SYS_HW_EVT_STACK_ENABLED_EVT */
+    bta_sys_hw_api_disable,             /* 3  BTA_SYS_HW_API_DISABLE_EVT     */
+    bta_sys_hw_evt_disabled,           	/* 4  BTA_SYS_HW_EVT_DISABLED_EVT  */
+    bta_sys_hw_error                   	/* 5  BTA_SYS_HW_ERROR_EVT  */
+}@bta_sys_main.c
+
+bta_sys_register( BTA_ID_SYS,  &bta_sys_hw_reg)@bta_sys_main.c
+
+//处理消息 BTA_SYS_HW_API_ENABLE_EVT
+bta_sys_hw_api_enable( tBTA_SYS_HW_MSG *p_sys_hw_msg ){
+- bta_sys_cb.sys_hw_cback[p_sys_hw_msg->hw_module ](  BTA_SYS_HW_ON_EVT   )
+}@bta_sys_main.c
+
+/***************
+ 线程"bt_jni_workqueue"
+ jni回调线程。用于回调java接口
+
+*/
+//btif BT_JNI_WORKQUEUE_NAME线程.用于底层回调到java
+btif_init_bluetooth{
+- bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME)
+  //底层调用切换到当前jni线程去执行
+- btif_transfer_context(p_cback,event,p_params){
+	- p_msg->hdr.event = BT_EVT_CONTEXT_SWITCH_EVT
+	- p_msg->p_cb = p_cback
+	- btif_sendmsg-->thread_post(bt_jni_workqueue_thread, bt_jni_msg_ready, p_msg)-->
+		bt_jni_msg_ready-->btif_context_switched(p_msg)-->p_msg->p_cb(p->event, p->p_param)
+	}
+}@btif_core.c
+
+
+//发送消息到其它线程处理
+btif_thread_post-->thread_post(thread_t *thread, thread_fn func, void *context){
+- work_item_t *item = (work_item_t *)osi_malloc(sizeof(work_item_t))
+- item->func = func
+- item->context = context
+- fixed_queue_enqueue(thread->work_queue, item)
+}@btif_core.c
+
+bta/sys/bta_sys_main.c
+bta/dm/bta_dm_act.c
+bta/sys/bta_sys.h
+bta/dm/bta_dm_api.c
+bta/sys/bta_sys.h
+bta/dm/bta_dm_int.h
+
+
+
+
+
+
+
+

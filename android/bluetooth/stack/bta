@@ -1,0 +1,45 @@
+/********************
+ bta
+*/
+
+// BTA_ID_DM/BTA_ID_DM_SEARCH 设备管理,设备扫描
+BTA_EnableBluetooth{
+- bta_sys_register(BTA_ID_DM, &bta_dm_reg)
+- bta_sys_register(BTA_ID_DM_SEARCH, &bta_dm_search_reg)
+}@bta_dm_api.cc
+
+
+system/bt/bta/dm/bta_dm_api.cc
+
+
+/*******************************************
+  创建线程BT_JNI_WORKQUEUE_NAME "bt_jni_workqueue"
+  回调到java接口
+
+*******************************************/
+btif_init_bluetooth{
+- bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME)"bt_jni_workqueue"
+- thread_post(bt_jni_workqueue_thread, run_message_loop)-->
+	run_message_loop{
+	- message_loop_ = new base::MessageLoop
+	- jni_run_loop = new base::RunLoop()
+  	- jni_run_loop->Run()
+	}
+}@btif_core.cc
+
+
+//回调接口切到jni上下文...线程"bt_jni_workqueue"
+btif_transfer_context(tBTIF_CBACK* p_cback, uint16_t event){
+- tBTIF_CONTEXT_SWITCH_CBACK* p_msg = (tBTIF_CONTEXT_SWITCH_CBACK*)osi_malloc
+- p_msg->hdr.event = BT_EVT_CONTEXT_SWITCH_EVT
+- btif_sendmsg(p_msg)
+}@btif_core.cc
+
+
+btif_sendmsg-->do_in_jni_thread(base::Bind(&bt_jni_msg_ready, p_msg)){
+- scoped_refptr<base::SingleThreadTaskRunner> task_runner = message_loop_->task_runner()
+- task_runner->PostTask(from_here, task)
+}@btif_core.cc
+
+
+bt/btif/src/btif_core.cc

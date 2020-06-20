@@ -1,5 +1,5 @@
-//pthread
 /*
+ pthread
 
 结束条件：
 - 调用pthread_exit，向调用pthread_join的线程传递退出信息
@@ -8,9 +8,7 @@
 - thread所在进程调用exit
 */
 
-int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
-                          void *(*start_routine) (void *), void *arg);
-
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr,void *(*start_routine) (void *), void *arg);
 
 
 //封装thread
@@ -47,8 +45,7 @@ reactor_register(reactor,fd,read_ready,write_ready){
 }
 
 run_reactor(reactor,/*0 循环运行 1 执行一次*/){
-- epoll_wait(reactor->epoll_fd) //监听事件
- 
+- epoll_wait(reactor->epoll_fd) //监听事件 
 //遍历返回的所有事件
 - eventfd_read(reactor->event_fd),监听是否结束运行
 - object = (reactor_object_t *)events[j].data.ptr
@@ -56,8 +53,7 @@ run_reactor(reactor,/*0 循环运行 1 执行一次*/){
 - object->write_ready
 }
 
-
-//想thread中加入任务
+//向thread中加入任务
 thread_post(thread,func,data)-->fixed_queue_enqueue
 
 
@@ -71,6 +67,9 @@ void fixed_queue_enqueue(fixed_queue_t *queue, void *data);
  this function will block the caller until an item is enqueued. This
  function will never return NULL. |queue| may not be NULL.*/
 void *fixed_queue_dequeue(fixed_queue_t *queue);
+
+//注册queue,并且设置了执行线程reactor，和dequeue后的处理函数ready_cb
+void fixed_queue_register_dequeue(fixed_queue_t *queue, reactor_t *reactor, fixed_queue_cb ready_cb, void *context);
 
 
 //alarm 定时回调

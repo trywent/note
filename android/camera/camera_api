@@ -1,9 +1,10 @@
 /**********************
  android.hardware.camera2
 
- 1-cameraManager获取CameraDevice.
- 2-CameraDevice.createCaptureSession创建session //对应native的stream
- 3-创建请求,一些键值对,CaptureRequest {
+*/
+1-cameraManager获取CameraDevice.
+2-CameraDevice.createCaptureSession创建session //对应native的stream
+3-创建请求,一些键值对,CaptureRequest {
 	- sensor配置
 	- lens镜头peiz
 	- flash闪光
@@ -11,8 +12,8 @@
 	- 控制
 	- output buffer //必须是在createCaptureSession中提供的
 	}
- 4-session提交请求
-*/
+4-session提交请求
+
 使用camera{
 - CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE/*"camera"*/)
   //获取摄像头id cameraId
@@ -135,7 +136,7 @@ cameraService.connectDevice(callbacks, cameraId,packageName, uid)
 /***********************
  CameraCaptureSession 
 
- CameraCaptureSession----->实际也是通过ICameraDeviceUser接口，操作服务端CameraDevice
+ CameraCaptureSession----->实际也是通过ICameraDeviceUser接口，操作服务端CameraDeviceClient
 
  camrea输出目标:
 	- SurfaceView
@@ -149,7 +150,7 @@ cameraService.connectDevice(callbacks, cameraId,packageName, uid)
 //创建session
 createCaptureSession(List<Surface> outputs,callback,handler,NORMAL_MODE){
 - List<OutputConfiguration> outConfigurations = new ArrayList<>(outputs.size())
-- for (Surface surface : outputs){ //遍历outputs,
+- for (Surface surface : outputs){			//遍历outputs,
 	outConfigurations.add(new OutputConfiguration(surface))
 	}
 - createCaptureSessionInternal(outConfigurations,callback,handler)
@@ -158,10 +159,10 @@ createCaptureSession(List<Surface> outputs,callback,handler,NORMAL_MODE){
 createCaptureSessionInternal(List<OutputConfiguration> outputConfigurations){
   //创建native Stream.保存StreamId
 - configureSuccess = configureStreamsChecked(OutputConfiguration outputs){
-	- checkInputConfiguration(inputConfig)	//检查当前camera是否支持inputconfig
+	- checkInputConfiguration(inputConfig)		//检查当前camera是否支持inputconfig
 	- 遍历已经设置的config,mConfiguredOutputs{
-		- deleteList.add(streamId)	//将不需要的配置移到deleteList
-		- outputs.remove(outConfig)	//移除已经设置的config
+		- deleteList.add(streamId)		//将不需要的配置移到deleteList
+		- outputs.remove(outConfig)		//移除已经设置的config
 		}
 	- mDeviceHandler.post(mCallOnBusy)
 	- stopRepeating
@@ -173,6 +174,7 @@ createCaptureSessionInternal(List<OutputConfiguration> outputConfigurations){
 		- int streamId = mRemoteDevice.createStream(outConfig	//配置outputs
 		- mConfiguredOutputs.put(streamId, outConfig)
 		}
+	- mRemoteDevice.endConfigure(operatingMode)	//结束配置，实际cameraService中开始执行配置
 	- mDeviceHandler.post(mCallOnIdle/mCallOnUnconfigured)
 	}
 - 若是高速捕获,mCurrentSession = new CameraConstrainedHighSpeedCaptureSessionImpl

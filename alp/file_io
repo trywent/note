@@ -132,13 +132,19 @@ int epoll_pwait(int epfd, struct epoll_event *events,
 
 
 /*****************
- event
+ event 用于线程间事件通知
 
 */
+//initval设置counter初始值
 int eventfd(unsigned int initval, int flags);
 
-read
-writeq
+//若设置了EFD_SEMAPHORE，读取一次counter-1
+//若initval为0，等待不为0才能读取
+ssize_t read(int fd, void *buf, size_t count)
+
+//将buffer中值与 counter相加，若溢出则等待read执行
+ssize_t write(int fd, const void *buf, size_t count)
+
 poll/select
 
 /*****************

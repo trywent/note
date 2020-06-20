@@ -1,0 +1,51 @@
+/***************
+
+*/
+
+
+//注册提供给上层的接口
+bta_sys_register(ID,tBTA_SYS_REG)-->
+bta_sys_cb{					//将id和回调保存到bta_sys_cb
+- reg[BTA_ID_SYS]= bta_sys_hw_reg		//bta_sys_main.c
+- reg[BTA_ID_DM] = bta_dm_search_reg		//bta_dm_api.c
+- reg[BTA_ID_DM_SEARCH] = bta_dm_search_reg	//bta_dm_api.c
+}
+
+
+/***************
+ 创建线程"btu message loop"
+ 处理上层接口调用
+*/
+btu_task_start_up{
+- message_loop_thread_ = thread_new("btu message loop")
+  //开始循环处理message 
+- thread_post(message_loop_thread_, btu_message_loop_run)-->btu_message_loop_run{
+	- message_loop_ = new base::MessageLoop()
+	- run_loop_ = new base::RunLoop()
+	- run_loop_->Run()
+	}
+}@btu_task.cc
+
+//btif接口执行。在btu线程中
+bta_sys_sendmsg(pmsg/*设置对应id*/){
+- base::MessageLoop* bta_message_loop = get_message_loop-->message_loop_@btu_task.cc //获取message_loop_thread_@btu_task  在线程message_loop_thread_
+- bta_message_loop->task_runner()->PostTask(bta_sys_event,pmsg)-->bta_sys_event(p_msg)
+	-->(*bta_sys_cb.reg[id]->evt_hdlr)(p_msg) //执行profile注册的接口
+}@bta_sys_main.cc
+
+
+/***************
+ 创建线程"bt_jni_workqueue"
+ jni回调线程。用于回调java接口
+
+*/
+//btif BT_JNI_WORKQUEUE_NAME线程.用于底层回调到java
+btif_init_bluetooth{
+- bt_jni_workqueue_thread = thread_new(BT_JNI_WORKQUEUE_NAME)
+- thread_post(bt_jni_workqueue_thread, run_message_loop)-->
+	run_message_loop{
+	- message_loop_ = new base::MessageLoop
+	- jni_run_loop = new base::RunLoop()
+  	- jni_run_loop->Run()
+	}
+}@btif_core.cc

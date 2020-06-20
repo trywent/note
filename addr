@@ -11,6 +11,7 @@ https://github.com/trywent/note
 //192.168.1.95
 bsp_王波
 fytwangbo
+\\192.168.1.95\Bsp组升级文件_正式生产用\android\王波android
 smbclient -L //192.168.1.95 -U bsp_王波%fytwangbo
 
 //redmine http://redmine.rockchip.com.cn/
@@ -40,7 +41,11 @@ lsec123456
 47.97.20.162:22
 用户名 lsec_2 密码 lsec59856
 
-//food
+//192.168.1.21
+ls_wb
+ls_wb
+
+//dinner
 192.168.1.138
 
 //software

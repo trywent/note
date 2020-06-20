@@ -1,4 +1,5 @@
-/* client
+/*************** 
+  client
 
   连接profile需要取消扫描。扫描时也需要取消连接(但是不能立即停止，需要等连接结束)
   
@@ -30,7 +31,8 @@ initializeNative{
 addQueuedAction--> mQueuedActions.add(new Pair<Integer, Object>(action, data))
 
 
-/*  connecting state
+/***************  
+ connecting state
 
 
 */
@@ -44,10 +46,10 @@ sBluetoothHfpClientCallbacks.connection_state_cb-->connection_state_cb@com_andro
 -->onConnectionStateChanged-->service.messageFromNative(event)@NativeInterface.java-->
 messageFromNative-->sm.sendMessage(StackEvent.STACK_EVENT,event)@HeadsetClientService.java
 
-/*  connectAudio/disconnectAudio
+/***************  
+  connectAudio/disconnectAudio
 
-
- */
+*/
 connectAudio-->sm.sendMessage(HeadsetClientStateMachine.CONNECT_AUDIO)@HeadsetClientService.java
 -->NativeInterface.connectAudioNative@HeadsetClientStateMachine.java-->connectAudioNative
 @NativeInterface.java-->connectAudioNative-->sBluetoothHfpClientInterface->connect_audio
@@ -63,7 +65,8 @@ onAudioStateChanged(state)@NativeInterface.java-->service.messageFromNative{
 }@HeadsetClientStateMachine.java 
 
 
-/*  Connected state
+/***************
+  Connected state
 
 
 */
@@ -87,6 +90,7 @@ Connected.processMessage{
 	}
 - REJECT_CALL-->rejectCall
 - STACK_EVENT{
+	- EVENT_TYPE_AUDIO_STATE_CHANGED-->processAudioEvent(event.valueInt, event.device)
 	- EVENT_TYPE_CALL-->updateCallIndicator
 	- EVENT_TYPE_CALLSETUP-->updateCallSetupIndicator
 	- EVENT_TYPE_CALLHELD-->updateCallHeldIndicator
@@ -116,8 +120,8 @@ StackEvent.STACK_EVENT:{//StackEvent.STACK_EVENT = 100
 }@HeadsetClientStateMachine.java 
 
 
-/*  AudioOn state
-
+/***************
+   AudioOn state
 
 */
 

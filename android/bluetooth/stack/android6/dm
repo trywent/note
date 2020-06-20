@@ -1,0 +1,109 @@
+/*
+ dm 设备管理接口
+*/
+
+enum {
+BTA_DM_API_SEARCH_EVT = BTA_SYS_EVT_START(BTA_ID_DM_SEARCH),
+BTA_DM_API_SEARCH_CANCEL_EVT,
+BTA_DM_API_DISCOVER_EVT,
+BTA_DM_INQUIRY_CMPL_EVT,
+}@bta_dm_int.h
+
+
+//使能蓝牙
+btif_init_ok(UNUSED_ATTR uint16_t event, UNUSED_ATTR char *p_param)-->BTA_EnableBluetooth(bte_dm_evt)@btif_core.c
+BTA_EnableBluetooth(tBTA_DM_SEC_CBACK *p_cback){
+- bta_sys_register (BTA_ID_DM, &bta_dm_reg )
+- bta_sys_register (BTA_ID_DM_SEARCH, &bta_dm_search_reg )
+  //发送消息到btu进程
+- tBTA_DM_API_ENABLE    *p_msg
+- p_msg->hdr.event = BTA_DM_API_ENABLE_EVT
+- p_msg->p_sec_cback = p_cback
+- bta_sys_sendmsg(p_msg)-->bta_dm_enable
+}@bta_dm_api.c
+
+  //蓝牙关闭异常时这一步没有执行。btif_transfer_context的线程卡死了
+bta_sys_hw_api_enable-->bta_sys_cb.sys_hw_cback[BTA_SYS_HW_BLUETOOTH,]@bta_sys_main.c-->
+bta_dm_sys_hw_cback-->bta_dm_cb.p_sec_cback@bta_dm_act.c-->
+bte_dm_evt(tBTA_DM_SEC_EVT event, tBTA_DM_SEC *p_data)-->	//切到jni线程执行，btif_dm_upstreams_evt
+btif_transfer_context(btif_dm_upstreams_evt, (uint16_t)event, (void*)p_data, sizeof(tBTA_DM_SEC), btif_dm_data_copy)-->
+btif_dm_upstreams_evt(UINT16 event, char* p_param){
+- 
+- 
+}@btif_dm.c
+
+//关闭蓝牙
+BTA_DisableBluetooth(void){
+- BT_HDR    *p_msg = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))
+- p_msg->event = BTA_DM_API_DISABLE_EVT
+- bta_sys_sendmsg(p_msg)-->bta_dm_disable
+}@bta_dm_api.c
+
+
+
+/************
+ btm接口
+*/
+bta_dm_action[] =
+{
+    /* device manager local device API events */
+    bta_dm_enable,            /* 0  BTA_DM_API_ENABLE_EVT */
+    bta_dm_disable,           /* 1  BTA_DM_API_DISABLE_EVT */
+    bta_dm_set_dev_name,      /* 2  BTA_DM_API_SET_NAME_EVT */
+    bta_dm_set_visibility,    /* 3  BTA_DM_API_SET_VISIBILITY_EVT */
+    bta_dm_acl_change,        /* 8  BTA_DM_ACL_CHANGE_EVT */
+    bta_dm_add_device,        /* 9  BTA_DM_API_ADD_DEVICE_EVT */
+    bta_dm_close_acl,        /* 10  BTA_DM_API_ADD_DEVICE_EVT */
+......
+}
+
+bta_sys_sendmsg(BTA_ID_DM)-->bta_dm_reg.evt_hdlr-->
+bta_dm_sm_execute(BT_HDR *p_msg){
+- UINT16  event = p_msg->event & 0x00ff
+- (*bta_dm_action[event])( (tBTA_DM_MSG*) p_msg)
+}@bta_dm_api.c
+
+//使能dm
+bta_dm_enable(tBTA_DM_MSG *p_data){
+- bta_sys_hw_register( BTA_SYS_HW_BLUETOOTH, bta_dm_sys_hw_cback )
+  //设置传入的回调
+- bta_dm_cb.p_sec_cback = p_data->enable.p_sec_cback
+- bta_dm_cb.is_bta_dm_active = TRUE
+  //发送消息
+- tBTA_SYS_HW_MSG *sys_enable_event= (tBTA_SYS_HW_MSG *) GKI_getbuf(sizeof(tBTA_SYS_HW_MSG))
+- sys_enable_event->hdr.event = BTA_SYS_API_ENABLE_EVT
+- sys_enable_event->hw_module = BTA_SYS_HW_BLUETOOTH
+- bta_sys_sendmsg(sys_enable_event)
+}@bta_dm_act.c
+
+//关闭
+bta_dm_disable (tBTA_DM_MSG *p_data){
+- 
+- if(BTM_GetNumAclLinks()==0){
+	- bta_dm_cb.disable_timer.p_cback = (TIMER_CBACK*)&bta_dm_disable_conn_down_timer_cback
+	- bta_sys_start_timer(&bta_dm_cb.disable_timer, 0, BTA_DISABLE_DELAY)
+  }else{
+	- bta_dm_cb.disable_timer.p_cback = (TIMER_CBACK*)&bta_dm_disable_timer_cback
+	- bta_sys_start_timer(&bta_dm_cb.disable_timer, 0, 5000)
+  }
+}@bta_dm_act.c
+
+bta_dm_disable_conn_down_timer_cback (TIMER_LIST_ENT *p_tle){
+- bta_dm_disable_pm()
+- bta_sys_hw_register( BTA_SYS_HW_BLUETOOTH, bta_dm_sys_hw_cback )\
+  //发送sys消息
+- tBTA_SYS_HW_MSG *sys_enable_event = (tBTA_SYS_HW_MSG *) GKI_getbuf(sizeof(tBTA_SYS_HW_MSG))
+- sys_enable_event->hdr.event = BTA_SYS_API_DISABLE_EVT
+- sys_enable_event->hw_module = BTA_SYS_HW_BLUETOOTH
+- bta_sys_sendmsg(sys_enable_event)
+}@bta_dm_act.c
+
+bta_sys_hw_api_disable-->bta_sys_cb.sys_hw_cback[BTA_SYS_HW_BLUETOOTH,]@bta_sys_main-->
+bta_dm_sys_hw_cback( tBTA_SYS_HW_EVT status ){
+- if( status == BTA_SYS_HW_OFF_EVT ){
+	- bta_dm_cb.p_sec_cback(BTA_DM_DISABLE_EVT, NULL)
+	}
+}@bta_dm_act.c
+
+system/bt/bta/dm/bta_dm_api.c
+bt/bta/dm/bta_dm_act.c
