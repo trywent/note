@@ -206,7 +206,46 @@ ext_control_init(struct tiny_audio_device *adev){
 - pthread_detach(pthread_self())
 }@ext_control.c
 
-//dump数据
+/******
+ dump数据
+*/
+typedef enum {
+    PCMDUMP_PRIMARY_PLAYBACK_VBC,
+    PCMDUMP_PRIMARY_PLAYBACK_MUSIC,
+
+    PCMDUMP_OFFLOAD_PLAYBACK_DSP,
+
+    PCMDUMP_NORMAL_RECORD_VBC,
+    PCMDUMP_NORMAL_RECORD_PROCESS,
+    PCMDUMP_NORMAL_RECORD_NR,
+    PCMDUMP_NORMAL_RECORD_HAL,
+
+    PCMDUMP_VOIP_PLAYBACK_VBC,
+    PCMDUMP_VOIP_RECORD_VBC,
+
+    PCMDUMP_LOOP_PLAYBACK_DSP,
+    PCMDUMP_LOOP_PLAYBACK_RECORD,
+    PCMDUMP_MAX
+} AUDIOHAL_PCM_DUMP_TYPE
+
+audiopcmdumpname[PCMDUMP_MAX] = {
+    "/data/vendor/local/media/playback_vbc",
+    "/data/vendor/local/media/playback_hal",
+    "/data/vendor/local/media/playback_offload",
+
+    "/data/vendor/local/media/record_vbc",
+    "/data/vendor/local/media/record_hal",
+    "/data/vendor/local/media/record_process",
+    "/data/vendor/local/media/record_nr",
+
+    "/data/vendor/local/media/voip_playback",
+    "/data/vendor/local/media/voip_record",
+
+    "/data/vendor/local/media/loop_playback",
+    "/data/vendor/local/media/loop_record",
+}@audio_debug.cpp
+
+
 audiohal_pcmdump(void *ctl,int flag,void *buffer,int size,int dumptype){
 - char file_name[128]={0}
 - snprintf(file_name,sizeof(file_name)-1,"%s_%d.pcm",audiopcmdumpname[dumptype],flag)
@@ -215,8 +254,11 @@ audiohal_pcmdump(void *ctl,int flag,void *buffer,int size,int dumptype){
 }@audio_debug.cpp
 
 set_audiohal_musicpcmdump(UNUSED_ATTR void *dev,UNUSED_ATTR struct str_parms *parms, int opt, UNUSED_ATTR char * val){
-- 
-- 
+- if(opt){
+	- dev_ctl->pcmdumpflag|=(1<<PCMDUMP_PRIMARY_PLAYBACK_MUSIC)
+  }else{
+	- dev_ctl->pcmdumpflag&=~(1<<PCMDUMP_PRIMARY_PLAYBACK_MUSIC)
+  }
 }@audio_debug.cpp
 
 

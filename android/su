@@ -1,4 +1,4 @@
-/*
+/*********************************
   su可执行文件有设置调用者的用户，用户组权限
   su的权限 4755
 */
@@ -41,4 +41,11 @@ new Shell("su",shellType.ROOT,Shell.defaultContext(ShellContext.NORMAL)){
 - 开始worker
 }@shell.java
 
+/*********************************
+ sh
+*/
 
+
+
+
+external/mksh
