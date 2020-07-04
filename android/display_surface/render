@@ -1,4 +1,6 @@
-//
+/************************
+
+*/
 setView@ViewRootImpl-->HardwareRenderer.createGlRenderer-->
 Gl20Renderer.create-->new Gl20Renderer
 
@@ -15,9 +17,6 @@ draw@ViewRootImpl-->sttachInfo.mHardwareRenderer.initializeIfNeeded(surface){
 	}
 - setup-->mCanvas.setViewport
 }
-
-
-
 
 //绘制
 draw{

@@ -1,0 +1,31 @@
+/*********************************************
+ surfaceflinger 
+ hwcomposer
+*/
+
+
+/***********
+ device
+*/
+DisplayDevice(DisplayDeviceCreationArgs&& args){
+- mFlinger(args.flinger)
+- Display mCompositionDisplay{mFlinger->getCompositionEngine().createDisplay(
+                compositionengine::DisplayCreationArgs{args.isSecure, args.isVirtual,args.displayId})
+  //
+- mCompositionDisplay->createRenderSurface
+- mCompositionDisplay->createDisplayColorProfile
+- mCompositionDisplay->getRenderSurface()->initialize()
+  //设置显示
+- setProjection(DisplayState::eOrientationDefault, Rect::INVALID_RECT, Rect::INVALID_RECT)
+}@DisplayDevice.cpp
+
+
+
+setProjection
+
+
+frameworks/native/services/surfaceflinger/DisplayDevice.cpp
+
+/***********
+ hwcomposer
+*/

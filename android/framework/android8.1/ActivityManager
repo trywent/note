@@ -49,12 +49,12 @@ mActivityManagerService.setWindowManager(wm)@SystemServer.java-->setWindowManage
 - mStackSupervisor.setWindowManager(wm){
 	- mWindowManager = wm
 	- mDisplayManager =(DisplayManager)getSystemService(Context.DISPLAY_SERVICE)
-	- Display[] displays = mDisplayManager.getDisplays() //获取display个数
+	- Display[] displays = mDisplayManager.getDisplays()				//获取display个数
 	- 遍历displays{
-		- ActivityDisplay activityDisplay = new ActivityDisplay(displayId) //创建
+		- ActivityDisplay activityDisplay = new ActivityDisplay(displayId) 	//创建
 		- mActivityDisplays.put(displayId, activityDisplay) 
 		}	
-	- mHomeStack = mFocusedStack = mLastFocusedStack =getStack(HOME_STACK_ID)//创建第一个stack
+	- mHomeStack = mFocusedStack = mLastFocusedStack =getStack(HOME_STACK_ID)	//创建第一个stack
 	}@ActivityStackSupervisor.java
 - mActivityStarter.setWindowManager(wm){
 	
@@ -65,30 +65,30 @@ mActivityManagerService.setWindowManager(wm)@SystemServer.java-->setWindowManage
 //启动应用进程
 resumeTopActivityInnerLocked@ActivityStack.java-->startSpecificActivityLocked@ActivityStackSupervisor.java-->
 mService.startProcessLocked(r.processName, r.info.applicationInfo)@ActivityManangerService.java-->
-startProcessLocked(processName,ApplicationInfo){//传入进程名,应用信息
+startProcessLocked(processName,ApplicationInfo){					//传入进程名,应用信息
 - ProcessRecord app
-- !isolated{//非独立进程
+- !isolated{										//非独立进程
 	- app = getProcessRecordLocked(processName)
 	}
-- app==null,app = newProcessRecordLocked(info, processName){//创建ProcessRecord保存
+- app==null,app = newProcessRecordLocked(info, processName){				//创建ProcessRecord保存
 	- ProcessRecord r = new ProcessRecord(stats, info)
 	- addProcessNameLocked(r) 
 	}
 - startProcessLocked(app)-->
   startProcessLocked(ProcessRecord app){
 	- app.gids = gids
-	- entryPoint = "android.app.ActivityThread" //进程入口
+	- entryPoint = "android.app.ActivityThread" 					//进程入口
 	- ComponentName cn = new ComponentName(app.info.packageName)
 	- ProcessStartResult startResult = Process.start(entryPoint, app.processName, uid, uid, gids)
 	- app.setPid(startResult.pid)
-	- this.mPidsSelfLocked.put(startResult.pid, app) //保存,用于和应用进程关联
+	- this.mPidsSelfLocked.put(startResult.pid, app) 				//保存,用于和应用进程关联
 	}
 }@ActivityManangerService.java
 
 //关联进程
 attachApplication(IApplicationThread thread)-->
 attachApplicationLocked(IApplicationThread thread,int pid){
-- ProcessRecord app = mPidsSelfLocked.get(pid) //根据pid 获取ProcessRecord
+- ProcessRecord app = mPidsSelfLocked.get(pid) 						//根据pid 获取ProcessRecord
  //监听进程是否挂了
 - AppDeathRecipient adr = new AppDeathRecipient(app)
 - thread.asBinder().linkToDeath(adr
@@ -131,10 +131,10 @@ frameworks/base/services/core/java/com/android/server/am/TaskChangeNotificationC
 getStack(stackId){
 - 若是DOCKED_STACK_ID,则需创建getStack(RECENTS_STACK_ID)
 - createStackOnDisplay(stackId,DEFAULT_DISPLAY)-->createStack{
-	- new PinnedActivityStack//PINNED_STACK_ID
+	- new PinnedActivityStack		//PINNED_STACK_ID
 	- new ActivityStack{
 		- mHandler = new ActivityStackHandler
-		- postAddToDisplay(display //加入到display
+		- postAddToDisplay(display 	//加入到display
 		}
 	}
 }@ActivityStackSupervisor.java
@@ -144,7 +144,7 @@ getStack(stackId){
 resumeHomeStackTask{
 - mHomeStack.moveHomeStackTaskToTop()
 - ActivityRecord r = getHomeActivity()
-- moveFocusableActivityStackToFrontLocked(r)//设置焦点
+- moveFocusableActivityStackToFrontLocked(r)	//设置焦点
 - resumeFocusedStackTopActivityLocked(mHomeStack)
 }
 

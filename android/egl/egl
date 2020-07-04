@@ -1,4 +1,4 @@
-/*
+/********************************************
  OpenGL® ES: cross-platform API for rendering advanced 2D and 3D graphics embedded and mobile systems (嵌入式平台上的图形接口)
 
  EGL: OpenGL ES or OpenVGand the underlying native platform window system(openGL ES和平台窗口系统的接口)
@@ -35,7 +35,7 @@ frameworks/base/opengl/java/com/google/android/gles_jni/EGLImpl.java
 frameworks/base/opengl/java/android/opengl/GLSurfaceView.java
 frameworks/base/core/jni/com_google_android_gles_jni_EGLImpl.cpp
 frameworks/base/core/jni/android_opengl_EGLExt.cpp
-/*
+/*******
  native 层
 
 */

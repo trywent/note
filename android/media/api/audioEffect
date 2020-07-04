@@ -1,20 +1,13 @@
-/* 音效
+/********************************
+  音效 操作接口。effect真正创建在audioflinger
 
   混音时：
   effectChain的输入halInBuffer是Track的mainBuffer
   effectChain的输出halOutBuffer是mEffectBuffer
 */
-Equalizer(int priority, int audioSession){
-- AudioEffect(UUID type, UUID uuid, int priority, int audioSession){
-	- int[] id = new int[1]
-	- native_setup(this,type.toString(), uuid.toString(), priority, audioSession, id,desc, ActivityThread.currentOpPackageName())
-	- mId = id[0]
-	}
-- getNumberOfBands()
-- mNumPresets = (int)getNumberOfPresets()
-}@Equalizer.java
 
-//初始化static fields_t fields
+
+//创建effect。。初始化static fields_t fields
 AudioEffect-->native_init@AudioEffect.java-->
 android_media_AudioEffect_native_init{
 - fields.clazzEffect // AudioEffect class
@@ -24,11 +17,7 @@ android_media_AudioEffect_native_init{
 android_media_AudioEffect_native_setup(JNIEnv *env, jobject thiz, jobject weak_this,jstring type, jstring uuid,
 	 jint priority, jint sessionId, jintArray jId,jobjectArray javadesc, jstring opPackageName){
 - setAudioEffect(env, thiz, 0)
-- lpAudioEffect = new AudioEffect(typeStr,
-                                    String16(opPackageNameStr.c_str()),
-                                    uuidStr,
-                                    priority,
-                                    effectCallback)
+- lpAudioEffect = new AudioEffect(typeStr,String16(opPackageNameStr.c_str()),uuidStr, priority,effectCallback)
 - setAudioEffect(env, thiz, lpAudioEffect)
 }@android_media_AudioEffect.cpp
 
@@ -49,97 +38,6 @@ set(pType, pUuid, priority, cbf, user, sessionId, io){
 }@AudioEffect.cpp
 
 
-AudioFlinger::createEffect(
-        effect_descriptor_t *pDesc,
-        const sp<IEffectClient>& effectClient,
-        int32_t priority,
-        audio_io_handle_t io,
-        audio_session_t sessionId){
- //查找对应的effect
-- mEffectsFactoryHal->queryNumberEffects(&numEffects)
-- for (uint32_t i = 0; i < numEffects; i++) {
-	- mEffectsFactoryHal->getDescriptor(i, &desc)
-	- if (memcmp(&desc.type, &pDesc->type, sizeof(effect_uuid_t)) == 0) 
-		break
-	}
-- *pDesc = desc
-  //查找sessionId对应的output
-- if (io == AUDIO_IO_HANDLE_NONE) {
-	- for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-		- if (mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId) != 0)
-			- io = mPlaybackThreads.keyAt(i)
-		}
-	}
-- ThreadBase *thread = checkRecordThread_l(io)
-- handle = thread->createEffect_l(client, effectClient, priority, sessionId,&desc)
-}@AudioFlinger.cpp
-
-//thread中创建关联sessionId的effectChain
-//保存effectChain在mEffectChains
-//创建effect,会设置effect中输入输出buffer为effectChain中buffer
-AudioFlinger::ThreadBase::createEffect_l(
-        const sp<AudioFlinger::Client>& client,
-        const sp<IEffectClient>& effectClient,
-        int32_t priority,
-        audio_session_t sessionId,
-        effect_descriptor_t *desc,
-        int *enabled,
-        status_t *status,
-        bool pinned)
-{
-- checkEffectCompatibility_l(desc, sessionId)
-- sp<EffectChain> chain = getEffectChain_l(sessionId)
-- if (chain == 0) {
-	- chain = new EffectChain(this, sessionId)
-	- addEffectChain_l(chain)
-	}
-- if (effect == 0) {
-	- audio_unique_id_t effectId = mAudioFlinger->nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT)
-	- AudioSystem::registerEffect(desc, mId, chain->strategy(), sessionId, effectId)
-	- chain->createEffect_l(effect, this, desc, effectId, sessionId, pinned)
-	- effect->setAudioSource(mAudioSource)
-	}
-- handle = new EffectHandle(effect, client, effectClient, priority)
-}@Threads.cpp
-
-AudioFlinger::EffectChain::createEffect_l(sp<EffectModule>& effect,
-                                                   ThreadBase *thread,
-                                                   effect_descriptor_t *desc){
-- effect = new EffectModule(thread, this, desc, id, sessionId, pinned){
-	- sp<AudioFlinger> audioFlinger = mAudioFlinger.promote()
-	- sp<EffectsFactoryHalInterface> effectsFactory = audioFlinger->getEffectsFactory()
-	  //创建effect  mEffectInterface
-	- effectsFactory->createEffect(&desc->uuid, sessionId, thread->id(), &mEffectInterface)
-	}
-- addEffect_ll(effect)
-}@Effects.cpp
-
-//保存effect信息
-//音效输入buffer     halInBuffer是track的MainBuffer
-//音效输出buffer     halOutBuffer是mEffectBuffer
-AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& chain){
-- audio_session_t session = chain->sessionId()
-  //halInBuffer设置为mEffectBuffer
-- sp<EffectBufferHalInterface> halInBuffer, halOutBuffer
-- mAudioFlinger->mEffectsFactoryHal->mirrorBuffer( mEffectBuffer,&halInBuffer)
-- halOutBuffer = halInBuffer
-- effect_buffer_t *buffer = reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData())
-  //非全局音效
-- if (session > AUDIO_SESSION_OUTPUT_MIX) {
-	- if (mType != DIRECT) {
-		- mAudioFlinger->mEffectsFactoryHal->allocateBuffer(numSamples * sizeof(effect_buffer_t),&halInBuffer)
-		- buffer = halInBuffer->audioBuffer()->s16
-		}
-	 //设置和effect相同sessionid的track
-	- track->setMainBuffer(buffer)
-	}
-  //设置buffer
-- chain->setThread(this)
-- chain->setInBuffer(halInBuffer)   //halInBuffer是track的MainBuffer
-- chain->setOutBuffer(halOutBuffer) //halOutBuffer是mEffectBuffer
-- mEffectChains.insertAt(chain, i)
-}@Threads.cpp
-
 //打开
 setEnabled(boolean enabled)-->native_setEnabled(enabled)@AudioEffect.java-->
 android_media_AudioEffect_native_setEnabled{
@@ -153,21 +51,55 @@ android_media_AudioEffect_native_setEnabled{
 	}
 }@android_media_AudioEffect.cpp
 
+
+//执行音效
 AudioFlinger::EffectHandle::enable(){
 - sp<EffectModule> effect = mEffect.promote()
 - effect->setEnabled(true)
 }@Effects.cpp
 
-//执行音效
-AudioFlinger::EffectChain::process_l(){
-- sp<ThreadBase> thread = mThread.promote()
-  //遍历effect执行
-- size_t size = mEffects.size()
-}@Effects.cpp
 
 
 frameworks/base/media/java/android/media/audiofx/AudioEffect.java
-frameworks/base/media/java/android/media/audiofx/Equalizer.java
 frameworks/base/media/jni/audioeffect/android_media_AudioEffect.cpp
-frameworks/av/media/libaudioclient/AudioEffect.cpp
-frameworks/av/services/audioflinger/Effects.cpp
+/**********
+ Equalizer 均衡器（高低音处理）
+*/
+Equalizer(int priority, int audioSession){
+- AudioEffect(UUID type, UUID uuid, int priority, int audioSession){
+	- int[] id = new int[1]
+	- native_setup(this,type.toString(), uuid.toString(), priority, audioSession, id,desc, ActivityThread.currentOpPackageName())
+	- mId = id[0]
+	}
+- getNumberOfBands()
+- mNumPresets = (int)getNumberOfPresets()
+}@Equalizer.java
+
+
+frameworks/base/media/java/android/media/audiofx/Equalizer.java
+/**********
+  echo canceler 回音消除，android本身使用的是单mic机制。使用播发数据和录制数据进行消除
+
+  NS（Noise Suppression 噪声抑制） 
+  VAD（Voice Activity Detection 静音检测）
+  AECM（Acoustic Echo Canceller for Mobile 声学回声消除）
+  AGC（Auto Gain Control 自动增益控制）
+*/
+1 AudioRecord
+2 获取sessionId AudioRecord.getAudioSessionId()
+3 创建AudioTrack(SessionId)
+4 创建AcousticEchoCanceler(SessionId)
+5 再次录音后会消除播放的声音？
+
+AcousticEchoCanceler extends AudioEffect{
+- super(EFFECT_TYPE_AEC, EFFECT_TYPE_NULL, 0, audioSession){
+	- 
+	}
+}@AcousticEchoCanceler.java
+
+
+
+frameworks/base/media/java/android/media/audiofx/AcousticEchoCanceler.java
+
+
+

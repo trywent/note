@@ -74,7 +74,7 @@ scanDirLI(File scanDir, int parseFlags, int scanFlags, long currentTime) {
 	- mService.submit(() -> {
 		- ParseResult pr = new ParseResult()
 		- PackageParser pp = new PackageParser()
-		- pp.setCacheDir(mCacheDir)				//存放缓存
+		- pp.setCacheDir(mCacheDir)					//存放缓存
 		- pr.pkg = parsePackage(pp, scanFile, parseFlags)
 		- mQueue.put(pr)
 		}
@@ -91,12 +91,27 @@ PackageParser.Package addForInitLI(PackageParser.Package pkg,@ParseFlags int par
 	@ScanFlags int scanFlags, long currentTime,@Nullable UserHandle user){
 - 
 - ScanResult scanResult = scanPackageNewLI(pkg, parseFlags, scanFlags| SCAN_UPDATE_SIGNATURE, currentTime, user)
-  //创建package信息。保存到settings
+  //packageSettings存到settings
 - final Map<String, ReconciledPackage> reconcileResult = reconcilePackagesLocked(new ReconcileRequest())
-- commitReconciledScanResultLocked(reconcileResult.get(pkgName)){
+- optimisticallyRegisterAppId{							//分配package的appid
+	- mSettings.registerAppIdLPw(result.pkgSetting)-->p.appId = acquireAndRegisterNewAppIdLPw(p)
+	}
+- commitReconciledScanResultLocked(reconcileResult.get(pkgName)){		//保存应用信息
 	- ScanResult result = reconciledPkg.scanResult
 	- pkgSetting = request.pkgSetting
 	- commitPackageSettings(pkg, oldPkg, pkgSetting, scanFlags,...)-->mSettings.insertPackageSettingLPw(pkgSetting, pkg)
+	}
+}@PackageManagerService.java
+
+ //创建packageSetting
+scanPackageNewLI(@NonNull PackageParser.Package pkg,final @ParseFlags int parseFlags, 
+	@ScanFlags int scanFlags, long currentTime,@Nullable UserHandle user) {
+- scanFlags = adjustScanFlags(scanFlags, pkgSetting, disabledPkgSetting, user, pkg)
+- applyPolicy(pkg, parseFlags, scanFlags, mPlatformPackage)
+- ScanRequest request = new ScanRequest(pkg, sharedUserSetting,...)
+- scanPackageOnlyLI(request, mFactoryTest, currentTime){
+	- pkgSetting = Settings.createNewSetting(pkg.packageName, originalPkgSetting,	//创建应用信息
+                   	 disabledPkgSetting, realPkgName, sharedUserSetting, destCodeFile,...)
 	}
 }@PackageManagerService.java
 
@@ -203,10 +218,41 @@ installPackageTracedLI-->installPackageLI(InstallArgs args, PackageInstalledInfo
   }
 }@PackageManagerService.java
 
-/**************************************
- 安装应用前传输apk文件到packageManagerServices
-*/
 
+/**************************************
+ install
+
+*/
+//packageManager接口
+getPackageManager() {
+- IPackageManager pm = ActivityThread.getPackageManager();
+- return (mPackageManager = new ApplicationPackageManager(this, pm));
+}@ContextImpl.java
+
+
+/*******
+ 直接安装package
+*/
+installExistingPackage@PackageManager.java-->installExistingPackage@ApplicationPackageManager.java
+installExistingPackageAsUser(string packageName,int userId, int installFlags...){
+- 
+}@PackageManagerService.java
+
+
+/*******
+ 通过文件流安装
+ 将文件写入到PackageInstaller
+
+*/
+1 int mSessionId = PackageInstaller.createSession
+2 PackageInstaller.SessionInfo sessionInfo = installer.getSessionInfo(mSessionId)
+3 PackageInstaller.Session session = getPackageManager().getPackageInstaller().openSession(mSessionId)
+4 OutputStream out = session.openWrite("PackageInstaller", 0, sizeBytes) 
+5 out.write(buffer, 0, numRead)				//将文件些入
+6 session.commit(pendingIntent.getIntentSender())	//提交数据
+
+
+//安装应用前传输apk文件到packageManagerServices
 //PackageInstallerService
 PackageManagerService-->PackageInstallerService(Context context, PackageManagerService pm){
 - mInstallThread = new HandlerThread(TAG)
@@ -260,6 +306,46 @@ commitLocked{
 - mPm.installStage(mPackageName, stageDir, stageCid, localObserver,...)
 }@PackageInstallerSession.java
 
+//android10
+handleMessage(MSG_COMMIT)-->
+handleCommit() {
+
+}@PackageInstallerSession.java
+
+
+installStage(ActiveInstallSession activeInstallSession)-->mHandler.sendMessage(INIT_COPY)
+-->params.startCopy()-->InstallParams.startCopy{
+- handleStartCopy{
+	- InstallArgs args = createInstallArgs(this)
+	- if ((installFlags & PackageManager.INSTALL_ENABLE_ROLLBACK) != 0) {
+		- Intent enableRollbackIntent = new Intent(Intent.ACTION_PACKAGE_ENABLE_ROLLBACK)
+		- 
+		}
+	}
+- handleReturnCode{
+	- PackageLite packageInfo = new PackageParser().parsePackageLite(origin.file, 0)
+	- observer.onPackageInstalled(packageName, mRet, "Dry run", new Bundle())
+	- processPendingInstall(mArgs, mRet)-->processInstallRequestsAsync
+	}
+}@PakcageManagerService.java
+
+processInstallRequestsAsync(boolean success, List<InstallRequest> installRequests){
+- for (InstallRequest request : installRequests) {
+	- request.args.doPreInstall(request.installResult.returnCode)
+- installPackagesTracedLI(installRequests)-->installPackagesLI(requests){
+	- preparePackageLI(request.args, request.installResult)
+	- scanPackageTracedLI(prepareResult.packageToScan, prepareResult.parseFlags,...)
+	- 
+	}
+- for (InstallRequest request : installRequests) 
+	- request.args.doPostInstall(request.installResult.returnCode..)
+- restoreAndPostInstall
+}@PakcageManagerService.java
+
+
+frameworks/base/core/java/android/content/pm/PackageManager.java
+frameworks/base/core/java/android/content/pm/PackageInstaller.java
+frameworks/base/core/java/android/app/ApplicationPackageManager.java
 frameworks/base/services/core/java/com/android/server/pm/PackageInstallerService.java
 frameworks/base/services/core/java/com/android/server/pm/PackageInstallerSession.java
 

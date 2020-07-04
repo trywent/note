@@ -1,4 +1,4 @@
-/*
+/********************************
 
 
 */
@@ -24,7 +24,7 @@ registerReceiverInternal(BroadcastReceiver receiver, int userId,IntentFilter fil
 
 
 //发送：
-sendBroadcast-->ActivityManagerNative.getDefault().broadcastIntent@ContextImpl.java-->
+sendBroadcast (Intent intent, String receiverPermission)-->ActivityManagerNative.getDefault().broadcastIntent@ContextImpl.java-->
 broadcastIntentLocked{(默认广播不会发送到stoped状态的应用,判断函数Intent.isExcludingStopped)
 - 首先检查广播权限
 - 处理特殊广播，应用移除广播
@@ -62,7 +62,7 @@ enqueueOrderedBroadcastLocked(如果不是动态注册的，或是有序广播�
 mOrderedBroadcasts.add@BroadcastQueue.java
 
 
-处理：
+//处理：
 scheduleBroadcastsLocked-->sendMessage(BROADCAST_INTENT_MSG)-->handleMessage-->
 processNextBroadcast{
 - 处理非有序广播，deliverToRegisteredReceiverLocked-->performReceiveLocked{

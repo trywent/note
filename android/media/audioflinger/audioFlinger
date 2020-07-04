@@ -43,7 +43,7 @@ AudioFlinger{
 			- mDevicesFactory = IDevicesFactory::getService() //获取hidl接口
 			}
 	}
-  //音效
+  //音效的hal操作接口
 - mEffectsFactoryHal = EffectsFactoryHalInterface::create()
 - onFirstRef-->mStandbyTimeInNsecs
 }AudioFlinger.cpp

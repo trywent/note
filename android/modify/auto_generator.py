@@ -7,6 +7,27 @@ import shutil
 import time
 import struct
 
+#templet1 name appdir lib
+templet1 = """LOCAL_PATH := $(my-dir)
+include $(CLEAR_VARS)
+LOCAL_MODULE := %s
+LOCAL_MODULE_CLASS := APPS
+LOCAL_MODULE_PATH := $(TARGET_OUT_OEM)/%s
+LOCAL_SRC_FILES := $(LOCAL_MODULE)$(COMMON_ANDROID_PACKAGE_SUFFIX)
+LOCAL_CERTIFICATE := PRESIGNED
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_SUFFIX := $(COMMON_ANDROID_PACKAGE_SUFFIX)
+libsrc := %s
+ifneq ($(libsrc), '')
+LOCAL_POST_INSTALL_CMD := \
+    mkdir -p $(MY_APP_LIB_PATH) \
+    && cp -f $(libsrc) $(LOCAL_MODULE_PATH)
+endif
+include $(BUILD_PREBUILT)
+
+"""
+
+# templet modluelname appdst arch libsrc appdst
 templet = """include $(CLEAR_VARS)
 LOCAL_MODULE := %s
 LOCAL_MODULE_CLASS := APPS
@@ -65,7 +86,7 @@ PANCFG_ADDR = 0x70
 PANCFGSIZE  = 0X1C8
 
 pad_data = [0x00 for i in range(0x200000)] 
-def lsecconf(argv):
+def lsecconf(val):
     cur_dir = './'
     unpack_dir = cur_dir+ 'config'
 
@@ -113,8 +134,8 @@ def lsecconf(argv):
     f.seek(APPTIME_ADDR)
     f.write(struct.pack("i", 0x66556655))  
     f.write(struct.pack("6B", 0x00,thislocal.tm_min,thislocal.tm_hour,thislocal.tm_mday,thislocal.tm_mon,thislocal.tm_year-1900))
-    print("arg "+str(sys.argv))
-    if  str(sys.argv[1])=='1':  
+    print("arg "+val)
+    if  val=='1':  
 	f.seek(UCLEAR_ADDR)
 	f.write(struct.pack("i", SIG_UPDATE_CLEAR))  
 	f.write(struct.pack("i", SIG_NEEDUBOOTUSB))  
@@ -134,7 +155,7 @@ def lsecconf(argv):
 #all other fiel comipile to 	/oem/app/
 #auto_generator.py src target
 #python auto_generator.py ./ preinstall
-def main(argv):
+def app1(argv):
     unpackApp()
     lsecconf(0)
     preinstall_dir = os.path.join(argv[1],argv[2])
@@ -283,5 +304,118 @@ def main(argv):
             break
         includefile.close()
 
+
+def app2(argv):
+    os.system('rm -rf preinstall/*')
+    os.system('unzip -q -P 048a02243bb74474b25233bda3cd02f8 AllAppUpdate.bin -d preinstall')
+    os.system('cp config.txt preinstall/')
+    lsecconf('1')
+    preinstall_dir = os.path.join(argv[1],argv[2])
+    if os.path.exists(preinstall_dir):
+        #Use to include modules
+        include_path = preinstall_dir + '/preinstall.mk'
+        android_path = preinstall_dir + '/Android.mk'
+
+        if os.path.exists(include_path):
+            os.remove(include_path)
+        if os.path.exists(android_path):
+            os.remove(android_path)
+
+        includefile = file(include_path, 'w')
+        androidfile = file(android_path, 'w')
+	#top andoid.mk
+        androidfile.write("include $(call all-subdir-makefiles)\n\n")
+	androidfile.close()
+
+	#app file
+	appdir=preinstall_dir+'/app'
+	appmkfile = file(appdir+'/Android.mk', 'w')
+	appmkfile.write("include $(call all-subdir-makefiles)\n\n")
+	appmkfile.close()
+        for root, dirs, files in os.walk(appdir):
+	    for fn in files:
+		if fn!='Android.mk' and fn!='preinstall.mk':
+		  includefile.write('PRODUCT_COPY_FILES +=$(CUR_PATH)/syu/product/preinstall/app/%s:oem/app/%s \n' % (fn , fn))
+            for filename in dirs:
+                apk = appdir+'/'+filename+'/'+filename+'.apk'
+		libsrc = ''
+                if os.path.exists(apk):
+		    print(apk)
+		    #rename systemui settings launcher3
+		    if filename=='SystemUI' or filename=='Settings' or filename=='Launcher3':
+			shutil.move(apk,appdir+'/'+filename+'/'+filename+'1.apk')
+			shutil.move(appdir+'/'+filename,appdir+'/'+filename+'1')
+			filename +='1'
+		    makefile_path = appdir+'/'+filename + '/Android.mk'
+		    makefile = file(makefile_path,'w')
+		    #find lib
+                    if os.path.exists(filename+'/lib'):
+			libsrc=filename+'/lib'
+		    if filename=='ResHolder':
+			makefile.write(copy_res_templet % (filename))
+		    else:
+			makefile.write(templet1 % (filename,'app',libsrc))
+                    makefile.close()
+		    includefile.write('PRODUCT_PACKAGES += %s \n' % (filename))
+            break
+
+	#priv file.systemui setting
+	privdir = preinstall_dir+'/priv-app'
+	privmkfile = file(privdir+'/Android.mk', 'w')
+	privmkfile.write("include $(call all-subdir-makefiles)\n\n")
+	privmkfile.close()
+	for root, dirs,files in os.walk(privdir):
+	    for filename in dirs:
+		apk = privdir+'/'+filename+'/'+filename+'.apk'
+		libsrc = ''
+		if os.path.exists(apk):
+		   print(apk)
+		   #rename systemui settings launcher3
+		   if filename=='SystemUI' or filename=='Settings' or filename=='Launcher3':
+			shutil.move(apk,privdir+'/'+filename+'/'+filename+'1.apk')
+			shutil.move(privdir+'/'+filename,privdir+'/'+filename+'1')
+			filename +='1'
+		   makefile_path = privdir+'/'+filename + '/Android.mk'
+		   makefile = file(makefile_path,'w')
+		   makefile.write(templet1 % (filename,'priv-app',libsrc))
+		   makefile.close()
+		   includefile.write('PRODUCT_PACKAGES += %s \n' % (filename))
+	    break
+	#vital file
+	vitaldir = preinstall_dir+'/vital-app'
+	vitalmkfile = file(vitaldir+'/Android.mk', 'w')
+	vitalmkfile.write("include $(call all-subdir-makefiles)\n\n")
+        for root, dirs,files in os.walk(vitaldir):
+            for filename in files:
+		print(filename)
+		p = re.compile(r'\S*(?=.apk\b)')
+		found = p.search(filename)
+		if filename!='Android.mk' and found:
+			include_apk_path = vitaldir + '/' + found.group()
+                    	makefile_path = include_apk_path + '/Android.mk'			
+                   	apk = vitaldir + '/' + found.group() + '.apk'
+			if os.path.exists(include_apk_path):
+                            shutil.rmtree(include_apk_path)
+                        os.makedirs(include_apk_path)
+
+			makefile = file(makefile_path,'w')
+			makefile.write(copy_app_templet % (found.group(), 'vital-app', 'vital-app'))			
+			makefile.close()
+			shutil.move(apk,include_apk_path)
+			includefile.write('PRODUCT_PACKAGES += %s \n' % (found.group()))
+            break
+
+	#config file
+        for root, dirs,files in os.walk(preinstall_dir):
+            for filename in files:
+		print(filename)
+		if filename!='Android.mk' and filename!='preinstall.mk':
+	                includefile.write('PRODUCT_COPY_FILES +=$(CUR_PATH)/syu/product/preinstall/%s:oem/app/%s \n' % (filename, filename))
+            break
+        includefile.close()
+
+def main(argv):
+    #app1(argv)
+    app2(argv)
 if __name__=="__main__":
   main(sys.argv)

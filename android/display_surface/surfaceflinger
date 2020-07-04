@@ -1,6 +1,7 @@
-/*
- surfaceFlinger
+/********************************************
+ TARGET_USES_HWC2使用:surfaceFlinger.cpp,HWComposer.cpp
 
+ 老的方法使用：surfaceFlnger_hwc1.cpp，HWComposer_hwc1.cpp
 */
 
 //service surfaceflinger /system/bin/surfaceflinger@init.rc
@@ -35,7 +36,7 @@ SurfaceFlinger::init{
 	- sp<MessageBase> msg = new MessageScreenInitialized(this)
 	- postMessageAsync(msg)-->(MessageQueue线程处理)SurfaceFlinger::onInitializeDisplays()
 	}
-}@SurfaceFlinger.cpp
+}@SurfaceFlinger_hwc1.cpp
 
 //surfaceflinger提供的接口
 ISurfaceComposer{//提供的接口
@@ -76,14 +77,17 @@ onMessageReceived(INVALIDATE){
 }
 
 
-//创建默认显示器
+//创建默认显示器。初始化display信息
 handleMessageTransaction-->handleTransaction-->
 handleTransactionLocked-->onHotplugReceived-->createDefaultDisplayDevice{
 - BufferQueue::createBufferQueue(&producer, &consumer)
 - fbs = new FramebufferSurface(*mHwc, type, consumer)
-- new DisplayDevice(fbs,producer)
+- sp<DisplayDevice> hw = new DisplayDevice(this, DisplayDevice::DISPLAY_PRIMARY, type, isSecure,
+	token, fbs, producer,...)
+- hw->makeCurrent(mEGLDisplay, mEGLContext)
 - mDisplays.add(token, hw)
 }@SurfaceFlinger.cppp
+
 
 //
 handleMessageRefresh{
@@ -130,7 +134,7 @@ doComposeSurfaces{
 - 若有hasGlesComposition{
 
 	}
-- 遍历layer,hw->getVisibleLayersSortedByZ{
+- hw->getVisibleLayersSortedByZ{	//遍历layer
 	- 获取layer需更新的可见区域,clip
 	- 根据合成类型执行操作,layer->getCompositionType{
 		- hwc处理,HWC_OVERLAY
@@ -146,7 +150,12 @@ postComposition{
 }
 
 
-/*  MessageQueue两个作用：
+frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
+frameworks/native/libs/gui/ISurfaceComposer.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
+/**************
+    MessageQueue两个作用：
     - 接受display的热拔插事件，脉冲事件，发出消息 Message(MessageQueue::INVALIDATE)
     - ipc调用接口后发送对应处理消息，在surfaceFlinger主线程中处理消息   Message(MessageQueue::REFRESH)
 
@@ -206,12 +215,11 @@ MessageQueue::Handler::handleMessage(const Message& message){
  Looper::pollOnce(int timeoutMillis, int* outFd, int* outEvents, void** outData)
 
 
-frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
-frameworks/native/libs/gui/ISurfaceComposer.cpp
-frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+
 frameworks/native/services/surfaceflinger/MessageQueue.cpp
 system/core/libutils/Looper.cpp
-/* client{ 客户端操作接口
+/**************
+   client{ 客户端操作接口
 	- createSurface 创建surface(layer)
 	}
 
@@ -227,7 +235,7 @@ sp<ISurfaceComposerClient> SurfaceFlinger::createConnection(){
 - initClient(client)-->client->initCheck()
 }SurfaceFlinger.cpp
 
-//创建surface
+//创建surface,创建IGraphicBufferProducer
 Client::createSurface(const String8& name,uint32_t w, uint32_t h, PixelFormat format, uint32_t flags,const sp<IBinder>& parentHandle,
  uint32_t windowType, uint32_t ownerUid,sp<IBinder>* handle, sp<IGraphicBufferProducer>* gbp){
 - sp<MessageBase> msg = new MessageCreateLayer(mFlinger.get(),name, this, w, h, format...){
@@ -247,15 +255,15 @@ SurfaceFlinger::createLayer(const String8& name, const sp<Client>& client,uint32
 	- *outLayer = new Layer(this, client, name, w, h, flags)
 	- (*outLayer)->setBuffers(w, h, format, flags)
 	- *handle = (*outLayer)->getHandle()
-	- *gbp = (*outLayer)->getProducer()
+	- *gbp = (*outLayer)->getProducer()	//Layer中的mProducer
 	}
-  //创建dimlayer
+  //创建DimLayer
 - ISurfaceComposerClient::eFXSurfaceDim:-->createDimLayer(client,uniqueName, w, h, flags, handle, gbp, &layer){
 	- *outLayer = new LayerDim(this, client, name, w, h, flags)
 	- *handle = (*outLayer)->getHandle()
 	- *gbp = (*outLayer)->getProducer()
 	}
-- layer->setInfo(windowType, ownerUid)	//窗口类型
+- layer->setInfo(windowType, ownerUid)		//窗口类型
 - addClientLayer(client, *handle, *gbp, layer, *parent){
 	- mCurrentState.layersSortedByZ.add(layer)
 	- mGraphicBufferProducerList.add(IInterface::asBinder(layer))
@@ -279,21 +287,39 @@ removeLayer(const sp<Layer>& layer, true/*topLevelOnly*/){
 frameworks/native/services/surfaceflinger/Client.h
 frameworks/native/services/surfaceflinger/Client.cpp
 frameworks/native/libs/gui/ISurfaceComposerClient.cpp
-/*  layer
+/**************
+  layer
 
 */
-//surfaceFlinger创建对应的layer(包含producer，consumer)，用来获取bufferQueue
+//surfaceFlinger创建对应的bufferQueue(包含producer，consumer)
 new Layer(this, client, name, w, h)-->onFirstRef{
-- createBufferQueue(&producer, &consumer,true/*to surfaceflinger*/)//
-- mProducer = new MonitoredProducer(producer, mFlinger)
-- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)
-- mSurfaceFlingerConsumer.setFrameAvailableListener(this) //bufferqueu监听器回调
+- sp<IGraphicBufferProducer> producer
+- sp<IGraphicBufferConsumer> consumer
+- createBufferQueue(&producer, &consumer,true/*to surfaceflinger*/)	//创建producer,consumer。加入队列
+- mProducer = new MonitoredProducer(producer, mFlinger){		//监听是否有应用数据。producer
+	- mProducer(producer)
+	- mFlinger(flinger)
+	- mLayer(layer)
+	}@MonitoredProducer.cpp
+- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)	//consumer
+- mSurfaceFlingerConsumer.setContentsChangedListener(this) 		//bufferqueu监听器回调
+}@Layer.cpp
+
+//应用提交了数据，
+Layer::onFrameAvailable(const BufferItem& item) {
+- while (item.mFrameNumber != mLastFrameNumberReceived + 1) {		//若编号不对，则继续等待
+	- mQueueItemCondition.waitRelative(mQueueItemLock,ms2ns(500))
+	}
+- mQueueItems.push_back(item)
+- mQueueItemCondition.broadcast()
+- mFlinger->signalLayerUpdate()
 }@Layer.cpp
 
 
 
 frameworks/native/services/surfaceflinger/Layer.cpp
-/* 更新窗口大小，位置，层次
+/**************
+  更新窗口大小，位置，层次
    
    signalTransaction/signalLayerUpdate-->mEventQueue.invalidate()  需要显示屏的脉冲事件
 */
@@ -315,7 +341,8 @@ SurfaceFlinger::setTransactionState(const Vector<ComposerState>& state,const Vec
 	}
 }@SurfaceFlinger.cpp
 
-/* 更新窗口显示内容
+/**************
+  更新窗口显示内容
    
    signalRefresh-->mEventQueue.refresh()
 */
@@ -328,6 +355,7 @@ createDefaultDisplayDevice-->new DisplayDevice(fbs,producer)-->new Surface(produ
 //consumer显示到fb
 createDefaultDisplayDevice-->new FramebufferSurface(consumer)
 
+
 FramebufferSurface::onFrameAvailable-->HWComposer::fbPost
 
 
@@ -339,7 +367,7 @@ frameworks/native/services/surfaceflinger/MonitoredProducer.cpp
 frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
 
 
-/* 
+/**************
 
 */
 

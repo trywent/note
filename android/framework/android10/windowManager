@@ -1,0 +1,135 @@
+/*******************************************
+
+ WindowManager
+*/
+//displayContent
+DisplayContent getDisplayContentOrCreate(int displayId, IBinder token) {
+- Display display = mDisplayManager.getDisplay(displayId)
+- displayContent = mRoot.createDisplayContent(display, null /* controller */){
+	- DisplayContent dc = new DisplayContent(display, mWmService, activityDisplay)
+	- mWmService.mDisplayWindowSettings.applySettingsToDisplayLocked(dc)
+	- dc.initializeDisplayOverrideConfiguration()
+	}@RootWindowContainer.java
+}@WindowManagerService.java
+
+/**************
+ window
+ 
+ RootWindowContainer
+
+*/
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/WindowManagerService.java
+frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
+frameworks/base/services/core/java/com/android/server/wm/ActivityDisplay.java
+
+/**************
+ activity
+ 
+ RootActivityContainer
+
+*/
+ActivityTaskManagerService(Context context) {
+- mContext = context
+- mSystemThread = ActivityThread.currentActivityThread()
+- mUiContext = mSystemThread.getSystemUiContext()
+- mLifecycleManager = new ClientLifecycleManager()
+- mInternal = new LocalService();
+- GL_ES_VERSION = SystemProperties.getInt("ro.opengles.version", GL_ES_VERSION_UNDEFINED);
+- mKillTopSystemAppBlacklist = context.getResources().getStringArray(com.android.internal.R.array.kill_top_system_app_blacklist);
+}@ActivityTaskManagerService.java
+
+//初始
+initialize(IntentFirewall intentFirewall, PendingIntentController intentController,Looper looper) {
+- mH = new H(looper)
+- mUiHandler = new UiHandler()
+  //supervisor
+- mStackSupervisor = createStackSupervisor()
+  //activity根容器
+- mRootActivityContainer = new RootActivityContainer(this){
+	- mService = service
+	- mStackSupervisor = service.mStackSupervisor
+	}
+- mRootActivityContainer.onConfigurationChanged(mTempConfig)
+- mRootActivityContainer.getWindowConfiguration().setTrackActivityTypeChange(true)
+  //taskcontrol
+- mTaskChangeNotificationController = new TaskChangeNotificationController(mGlobalLock, mStackSupervisor, mH)
+- mLockTaskController = new LockTaskController(mContext, mStackSupervisor, mH)
+- mActivityStartController = new ActivityStartController(this){
+	- mService = service
+	- mFactory = new DefaultFactory(service, service.mStackSupervisor, new ActivityStartInterceptor(service, service.mStackSupervisor)){
+		- mSupervisor = supervisor
+		- mInterceptor = interceptor
+		}
+	- mFactory.setController(this)
+	- mPendingRemoteAnimationRegistry = new PendingRemoteAnimationRegistry
+	}@ActivityStartController.java
+  //recent
+- mRecentTasks = createRecentTasks()
+- mStackSupervisor.setRecentTasks(mRecentTasks)
+- mKeyguardController = mStackSupervisor.getKeyguardController()
+}@ActivityTaskManagerService.java
+
+//设置windowManager.创建ActivityDisplay
+setWindowManager-->mActivityTaskManager.setWindowManager(wm)@ActivityManagerService.java-->
+setWindowManager(WindowManagerService wm){
+- mWindowManager = wm
+- mLockTaskController.setWindowManager(wm)
+- mStackSupervisor.setWindowManager(wm)
+  //初始化activity所在display信息
+- mRootActivityContainer.setWindowManager(wm){
+	- mWindowManager = wm
+	- for (int displayNdx = 0; displayNdx < displays.length; ++displayNdx) {		//遍历加入所有屏幕
+		- final ActivityDisplay activityDisplay = new ActivityDisplay(this, display)
+		- addChild(activityDisplay, ActivityDisplay.POSITION_TOP)
+		}
+	- calculateDefaultMinimalSizeOfResizeableTasks
+	- defaultDisplay.getOrCreateStack(WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_HOME, ON_TOP)//主屏幕创建全屏栈
+	- positionChildAt(defaultDisplay, ActivityDisplay.POSITION_TOP)
+	}@RootActivityContainer.java
+}@ActivityTaskManagerService.java
+
+
+
+
+
+
+
+
+
+
+
+
+
+//启动activity
+startActivityAsUser(caller, callingPackage, intent, resolvedType, resultTo,resultWho, requestCode, startFlags, profilerInfo, bOptions,
+                UserHandle.getCallingUserId()){
+- getActivityStartController().checkTargetUser(userId, validateIncomingUser,...)
+- getActivityStartController().obtainStarter(intent, "startActivityAsUser")
+                .setCaller(caller)
+		...
+		.execute()
+}@ActivityTaskManagerService.java
+
+
+obtainStarter(Intent intent, String reason)-->mFactory.obtain().setIntent(intent).setReason(reason)@ActivityStartController
+DefaultFactory.obtain(){
+  //加了一个锁的机制
+- ActivityStarter starter = mStarterPool.acquire()
+- if (starter == null) {
+	- starter = new ActivityStarter(mController, mService, mSupervisor, mInterceptor)
+	}
+- return starter
+}@ActivityStarter.java
+
+execute{
+- 
+}@ActivityStarter.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+frameworks/base/services/core/java/com/android/server/wm/ActivityStartController.java
+frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java
+frameworks/base/services/core/java/com/android/server/wm/RootActivityContainer.java

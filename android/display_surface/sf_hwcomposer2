@@ -1,14 +1,19 @@
-/*
- 显示屏操作
+/************************
+ 显示屏操作。显示屏的信息获取
+
+ hal ---> ComposerCallbackBridge ---> surfaceflinger
+ surfaceflinger---> hwcomposer ---> hwc2:device
 
  android8.1 TARGET_USES_HWC2 := true@BoardCommon.mk 使用HWComposer.cpp
 
 */
-
+//HWC2中实现Device ，Layer类
 HWComposer{
-- Device
-- Layer
-}
+- HWC2::Device Device{
+	- android::Hwc2::Composer& mComposer					//hal层接口
+	- std::unordered_map<hwc2_layer_t, std::unique_ptr<Layer>> mLayers	//Layer
+	}
+}@HWComposer.cpp
 
 //创建hwcomposer
 SurfaceFlinger::init-->new HWComposer(false)-->
@@ -32,6 +37,24 @@ Device::Device(bool useVrComposer){
 }@HWC2.cpp
 
 
+/********
+ hal层信息通过回调发给上层
+
+*/
+//hal层回调接口
+ComposerCallbackBridge : public Hwc2::IComposerCallback{
+- mCallback(callback)	//callback为surfaceflinger对象
+- onHotplug(Hwc2::Display display, IComposerCallback::Connection conn){
+	- mCallback->onHotplugReceived(mSequenceId, display,connection, false)
+	}
+- onRefresh(Hwc2::Display display){
+	- mCallback->onRefreshReceived(mSequenceId, display)
+	}
+- onVsync(Hwc2::Display display, int64_t timestamp){
+	- mCallback->onVsyncReceived(mSequenceId, display, timestamp)
+	}
+}@HWC2.cpp
+
 //注册hal回调
 SurfaceFlinger::init()-->registerCallback(this)@SurfaceFlinger.cpp-->
 HWComposer::registerCallback(HWC2::ComposerCallback* callback,int32_t sequenceId)-->
@@ -54,7 +77,9 @@ SurfaceFlinger::onVsyncReceived(int32_t sequenceId,hwc2_display_t displayId, int
     }
 }@SurfaceFlinger.cpp
 
-
+/********
+ 提交显示数据
+*/
 //创建layer
 createWorkList{
 - 创建mDisplayData.list中hwc_layer_1_t
@@ -64,6 +89,13 @@ createWorkList{
 
 frameworks/native/services/surfaceflinger/DisplayHardware/HWComposer.cpp
 frameworks/native/services/surfaceflinger/DisplayHardware/HWC2.cpp
+
+/*******************************
+
+ hidl接口
+*/
+
+
 frameworks/native/services/surfaceflinger/DisplayHardware/ComposerHal.cpp
 
 

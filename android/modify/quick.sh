@@ -69,7 +69,7 @@ do
 	   ;;
         p)
 	    echo "build product"
-	    cd device/sprd/sharkl5Pro/ums512_1h10/syu
+	    cd device/sprd/sharkl5Pro/ums512_1h10/syu/product
 	    #./oem.sh
 	    python ./auto_generator.py ./ preinstall
 	    cd -
@@ -118,13 +118,17 @@ if [ "$GMS" == "gms" ] ;then
     export FYT_BUILD_WHITH_GMS="true"
 fi
 
-
 #make api-stubs-docs-update-current-api
 #make test-api-stubs-docs-update-current-api
 #make systemimage
-#m oem_image && make -j8
-make -j8 && make otapackage -j4
-#source build/lsecpac.sh
+
+#make -j8 && make otapackage -j4
+if [ "$fytpp" == "y" ] ;then
+m oem_image && make -j8 && source build/lsecpac.sh
+else
+make -j8 && make otapackage -j8
+fi
+
 
 #move
 otapkg=out/target/product/ums512_1h10/ums512_1h10_Natv*.zip

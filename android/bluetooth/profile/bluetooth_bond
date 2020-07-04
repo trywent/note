@@ -1,8 +1,30 @@
 /***********************************************
-settingslib提供蓝牙访问的接口。蓝牙信息通过LocalBluetoothManager获取
-frameworks/base/packages/SettingsLib/src/com/android/settingslib
 
-BluetoothBondStateMachine: Bond address is:04:79:70:92:BB:14
+ 扫描设备
+ BluetoothDevice.ACTION_DISCOVERY_STARTED 
+ BluetoothDevice.ACTION_DISCOVERY_FINISHED 
+ BluetoothDevice.ACTION_FOUND 接受广播找到设备
+*/
+//扫描
+startDiscovery@AdapterService.java-->startDiscovery@Bluetooth.c
+
+discovery_state_changed_callback@com_android_bluetooth_btservice_AdapterService.cpp-->discoveryStateChangeCallback
+@AdapterProperties.java
+
+//device信息
+remote_device_properties_callback-->method_devicePropertyChangedCallback@luetooth_btservice_AdapterService.cpp
+-->devicePropertyChangedCallback@JniCallbacks.java-->devicePropertyChangedCallback{
+- addDeviceProperties(address)-->mDevices.put
+- device.mName,device.mAddress,device.mBluetoothClass...//设置设备信息
+}@RemoteDevices.java
+
+//加入设备
+device_found_callback-->method_deviceFoundCallbac@@com_android_bluetooth_btservice_AdapterService.cpp-->
+deviceFoundCallback@JniCallbacks.java-->deviceFoundCallback(address/*发送广播ACTION_FOUND*/)@RemoteDevices.java
+
+
+/************
+ 通知上层扫描到的设备
 */
 //加入扫描的设备
 DeviceFoundHandler(BluetoothDevice.ACTION_FOUND){
@@ -24,7 +46,6 @@ frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/Local
 frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/CachedBluetoothDeviceManager.java
 
 //settings注册回调
-
 mLocalManager.getEventManager().registerCallback(this)@DeviceListPreferenceFragment.java
 
 //设置中显示设备
@@ -37,73 +58,42 @@ addCachedDevices{
 	}
 }@DeviceListPreferenceFragment.java
 
-================
-//收到配对
-BluetoothPairingRequest.onReceive(ACTION_PAIRING_REQUEST)-->startActivity(pairingIntent)@BluetoothPairingRequest.java
--->onCreate{
-- mType= intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT)//获取连接类型
-- PAIRING_VARIANT_PIN或PAIRING_VARIANT_PASSKEY //需要输入
-	-createUserEntryDialog-->createPinEntryView-->(点击确认)onClick-->onPair{
-		- PAIRING_VARIANT_PIN: mDevice.setPin
-		- PAIRING_VARIANT_PASSKEY: mDevice.setPasskey
-		- PAIRING_VARIANT_PASSKEY_CONFIRMATION: mDevice.setPairingConfirmation
-		}
-- PAIRING_VARIANT_PASSKEY_CONFIRMATION//passkey确认
-	-createConfirmationDialog
-- PAIRING_VARIANT_DISPLAY_PASSKEY或PAIRING_VARIANT_DISPLAY_PIN //只显示pin或passkey。发起端
-	-createDisplayPasskeyOrPinDialog 
-
-}@BluetoothPairingDialog.java
-
 packages/apps/Settings/src/com/android/settings/bluetooth/DeviceListPreferenceFragment.java
 packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothPairingRequest.java
 packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothPairingDialog.java
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothSettings.java
+packages/apps/Settings/src/com/android/settings/bluetooth/DeviceListPreferenceFragment.java
+packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothDevicePreference.java
+frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/CachedBluetoothDevice.java
+frameworks/base/core/java/android/bluetooth/BluetoothDevice.java
+
 
 /***********************************************
- 开始扫描
-BluetoothDevice.ACTION_DISCOVERY_STARTED 
-BluetoothDevice.ACTION_DISCOVERY_FINISHED 
-BluetoothDevice.ACTION_FOUND 接受广播找到设备
+ 配对
 */
-startDiscovery@AdapterService.java-->startDiscovery@Bluetooth.c
 
-discovery_state_changed_callback@com_android_bluetooth_btservice_AdapterService.cpp-->discoveryStateChangeCallback
-@AdapterProperties.java
+//已配对的设备状态更新。从底层更新到上层
+sBluetoothCallbacks.bond_state_changed_cb-->bond_state_changed_callback-->method_bondStateChangeCallback
+@com_android_bluetooth_btservice_AdapterService.cpp-->bondStateChangeCallback-->@JniCallbacks.java-->
+bondStateChangeCallback(int status, byte[] address, int newState) {{
+- BluetoothDevice device = mRemoteDevices.getDevice(address)
+- device = mAdapter.getRemoteDevice(Utils.getAddressStringFromByte(address))
+  //更新设备状态
+- Message msg = obtainMessage(BONDING_STATE_CHANGE)
+- msg.obj = device
+- sendMessage(msg)
+}BondStateMachine.java
 
-//扫描到设备,创建设备，设置设备信息
-remote_device_properties_callback-->method_devicePropertyChangedCallback@luetooth_btservice_AdapterService.cpp
--->devicePropertyChangedCallback@JniCallbacks.java-->devicePropertyChangedCallback{
-- addDeviceProperties(address)-->mDevices.put
-- device.mName,device.mAddress,device.mBluetoothClass...//设置设备信息
-}@RemoteDevices.java
-
-//加入设备
-device_found_callback-->method_deviceFoundCallbac@@com_android_bluetooth_btservice_AdapterService.cpp-->
-deviceFoundCallback@JniCallbacks.java-->deviceFoundCallback(address/*发送广播ACTION_FOUND*/)@RemoteDevices.java
-
-/***********************************************
-LMP(链路层Link Management Protocol)PIN code 
-
-
-*/
-安全简易配对SSP（Secure simple pairing）,蓝牙2.0之后配对方式，简易安全配对一共有四种，其中Out of Band很少使用到:
-1 Numeric Comparison 
-配对双方都显示一个6位的数字，由用户来核对数字是否一致，并输入Yes/No，两端Yes表示一致即可配对,可以防止中间人攻击。 
-使用场景：两端设备可以弹出6位十进制数，并且有yes和no按钮。
-：A发起配对--->A显示6位数，并发送到B--->B显示接收的6位数，确认后可配对成功
-
-2 Passkey Entry 
-配对目标输入一个在本地设备上显示的6位数字，输入正确即可配对，并可以防止中间人攻击。 
-使用场景：一端设备可以显示，另一端设备可以输入。
-
-：A发起配对--->A显示6位数--->B输入对应的6位数，确认后可配对成功
-
-3 Just Works 
-不会进行鉴权,不能防止中间人攻击用于配对没有显示没有输入的设备，主动发起连接即可配对，用户看不到配对过程，不可以防止中间人攻击，例如连接蓝牙耳机。 
-使用场景：用于即不能显示6位随机数，也不能输入的设备。
-
-4 Out of Band 
-两设备的通过别的途径交换配对信息，例如一些NFC蓝牙音箱。
+StableState.processMessage(BONDING_STATE_CHANGE){
+- if (newState == BluetoothDevice.BOND_BONDING){
+	- sendIntent(dev, newState, 0)
+	- transitionTo(mPendingCommandState)
+  }else if (newState == BluetoothDevice.BOND_NONE){
+	- sendIntent(dev, newState, 0){
+		- mAdapterProperties.onBondStateChanged(device, newState)	//更新设备状态
+		}
+  }
+}BondStateMachine.java
 
 //请求配对
 onPreferenceTreeClick-->onDevicePreferenceClick-->btPreference.onClicked@DeviceListPreferenceFragment.java
@@ -154,11 +144,23 @@ sendDisplayPinIntent-->mAdapterService.sendOrderedBroadcast(ACTION_PAIRING_REQUE
 }@BluetoothPairingDialog.java
 
 
-packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothSettings.java
-packages/apps/Settings/src/com/android/settings/bluetooth/DeviceListPreferenceFragment.java
-packages/apps/Settings/src/com/android/settings/bluetooth/BluetoothDevicePreference.java
-frameworks/base/packages/SettingsLib/src/com/android/settingslib/bluetooth/CachedBluetoothDevice.java
-frameworks/base/core/java/android/bluetooth/BluetoothDevice.java
+//收到配对请求
+BluetoothPairingRequest.onReceive(ACTION_PAIRING_REQUEST)-->startActivity(pairingIntent)@BluetoothPairingRequest.java
+-->onCreate{
+- mType= intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT)//获取连接类型
+- PAIRING_VARIANT_PIN或PAIRING_VARIANT_PASSKEY //需要输入
+	-createUserEntryDialog-->createPinEntryView-->(点击确认)onClick-->onPair{
+		- PAIRING_VARIANT_PIN: mDevice.setPin
+		- PAIRING_VARIANT_PASSKEY: mDevice.setPasskey
+		- PAIRING_VARIANT_PASSKEY_CONFIRMATION: mDevice.setPairingConfirmation
+		}
+- PAIRING_VARIANT_PASSKEY_CONFIRMATION//passkey确认
+	-createConfirmationDialog
+- PAIRING_VARIANT_DISPLAY_PASSKEY或PAIRING_VARIANT_DISPLAY_PIN //只显示pin或passkey。发起端
+	-createDisplayPasskeyOrPinDialog 
+
+}@BluetoothPairingDialog.java
+
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterService.java
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/BondStateMachine.java
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/JniCallbacks.java
@@ -166,8 +168,9 @@ packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/AdapterProperties.java
 packages/apps/Bluetooth/src/com/android/bluetooth/btservice/RemoteDevices.java
 packages/apps/Bluetooth/jni/com_android_bluetooth_btservice_AdapterService.cpp
-================
-//stack
+/*****************
+ stack
+*/
 smp_sm_event-->(*smp_sm_action[action])@smp_main.c-->
 smp_proc_pair_cmd@smp_act.c-->smp_select_association_model@smp_utils.c
 
@@ -179,5 +182,27 @@ system/bt/stack/smp/smp_utils.c
 system/bt/stack/smp/smp_act.c
 system/bt/stack/smp/smp_main.c
 
+/***********************************************
+LMP(链路层Link Management Protocol)PIN code 
 
+
+*/
+安全简易配对SSP（Secure simple pairing）,蓝牙2.0之后配对方式，简易安全配对一共有四种，其中Out of Band很少使用到:
+1 Numeric Comparison 
+配对双方都显示一个6位的数字，由用户来核对数字是否一致，并输入Yes/No，两端Yes表示一致即可配对,可以防止中间人攻击。 
+使用场景：两端设备可以弹出6位十进制数，并且有yes和no按钮。
+：A发起配对--->A显示6位数，并发送到B--->B显示接收的6位数，确认后可配对成功
+
+2 Passkey Entry 
+配对目标输入一个在本地设备上显示的6位数字，输入正确即可配对，并可以防止中间人攻击。 
+使用场景：一端设备可以显示，另一端设备可以输入。
+
+：A发起配对--->A显示6位数--->B输入对应的6位数，确认后可配对成功
+
+3 Just Works 
+不会进行鉴权,不能防止中间人攻击用于配对没有显示没有输入的设备，主动发起连接即可配对，用户看不到配对过程，不可以防止中间人攻击，例如连接蓝牙耳机。 
+使用场景：用于即不能显示6位随机数，也不能输入的设备。
+
+4 Out of Band 
+两设备的通过别的途径交换配对信息，例如一些NFC蓝牙音箱。
 

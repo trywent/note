@@ -1,20 +1,20 @@
 /******************************
- SurfaceSession 应用client端到surfaceflinger的一个连接(创建surface的接口)。对应SurfaceComposerClient
- SurfaceControl 操作native surface的接口
- Surface 封装SurfaceControl的接口.应用绘制数据都是通过Surface
-
+ SurfaceSession -- SurfaceComposerClient。对应surfaceFlinger中的client
+ SurfaceControl 操作native surface的接口。对应surfaceFlinger中的Layer
+ Surface{ 
+  - 封装SurfaceControl的IGraphicBufferProducer.应用绘制数据都是通过Surface
+ }
 
  cpp层中是由SurfaceComposerClient控制显示窗口
-
 */
-//activity中view创建surface
+//activity的显示窗口。创建SurfaceSession
 addWindow@WindowManagerService.java-->attach@WindowState.java-->
 windowAddedLocked{
 - mSurfaceSession = new SurfaceSession()
 - mService.mSessions.add(this)
 }@Session.java
 
-//创建SurfaceSession,surfaceControl,surface
+ //activity 创建surfaceControl,surface
 relayoutWindow(Session session, IWindow client, int seq, LayoutParams attrs,.... Surface outSurface){
 - createSurfaceLocked(createSurfaceControl(outSurface, result, win, winAnimator))
   createSurfaceControl(Surface outSurface, int result, WindowState win,WindowStateAnimator winAnimator){
@@ -26,7 +26,7 @@ relayoutWindow(Session session, IWindow client, int seq, LayoutParams attrs,....
 - surfaceController.getSurface(outSurface)-->outSurface.copyFrom(mSurfaceControl)@WindowSurfaceController
 }@WindowManagerService.java
 
-//surfaceView创建SurfaceSession,surfaceControl,surface
+//surfaceView的显示窗口。创建SurfaceSession,surfaceControl,surface
 updateSurface{
 - mSurfaceSession = new SurfaceSession(viewRoot.mSurface)
 - new SurfaceControlWithBackground(mSurfaceSession)-->new SurfaceControl
@@ -34,9 +34,7 @@ updateSurface{
 }@SurfaceView.java
 
 
-
-
-/*
+/*******
  surfaceSession   对应一个SurfaceComposerClient
 
 */
@@ -56,11 +54,21 @@ SurfaceSession(Surface root){//复用nativeCreateScoped
 
 frameworks/base/core/java/android/view/SurfaceSession.java
 frameworks/base/core/jni/android_view_SurfaceSession.cpp
-/*
+/*******
  surfaceControl
-
+	1 数据填充接口。用surface封装，创建了实际填充数据的IGraphicBufferProducer
+	2 层次，大小，显示隐藏操作接口
  mNativeObject 一个指针指向SurfaceComposerClient
 */
+//SurfaceControl.Builder
+Builder(SurfaceSession session) {
+- SurfaceSession mSession = session
+}
+
+SurfaceControl build() {
+- new SurfaceControl(mSession, mName, mWidth, mHeight, mFormat, mFlags, mParent, mWindowType, mOwnerUid)
+}@SurfaceControl.java
+
 //创建native surfaceControl
 SurfaceControl(SurfaceSession session, String name, int w, int h, int format, int flags,
             SurfaceControl parent, int windowType, int ownerUid){
@@ -75,34 +83,36 @@ nativeCreate(JNIEnv* env, jclass clazz, jobject sessionObj,jstring nameStr,
 - sp<SurfaceComposerClient> client(android_view_SurfaceSession_getClient(env, sessionObj))
   //创建surfaceControl
 - sp<SurfaceControl> surface
-- client->createSurfaceChecked(String8(name.c_str()), w, h, format, &surface,){
+- client->createSurface(String8(name.c_str()), w, h, format, &surface,){
+	- sp<IGraphicBufferProducer> gbp
 	- mClient->createSurface(name, w, h, format, flags, parentHandle,windowType, ownerUid, &handle, &gbp)
-	- *outSurface = new SurfaceControl(this, handle, gbp, true /* owned */)
+	- *outSurface = new SurfaceControl(this, handle, gbp, true /* owned */){
+			- mClient(client)		//SurfaceComposerClient
+			- mHandle(handle)		//surfaceflinger中的layer
+			- mGraphicBufferProducer(gbp)	//IGraphicBufferProducer
+			}@SurfaceControl.cpp
 	}SurfaceComposerClient.cpp
 - return reinterpret_cast<jlong>(surface.get())
 }@android_view_SurfaceControl.cpp
 
+//创建surface
+getSurface-->generateSurfaceLocked{
+- mSurfaceData = new Surface(mGraphicBufferProducer, false)
+}@SurfaceControl.cpp
+
 //销毁
 destory-->nativeDestroy@SurfaceControl.java-->destroy-->mClient->destroySurface(mHandle)@SurfaceControl.cpp
-
-//SurfaceControl.Builder
-Builder(SurfaceSession session) {
-- SurfaceSession mSession = session
-}
-SurfaceControl build() {
-- new SurfaceControl(mSession, mName, mWidth, mHeight, mFormat, mFlags, mParent, mWindowType, mOwnerUid)
-}@SurfaceControl.java
-
 
 //开始设置。所有的设置保存在一个对象中，提交时统一提交
 openTransaction-->nativeOpenTransaction@SurfaceControl.java-->SurfaceComposerClient::openGlobalTransaction
 @android_view_SurfaceControl.cpp
 
-//设置
-setLayer
-setSize
-hide
-show
+//操作层次，大小，隐藏，显示的接口
+SurfaceControl::setLayer(int32_t layer)-->mClient->setLayer(mHandle, layer)
+SurfaceControl::setPosition(float x, float y)
+SurfaceControl::setSize(uint32_t w, uint32_t h) 
+SurfaceControl::hide()
+SurfaceControl::show()
 
 //提交设置
 closeTransaction-->nativeCloseTransaction@SurfaceControl.java-->SurfaceComposerClient::closeGlobalTransaction
@@ -112,7 +122,7 @@ frameworks/base/core/java/android/view/SurfaceControl.java
 frameworks/base/core/jni/android_view_SurfaceControl.cpp
 frameworks/native/libs/gui/SurfaceControl.cpp
 frameworks/native/libs/gui/SurfaceComposerClient.cpp
-/*
+/*******
  Surface(java层) 
  mCanvas用于绘制图像
  
@@ -123,16 +133,6 @@ frameworks/native/libs/gui/SurfaceComposerClient.cpp
  3 提交buffer unlockCanvasAndPost-->
 
 */
-android_view_Surface_createFromIGraphicBufferProducer(JNIEnv* env,
-        const sp<IGraphicBufferProducer>& bufferProducer){
-- sp<Surface> surface(new Surface(bufferProducer, true))
-- android_view_Surface_createFromSurface(JNIEnv* env, const sp<Surface>& surface){
-	- jobject surfaceObj = env->NewObject(gSurfaceClassInfo.clazz,gSurfaceClassInfo.ctor, (jlong)surface.get())
-		-->Surface(long nativeObject)@Surface.java
-	}
-}@android_view_Surface.cpp
-
-
 1//创建surface
 mSurface.copyFrom(mSurfaceControl)-->copyFrom(SurfaceControl other){
 - long surfaceControlPtr = other.mNativeObject
@@ -211,7 +211,23 @@ surface->unlockAndPost{
 	}
 }@Surface.cpp
 
-
 frameworks/base/core/java/android/view/Surface.java
 frameworks/base/core/jni/android_view_Surface.cpp
 frameworks/native/libs/gui/Surface.cpp
+/*******
+ cpp层使用的surface接口
+*/
+
+1 //创建 IGraphicBufferProducer
+sp<IGraphicBufferProducer> bufferProducer;
+
+2 //创建surface
+android_view_Surface_createFromIGraphicBufferProducer(JNIEnv* env, const sp<IGraphicBufferProducer>& bufferProducer){
+- sp<Surface> surface(new Surface(bufferProducer, true))
+- android_view_Surface_createFromSurface(JNIEnv* env, const sp<Surface>& surface){
+	- jobject surfaceObj = env->NewObject(gSurfaceClassInfo.clazz,gSurfaceClassInfo.ctor, (jlong)surface.get())
+		-->Surface(long nativeObject)@Surface.java
+	}
+}@android_view_Surface.cpp
+
+

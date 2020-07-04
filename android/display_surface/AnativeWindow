@@ -1,21 +1,58 @@
-/*
+/************************
  surface 
  ANativeWindow
+
+ NDK接口
 */
+struct ANativeWindow
+{
+#ifdef __cplusplus
+    ANativeWindow(): flags(0), minSwapInterval(0), maxSwapInterval(0), xdpi(0), ydpi(0)
+    {
+        common.magic = ANDROID_NATIVE_WINDOW_MAGIC;
+        common.version = sizeof(ANativeWindow);
+        memset(common.reserved, 0, sizeof(common.reserved));
+    }
+#endif
+
+    struct android_native_base_t common;
+    int     (*setSwapInterval)(struct ANativeWindow* window, int interval);
+    int     (*dequeueBuffer_DEPRECATED)(struct ANativeWindow* window, struct ANativeWindowBuffer** buffer);
+    int     (*lockBuffer_DEPRECATED)(struct ANativeWindow* window,struct ANativeWindowBuffer* buffer);
+    int     (*queueBuffer_DEPRECATED)(struct ANativeWindow* window, struct ANativeWindowBuffer* buffer);
+    int     (*query)(const struct ANativeWindow* window,int what, int* value);
+    int     (*perform)(struct ANativeWindow* window, int operation, ... );
+    int     (*cancelBuffer_DEPRECATED)(struct ANativeWindow* window,struct ANativeWindowBuffer* buffer);
+    int     (*dequeueBuffer)(struct ANativeWindow* window,struct ANativeWindowBuffer** buffer, int* fenceFd);
+    int     (*queueBuffer)(struct ANativeWindow* window,struct ANativeWindowBuffer* buffer, int fenceFd);
+    int     (*cancelBuffer)(struct ANativeWindow* window,struct ANativeWindowBuffer* buffer, int fenceFd);
+}@window.h
+
 
 //ANativeObjectBase
 template <typename NATIVE_TYPE, typename TYPE, typename REF,typename NATIVE_BASE = android_native_base_t>
-class ANativeObjectBase : public NATIVE_TYPE, public REF
-@ANativeObjectBase.h
+class ANativeObjectBase : public NATIVE_TYPE, public REF{
+- static inline TYPE* getSelf(NATIVE_TYPE* self) 	//获取的对象为TYPE
+}@ANativeObjectBase.h
 
+/*********
+ surface实现了ANavtiveWindow接口。数据生产者
 
-//surface实现了ANavtiveWindow
+*/
 class Surface: public ANativeObjectBase<ANativeWindow, Surface, RefBase>
+class Surface: public ANativeObjectBase: public ANativeWindow, public RefBase
+
+Surface::Surface(const sp<IGraphicBufferProducer>& bufferProducer, bool controlledByApp){
+- mGraphicBufferProducer(bufferProducer)
+  //替换ANativeWindow操作接口,最终会调用surface的接口
+- ANativeWindow::setSwapInterval  = hook_setSwapInterval
+- ANativeWindow::dequeueBuffer    = hook_dequeueBuffer
+- ANativeWindow::queueBuffer      = hook_queueBuffer
+}@Surface.cpp
 
 
-
-
-
-frameworks/native/include/ui/ANativeObjectBase.h
 frameworks/native/libs/nativewindow/include/system/window.h
+frameworks/native/libs/nativewindow/include/android/native_window.h
+frameworks/native/include/ui/ANativeObjectBase.h
 frameworks/native/libs/nativewindow/ANativeWindow.cpp
+frameworks/native/libs/gui/Surface.cpp

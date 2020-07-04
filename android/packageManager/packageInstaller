@@ -1,4 +1,4 @@
-/*
+/***********************
  应用安装器
 
 ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.DEFAULT] dat=file:///mnt/sdcard/000000000_com.syu.ms.apk typ=application/vnd.android.package-archive flg=0x10000000 cmp=com.android.packageinstaller/.InstallStart} from uid 10005, pid 3759
@@ -11,7 +11,8 @@ ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.ca
 ActivityManager: ->startActivity for ActivityRecord{9d15999 u0 com.android.packageinstaller/.PackageInstallerActivity t81} result:0
 
 */
-/*
+
+/***********************
  android6.0
 */
 onClick(mOk)-->startInstall(InstallAppProgress.class)@PackageInstallerActivity.java-->onCreate-->
@@ -30,7 +31,7 @@ initView{
 packages/apps/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
 packages/apps/PackageInstaller/src/com/android/packageinstaller/InstallAppProgress.java
 packages/apps/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
-/*
+/***********************
  andoid8.0
 */
 onCreate@InstallStart.java-->onCreate@InstallStageing.java-->
@@ -113,18 +114,19 @@ onClick(View v) {
 	}
 }@PackageInstallerActivity.java
 
-/*
+/***********************
  installing
 */
 
 //准备安装
 onCreate(@Nullable Bundle savedInstanceState) {
 - setContentView(R.layout.install_installing)
-  //已经存在
+  //package文件，直接安装
 - if ("package".equals(mPackageURI.getScheme())) {
 	- getPackageManager().installExistingPackage(appInfo.packageName)-->installExistingPackageAsUser--> mPM.installExistingPackageAsUser
 		@ApplicationPackageManager.java-->installExistingPackageAsUser@PackageManagerService.java
-  }else{
+	- launchSuccess	//安装成功退出activity
+  }else{//通过文件流安装？
 	- final File sourceFile = new File(mPackageURI.getPath())
 	- PackageUtil.initSnippetForNewApp(this, PackageUtil.getAppSnippet(this, appInfo, sourceFile), R.id.app_snippet)
 	  //监听安装结果
@@ -178,7 +180,7 @@ onResume() {
 
 
 
-/*
+/***********************
  PackageInstaller
  安装器通过这个接口执行安装
 

@@ -28,9 +28,9 @@ start hwservicemanager@init.rc-->/system/bin/hwservicemanager@hwservicemanager.r
 
 //加入服务
 ServiceManager::add{
-- service->interfaceChain //获取调用者的标识descripter
-- ifaceMap = mServiceMap[fqName] //获取对应的服务map
-- ifaceMap.insertService //加入到map
+- service->interfaceChain 					//获取调用者的标识descripter
+- ifaceMap = mServiceMap[fqName] 				//获取对应的服务map
+- ifaceMap.insertService 					//加入到map
 }
 
 
@@ -39,16 +39,16 @@ ServiceManager::add{
    服务的启动和注册，获取
 */
 service xxx_service /vendor/bin/hw/android.hardware.xxx@1.0-service@Ixxx.rc-->
-main{//HAL层只需实现该方法.用于启动服务
+main{								//HAL层只需实现该方法.用于启动服务
 - android::ProcessState::initWithDriver("/dev/vndbinder");
-- return defaultPassthroughServiceImplementation<Ixxx>();//IGNSS,ICameraProvider
+- return defaultPassthroughServiceImplementation<Ixxx>();	//IGNSS,ICameraProvider
 }@Ixx/service.cpp
 
 defaultPassthroughServiceImplementation<Ixxx>(name,thread){
-- configureRpcThreadpool(maxThreads)//配置线程数
+- configureRpcThreadpool(maxThreads)				//配置线程数
 - registerPassthroughServiceImplementation<Ixxx>(name = "default"){
-	- service = Ixxx::getService(name,true/*getstub*/) //IGNSS,ICamerProvider 获取对应的服务
-	- service->registerAsService(name) //注册服务
+	- service = Ixxx::getService(name,true/*getstub*/) 	//IGNSS,ICamerProvider 获取对应的服务
+	- service->registerAsService(name) 			//注册服务
 	}
 }@LegacySupport.h
 
@@ -62,12 +62,12 @@ Ixxx::getService(name,bool getStub/*是本地,还是remote*/){
 	}
 //本地服务启动
 - stub==true,baseInterface= getPassthroughServiceManager().get-->IServiceManager.get("android.hardware.xxx@1.0::Ixxx","default"){
-	- dlopen("android.hardware.xxx@1.0-impl.so")//加载hidl库文件.用户实现加载vendor库文件(原来的老方式库文件)
-	- generator = dlsym(handle, "HIDL_FETCH_Ixxx")//获取函数HIDL_FETCH_Ixxx
+	- dlopen("android.hardware.xxx@1.0-impl.so")		//加载hidl库文件.用户实现加载vendor库文件(原来的老方式库文件)
+	- generator = dlsym(handle, "HIDL_FETCH_Ixxx")		//获取函数HIDL_FETCH_Ixxx
 	- interface = generator("default")-->HIDL_FETCH_Ixxx{
-		- hw_get_module(xxx_HARDWARE_MODULE_ID) //加载库
+		- hw_get_module(xxx_HARDWARE_MODULE_ID) 	//加载库
 		- module->methods->open
-		- 返回Ixxx //ICameraProvider ,IGnss
+		- 返回Ixxx 					//ICameraProvider ,IGnss
 	}
 
 }@xxx.cpp

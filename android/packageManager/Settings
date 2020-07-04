@@ -15,11 +15,76 @@ PackageManagerService{
 }@PakcageManagerService.java
 
 
-//加入应用信息
+//创建应用信息packageSetting
+createNewSetting(String pkgName, PackageSetting originalPkg,PackageSetting disabledPkg, 
+	String realPkgName, SharedUserSetting sharedUser,File codePath,...){
+- if (originalPkg != null) {
+ - pkgSetting = new PackageSetting(originalPkg, pkgName /*realPkgName*/)
+ - pkgSetting.codePath = codePath
+ }else{
+ - PackageSetting pkgSetting
+ - pkgSetting = new PackageSetting(pkgName, realPkgName, codePath, resourcePath...)
+ - if (sharedUser != null) {
+  	- pkgSetting.appId = sharedUser.userId
+   else if (disabledPkg != null) {
+ 	- pkgSetting.appId = disabledPkg.appId
+   }
+  }
+}@Settings.java
+
+//分配应用的appId,uesrId。。。使用sharedUser的不分配uid(使用shareduser一样的id)
+registerAppIdLPw(PackageSetting p) throws PackageManagerException {
+- if (p.appId == 0) {
+	- p.appId = acquireAndRegisterNewAppIdLPw(p){	//获取应用id
+		- for (int i = mFirstAvailableUid; i < mAppIds.size(); i++) {
+			- if (mAppIds.get(i) == null){
+				- mAppIds.set(i, obj)
+				- return Process.FIRST_APPLICATION_UID + i
+				}			
+			}
+		- mAppIds.add(obj)
+		- return Process.FIRST_APPLICATION_UID + size
+		}
+  }else{
+	- createdNew = registerExistingAppIdLPw(p.appId, p, p.name)
+  }
+}@Settings.java
+
+/* 
+ 加入应用信息
+*/
 scanDirLI-->addForInitLI-->commitReconciledScanResultLocked-->commitPackageSettings
 @PackageManagerService.java-->insertPackageSettingLPw(PackageSetting p, PackageParser.Package pkg)-->
 addPackageSettingLPw(PackageSetting p, SharedUserSetting sharedUser) {
 - mPackages.put(p.name, p)
+}@Settings.java
+
+//加入package,一般是sharedUid
+insertPackageSettingLPw-->
+addPackageSettingLPw(PackageSetting p, SharedUserSetting sharedUser) {
+- mPackages.put(p.name, p)
+- 
+}
+
+/*
+ 加入package。sharedUid不会执行这个步骤？
+*/
+enableSystemPackageLPw-->
+addPackageLPw(name.intern(), realName, new File(codePathStr),new File(resourcePathStr), 
+	legacyNativeLibraryPathStr, primaryCpuAbiString ....){
+- p = new PackageSetting(name, realName, codePath, resourcePath,legacyNativeLibraryPathString, primaryCpuAbiString,....)
+- addUserIdLPw(uid, p, name)
+- registerExistingAppIdLPw(uid, p, name){		//注册app,判断是否有冲突userId
+	- if (appId >= Process.FIRST_APPLICATION_UID) {	//普通应用id(10000+id) mAppIds
+		- index = appId - Process.FIRST_APPLICATION_UID
+		- mAppIds.set(index, obj)
+	  }else{					//系统id
+		- if (mOtherAppIds.get(appId) != null) return false
+		- mOtherAppIds.put(appId, obj)
+	  }
+	- return true
+	}
+- mPackages.put(name, p)
 }@Settings.java
 
 
@@ -49,6 +114,25 @@ readLPw(List<UserInfo> users) {
 	- "permissions" readPermissionsLPw(mPermissions, parser)
 	- "permission-trees" readPermissionsLPw(mPermissionTrees, parser)
 	- "shared-user" readSharedUserLPw(parser)
+	- "updated-package"readDisabledSysPackageLPw(parser){
+		- PackageSetting ps = new PackageSetting(name, realName, new File(codePathStr)...)
+		- 
+		- mDisabledSysPackages.put(name, ps)
+		}
+	- "renamed-package"{
+		- String nname = parser.getAttributeValue(null, "new")
+		- String oname = parser.getAttributeValue(null, "old")
+		- mRenamedPackages.put(nname, oname)
+		}
+	}
+  //处理没有加入的package 如：shareduid
+- mPendingPackages.size()
+- for (int i = 0; i < N; i++) {
+	- PackageSetting p = mPendingPackages.get(i)
+	- Object idObj = getSettingLPr(sharedUserId)
+	- if (idObj instanceof SharedUserSetting)-->addPackageSettingLPw(p, sharedUser){
+		- 	
+		}
 	}
 }@Settings.java
 
@@ -58,15 +142,20 @@ readPackageLPw(XmlPullParser parser){
 - PackageSetting packageSetting = null
   //信息
 - name = parser.getAttributeValue(null, ATTR_NAME)
+- idStr = parser.getAttributeValue(null, "userId")
+- sharedIdStr = parser.getAttributeValue(null, "sharedUserId")
 - primaryCpuAbiString = parser.getAttributeValue(null, "primaryCpuAbi")
-- packageSetting = addPackageLPw(name.intern(), realName, new File(codePathStr),
- 	  new File(resourcePathStr), legacyNativeLibraryPathStr, primaryCpuAbiString ....){
-	- p = new PackageSetting(name, realName, codePath, resourcePath,legacyNativeLibraryPathString, primaryCpuAbiString,....)
-	- addUserIdLPw(uid, p, name)
-	- mPackages.put(name, p)
-	}
-- 
+- if (userId > 0) {
+	- packageSetting = addPackageLPw(name.intern(), realName, new File(codePathStr),
+ 	  new File(resourcePathStr), legacyNativeLibraryPathStr, primaryCpuAbiString ....)
+  }else if (sharedIdStr != null){
+	- packageSetting = new PackageSetting(name.intern(), realName, new File....)
+	- mPendingPackages.add(packageSetting)
+  }
 }@Settings.java
+
+
+
 
 //运行时权限
 RuntimePermissionPersistence.readStateForUserSyncLPr(int userId) {
@@ -104,8 +193,15 @@ writeLPr() {
 - 
 }@Settings.java
 
-//package
+//保存package信息
 writePackageLPr(XmlSerializer serializer, final PackageSetting pkg){
+- serializer.attribute(null, ATTR_NAME, pkg.name)
+  //shareduser不保存userId,不然会冲突
+- if (pkg.sharedUser == null) {
+	- serializer.attribute(null, "userId", Integer.toString(pkg.appId))	//userId
+  }else{
+	- serializer.attribute(null, "sharedUserId", Integer.toString(pkg.appId))
+ 	}
 - writeChildPackagesLPw(serializer, pkg.childPackageNames) 
 - writePermissionsLPr(serializer, pkg.getPermissionsState().getInstallPermissionStates())
 }@Settings.java
@@ -116,6 +212,8 @@ isEnabledAndMatchLPr(ComponentInfo componentInfo, int flags, int userId){
 - PackageUserState userState = ps.readUserState(userId)
 - userState.isMatch(componentInfo, flags)
 }@Settings.java
+
+
 
 
 

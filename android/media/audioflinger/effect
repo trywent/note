@@ -1,7 +1,7 @@
-/* effect
-  
- EffectsFactory.c加载本地音效库文件 //libeffects
- HAL层提供接口，使用libeffects //android.hardware.audio.effect@all-versions-impl
+/********************************
+ effect配置信息.audiopolicy加载
+
+ 
 */
 AudioPolicyService::onFirstRef-->new AudioPolicyEffects{
 - status_t loadResult = loadAudioEffectXmlConfig()
@@ -16,38 +16,82 @@ AudioPolicyService::onFirstRef-->new AudioPolicyEffects{
 	}
 }@AudioPolicyEffects.cpp
 
-//本地库,创建音效加入链表gEffectList
-EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, effect_handle_t *pHandle){
-- list_elem_t *e = gLibraryList
-- lib_entry_t *l = NULL
-- effect_entry_t *fx
-- init()
-- findEffect(NULL, uuid, &l, &d)
-- fx = (effect_entry_t *)malloc(sizeof(effect_entry_t))
-- e = (list_elem_t *)malloc(sizeof(list_elem_t))
-- gEffectList = e
-}@EffectsFactory.c
-
-init@EffectsFactory.c-->EffectLoadEffectConfig(){
-- loadEffectConfigFile(AUDIO_EFFECT_VENDOR_CONFIG_FILE)
-  "/system/etc/audio_effects.conf"
-- loadEffectConfigFile(AUDIO_EFFECT_DEFAULT_CONFIG_FILE){
-	- loadLibraries-->loadLibrary{
-		- gLibraryList //将库信息加入到链表
-		}
-	- loadEffects-->loadEffect-->gSubEffectList //将音效加入链表
-	}
-}@EffectLoadEffectConfig
-
-frameworks/av/services/audiopolicy/service/AudioPolicyEffects.cpp
-frameworks/av/media/libeffects/factory/EffectsFactory.c
-frameworks/av/media/libeffects/factory/EffectsConfigLoader.c
-frameworks/av/media/libeffects/factory/EffectsFactoryState.c
-/*
- hal接口
+/********************************
+ effect 的实现
+  
+ EffectsFactory.c加载本地音效库文件 //libeffects
+ HAL层提供接口，使用libeffects //android.hardware.audio.effect@all-versions-impl
 */
-//获取音效工厂接口
+
+//创建effect
+AudioFlinger::createEffect( effect_descriptor_t *pDesc,const sp<IEffectClient>& effectClient,
+        int32_t priority,audio_io_handle_t io,audio_session_t sessionId){
+ //查找对应的effect
+- mEffectsFactoryHal->queryNumberEffects(&numEffects)
+- for (uint32_t i = 0; i < numEffects; i++) {
+	- mEffectsFactoryHal->getDescriptor(i, &desc)
+	- if (memcmp(&desc.type, &pDesc->type, sizeof(effect_uuid_t)) == 0) 
+		break
+	}
+- *pDesc = desc
+  //查找sessionId对应的output
+- if (io == AUDIO_IO_HANDLE_NONE) {
+	- for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+		- if (mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId) != 0)
+			- io = mPlaybackThreads.keyAt(i)
+		}
+	}
+- ThreadBase *thread = checkRecordThread_l(io)
+- handle = thread->createEffect_l(client, effectClient, priority, sessionId,&desc)
+}@AudioFlinger.cpp
+
+
+/*thread中创建关联sessionId的effectChain
+ 保存effectChain在mEffectChains
+ 创建effect,会设置effect中输入输出buffer为effectChain中buffer */
+AudioFlinger::ThreadBase::createEffect_l(const sp<AudioFlinger::Client>& client,const sp<IEffectClient>& effectClient,
+        int32_t priority,audio_session_t sessionId,effect_descriptor_t *desc,int *enabled,status_t *status,bool pinned)
+{
+- checkEffectCompatibility_l(desc, sessionId)
+- sp<EffectChain> chain = getEffectChain_l(sessionId)
+- if (chain == 0) {
+	- chain = new EffectChain(this, sessionId)
+	- addEffectChain_l(chain)
+	}
+- if (effect == 0) {
+	- audio_unique_id_t effectId = mAudioFlinger->nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT)
+	- AudioSystem::registerEffect(desc, mId, chain->strategy(), sessionId, effectId)
+	- chain->createEffect_l(effect, this, desc, effectId, sessionId, pinned)
+	- effect->setAudioSource(mAudioSource)
+	}
+- handle = new EffectHandle(effect, client, effectClient, priority)
+}@Threads.cpp
+
+AudioFlinger::EffectChain::createEffect_l(sp<EffectModule>& effect,ThreadBase *thread,effect_descriptor_t *desc){
+- effect = new EffectModule(thread, this, desc, id, sessionId, pinned){
+	- sp<AudioFlinger> audioFlinger = mAudioFlinger.promote()
+	- sp<EffectsFactoryHalInterface> effectsFactory = audioFlinger->getEffectsFactory()
+	  //通过hidl接口创建effect  mEffectInterface
+	- effectsFactory->createEffect(&desc->uuid, sessionId, thread->id(), &mEffectInterface)
+	}
+- addEffect_ll(effect)
+}@Effects.cpp
+
+//hidl接口创建音效
+EffectsFactoryHalHidl::createEffect(const effect_uuid_t *pEffectUuid,sp<EffectHalInterface> *effect)-->
+mEffectsFactory->createEffect(hidlUuid, sessionId,
+	//hal层返回的effect
+	[&](Result r, const sp<IEffect>& result, uint64_t effectId) {*effect = new EffectHalHidl(result, effectId);}
+)@EffectsFactoryHalHidl.cpp
+
+
+//获取音效hidl接口 mEffectsFactory
 EffectsFactoryHalInterface EffectsFactoryHalInterface::create(){
+- if (hardware::audio::effect::V5_0::IEffectsFactory::getService() != nullptr) {
+	- effect::V5_0::createEffectsFactoryHal()-->createEffectsFactoryHal(){
+		- new EffectsFactoryHalHidl()
+		}@EffectsFactoryHalHild.h
+	}
 - if (hardware::audio::effect::V4_0::IEffectsFactory::getService() != nullptr) {
        - return new V4_0::EffectsFactoryHalHidl(){
 		- mEffectsFactory = IEffectsFactory::getService()	
@@ -57,30 +101,85 @@ EffectsFactoryHalInterface EffectsFactoryHalInterface::create(){
 }@EffectsFactoryHalInterface.cpp
 
 
-//创建音效
-EffectsFactoryHalHidl::createEffect(const effect_uuid_t *pEffectUuid,sp<EffectHalInterface> *effect)-->
-mEffectsFactory->createEffect(hidlUuid, sessionId,
-	//hal层返回的effect
-	[&](Result r, const sp<IEffect>& result, uint64_t effectId) {
-                    *effect = new EffectHalHidl(result, effectId);
-                })@EffectsFactoryHalHidl.cpp
+/*保存effect信息
+  音效输入buffer     halInBuffer是track的MainBuffer
+  音效输出buffer     halOutBuffer是mEffectBuffer*/
+AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& chain){
+- audio_session_t session = chain->sessionId()
+  //halInBuffer设置为mEffectBuffer
+- sp<EffectBufferHalInterface> halInBuffer, halOutBuffer
+- mAudioFlinger->mEffectsFactoryHal->mirrorBuffer( mEffectBuffer,&halInBuffer)
+- halOutBuffer = halInBuffer
+- effect_buffer_t *buffer = reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData())
+  //非全局音效
+- if (session > AUDIO_SESSION_OUTPUT_MIX) {
+	- if (mType != DIRECT) {
+		- mAudioFlinger->mEffectsFactoryHal->allocateBuffer(numSamples * sizeof(effect_buffer_t),&halInBuffer)
+		- buffer = halInBuffer->audioBuffer()->s16
+		}
+	 //设置和effect相同sessionid的track
+	- track->setMainBuffer(buffer)
+	}
+  //设置buffer
+- chain->setThread(this)
+- chain->setInBuffer(halInBuffer)   //halInBuffer是track的MainBuffer
+- chain->setOutBuffer(halOutBuffer) //halOutBuffer是mEffectBuffer
+- mEffectChains.insertAt(chain, i)
+}@Threads.cpp
 
-/*hal层创建effect*/EffectsFactory::createEffect(const Uuid& uid, int32_t session, int32_t ioHandle,
-                                          createEffect_cb _hidl_cb) {
+//执行音效
+AudioFlinger::EffectChain::process_l(){
+- sp<ThreadBase> thread = mThread.promote()
+  //遍历effect执行
+- size_t size = mEffects.size()
+}@Effects.cpp
+
+
+frameworks/av/media/libaudioclient/AudioEffect.cpp
+frameworks/av/services/audioflinger/Effects.cpp
+frameworks/av/services/audiopolicy/service/AudioPolicyEffects.cpp
+
+/*************
+ hal接口
+
+ audioEffect和audio一起注册
+*/
+
+//版本号
+#define CPP_VERSION EXPAND_CONCAT_4(V, MAJOR_VERSION, _, MINOR_VERSION)
+@interfaces/audio/common/all-versions/util/include/common/all-versions/VersionMacro.h
+
+MAJOR_VERSION=5
+MINOR_VERSION=0
+@interfaces/audio/effect/all-versions/vts/functional/Android.bp
+
+//hidl服务
+int main(int /* argc */, char* /* argv */ []) {
+- registerPassthroughServiceImplementation<audio::V5_0::IDevicesFactory>()
+  //effect
+- registerPassthroughServiceImplementation<audio::effect::V5_0::IEffectsFactory>()
+- registerPassthroughServiceImplementation<soundtrigger::V2_2::ISoundTriggerHw>()
+- registerPassthroughServiceImplementation<bluetooth::audio::V2_0::IBluetoothAudioProvidersFactory>() 
+}@hardware/interfaces/audio/common/all-versions/default/service/service.cpp
+
+
+//hal层创建effect
+EffectsFactory::createEffect(const Uuid& uid, int32_t session, int32_t ioHandle,createEffect_cb _hidl_cb) {
+  //实际的音效对象。调用到老的接口EffectsFactory.c
 - EffectCreate(&halUuid, session, ioHandle, &handle){
 
 	}@
 - (*handle)->get_descriptor(handle, &halDescriptor)
+  //封装的音效接口。通过handle操作到effect
 - dispatchEffectInstanceCreation(halDescriptor, handle){
-	- FX_IID_AEC:new AcousticEchoCancelerEffect(handle)
+	- FX_IID_AEC:new AcousticEchoCancelerEffect(handle)	//回音消除
 	- FX_IID_AGC:new AutomaticGainControlEffect(handle)
 	- SL_IID_BASSBOOST:new BassBoostEffect(handle)
 	- EFFECT_UIID_DOWNMIX:new DownmixEffect(handle)
-	- SL_IID_EQUALIZER:new EqualizerEffect(handle)
+	- SL_IID_EQUALIZER:new EqualizerEffect(handle)		//均衡器
 	- new Effect(handle)
 	}
-}@EffectsFactory.impl.h
-
+}@EffectsFactory.cpp
 
 
 
@@ -89,3 +188,75 @@ frameworks/av/media/libaudiohal/4.0/EffectsFactoryHalHidl.cpp
 hardware/interfaces/audio/effect/4.0/default/EffectsFactory.cpp
 hardware/interfaces/audio/effect/all-versions/default/include/effect/all-versions/default/EffectsFactory.impl.h
 frameworks/av/media/libeffects/factory/EffectsFactory.c
+  //android10
+frameworks/av/media/libaudiohal/impl/EffectsFactoryHalHidl.cpp
+
+
+/************
+  effectFactory
+
+  原来的接口。使用hidl时生成库libeffects工hidl调用
+*/
+//本地库,创建音效加入链表gEffectList
+EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, effect_handle_t *pHandle){
+- list_elem_t *e = gLibraryList
+- lib_entry_t *l = NULL
+- effect_entry_t *fx
+  //执行初始化
+- init()
+- findEffect(NULL, uuid, &l, &d){
+	- list_elem_t *e = gLibraryList					//从库链表中查找库
+	}
+- fx = (effect_entry_t *)malloc(sizeof(effect_entry_t))
+- e = (list_elem_t *)malloc(sizeof(list_elem_t))
+- gEffectList = e
+}@EffectsFactory.c
+
+
+init{
+- gConfigNbElemSkipped = EffectLoadXmlEffectConfig(NULL){
+	- effectsConfig::parse{
+		- for (const std::string& location : DEFAULT_LOCATIONS) {		//"/odm/etc", "/vendor/etc", "/system/etc"
+			- std::string defaultPath = location + '/' + DEFAULT_NAME	//"audio_effects.xml"
+			- parseWithPath(std::move(defaultPath))
+			}
+		}@EffectsConfig.cpp
+	- loadLibraries(result.parsedConfig->libraries,&gLibraryList, &gLibLock, &gLibraryFailedList)
+	- loadEffects(result.parsedConfig->effects, gLibraryList,&gSkippedEffects, &gSubEffectList)
+	- return result.nbSkippedElement
+	}
+- if (gConfigNbElemSkipped < 0) EffectLoadEffectConfig(){		//xml没有加载成功
+	- loadEffectConfigFile(AUDIO_EFFECT_VENDOR_CONFIG_FILE) 	//"/vendor/etc/audio_effects.conf"	 
+	- loadEffectConfigFile(AUDIO_EFFECT_DEFAULT_CONFIG_FILE){	//"/system/etc/audio_effects.conf"
+		- loadLibraries(const effectsConfig::Libraries& libs,list_elem_t** libList...){
+			- auto libEntry = makeUniqueC<lib_entry_t>()
+			- libEntry->name = strdup(library.name.c_str())
+			- loadLibrary(library.path.c_str(), libEntry.get())
+			- listPush(std::move(libEntry), libList, libListLock)	//将库信息加入到链表
+			}
+		- loadEffects-->loadEffect-->gSubEffectList			//将音效加入链表
+		}
+	}@EffectLoadEffectConfig
+- updateNumEffects()
+}@EffectsFactory.c
+
+loadLibrary(const char* relativePath, lib_entry_t* libEntry) noexcept {
+  //获取库的绝对路径
+- resolveLibrary(relativePath, &absolutePath)
+- const char* path = absolutePath.c_str()
+- libEntry->path = strdup(path)
+  //打开
+- libHandle(dlopen(path, RTLD_NOW), dlclose)
+- auto* description = dlsym(libHandle.get(), AUDIO_EFFECT_LIBRARY_INFO_SYM_AS_STR)//获取库的描述符
+- uint32_t majorVersion = EFFECT_API_VERSION_MAJOR(description->version)
+- libEntry->handle = libHandle.release()
+- libEntry->desc = description
+}@EffectsXmlConfigLoader.cpp
+
+
+frameworks/av/media/libeffects/factory/EffectsFactory.c
+frameworks/av/media/libeffects/factory/EffectsConfigLoader.c
+frameworks/av/media/libeffects/factory/EffectsFactoryState.c
+frameworks/av/media/libeffects/factory/EffectsXmlConfigLoader.cpp
+frameworks/av/media/libeffects/config/src/EffectsConfig.cpp
+frameworks/av/media/libeffects/factory/EffectsFactoryState.c

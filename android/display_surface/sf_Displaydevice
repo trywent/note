@@ -1,10 +1,67 @@
-//
-DisplayDevice::DisplayDevice{
-- mDisplaySurface       //FramebufferSurface，显示到屏幕上
-- mNativeWindow=new Surface(producer/*BufferQueue*/) //所有应用的surface最终应该合并到这里
+/********************************************
+  displayDevice 显示器的抽象。数据填充到这里？
+
+
+*/
+
+SurfaceFlinger::createDefaultDisplayDevice() {
+  //bufferqueue
+- sp<IGraphicBufferProducer> producer
+- sp<IGraphicBufferConsumer> consumer
+- BufferQueue::createBufferQueue(&producer, &consumer)
+- sp<FramebufferSurface> fbs = new FramebufferSurface(*mHwc, type, consumer)
+- sp<DisplayDevice> hw = new DisplayDevice(this, DisplayDevice::DISPLAY_PRIMARY,token, fbs, producer...)//创建设备
+- hw->makeCurrent(mEGLDisplay, mEGLContext)
+}@SurfaceFlinger.cpp
+
+
+DisplayDevice::DisplayDevice(const sp<SurfaceFlinger>& flinger, DisplayType type,int32_t hwcId...
+	const sp<DisplaySurface>& displaySurface, const sp<IGraphicBufferProducer>& producer){
+- mFlinger(flinger)
+- mDisplaySurface(displaySurface)       			//FramebufferSurface，显示到屏幕上
+- Surface* surface
+- mNativeWindow = surface = new Surface(producer) 		//BufferQueue 所有应用的surface最终应该合并到这里
+- mSurface = eglCreateWindowSurface(mDisplay,mConfig,window...) //
+  //
+- EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY)
+- EGLSurface eglSurface = eglCreateWindowSurface(display, config, window, NULL)
+- eglQuerySurface(display, eglSurface, EGL_WIDTH,  &mDisplayWidth)
+- eglQuerySurface(display, eglSurface, EGL_HEIGHT, &mDisplayHeight)
+  //
+- setDisplayDevice{
+	- property_get("ro.sf.swrotation", property, NULL)	//获取初始旋转
+	- mDisplayWidth= w, mDisplayHeight = h			//设置宽高信息
+	- DisplayDevice::orientationToTransfrom(displayOrientation, w, h,&mDisplayTransform)
+	- setProjection(DisplayState::eOrientationDefault, mViewport, mFrame)
+	}
 }
 
+//makecurrent.初始化?
+createDefaultDisplayDevice-->hw->makeCurrent(mEGLDisplay, mEGLContext)@SurfaceFlinger.cpp
+-->DisplayDevice::makeCurrent(EGLDisplay dpy, EGLContext ctx){
+- EGLSurface sur = eglGetCurrentSurface(EGL_DRAW)
+- eglMakeCurrent(dpy, mSurface, mSurface, ctx)
+- setViewportAndProjection
+}DisplayDevice.cpp
 
+
+DisplayDevice::setViewportAndProjection() const {
+- if ((mType == DisplayDevice::DISPLAY_PRIMARY)&& (property_get("ro.sf.swrotation", property, NULL) > 0)){
+	- switch (atoi(property)) {
+		- case 90:	//90,270度调换宽高
+           	  case 270:
+                	w = mDisplayHeight;
+                	h = mDisplayWidth;
+		}
+	}
+- Rect sourceCrop(0, 0, w, h)
+- mFlinger->getRenderEngine().setViewportAndProjection(w, h, sourceCrop, h,false, Transform::ROT_0)
+}@DisplayDevice.cpp
 
 
 frameworks/native/services/surfaceflinger/DisplayDevice.cpp
+/**********
+ displaySurface = FramebufferSurface
+
+*/
+

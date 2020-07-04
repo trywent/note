@@ -22,6 +22,10 @@ onCreate{
 - initNative()
 }@AdapterService.java
 
+//启动完成自动连接.android6
+OnState.enter-->adapterService.autoConnect()@AdapterState.java-->autoConnect@AdapterService.java
+
+
 //加载库
 static{classInitNative}@AdapterService.java-->
 classInitNative{

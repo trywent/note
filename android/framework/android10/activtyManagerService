@@ -1,12 +1,83 @@
 /*******************************************
+ ActivityManager
 
 */
 
+//ActivityManager服务启动
+startBootstrapServices{
+- ActivityTaskManagerService atm = mSystemServiceManager.startService(ActivityTaskManagerService.Lifecycle.class).getService()
+- mActivityManagerService = ActivityManagerService.Lifecycle.startService(mSystemServiceManager, atm)
+- mActivityManagerService.setSystemServiceManager(mSystemServiceManager)
+- mActivityManagerService.setInstaller(installer)
+- mWindowManagerGlobalLock = atm.getGlobalLock()
+}@SystemServer.java
+
+ActivityManagerService(Context systemContext, ActivityTaskManagerService atm) {
+- Injector = new Injector()
+
+ //taskManager
+- mActivityTaskManager = atm
+- mActivityTaskManager.initialize(mIntentFirewall, mPendingIntentController,DisplayThread.get().getLooper())
+}@ActivityManagerService.java
 
 
-/*
+//设置windowManager
+setWindowManager(WindowManagerService wm){
+- mWindowManager = wm
+- mActivityTaskManager.setWindowManager(wm)
+}@ActivityManagerService.java
+
+//启动应用
+startActivity(IApplicationThread caller, String callingPackage,Intent intent, String resolvedType, IBinder resultTo, 
+	String resultWho, int requestCode,int startFlags, ProfilerInfo profilerInfo, Bundle bOptions)@ActivityManagerService.java
+-->mActivityTaskManager.startActivity(caller, callingPackage, intent, resolvedType,resultTo, resultWho...)-->
+startActivityAsUser(caller, callingPackage, intent, resolvedType, resultTo,resultWho, requestCode, startFlags, profilerInfo, bOptions,
+                UserHandle.getCallingUserId())@ActivityTaskManagerService.java
+
+
+
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+/************
+ 最近任务
+*/
+
+//保存task
+notifyTaskPersisterLocked-->mTaskPersister.wakeup@RecentTasks.java-->
+wakeup{
+- TaskWriteQueueItem item = mPersisterQueue.findLastItem(queueItem -> task == queueItem.mTask, TaskWriteQueueItem.class)
+- mPersisterQueue.addItem(new TaskWriteQueueItem(task, mService), flush)
+}@TaskPersister.java
+
+
+//保存图片
+saveImage(Bitmap image, String filePath){
+- mPersisterQueue.updateLastOrAddItem(new ImageWriteQueueItem(filePath, image),/* flush */ false)
+}
+
+
+//执行保存的线程LazyTaskWriterThread
+addItem(WriteQueueItem item, boolean flush){
+- mWriteQueue.add(item)
+- notify()		//通知LazyTaskWriterThread
+}@PersisterQueue.java
+
+LazyTaskWriterThread.run{
+- mListeners.get(i).onPreProcessItem(probablyDone)	//
+- processNextItem{					//处理
+	- while (mWriteQueue.isEmpty()) {
+		- wait()
+		}
+	- item = mWriteQueue.remove(0)
+	- item.process()				//保存到文件
+	}
+}@PersisterQueue.java
+
+frameworks/base/services/core/java/com/android/server/wm/RecentTasks.java
+frameworks/base/services/core/java/com/android/server/wm/TaskPersister.java
+frameworks/base/services/core/java/com/android/server/wm/PersisterQueue.java
+/************
  弹旧版android框
-  targetSdkVersion < ro.build.version.min_supported_target_sdk //android10最小为23
+ targetSdkVersion < ro.build.version.min_supported_target_sdk //android10最小为23
  "此应用专为旧版 Android 打造，因此可能无法正常运行"
 */
 
@@ -18,5 +89,6 @@ showDeprecatedTargetSdkDialogUiThread(ActivityRecord ar) {
 }@AppWarnings.java
 
 
-
 frameworks/base/services/core/java/com/android/server/am/AppWarnings.java
+
+
