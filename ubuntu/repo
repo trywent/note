@@ -1,8 +1,23 @@
-//repo脚本：
+/*
+ repo 
+*/
 
-需要在执行repo目录下，创建repo仓库。(若本地存在则本地克隆，或远程克隆)
+//tsinghua源 
+repo init -u https://aosp.tuna.tsinghua.edu.cn/platform/manifest
+
+repo init -u https://aosp.tuna.tsinghua.edu.cn/platform/manifest --mirror
+修改路径：
+.repo/manifest.xml：<remote  name="aosp">
+.repo/manifests.git/config
 
 
+//修改为本地源
+url = /media/w/linux/aosp/platform/manifest
+@.repo/manifests.git/config
+
+/*
+ repo命令
+*/
 repo help [ command ] 
 repo init -u URL 
 //同步
@@ -40,15 +55,8 @@ repo forall -c command，对所有项目执行一个command
 //查看状态
 repo status
 
-//tsinghua源
-repo init -u https://aosp.tuna.tsinghua.edu.cn/platform/manifest
-修改路径：
-.repo/manifest.xml：<remote  name="aosp">
-.repo/manifests.git/config
-===========
-ssh:
-wb@192.168.1.131
-pw:wb
+
+
 
 
 ===========

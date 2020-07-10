@@ -59,71 +59,89 @@ SurfaceHolder.Callback.surfaceDestroyed()之间
 
 
 /******************************
- 通过SurfaceHolder来操作Surface
+ surfaceView使用步骤
+
 */
 
+1 创建SurfaceView,一般嵌入到layout文件,自动创建
 SurfaceView{
 - getHolder()//获取 SurfaceHolder 
 }
 
-//操作surface
+2 获取SurfaceHolder,用于操作surface
 SurfaceHolder{
-SurfaceHolder.addCallback(Callback callback) //加入回调函数
+- addCallback(Callback callback)	//加入回调函数
+- setFixedSize(int width, int height)
+- lockCanvas()				//获取canvas
+- getSurface()				//获取surface
 }
-//surface 变化的回调函数
+3 surface变化的回调函数
 SurfaceHolder.Callback{
-surfaceChanged(SurfaceHolder holder, int format, int width, int height)
-surfaceCreated(SurfaceHolder holder)
-surfaceDestroyed(SurfaceHolder holder)
+- surfaceChanged(SurfaceHolder holder, int format, int width, int height)
+- surfaceCreated(SurfaceHolder holder)
+- surfaceDestroyed(SurfaceHolder holder)
 }
-//获取surface
-public Surface getSurface()
-
-//获取canvas
-public Canvas lockCanvas(Rect inOutDirty) 
 
 frameworks/base/core/java/android/view/SurfaceView.java
+frameworks/base/core/java/android/view/SurfaceHolder.java
 /******************************
  surfaceView
+
+ SurfaceView extends View implements ViewRootImpl.WindowStoppedCallback 
 */
+//窗口可见性发生变化,会通知到view
+onWindowVisibilityChanged(int visibility) {
+- super.onWindowVisibilityChanged(visibility)
+- mWindowVisibility = visibility == VISIBLE
+- updateRequestedVisibility(){
+	- mRequestedVisible = mViewVisibility && mWindowVisibility && !mWindowStopped
+	}
+- updateSurface()
+}@SurfaceView.java
+
 
 //visible
 setVisibility(设置mRequestedVisible)-->
 updateSurface{
   //需要创建surface
-- boolean creating = (mSurfaceControl == null || formatChanged || visibleChanged)&& mRequestedVisible
-  //大小变化
+- boolean creating = (mSurfaceControl == null || formatChanged || visibleChanged)&& mRequestedVisible  
 - boolean sizeChanged = mSurfaceWidth != myWidth || mSurfaceHeight != myHeight
-- if(creating||sizeChanged||visibleChanged...){ //创建surface,显示变化
-	- if(creating){
+  ////创建,大小,可见性变化.操作surface
+- if(creating||sizeChanged||visibleChanged...){			
+	- if(creating){						//创建surfaceControl
 		- mSurfaceSession = new SurfaceSession
+		- mDeferredDestroySurfaceControl = mSurfaceControl
 		- mSurfaceControl = new SurfaceControlWithBackground
-		}
-          //设置当前surfaceView状态,显示,大小,位置
+	   }else if(mSurfaceControl == null){
+		- return 					//没有mSurfaceControl返回
+	   }
+          //设置当前surfaceView状态,显示,大小,位置,可见性
 	- SurfaceControl.openTransaction()
 	- mSurfaceControl.setLayer
-	- mSurfaceControl.show/mSurfaceControl.hide //显示或隐藏
+	- mSurfaceControl.show/mSurfaceControl.hide		//显示或隐藏
 	- mSurfaceControl.setPosition
 	- mSurfaceControl.setMatrix
 	- mSurfaceControl.setSize
 	- SurfaceControl.closeTransaction
+	  //surfaceControl已经创建,但现在要隐藏
 	- if (mSurfaceCreated && (surfaceChanged || (!visible)){
 		- mSurfaceCreated = false
 		- mSurface.forceScopedDisconnect()
 		}
 	  //若是创建,初始化surface
-	- mSurface.copyFrom(mSurfaceControl)
-	- if(visible && mSurface.isValid()){ //surface可见,通知创建信息
+	- if (creating) mSurface.copyFrom(mSurfaceControl)
+	- if(visible && mSurface.isValid()){			//surfaceView可见,通知创建信息
 		- surfaceCreated
 		- surfaceChanged
 		  //大小发生变化,重建了.需要redraw
 		- SurfaceCallbackHelper(this::onDrawFinished).dispatchSurfaceRedrawNeededAsync
 		}
-	- if(mSurfaceControl != null && !mSurfaceCreated){ //销毁
+	  //不是创建surfaceControl,且surfaceControl存在,则销毁..走的上面隐藏的逻辑
+	- if(mSurfaceControl != null && !mSurfaceCreated){
 		- mSurface.release()
 		- mSurfaceControl.destroy()
 		}
-  }else{
+  }else{							//没有任何更新.不需要操作surface
 	- 
 	}
 }@SurfaceView.java
@@ -132,7 +150,7 @@ updateSurface{
 setFrame(int left, int top, int right, int bottom) {
 - super.setFrame
 - updateSurface()
-}
+}@SurfaceView.java
 
 
 //SurfaceControlWithBackground
@@ -148,12 +166,19 @@ SurfaceControlWithBackground extends SurfaceControl(String name, boolean opaque,
 }@SurfaceView.java
 
 
-
 //显示/隐藏
 show/hide@SurfaceControl.java-->nativeSetFlags@android_view_SurfaceControl.cpp
 
 
-frameworks/base/core/java/android/view/SurfaceView.java
+
+/******************************
+ surfaceControl
+*/
+
+
+nativeSeverChildren
+
+frameworks/base/core/java/android/view/SurfaceControl.java
 
 
 

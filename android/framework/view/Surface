@@ -118,6 +118,26 @@ SurfaceControl::show()
 closeTransaction-->nativeCloseTransaction@SurfaceControl.java-->SurfaceComposerClient::closeGlobalTransaction
 @android_view_SurfaceControl.cpp
 
+//设置parents
+nativeReparentChildren(JNIEnv* env, jclass clazz, jlong nativeObject, jobject newParentObject)
+@android_view_SurfaceControl.cpp-->reparentChildren(handle)@SurfaceControl.cpp-->
+SurfaceComposerClient::reparentChildren-->Composer::reparentChildren(const sp<SurfaceComposerClient>& client,
+        const sp<IBinder>& id,const sp<IBinder>& newParentHandle)){
+- layer_state_t* s = getLayerStateLocked(client, id)
+- s->what |= layer_state_t::eReparentChildren
+- s->reparentHandle = newParentHandle
+}@SurfaceComposerClient.cpp
+
+//删除child
+nativeSeverChildren(JNIEnv* env, jclass clazz, jlong nativeObject)@android_view_SurfaceControl.cpp-->
+detachChildren()@SurfaceControl.cpp-->SurfaceComposerClient::detachChildren(const sp<IBinder>& id)-->
+Composer::detachChildren(const sp<SurfaceComposerClient>& client, const sp<IBinder>& id){
+- layer_state_t* s = getLayerStateLocked(client, id)
+- s->what |= layer_state_t::eDetachChildren
+}@SurfaceComposerClient.cpp
+
+
+
 frameworks/base/core/java/android/view/SurfaceControl.java
 frameworks/base/core/jni/android_view_SurfaceControl.cpp
 frameworks/native/libs/gui/SurfaceControl.cpp
