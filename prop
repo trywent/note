@@ -67,3 +67,7 @@ sys.fyt.systemobd=true
 
 #默认 NETWORK_MODE_WCDMA_ONLY     = 2; /* WCDMA only */
 ro.telephony.default_network=2
+
+#
+sys.lsec.pip_rect=520 60 1020 360
+persist.launcher.packagename=com.autonavi.amapauto

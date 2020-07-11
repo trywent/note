@@ -2,134 +2,262 @@
 
  WindowManager
 */
+//启动模式
+WINDOWING_MODE_UNDEFINED = 0
+WINDOWING_MODE_FULLSCREEN = 1
+WINDOWING_MODE_PINNED = 2
+WINDOWING_MODE_SPLIT_SCREEN_PRIMARY = 3
+WINDOWING_MODE_SPLIT_SCREEN_SECONDARY = 4
+WINDOWING_MODE_FULLSCREEN_OR_SPLIT_SCREEN_SECONDARY =WINDOWING_MODE_SPLIT_SCREEN_SECONDARY
+WINDOWING_MODE_FREEFORM = 5
+@WindowConfiguration.java
+
 //displayContent
 DisplayContent getDisplayContentOrCreate(int displayId, IBinder token) {
 - Display display = mDisplayManager.getDisplay(displayId)
-- displayContent = mRoot.createDisplayContent(display, null /* controller */){
-	- DisplayContent dc = new DisplayContent(display, mWmService, activityDisplay)
-	- mWmService.mDisplayWindowSettings.applySettingsToDisplayLocked(dc)
-	- dc.initializeDisplayOverrideConfiguration()
-	}@RootWindowContainer.java
+- displayContent = mRoot.createDisplayContent(display, null /* controller */)
 }@WindowManagerService.java
 
-/**************
- window
- 
- RootWindowContainer
-
-*/
 
 
+//surfaceBuilder
+makeSurfaceBuilder(SurfaceSession s)-->mSurfaceBuilderFactory.make(s)@WindowManagerService.java-->
+new SurfaceControl.Builder(SurfaceSession)@SurfaceControl.java
 
 frameworks/base/services/core/java/com/android/server/wm/WindowManagerService.java
-frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
-frameworks/base/services/core/java/com/android/server/wm/ActivityDisplay.java
+frameworks/base/core/java/android/app/WindowConfiguration.java
+
+/**************  
+ WindowContainer<E extends WindowContainer> extends ConfigurationContainer<E> implements Comparable<WindowContainer>, Animatable
+
+ activity也继承自ConfigurationContainer
+*/
+WindowContainer(WindowManagerService wms) {
+- mWmService = wms
+  //创建SurfaceControl.Transaction
+- mPendingTransaction = wms.mTransactionFactory.make()
+  //
+- mSurfaceAnimator = new SurfaceAnimator(this, this::onAnimationFinished, wms){
+		- mAnimatable = animatable
+		- mAnimationFinishedCallback = animationFinishedCallback
+		}@SurfaceAnimator.java
+}@WindowContainer.java
+
+//surfaceBuidler用于创建surfaceConstroler。。最终只有DisplayContent实现这个方法
+SurfaceControl.Builder makeChildSurface(WindowContainer child) {
+- WindowContainer p = getParent()
+- p.makeChildSurface(child).setParent(mSurfaceControl)
+}@WindowContainer.java
+
+//设置位置
+
+//设置大小
+
+//设置层次
+assignChildLayers(Transaction t) {
+- int layer = 0
+  //正常层次
+- for (int j = 0; j < mChildren.size(); ++j) {
+	- final WindowContainer wc = mChildren.get(j);
+        - wc.assignChildLayers(t);
+        - if (!wc.needsZBoost()) wc.assignLayer(t, layer++)
+        }
+  //显示在其它窗口之上 needsZBoost
+- for (int j = 0; j < mChildren.size(); ++j) {
+	- final WindowContainer wc = mChildren.get(j);
+        - wc.assignChildLayers(t);
+        - if (wc.needsZBoost()) wc.assignLayer(t, layer++)
+        }
+}@WindowContainer.java
+
+assignLayer(Transaction t, int layer)-->setLayer(Transaction t, int layer){
+- mSurfaceAnimator.setLayer(t, layer){	//获取当前WindowConatiner的SurfaceControl，设置层次
+	- t.setLayer(mLeash != null ? mLeash : mAnimatable.getSurfaceControl(), layer)-->
+	  Transaction.setLayer(){
+		- nativeSetLayer(mNativeObject, sc.mNativeObject, z)
+		}@SurfaceControl.java
+	}@SurfaceAnimator.java
+}@WindowContainer.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/WindowContainer.java
 
 /**************
- activity
- 
- RootActivityContainer
+  RootWindowContainer extends WindowContainer<DisplayContent> implements ConfigurationContainerListener
 
 */
-ActivityTaskManagerService(Context context) {
-- mContext = context
-- mSystemThread = ActivityThread.currentActivityThread()
-- mUiContext = mSystemThread.getSystemUiContext()
-- mLifecycleManager = new ClientLifecycleManager()
-- mInternal = new LocalService();
-- GL_ES_VERSION = SystemProperties.getInt("ro.opengles.version", GL_ES_VERSION_UNDEFINED);
-- mKillTopSystemAppBlacklist = context.getResources().getStringArray(com.android.internal.R.array.kill_top_system_app_blacklist);
-}@ActivityTaskManagerService.java
 
-//初始
-initialize(IntentFirewall intentFirewall, PendingIntentController intentController,Looper looper) {
-- mH = new H(looper)
-- mUiHandler = new UiHandler()
-  //supervisor
-- mStackSupervisor = createStackSupervisor()
-  //activity根容器
-- mRootActivityContainer = new RootActivityContainer(this){
-	- mService = service
-	- mStackSupervisor = service.mStackSupervisor
+//创建displayContent
+createDisplayContent(display, null /* controller */){
+- DisplayContent dc = new DisplayContent(display, mWmService, activityDisplay)
+- mWmService.mDisplayWindowSettings.applySettingsToDisplayLocked(dc)
+- dc.initializeDisplayOverrideConfiguration()
+}@RootWindowContainer.java
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
+frameworks/base/services/core/java/com/android/server/wm/ActivityDisplay.java
+/**************
+
+  DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowContainer> implements WindowManagerPolicy.DisplayContentInfo 
+
+  当前display中的窗口都是mWindowingLayer的child
+*/
+SurfaceSession mSession = new SurfaceSession()
+
+DisplayContent(Display display, WindowManagerService service,ActivityDisplay activityDisplay) {
+- mAcitvityDisplay = activityDisplay
+
+  //设置surfaceControl
+- SurfaceControl.Builder b = mWmService.makeSurfaceBuilder(mSession).setOpaque(true).setContainerLayer()
+- mWindowingLayer = b.setName("Display Root").build()
+- mOverlayLayer = b.setName("Display Overlays").build()
+- getPendingTransaction().setLayer(mWindowingLayer, 0)
+                .setLayerStack(mWindowingLayer, mDisplayId)
+                .show(mWindowingLayer)
+                .setLayer(mOverlayLayer, 1)
+                .setLayerStack(mOverlayLayer, mDisplayId)
+                .show(mOverlayLayer)
+- getPendingTransaction().apply()
+ //
+- super.addChild(mBelowAppWindowsContainers, null)	//app之下的窗口，wallpaper
+- super.addChild(mTaskStackContainers, null)		//app窗口
+- super.addChild(mAboveAppWindowsContainers, null)	//app之上窗口,statusBar,navibar
+- super.addChild(mImeWindowsContainers, null)
+}@DisplayContent.java
+
+
+//设置stack。ActivityStack创建时会创建TaskStack并加入这里
+setStackOnDisplay(int stackId, boolean onTop, TaskStack stack)-->
+mTaskStackContainers.addStackToDisplay(stack, onTop)@DisplayContent.java
+
+
+//创建surfaceControl
+makeChildSurface(WindowContainer child) {
+- SurfaceSession s = child != null ? child.getSession() : getSession()
+- SurfaceControl.Builder b = mWmService.makeSurfaceBuilder(s).setContainerLayer() //SurfaceControl.Builder 不直接使用这个类。不知道有什么意义
+- b.setName(child.getName()).setParent(mWindowingLayer)				  //意义在这里？设置为当前SurfaceControl的child?
+}@DisplayContent.java
+
+
+//容器大小。容器没有设置窗口大小。只有WindowStateAnimator
+
+//窗口层次
+assignWindowLayers(boolean setLayoutNeeded) {
+- assignChildLayers(getPendingTransaction())
+- scheduleAnimation()
+}@DisplayContent.java
+
+assignChildLayers(SurfaceControl.Transaction t) {
+  //mWindowingLayer 的子窗口
+- mBelowAppWindowsContainers.assignLayer(t, 0)
+- mTaskStackContainers.assignLayer(t, 1)
+- mAboveAppWindowsContainers.assignLayer(t, 2)
+  //TaskStack层次
+- mBelowAppWindowsContainers.assignChildLayers(t)
+- mTaskStackContainers.assignChildLayers(t)
+- mAboveAppWindowsContainers.assignChildLayers(t,needAssignIme == true ? mImeWindowsContainers : null)
+- mImeWindowsContainers.assignChildLayers(t)
+}@DisplayContent.java
+
+
+/*******
+ TaskStackContainers应用栈容器
+*/
+
+//设置TaskStack位置
+
+
+//设置TaskStack大小
+
+
+//设置TaskStack层次
+assignChildLayers(SurfaceControl.Transaction t) {
+- assignStackOrdering(SurfaceControl.Transaction t){
+	- 
 	}
-- mRootActivityContainer.onConfigurationChanged(mTempConfig)
-- mRootActivityContainer.getWindowConfiguration().setTrackActivityTypeChange(true)
-  //taskcontrol
-- mTaskChangeNotificationController = new TaskChangeNotificationController(mGlobalLock, mStackSupervisor, mH)
-- mLockTaskController = new LockTaskController(mContext, mStackSupervisor, mH)
-- mActivityStartController = new ActivityStartController(this){
-	- mService = service
-	- mFactory = new DefaultFactory(service, service.mStackSupervisor, new ActivityStartInterceptor(service, service.mStackSupervisor)){
-		- mSupervisor = supervisor
-		- mInterceptor = interceptor
-		}
-	- mFactory.setController(this)
-	- mPendingRemoteAnimationRegistry = new PendingRemoteAnimationRegistry
-	}@ActivityStartController.java
-  //recent
-- mRecentTasks = createRecentTasks()
-- mStackSupervisor.setRecentTasks(mRecentTasks)
-- mKeyguardController = mStackSupervisor.getKeyguardController()
-}@ActivityTaskManagerService.java
-
-//设置windowManager.创建ActivityDisplay
-setWindowManager-->mActivityTaskManager.setWindowManager(wm)@ActivityManagerService.java-->
-setWindowManager(WindowManagerService wm){
-- mWindowManager = wm
-- mLockTaskController.setWindowManager(wm)
-- mStackSupervisor.setWindowManager(wm)
-  //初始化activity所在display信息
-- mRootActivityContainer.setWindowManager(wm){
-	- mWindowManager = wm
-	- for (int displayNdx = 0; displayNdx < displays.length; ++displayNdx) {		//遍历加入所有屏幕
-		- final ActivityDisplay activityDisplay = new ActivityDisplay(this, display)
-		- addChild(activityDisplay, ActivityDisplay.POSITION_TOP)
-		}
-	- calculateDefaultMinimalSizeOfResizeableTasks
-	- defaultDisplay.getOrCreateStack(WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_HOME, ON_TOP)//主屏幕创建全屏栈
-	- positionChildAt(defaultDisplay, ActivityDisplay.POSITION_TOP)
-	}@RootActivityContainer.java
-}@ActivityTaskManagerService.java
-
-
-
-
-
-
-
-
-
-
-
-
-
-//启动activity
-startActivityAsUser(caller, callingPackage, intent, resolvedType, resultTo,resultWho, requestCode, startFlags, profilerInfo, bOptions,
-                UserHandle.getCallingUserId()){
-- getActivityStartController().checkTargetUser(userId, validateIncomingUser,...)
-- getActivityStartController().obtainStarter(intent, "startActivityAsUser")
-                .setCaller(caller)
-		...
-		.execute()
-}@ActivityTaskManagerService.java
-
-
-obtainStarter(Intent intent, String reason)-->mFactory.obtain().setIntent(intent).setReason(reason)@ActivityStartController
-DefaultFactory.obtain(){
-  //加了一个锁的机制
-- ActivityStarter starter = mStarterPool.acquire()
-- if (starter == null) {
-	- starter = new ActivityStarter(mController, mService, mSupervisor, mInterceptor)
+  //子窗口，TaskStack层次
+- for (int i = 0; i < mChildren.size(); i++) {
+	- TaskStack s = mChildren.get(i)
+	- s.assignChildLayers(t)
 	}
-- return starter
-}@ActivityStarter.java
+}@DisplayContent.java
 
-execute{
+//栈中的位置(层次)
+positionChildAt(int position, TaskStack child, boolean includingParents)
+
+
+/*******
+ AboveAppWindowContainers statusbar容器
+*/
+
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
+/**************
+  
+ TaskStack extends WindowContainer<Task> implements BoundsAnimationTarget, ConfigurationContainerListener
+
+*/
+
+
+onConfigurationChanged(Configuration newParentConfig){
+- super.onConfigurationChanged(newParentConfig)
 - 
-}@ActivityStarter.java
+}
+
+frameworks/base/services/core/java/com/android/server/wm/TaskStack.java
+/**************
+ Task extends WindowContainer<AppWindowToken> implements ConfigurationContainerListener
+
+ 
+ 最小单位的窗口位置，大小。windowState的大小从这里获取
+*/
+createTask@TaskRecord.java-->
+Task(int taskId, TaskStack stack, int userId, WindowManagerService service, int resizeMode, 
+	boolean supportsPictureInPicture, TaskDescription taskDescription,TaskRecord taskRecord) {
+- super(service)
+- mTaskRecord.registerConfigurationChangeListener(this)
+- setBounds(getRequestedOverrideBounds())	//设置大小
+- setOrientation(SCREEN_ORIENTATION_UNSET)
+}@Task.java
+
+//设置大小。windowstate使用的值mOverrideDisplayedBounds
+setOverrideDisplayedBounds(Rect overrideDisplayedBounds) {
+- mOverrideDisplayedBounds.set(overrideDisplayedBounds)
+  //设置位置
+- updateSurfacePosition(){
+	- getRelativeDisplayedPosition(mTmpPos)
+	- getPendingTransaction().setPosition(mSurfaceControl, mTmpPos.x, mTmpPos.y)
+	- mLastSurfacePosition.set(mTmpPos.x, mTmpPos.y)
+	}
+}@Task.java
 
 
-frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
-frameworks/base/services/core/java/com/android/server/wm/ActivityStartController.java
-frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java
-frameworks/base/services/core/java/com/android/server/wm/RootActivityContainer.java
+//windowState获取大小
+getDisplayedBounds@WindowState.java-->getOverrideDisplayedBounds-->mOverrideDisplayedBounds@Task.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/Task.java
+/**************
+ AppWindowToken extends WindowToken implements WindowManagerService.AppFreezeListener, ConfigurationContainerListener
+ WindowToken extends WindowContainer<WindowState> 
+
+ ActivityRecord创建后创建。ViewRootImpl加入窗口时，addWidow会将WindowState加入到AppWindowToken
+*/
+createAppWindow-->new AppWindowToken@ActivityRecord.java-->
+
+
+//销毁surface
+destroySurfaces-->destroySurfaces(boolean cleanupOnResume) {
+- final ArrayList<WindowState> children = new ArrayList<>(mChildren)
+- for (int i = children.size() - 1; i >= 0; i--) {
+	- WindowState win = children.get(i)
+	- destroyedSomething |= win.destroySurface(cleanupOnResume, mAppStopped)	//销毁
+	}
+ //
+- 
+}@AppWindowToken.java
+
+frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java

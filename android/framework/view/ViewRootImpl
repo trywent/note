@@ -80,6 +80,10 @@ setWindowStopped(boolean stopped){
 - ThreadedRenderer renderer = mAttachInfo.mThreadedRenderer
 - !stopped,scheduleTraversals
 - stoped,renderer.destroyHardwareResources(mView)
+  //通知监听器。surfaceView监听了窗口状态
+- for (int i = 0; i < mWindowStoppedCallbacks.size(); i++) {
+	- mWindowStoppedCallbacks.get(i).windowStopped(stopped)
+	}
 }@ViewRootImpl.java
 
 

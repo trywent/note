@@ -16,8 +16,8 @@
 WindowState(WindowManagerService service, Session s, IWindow c, WindowToken token,
            WindowState parentWindow, int appOp, int seq, WindowManager.LayoutParams a){
 - mService = service;
-- mSession = s //ViewRootImpl中Isession
-- mClient = c //ViewRootImpl中Window
+- mSession = s 	//ViewRootImpl中Isession
+- mClient = c 	//ViewRootImpl中Window
 - mToken = token
 - mAppToken = mToken.asAppWindowToken()
 - if(SUB_WINDOW){
@@ -30,7 +30,7 @@ WindowState(WindowManagerService service, Session s, IWindow c, WindowToken toke
 - mInputWindowHandle = new InputWindowHandle
 }
 
-/*计算窗口大小
+/*计算窗口大小  task  --- (performLayout)window --- (relayout布局)windowStateAnimator --- surfactControler
 
  view的大小
 */
@@ -39,7 +39,7 @@ computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
             Rect outsetFrame){
 - Task task = getTask()
 - boolean inFullscreenContainer = inFullscreenContainer{
-	- mAppToken == null,return true
+	- if(mAppToken == null)return true
 	- return !isInMultiWindowMode-->task.isFullscreen
 	}
 - inFullscreenContainer{
@@ -47,7 +47,7 @@ computeFrameLw(Rect parentFrame, Rect displayFrame, Rect overscanFrame,
   }else{
 	- getContainerBounds(mContainingFrame){
 		- if(isInMultiWindowMode),getTask().getBounds(outBounds) //返回窗口所在task大小
-		- else,mAppToken.getBounds(outBounds)  //否则返回窗口大小
+		- else,mAppToken.getBounds(outBounds) 			 //否则返回窗口大小
 		}
 	- mDisplayFrame.set(mContainingFrame)
   }

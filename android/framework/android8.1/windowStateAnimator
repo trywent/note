@@ -13,6 +13,10 @@ WindowState-->WindowStateAnimator(WindowState win){//windowState中创建
 relayoutWindow-->
 createSurfaceControl(Surface outSurface, int result, WindowState win,WindowStateAnimator winAnimator)@WindowManagerService.java-->
 createSurfaceLocked(windowType){
+  //计算窗口大小
+- calculateSurfaceBounds(w, attrs, mTmpSize)
+- final int width = mTmpSize.width()
+- final int height = mTmpSize.height()
   //WindowSurfaceController surfacecontroller
 - mSurfaceController = new WindowSurfaceController(mSession.mSurfaceSession,width, height){
 	- mSurfaceW = w
@@ -27,10 +31,25 @@ createSurfaceLocked(windowType){
 - mService.openSurfaceTransaction()
 - mSurfaceController.setPositionInTransaction
 - mSurfaceController.setLayerStackInTransaction
-- mSurfaceController.setLayer(mAnimLayer)
+- mSurfaceController.setLayer(mAnimLayer)		//层次
 - mService.closeSurfaceTransaction()
 }@WindowStateAnimator.java
 
+calculateSurfaceBounds(WindowState w, LayoutParams attrs, Rect outSize) {
+- if ((attrs.flags & FLAG_SCALED) != 0) {
+	- outSize.right = w.mRequestedWidth
+	- outSize.bottom = w.mRequestedHeight
+  }else{
+	-if (w.isDragResizing()) {
+		- final DisplayInfo displayInfo = w.getDisplayInfo()
+		- outSize.right = displayInfo.logicalWidth
+		- outSize.bottom = displayInfo.logicalHeight
+	 }else{
+		- w.getCompatFrameSize(outSize)
+  	 } 
+  }
+- outSize.inset(-attrs.surfaceInsets.left, -attrs.surfaceInsets.top, -attrs.surfaceInsets.right, -attrs.surfaceInsets.bottom)
+}@WindowStateAnimator.java
 
 
 /*
@@ -44,7 +63,7 @@ setSurfaceBoundariesLocked{
 	- mTmpSize.right,mTmpSize.bottom
 	- 根据surfaceInsets调整mTmpSize
 	}
-- mSurfaceController.setSizeInTransaction //设置大小
+- mSurfaceController.setSizeInTransaction 		//设置大小
   //是否裁剪
 - calculateCrop(mTmpClipRect){
 	- w.inPinnedWorkspace(),pinstack中返回
@@ -57,11 +76,11 @@ setSurfaceBoundariesLocked{
 	- 
 	}
 - isForceScaled(){
-	- mSurfaceController.setPositionInTransaction //设置位置
+	- mSurfaceController.setPositionInTransaction 	//设置位置
 	}
 }@WindowStateAnimator.java
 
-calculateSurfaceBounds
+
 //销毁
 destroySurfaces-->win.destroySurface@AppWindowToken.java-->destroySurface@WindowState.java-->
 destroyPreservedSurfaceLocked-->destroyDeferredSurfaceLocked
@@ -75,7 +94,8 @@ destroySurfaceLocked{
 - mWin.setHasSurface(false)
 }@WindowStateAnimator.java
 
- 
+
+preserveSurfaceLocked-->destroySurfaceLocked@WindowStateAnimator.java
 
 /*
   窗口动画：显示，隐藏

@@ -77,9 +77,34 @@ onMessageReceived(INVALIDATE){
 }
 
 
-//创建默认显示器。初始化display信息
+//处理事务。创建默认显示器。初始化display信息
 handleMessageTransaction-->handleTransaction-->
-handleTransactionLocked-->onHotplugReceived-->createDefaultDisplayDevice{
+handleTransactionLocked{
+  //layer的处理
+- if (transactionFlags & eTraversalNeeded) {
+
+	}
+  //显示屏处理
+- if (transactionFlags & eDisplayTransactionNeeded) {
+	
+	}
+  //重新遍历
+- if (transactionFlags & (eTraversalNeeded|eDisplayTransactionNeeded)) {
+
+	}
+  //有layer移除，遍历找出要移除的layer
+- mDrawingState.traverseInZOrder([&](Layer* layer) {
+	- if (mLayersPendingRemoval.indexOf(layer) >= 0)
+		invalidateLayerStack(layer, visibleReg){
+		- 
+		}
+	}
+- commitTransaction()
+}@SurafaceFlinger.cpp
+
+
+ 
+onHotplugReceived-->createDefaultDisplayDevice{	//显示屏热插拔事务
 - BufferQueue::createBufferQueue(&producer, &consumer)
 - fbs = new FramebufferSurface(*mHwc, type, consumer)
 - sp<DisplayDevice> hw = new DisplayDevice(this, DisplayDevice::DISPLAY_PRIMARY, type, isSecure,
@@ -273,20 +298,31 @@ SurfaceFlinger::createLayer(const String8& name, const sp<Client>& client,uint32
 - 
 }@SurfaceFlinger.cpp
 
-//销毁
+//移除layer
+destroySurface(mHandle)@SurfaceControl.cpp-->
 Client::destroySurface@Client.cpp-->onLayerRemoved-->
 removeLayer(const sp<Layer>& layer, true/*topLevelOnly*/){
-- auto& p = layer->getParent() //获取父layer,surfaceView父layer为Activity窗口
-- if(!topLevelOnly) p->removeChild(layer) //有父layer一般不删除
+- auto& p = layer->getParent()			//获取父layer,surfaceView父layer为Activity窗口
+- if(!topLevelOnly) p->removeChild(layer)	//有父layer一般不删除。等到父layer移除时一起移除
   else mCurrentState.layersSortedByZ.remove(layer)
 - layer->onRemovedFromCurrentState()
+  //
+- mLayersPendingRemoval.add(layer)
+- mLayersRemoved = true				//设置移除标记
 }@SurfaceFlinger.cpp
 
 
+commitTransaction{				//提交修改,销毁要移除的layer
+ //移除要销毁的layer
+- for (const auto& l : mLayersPendingRemoval) {
+	- recordBufferingStats(l->getName().string(), l->getOccupancyHistory(true))
+	- l->onRemoved()
+	}
+
+}@SurfaceFlinger.cpp
 
 frameworks/native/services/surfaceflinger/Client.h
 frameworks/native/services/surfaceflinger/Client.cpp
-frameworks/native/libs/gui/ISurfaceComposerClient.cpp
 /**************
   layer
 
@@ -315,7 +351,17 @@ Layer::onFrameAvailable(const BufferItem& item) {
 - mFlinger->signalLayerUpdate()
 }@Layer.cpp
 
+//移除
+Layer::onRemoved() {
+- mSurfaceFlingerConsumer->abandon()
+- destroyAllHwcLayers()
+- for (const auto& child : mCurrentChildren) {
+	- child->onRemoved()
+	}
+}@Layer.cpp
 
+//销毁
+~LayerCleaner()-->mFlinger->onLayerDestroyed(mLayer)
 
 frameworks/native/services/surfaceflinger/Layer.cpp
 /**************

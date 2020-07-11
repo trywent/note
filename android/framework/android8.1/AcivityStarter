@@ -88,13 +88,13 @@ startActivityUnchecked(final ActivityRecord r, ActivityRecord sourceRecord,
 - if (mInTask != null)setTaskFromInTask
 - setTaskToCurrentTopOrCreateNewTask				//放到当前top task
   //启动
-- mTargetStack.startActivityLocked(mStartActivity, topFocused, newTask,mOptions) 1-->
+- mTargetStack.startActivityLocked(mStartActivity, topFocused, newTask,mOptions) -->1
 - mDoResume{
 	- !isFocusable{
 		- mTargetStack.ensureActivitiesVisibleLocked
 		- mWindowManager.executeAppTransition
 		}
-	- mSupervisor.resumeFocusedStackTopActivityLocked 2-->
+	- mSupervisor.resumeFocusedStackTopActivityLocked -->2
 	}
 - mSupervisor.updateUserStackLocked
   //判断是否是小窗口（分屏）显示

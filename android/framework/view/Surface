@@ -1,7 +1,8 @@
 /******************************
  SurfaceSession -- SurfaceComposerClient。对应surfaceFlinger中的client
- SurfaceControl 操作native surface的接口。对应surfaceFlinger中的Layer
- Surface{ 
+ SurfaceControl(java)--->SurfaceComposerClient ---> SurfaceControl(cpp)
+		 -- 操作native surface的接口，设置大小，位置，层次。对应surfaceFlinger中的Layer
+ Surface{ 	应用端数据填充，不能设置大小位置
   - 封装SurfaceControl的IGraphicBufferProducer.应用绘制数据都是通过Surface
  }
 
@@ -100,8 +101,22 @@ getSurface-->generateSurfaceLocked{
 - mSurfaceData = new Surface(mGraphicBufferProducer, false)
 }@SurfaceControl.cpp
 
-//销毁
-destory-->nativeDestroy@SurfaceControl.java-->destroy-->mClient->destroySurface(mHandle)@SurfaceControl.cpp
+//释放layer
+nativeRelease{
+- sp<SurfaceControl> ctrl(reinterpret_cast<SurfaceControl *>(nativeObject));
+- ctrl->decStrong((void *)nativeCreate)
+}@android_view_SurfaceControl.cpp
+
+//销毁，释放引用
+destory@SurfaceControl.java-->nativeDestroy{
+- sp<SurfaceControl> ctrl(reinterpret_cast<SurfaceControl *>(nativeObject))
+- ctrl->clear()-->SurfaceControl::clear()-->destory{
+	- mClient->destroySurface(mHandle)-->SurfaceComposerClient::destroySurface@SurfaceComposerClient.cpp
+	- mClient.clear()
+	- mHandle.clear()
+	}@SurfaceControl.cpp
+- ctrl->decStrong((void *)nativeCreate)
+}@android_view_SurfaceControl.cpp
 
 //开始设置。所有的设置保存在一个对象中，提交时统一提交
 openTransaction-->nativeOpenTransaction@SurfaceControl.java-->SurfaceComposerClient::openGlobalTransaction

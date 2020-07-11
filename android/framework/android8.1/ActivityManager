@@ -161,12 +161,13 @@ findActivityLocked(mIntent, mStartActivity.info){
 }@ActivityStackSuperVisor.java
 
 ==================
-//设置栈大小
+//设置栈大小。从activity容器到窗口容器
 void resizeStackLocked(int stackId, Rect bounds){
 - ActivityStack stack = getStack(stackId)
 - stack.resize(bounds)
 - stack.ensureVisibleActivitiesConfigurationLocked
 }@ActivityStackSupervisor.java
+
 //设置dock栈
 void resizeDockedStackLocked(Rect dockedBounds)
 

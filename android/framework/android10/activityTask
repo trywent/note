@@ -1,0 +1,532 @@
+/*******************************************
+ ActivityTaskManagerService
+ 
+ 
+
+*/
+ActivityTaskManagerService(Context context) {
+- mContext = context
+- mSystemThread = ActivityThread.currentActivityThread()
+- mUiContext = mSystemThread.getSystemUiContext()
+- mLifecycleManager = new ClientLifecycleManager()
+- mInternal = new LocalService();
+- GL_ES_VERSION = SystemProperties.getInt("ro.opengles.version", GL_ES_VERSION_UNDEFINED);
+- mKillTopSystemAppBlacklist = context.getResources().getStringArray(com.android.internal.R.array.kill_top_system_app_blacklist);
+}@ActivityTaskManagerService.java
+
+//初始
+initialize(IntentFirewall intentFirewall, PendingIntentController intentController,Looper looper) {
+- mH = new H(looper)
+- mUiHandler = new UiHandler()
+  //supervisor
+- mStackSupervisor = createStackSupervisor()
+  //activity根容器
+- mRootActivityContainer = new RootActivityContainer(this){
+	- mService = service
+	- mStackSupervisor = service.mStackSupervisor
+	}
+- mRootActivityContainer.onConfigurationChanged(mTempConfig)
+- mRootActivityContainer.getWindowConfiguration().setTrackActivityTypeChange(true)
+  //taskcontrol
+- mTaskChangeNotificationController = new TaskChangeNotificationController(mGlobalLock, mStackSupervisor, mH)
+- mLockTaskController = new LockTaskController(mContext, mStackSupervisor, mH)
+- mActivityStartController = new ActivityStartController(this){
+	- mService = service
+	- mFactory = new DefaultFactory(service, service.mStackSupervisor, new ActivityStartInterceptor(service, service.mStackSupervisor)){
+		- mSupervisor = supervisor
+		- mInterceptor = interceptor
+		}
+	- mFactory.setController(this)
+	- mPendingRemoteAnimationRegistry = new PendingRemoteAnimationRegistry
+	}@ActivityStartController.java
+  //recent
+- mRecentTasks = createRecentTasks()
+- mStackSupervisor.setRecentTasks(mRecentTasks)
+- mKeyguardController = mStackSupervisor.getKeyguardController()
+}@ActivityTaskManagerService.java
+
+//设置windowManager.创建ActivityDisplay
+setWindowManager-->mActivityTaskManager.setWindowManager(wm)@ActivityManagerService.java-->
+setWindowManager(WindowManagerService wm){
+- mWindowManager = wm
+- mLockTaskController.setWindowManager(wm)
+- mStackSupervisor.setWindowManager(wm)
+  //初始化activity所在display信息
+- mRootActivityContainer.setWindowManager(wm){
+	- mWindowManager = wm
+	- for (int displayNdx = 0; displayNdx < displays.length; ++displayNdx) {		//遍历加入所有屏幕
+		- final ActivityDisplay activityDisplay = new ActivityDisplay(this, display)
+		- addChild(activityDisplay, ActivityDisplay.POSITION_TOP)
+		}
+	- calculateDefaultMinimalSizeOfResizeableTasks
+	- defaultDisplay.getOrCreateStack(WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_HOME, ON_TOP)//主屏幕创建全屏栈
+	- positionChildAt(defaultDisplay, ActivityDisplay.POSITION_TOP)
+	}@RootActivityContainer.java
+}@ActivityTaskManagerService.java
+
+
+//进入pip
+enterPictureInPictureMode(IBinder token, final PictureInPictureParams params) {
+- Runnable enterPipRunnable = () -> {
+	- r.pictureInPictureArgs.copyOnlySet(params)
+	- float aspectRatio = r.pictureInPictureArgs.getAspectRatio()
+	- List<RemoteAction> actions = r.pictureInPictureArgs.getActions()
+	- ect sourceBounds = new Rect( r.pictureInPictureArgs.getSourceRectHint())
+	- mRootActivityContainer.moveActivityToPinnedStack(r, sourceBounds, aspectRatio, "enterPictureInPictureMode")
+	- stack.setPictureInPictureAspectRatio(aspectRatio)
+  	}
+- enterPipRunnable.run()
+}@ActivityTaskManagerService.java
+
+//resume
+resumeTopActivities(boolean scheduleIdle) {
+- mRootActivityContainer.resumeFocusedStacksTopActivities()
+- mStackSupervisor.scheduleIdleLocked()
+}@ActivityTaskManagerService.java
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+frameworks/base/services/core/java/com/android/server/wm/ActivityStartController.java
+
+/**************
+  ConfigurationContainer
+
+  设置bound，WindowMode，ActivityType时会调用onRequestedOverrideConfigurationChanged
+*/
+WindowConfiguration windowConfiguration = new WindowConfiguration()
+
+{
+- Configuration mRequestedOverrideConfiguration		//自己请求的配置
+- Configuration mResolvedOverrideConfiguration 		//mRequestedOverrideConfiguration一样。父容器，策略约束的配置
+- Configuration mFullConfiguration			//父mFullConfiguration和 mResolvedOverrideConfiguration
+- Configuration mMergedOverrideConfiguration		//父mMergedOverrideConfiguration和mResolvedOverrideConfiguration
+}@ConfigurationContainer.java
+
+//设置位置大小。改变mRequestedOverrideConfiguration
+setBounds(int left, int top, int right, int bottom) {
+- mTmpRect.set(left, top, right, bottom)
+- setBounds(mTmpRect){
+	- int boundsChange = diffRequestedOverrideBounds(bounds)	//是否改变
+	- mTmpConfig.setTo(getRequestedOverrideConfiguration())
+	- mTmpConfig.windowConfiguration.setBounds(bounds)		//设置窗口
+	- onRequestedOverrideConfigurationChanged(mTmpConfig)
+	}
+}@ConfigurationContainer.java
+
+
+//设置窗口模式  
+setWindowingMode(int windowingMode) {
+- mTmpConfig.setTo(getRequestedOverrideConfiguration())
+- mTmpConfig.windowConfiguration.setWindowingMode(windowingMode)
+- onRequestedOverrideConfigurationChanged(mTmpConfig)
+}@ConfigrationContainer.java
+
+//更新config信息
+onRequestedOverrideConfigurationChanged(Configuration overrideConfiguration) {
+  //更新config
+- mRequestedOverrideConfiguration.setTo(overrideConfiguration)
+- onConfigurationChanged(parent != null ? parent.getConfiguration() : Configuration.EMPTY){
+	- mFullConfiguration.setTo(newParentConfig)
+	- for (int i = getChildCount() - 1; i >= 0; --i) {
+		- final ConfigurationContainer child = getChildAt(i)
+		- child.onConfigurationChanged(mFullConfiguration)	//一般子容器在这个方法中调用setBounds
+		}
+	}
+}@ConfigurationContainer.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/ConfigurationContainer.java
+frameworks/base/core/java/android/app/WindowConfiguration.java
+/**************
+  RootActivityContainer extends ConfigurationContainer implements DisplayManager.DisplayListener 
+
+*/
+//创建ActivityDisplay
+setWindowManager(WindowManagerService wm){
+- mWindowManager = wm
+- setWindowContainer(mWindowManager.mRoot){						//window容器
+	- mRootWindowContainer = container
+	}
+  //display
+- mDisplayManager = mService.mContext.getSystemService(DisplayManager.class)
+- mDisplayManager.registerDisplayListener(this, mService.mUiHandler)
+  //遍历加入所有屏幕
+- for (int displayNdx = 0; displayNdx < displays.length; ++displayNdx) {		
+	- final ActivityDisplay activityDisplay = new ActivityDisplay(this, display)
+	- addChild(activityDisplay, ActivityDisplay.POSITION_TOP)
+	}
+- calculateDefaultMinimalSizeOfResizeableTasks
+  //加入默认display,创建默认栈
+- ActivityDisplay defaultDisplay = getDefaultDisplay()
+- defaultDisplay.getOrCreateStack(WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_HOME, ON_TOP)//主屏幕创建全屏栈
+- positionChildAt(defaultDisplay, ActivityDisplay.POSITION_TOP)
+}@RootActivityContainer.java
+
+//获取栈
+getLaunchStack(ActivityRecord r,ActivityOptions options, TaskRecord candidateTask,
+	 boolean onTop,LaunchParamsController.LaunchParams launchParams) {
+  //从task获取
+- taskId = options.getLaunchTaskId()
+- displayId = options.getLaunchDisplayId()
+- if (taskId != INVALID_TASK_ID) {
+	- TaskRecord task = anyTaskForId(taskId, MATCH_TASK_IN_STACKS_OR_RECENT_TASKS_AND_RESTORE...)
+	- return task.getStack()
+	}
+  //从displayId获取
+- displayId = launchParams.mPreferredDisplayId
+- if (displayId != INVALID_DISPLAY && canLaunchOnDisplay(r, displayId)) {
+	- 
+	- 
+	}
+  //创建新栈
+- return display.getOrCreateStack(r, options, candidateTask, activityType, onTop)
+}@RootActivityContainer.java
+
+//进入pip
+moveActivityToPinnedStack(ActivityRecord r, Rect sourceHintBounds, float aspectRatio,String reason) {
+- ActivityDisplay display = r.getActivityStack().getDisplay()
+- stack = display.getPinnedStack()
+  //移走pip中已存在activity
+- mStackSupervisor.moveTasksToFullscreenStackLocked(stack, !ON_TOP)
+  //改变pip栈大小，为task大小
+- stack = display.getOrCreateStack(WINDOWING_MODE_PINNED, r.getActivityType(), ON_TOP)
+- TaskRecord task = r.getTaskRecord()
+- resizeStack(stack, task.getRequestedOverrideBounds(), null,null, !PRESERVE_WINDOWS,true , !DEFER_RESUME)
+  //移动task到pip
+- task.reparent(stack, ON_TOP, REPARENT_MOVE_STACK_TO_FRONT, !ANIMATE, DEFER_RESUME,false, reason)
+- stack.animateResizePinnedStack(sourceHintBounds, destBounds, -1,true )
+  //显示
+- ensureActivitiesVisible(null, 0, false)
+- resumeFocusedStacksTopActivities()
+}@RootActivityContainer.java
+
+
+//设置栈大小
+resizeStack(ActivityStack stack, Rect bounds, Rect tempTaskBounds, Rect tempTaskInsetBounds,
+	 boolean preserveWindows, boolean allowResizeInDockedMode,boolean deferResume){
+- if (stack.inSplitScreenPrimaryWindowingMode()) {
+	- mStackSupervisor.resizeDockedStackLocked(bounds, tempTaskBounds,...)
+	- return
+	}
+- stack.resize(bounds, tempTaskBounds, tempTaskInsetBounds)
+- stack.ensureVisibleActivitiesConfigurationLocked(stack.topRunningActivityLocked(), preserveWindows)
+}@RootActivityContainer.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/RootActivityContainer.java
+frameworks/base/services/core/java/com/android/server/wm/ActivityDisplay.java
+/**************
+  ActivityDisplay
+
+*/
+
+//创建栈
+getOrCreateStack(ActivityRecord r, ActivityOptions options,TaskRecord candidateTask, int activityType,boolean onTop){
+- int windowingMode = (options != null)? options.getLaunchWindowingMode() : WINDOWING_MODE_UNDEFINED
+- windowingMode = validateWindowingMode(windowingMode, r, candidateTask, activityType){	//检查activity是否支持窗口类型
+	- boolean supportsMultiWindow = mService.mSupportsMultiWindow
+	- if (windowingMode != WINDOWING_MODE_UNDEFINED&& isWindowingModeSupported(windowingMode, supportsMultiWindow, supportsSplitScreen,
+                        supportsFreeform, supportsPip, activityType)) {
+		- return windowingMode
+		}
+	}
+- getOrCreateStack(windowingMode, activityType, onTop){
+	- if (!alwaysCreateStack(windowingMode, activityType)) {	//非必须创建，必须创建的有FULLSCREEN，FREEFORM，SPLIT_SCREEN_SECONDARY
+		- T stack = getStack(windowingMode, activityType)	//从mStack中获取
+		- if(stack!=null )return stack
+		}
+	- createStack(windowingMode, activityType, onTop)
+	}
+}@ActivityDisplay.java
+
+createStack(int windowingMode, int activityType, boolean onTop) {
+  //只包含一个任务的display(非默认display)。让默认display创建
+- if (mSingleTaskInstance && getChildCount() > 0) {
+	- return mRootActivityContainer.getDefaultDisplay().createStack(windowingMode, activityType, onTop)
+	}
+  //创建栈
+- int stackId = getNextStackId()
+- createStackUnchecked(windowingMode, activityType, stackId, onTop){
+	-  return (T) new ActivityStack(this, stackId, mRootActivityContainer.mStackSupervisor, windowingMode, activityType, onTop)
+	}
+}@ActivityDisplay.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/ActivityDisplay.java
+/**************
+ ActivityStack extends ConfigurationContainer
+
+ mTaskStack 窗口端容器
+*/
+
+ActivityStack(ActivityDisplay display, int stackId, ActivityStackSupervisor supervisor,
+	int windowingMode, int activityType, boolean onTop) {
+- mStackSupervisor = supervisor
+- mHandler = new ActivityStackHandler(supervisor.mLooper)
+- setActivityType(activityType)		//activity类型
+- createTaskStack(display.mDisplayId, onTop, mTmpRect2){
+	- DisplayContent dc = mWindowManager.mRoot.getDisplayContent(displayId)
+	- mTaskStack = new TaskStack(mWindowManager, mStackId, this)
+	- dc.setStackOnDisplay(mStackId, onTop, mTaskStack)
+	}
+- setWindowingMode(windowingMode, false /* animate */, false /* showRecents */...)	//窗口类型
+- display.addChild(this, onTop ? POSITION_TOP : POSITION_BOTTOM);
+}@ActivityStack.java
+
+//创建TaskRecord, Task
+createTaskRecord(int taskId, ActivityInfo info, Intent intent,...){
+- TaskRecord task = TaskRecord.create(mService, taskId, info, intent, voiceSession, voiceInteractor)
+- addTask(task, toTop, "createTaskRecord")
+- task.createTask(toTop, (info.flags & FLAG_SHOW_FOR_ALL_USERS) != 0)
+}@ActivityStack.java
+
+//创建ActivityRecord,AppWindowToken
+startActivityLocked(ActivityRecord r, ActivityRecord focusedTopActivity,
+            boolean newTask, boolean keepCurTransition, ActivityOptions options) {
+-
+- r.createAppWindowToken()
+}@ActivityStack.java
+
+
+//设置大小。dock,pin调整大小@ActivityStackSupervisor
+resize(Rect bounds, Rect tempTaskBounds, Rect tempTaskInsetBounds) {
+- for (int i = mTaskHistory.size() - 1; i >= 0; i--) {
+	- TaskRecord task = mTaskHistory.get(i)
+	- task.updateOverrideConfiguration(taskBounds, tempTaskInsetBounds)
+ 	}
+- setBounds(bounds)
+}@ActivityStack.java
+
+onConfigurationChanged(Configuration newParentConfig) {	//改变大小会调用
+- int prevWindowingMode = getWindowingMode()
+- super.onConfigurationChanged(newParentConfig)
+- if (overrideWindowingMode == WINDOWING_MODE_PINNED) {
+	- hasNewOverrideBounds = getTaskStack().calculatePinnedBoundsForConfigChange(newBounds)
+  } else if (!matchParentBounds()) {
+	- 
+  	}
+- if (hasNewOverrideBounds) {
+	- mRootActivityContainer.resizeStack(this, new Rect(newBounds),null,null,PRESERVE_WINDOWS,true, true )
+  	}
+}@ActivtiStack.java
+
+frameworks/base/services/core/java/com/android/server/wm/ActivityStack.java
+/**************
+ TaskRecord extends ConfigurationContainer 
+
+ 窗口端容器
+*/
+
+create(ActivityTaskManagerService service, int taskId, ActivityInfo info,...)-->
+getTaskRecordFactory().create( service, taskId, info, intent, voiceSession, voiceInteractor)-->
+new TaskRecord(service, taskId, info, intent, taskDescription){
+- mService = service
+- setIntent(_intent, info)
+}@TaskRecord.java
+
+//窗口容器
+createTask(boolean onTop, boolean showForAllUsers) {
+- Rect bounds = updateOverrideConfigurationFromLaunchBounds(){
+	- Rect bounds = getLaunchBounds()	//返回parent的bounds
+	- updateOverrideConfiguration(bounds)
+	}
+- TaskStack stack = getStack().getTaskStack()
+  //创建task
+- mTask = new Task(taskId, stack, userId, mService.mWindowManager, mResizeMode...)
+- if (!mDisplayedBounds.isEmpty()) mTask.setOverrideDisplayedBounds(mDisplayedBounds)		//设置大小
+- stack.addTask(mTask, position, showForAllUsers, onTop /* moveParents */)
+}@TaskRecord.java
+
+
+//改变大小。调用mTask.setOverrideDisplayedBounds设置到task
+resize(Rect bounds, int resizeMode, boolean preserveWindow, boolean deferResume) {
+- mService.mWindowManager.deferSurfaceLayout()
+  //改变task大小
+- updateOverrideConfiguration(bounds)
+- mTask.resize(kept, forced)
+- mService.mWindowManager.continueSurfaceLayout()
+}@TaskRecord.java
+
+updateOverrideConfiguration(Rect bounds)-->
+updateOverrideConfiguration(Rect bounds, @Nullable Rect insetBounds) {
+- boolean hasSetDisplayedBounds = (insetBounds != null && !insetBounds.isEmpty())
+- setDisplayedBounds(bounds){//全屏时设置null,去除statusbar设置insetBounds
+	- mDisplayedBounds.setEmpty()
+	- mTask.setOverrideDisplayedBounds(mDisplayedBounds.isEmpty() ? null : mDisplayedBounds)//设置task的大小
+	}
+- Rect steadyBounds = hasSetDisplayedBounds ? insetBounds : bounds
+- setBounds(steadyBounds)
+}@TaskRecord.java
+
+frameworks/base/services/core/java/com/android/server/wm/TaskRecord.java
+/**************
+ ActivityRecord extends ConfigurationContainer
+
+*/
+ActivityRecord(ActivityTaskManagerService _service, WindowProcessController _caller,...){
+- appToken = new Token(this, _intent)
+- setActivityType(_componentSpecified, _launchedFromUid, _intent, options, sourceRecord)
+- 
+}@ActivityRecord.java
+
+//AppwindowToken。ActivityStack启动应用时调用
+createAppWindowToken() {
+- updateOverrideConfiguration()
+- mAppWindowToken = createAppWindow(mAtmService.mWindowManager, appToken,...){
+	- return new AppWindowToken(service, token, mActivityComponent, voiceInteraction, dc...)
+	}
+- task.addActivityToTop(this)
+}
+
+
+frameworks/base/services/core/java/com/android/server/wm/ActivityRecord.java
+/**************
+ ActivityStarter
+
+ 启动应用
+*/
+startActivityAsUser(caller, callingPackage, intent, resolvedType, resultTo,resultWho, requestCode, startFlags, profilerInfo, bOptions,
+                UserHandle.getCallingUserId()){
+- getActivityStartController().checkTargetUser(userId, validateIncomingUser,...)
+- getActivityStartController().obtainStarter(intent, "startActivityAsUser")
+                .setCaller(caller)
+		.setCallingPackage(callingPackage)
+		...
+		.setMayWait(userId)
+		.execute()
+}@ActivityTaskManagerService.java
+
+
+obtainStarter(Intent intent, String reason)-->mFactory.obtain().setIntent(intent).setReason(reason)@ActivityStartController
+DefaultFactory.obtain(){
+  //加了一个锁的机制
+- ActivityStarter starter = mStarterPool.acquire()
+- if (starter == null) {
+	- starter = new ActivityStarter(mController, mService, mSupervisor, mInterceptor)
+	}
+- return starter
+}@ActivityStarter.java
+
+execute{
+- if (mRequest.mayWait) {
+	- startActivityMayWait(mRequest.caller, mRequest.callingUid,....)
+  }else{
+	- startActivity(mRequest.caller, mRequest.intent, mRequest.ephemeralIntent...)
+  }
+- onExecutionComplete{
+	- mController.onExecutionComplete(this);
+	}
+}@ActivityStarter.java
+
+
+//启动等待结果？
+startActivityMayWait(IApplicationThread caller, int callingUid,String callingPackage, int requestRealCallingPid, 
+	int requestRealCallingUid....){
+- mSupervisor.getActivityMetricsLogger().notifyActivityLaunching(intent)
+- intent = new Intent(intent)
+- synchronized (mService.mGlobalLock) {
+	- ActivityStack stack = mRootActivityContainer.getTopDisplayFocusedStack()
+	- startActivity(caller, intent, ephemeralIntent, resolvedType, aInfo, rInfo...)
+	  //等待窗口绘制，获取启动结果
+	- mSupervisor.getActivityMetricsLogger().notifyActivityLaunched(res, outRecord[0])
+	}
+}@ActivityStarter.java
+
+
+startActivity(final ActivityRecord r, ActivityRecord sourceRecord,IVoiceInteractionSession voiceSession,
+	 IVoiceInteractor voiceInteractor,int startFlags, boolean doResume, ActivityOptions options...){
+- mService.mWindowManager.deferSurfaceLayout()
+- startActivityUnchecked(r, sourceRecord, voiceSession, voiceInteractor...)
+- if (ActivityManager.isStartResultSuccessful(result)) {
+	- ActivityRecord currentTop = startedActivityStack.topRunningActivityLocked()
+	- mRootActivityContainer.ensureVisibilityAndConfig(currentTop, currentTop.getDisplayId()...)
+  }else{	//启动失败？
+	- ActivityStack stack = mStartActivity.getActivityStack()
+	- stack.finishActivityLocked(mStartActivity, RESULT_CANCELED
+	- startedActivityStack.remove()
+  }
+- mService.mWindowManager.continueSurfaceLayout()
+- postStartActivityProcessing(r, result, startedActivityStack)
+}@ActivityStarter.java
+
+
+startActivityUnchecked(final ActivityRecord r, ActivityRecord sourceRecord, IVoiceInteractionSession voiceSession,
+	 IVoiceInteractor voiceInteractor,int startFlags, boolean doResume, ActivityOptions options...){
+- setInitialState(r, options, inTask, doResume, startFlags, sourceRecord, voiceSession, voiceInteractor, restrictedBgActivity)
+- computeLaunchingTaskFlags
+- computeSourceStack
+- ActivityRecord reusedActivity = getReusableIntentActivity()
+  //存在可用的activity
+- if (reusedActivity != null) {
+	- 
+	}
+  //activity已经在top,不需要启动
+- ActivityStack topStack = mRootActivityContainer.getTopDisplayFocusedStack();
+- ActivityRecord topFocused = topStack.getTopActivity()
+- ActivityRecord top = topStack.topRunningNonDelayedActivityLocked(mNotTop)
+- boolean dontStart = top != null && mStartActivity.resultTo == null...
+- if (dontStart) {
+	- 
+	- deliverNewIntent(top)
+	- return START_DELIVERED_TO_TOP
+  	}
+  //设置task
+-  if (mStartActivity.resultTo == null && mInTask == null && !mAddingToTask && (mLaunchFlags & FLAG_ACTIVITY_NEW_TASK) != 0) {
+	- setTaskFromReuseOrCreateNewTask(taskToAffiliate)
+   }else if(mSourceRecord != null){
+	- setTaskFromSourceRecord()
+   }else if(mInTask != null){
+	- setTaskFromInTask()
+   }else{
+	- setTaskToCurrentTopOrCreateNewTask()
+   }
+- mTargetStack.startActivityLocked(mStartActivity, topFocused, newTask, mKeepCurTransition,mOptions)
+}@ActivityStarter.java
+
+//获取栈
+ActivityStack computeStackFocus(ActivityRecord r, boolean newTask, int launchFlags,ActivityOptions aOptions) {
+ //已经存在task,和stack
+- TaskRecord task = r.getTaskRecord()
+- ActivityStack stack = getLaunchStack(r, launchFlags, task, aOptions){
+	- if (mReuseTask != null) return mReuseTask.getStack()
+	  //非分屏
+	- if (((launchFlags & FLAG_ACTIVITY_LAUNCH_ADJACENT) == 0)|| mPreferredDisplayId != DEFAULT_DISPLAY) {
+		- ActivityStack stack = mRootActivityContainer.getLaunchStack(r, aOptions, task, onTop, mLaunchParams)
+		- return stack
+	  }
+ 	  //adjacent模式启动的activity分屏模式，栈邻近caller
+	- ActivityStack focusedStack = mRootActivityContainer.getTopDisplayFocusedStack()
+	- ActivityStack parentStack = task != null ? task.getStack(): focusedStack
+	- if (parentStack != focusedStack) {
+		- return parentStack										//使用所在task的栈
+	  }else{
+		- if (focusedStack != null && task == focusedStack.topTask()) return focusedStack		//使用焦点栈
+		- if (parentStack != null && parentStack.inSplitScreenPrimaryWindowingMode()) {
+			- parentStack.getDisplay().getOrCreateStack(WINDOWING_MODE_SPLIT_SCREEN_SECONDARY)	//创建第二个分屏栈(挨着第一个？)
+		  }else{
+			- ActivityStack dockedStack = mRootActivityContainer.getDefaultDisplay().getSplitScreenPrimaryStack()
+			- return dockedStack
+			}
+	  }
+	}
+- if(stack!=null) return stack
+  //
+- ActivityStack focusedStack = mRootActivityContainer.getTopDisplayFocusedStack()
+- if (canLaunchIntoFocusedStack(r, newTask)) return focusedStack	//启动到焦点栈。判断分屏状态时能否启动到焦点栈
+- if (mPreferredDisplayId != DEFAULT_DISPLAY) {				//启动到非默认屏
+	- stack = mRootActivityContainer.getValidLaunchStackOnDisplay(mPreferredDisplayId...)
+	- if(stack==null)stack = mRootActivityContainer.getNextValidLaunchStack(r, mPreferredDisplayId)
+  }else{								//启动到默认屏
+	- stack = mRootActivityContainer.getLaunchStack(r, aOptions, task, ON_TOP)
+  }
+- return stack
+}@ActivityStarter.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java
+
+
+
+
+

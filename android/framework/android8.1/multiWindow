@@ -49,12 +49,12 @@ setBounds@TaskStack.java
  setprop sys.lsec.pip_rect "80 120 580 420"
 
 */
-getStack-->createStackOnDisplay-->createStack{//创建Activitystack
+getStack-->createStackOnDisplay-->createStack{					//创建Activitystack
 - PINNED_STACK_ID:new PinnedActivityStack-->super()-->createStackWindowController-->
   new PinnedStackWindowController{
 	- StackWindowController{
-		- TaskStack stack = dc.addStackToDisplay(stackId, onTop)//加入到displayContent
-		- stack.setController(this)//设置controller,container
+		- TaskStack stack = dc.addStackToDisplay(stackId, onTop)	//加入到displayContent
+		- stack.setController(this)					//设置controller,container
 		} 
 	}@PinnedStackWindowController.java
 }@ActivityStackSupervisor.java
@@ -71,31 +71,31 @@ PinnedStackController{
 
 PipSnapAlgorithm{
 - mMinimizedVisibleSize = 48
-- mDefaultSizePercent = 0.23 //占屏幕的比例,不会少于mDefaultMinSize
+- mDefaultSizePercent = 0.23							//占屏幕的比例,不会少于mDefaultMinSize
 - mMaxAspectRatioForMinSize = 1.777778
 }
 
 //进入pip
 enterPictureInPictureMode-->enterPictureInPictureMode(new PictureInPictureParams.Builder().build()
 -->enterPictureInPictureMode{
-- deviceSupportsPictureInPictureMode--> //检查是否支持pip模式
+- deviceSupportsPictureInPictureMode-->						//检查是否支持pip模式
 	getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
 - ActivityManagerNative.getDefault().enterPictureInPictureMode(mToken, params)
 }@Activity.java
 
 enterPictureInPictureMode(IBinder token,final PictureInPictureParams params){
-- ActivityRecord r = ensureValidPictureInPictureActivityParamsLocked{ //检查是否支持pip
+- ActivityRecord r = ensureValidPictureInPictureActivityParamsLocked{		//检查是否支持pip
 	- ActivityRecord r = ActivityRecord.forTokenLocked(token)
-	- mSupportsPictureInPicture //系统是否支持
-	- r.supportsPictureInPicture() //activity是否支持
+	- mSupportsPictureInPicture						//系统是否支持
+	- r.supportsPictureInPicture()						//activity是否支持
 	- params.truncateActions
 	}
-- isInPictureInPictureMode(r) //是否已经在pip模式
-- enterPipRunnable{ //进入pip
+- isInPictureInPictureMode(r)							//是否已经在pip模式
+- enterPipRunnable{								//进入pip
 	- float aspectRatio = r.pictureInPictureArgs.getAspectRatio()
-	- Rect sourceBounds = new Rect(getSourceRectHint) //计算大小
-	- mStackSupervisor.moveActivityToPinnedStackLocked(r, sourceBounds)//移动activity到PINNED_STACK
-	- PinnedActivityStack stack = mStackSupervisor.getStack(PINNED_STACK_ID) //pinned stack
+	- Rect sourceBounds = new Rect(getSourceRectHint)			//计算大小
+	- mStackSupervisor.moveActivityToPinnedStackLocked(r, sourceBounds)	//移动activity到PINNED_STACK
+	- PinnedActivityStack stack = mStackSupervisor.getStack(PINNED_STACK_ID)//pinned stack
 	- stack.setPictureInPictureAspectRatio(aspectRatio)
 	- stack.setPictureInPictureActions(actions)
 	}
@@ -105,27 +105,27 @@ enterPictureInPictureMode(IBinder token,final PictureInPictureParams params){
 //移动到pinnedStack
 moveActivityToPinnedStackLocked(ActivityRecord r, Rect sourceHintBounds, float aspectRatio){
 - PinnedActivityStack stack = getStack(PINNED_STACK_ID)
-- TaskRecord task = r.getTask() //activity所在task
-- resizeStackLocked(PINNED_STACK_ID, task.mBounds){ //先将stack设置为应用当前task大小...
+- TaskRecord task = r.getTask()							//activity所在task
+- resizeStackLocked(PINNED_STACK_ID, task.mBounds){				//先将stack设置为应用当前task大小...
 	- stack = getStack(PINNED_STACK_ID)
 	- stack.resize(bounds)
 	}
-- task.mActivities.size() == 1{//task中只有一个activity,直接移动到pinStack
+- task.mActivities.size() == 1{							//task中只有一个activity,直接移动到pinStack
 	- task.reparent(PINNED_STACK_ID)
 	}
-- task.mActivities.size() != 1{//不止一个activity,创建新task再移动
+- task.mActivities.size() != 1{							//不止一个activity,创建新task再移动
 	- TaskRecord newTask = task.getStack().createTaskRecord)
 	- newTask.reparent(PINNED_STACK_ID)
 	}
-- Rect destBounds = stack.getDefaultPictureInPictureBounds(aspectRatio)//获取默认位置
-- stack.animateResizePinnedStack(sourceHintBounds, destBounds) //开始缩变动画
+- Rect destBounds = stack.getDefaultPictureInPictureBounds(aspectRatio)		//获取默认位置
+- stack.animateResizePinnedStack(sourceHintBounds, destBounds)			//开始缩变动画
 - ensureActivitiesVisibleLocked
 - resumeFocusedStackTopActivityLocked
 }@ActivityStackSupervisor.java
 
 //开始缩变动画
 animateResizePinnedStack(Rect sourceHintBounds, Rect toBounds, int animationDuration,boolean fromFullscreen){
-- skipResizeAnimation(true/*全屏*/),mService.moveTasksToFullscreenStack //全屏跳过动画
+- skipResizeAnimation(true/*全屏*/),mService.moveTasksToFullscreenStack		//全屏跳过动画
 - getWindowContainerController().animateResizePinnedStack(toBounds, sourceHintBounds)-->
   animateResizePinnedStack{
 	- mContainer.setAnimationFinalBounds(sourceHintBounds, toBounds
@@ -140,10 +140,10 @@ getDefaultPictureInPictureBounds@PinnedActivityStack.java-->getWindowContainerCo
 -->getPictureInPictureBounds(float aspectRatio, Rect stackBounds){
 - displayContent = mContainer.getDisplayContent
 - pinnedStackController = displayContent.getPinnedStackController()
-- Rect stackBounds = pinnedStackController.getDefaultBounds() //stackBounds为空,获取默认大小
+- Rect stackBounds = pinnedStackController.getDefaultBounds()			//stackBounds为空,获取默认大小
 	-->getDefaultBounds{
-	- getInsetBounds(insetBounds){//根据insetBounds计算默认值
-		- mService.mPolicy.getStableInsetsLw(mTmpInsets) //获取去掉systemui的inset
+	- getInsetBounds(insetBounds){						//根据insetBounds计算默认值
+		- mService.mPolicy.getStableInsetsLw(mTmpInsets)		//获取去掉systemui的inset
 		}
 	- Size size = mSnapAlgorithm.getSizeForAspectRatio(aspectRatio,minEdgeSize){
 		

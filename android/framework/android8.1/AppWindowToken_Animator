@@ -37,6 +37,9 @@ setVisibility(WindowManager.LayoutParams lp,boolean visible, int transit,
 - 
 }AppWindowToken.java
 
+//销毁surface
+destroySurfaces
+
 //设置动画
 setVisibility-->mService.applyAnimationLocked(this, lp, transit, visible, isVoiceInteraction)@AppWindowToken.java
 applyAnimationLocked(AppWindowToken atoken, WindowManager.LayoutParams lp,
@@ -92,7 +95,8 @@ stepAnimationLocked(long currentTime){
 - mService.mAppTransition.notifyAppTransitionFinishedLocked(mAppToken.token)
 }@AppWindowAnimator.java
 
-/* 缩略图动画
+/***********
+  缩略图动画
 
 */
 //设置动画

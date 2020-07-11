@@ -1,0 +1,118 @@
+/*******************************************
+  应用窗口WindowState WindowStateAnimator
+
+ 
+*/
+
+relayoutWindow(Session session, IWindow client, int seq, LayoutParams attrs,int requestedWidth, int requestedHeight...)-->
+createSurfaceControl(SurfaceControl outSurfaceControl, int result, WindowState win,WindowStateAnimator winAnimator) {
+- WindowSurfaceController surfaceController
+- surfaceController = winAnimator.createSurfaceLocked(win.mAttrs.type, win.mOwnerUid)
+- surfaceController.getSurfaceControl(outSurfaceControl)
+}@WindowManagerService.java
+
+/**************  
+ WindowState
+
+*/
+
+
+//大小
+从task中获取大小，计算windowState的frame大小。再设置到surfaceControler。（其它容器不会设置大小）
+
+//销毁
+destroySurface(boolean cleanupOnResume, boolean appStopped) {
+- 
+- 
+}@WindowState.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/WindowState.java
+/**************  
+ WindowStateAnimator
+
+ WindowSurfaceController mSurfaceController
+*/
+createSurfaceLocked(int windowType, int ownerUid) {
+- 
+- 
+}@WindowStateAnimatro.java
+
+//
+prepareSurfaceLocked{
+- computeShownFrameLocked
+- setSurfaceBoundariesLocked
+}
+
+//设置位置，大小
+setSurfaceBoundariesLocked(final boolean recoveringMemory) {
+- WindowState w = mWin
+- LayoutParams attrs = mWin.getAttrs()
+- calculateSurfaceBounds(w, attrs, mTmpSize)
+- mSurfaceController.setBufferSizeInTransaction(mTmpSize.width(), mTmpSize.height(), recoveringMemory)	//设置大小
+- if (isForceScaled()) {
+	- mSurfaceController.setPositionInTransaction((float) Math.floor(posX),(float) Math.floor(posY), recoveringMemory)
+	- 
+  }else{
+	- mSurfaceController.setPositionInTransaction(xOffset, yOffset, recoveringMemory)		//设置位置
+  }
+- 
+}@WindowStateAnimator.java
+
+calculateSurfaceBounds(WindowState w, LayoutParams attrs, Rect outSize) {//计算大小
+- if ((attrs.flags & FLAG_SCALED) != 0) {
+	- outSize.right = w.mRequestedWidth
+	- outSize.bottom = w.mRequestedHeight
+  }else{
+	- w.getCompatFrameSize(outSize)
+  }
+  //insert
+- outSize.inset(-attrs.surfaceInsets.left, -attrs.surfaceInsets.top,-attrs.surfaceInsets.right, -attrs.surfaceInsets.bottom) 
+}@WindowStateAnimator.java
+
+
+//销毁
+//stop状态等... 销毁后每次relayoutWindow@WindowManagerService.java都会尝试重建。应该没问题
+- destroySurfaceLocked
+destroySurface() {
+- mSurfaceController.destroyNotInTransaction()
+- mWin.setHasSurface(false)
+- mSurfaceController = null
+}@WindowStateAnimator.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/WindowStateAnimator.java
+
+
+/**************  
+ WindowSurfaceController
+
+*/
+WindowSurfaceController(SurfaceSession s, String name, int w, int h, int format,
+            int flags, WindowStateAnimator animator, int windowType, int ownerUid) {
+- mAnimator = animator
+- mSurfaceW = w,mSurfaceH = h
+- SurfaceControl.Builder b = win.makeSurface()
+                .setParent(win.getSurfaceControl())
+                .setName(name)
+		...
+- mSurfaceControl = b.build()
+}@WindowSurfaceController.java
+
+
+//设置大小
+setBufferSizeInTransaction(int width, int height, boolean recoveringMemory) {
+- mSurfaceW = width
+- mSurfaceH = height
+- mSurfaceControl.setBufferSize(width, height)
+}@WindowSurfaceController.java
+
+//销毁surface
+destroyNotInTransaction{
+- mSurfaceControl.remove()	//销毁surfaceControl
+- setShown(false)
+- mSurfaceControl = null
+}@WindowSurfaceController.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/WindowSurfaceController.java

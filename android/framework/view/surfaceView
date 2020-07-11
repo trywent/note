@@ -138,8 +138,8 @@ updateSurface{
 		}
 	  //不是创建surfaceControl,且surfaceControl存在,则销毁..走的上面隐藏的逻辑
 	- if(mSurfaceControl != null && !mSurfaceCreated){
-		- mSurface.release()
-		- mSurfaceControl.destroy()
+		- mSurface.release()				
+		- if (!mWindowStopped)mSurfaceControl.destroy() //窗口状态为非stop则销毁。stop时会有父surfaceControl一起销毁
 		}
   }else{							//没有任何更新.不需要操作surface
 	- 
@@ -151,6 +151,13 @@ setFrame(int left, int top, int right, int bottom) {
 - super.setFrame
 - updateSurface()
 }@SurfaceView.java
+
+//窗口状态。activity通知
+windowStopped(boolean stopped) {
+- mWindowStopped = stopped
+- updateRequestedVisibility
+- updateSurface()
+}
 
 
 //SurfaceControlWithBackground
