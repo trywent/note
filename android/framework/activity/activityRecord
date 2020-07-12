@@ -1,5 +1,6 @@
-/*
- activity
+/**************************
+ ActivityRecord
+
 */
 
 enum ActivityState {
@@ -60,6 +61,14 @@ makeFinishing{
 - 若已经stoped，清除没有处理的操作
 }
 
+
+//通知应用端进入分屏模式
+onConfigurationChanged@TaskRecord.java-->scheduleUpdateMultiWindowMode-->
+mHandler.sendEmptyMessage(REPORT_MULTI_WINDOW_MODE_CHANGED_MSG)@ActivityStackSupervisor.java-->
+updateMultiWindowMode{
+- mLastReportedMultiWindowMode = inMultiWindowMode
+- scheduleMultiWindowModeChanged(getConfiguration())
+}@ActivityRecord.java
 
 frameworks/base/services/core/java/com/android/server/am/ActivityRecord.java
 frameworks/base/services/core/java/com/android/server/wm/AppWindowContainerController.java

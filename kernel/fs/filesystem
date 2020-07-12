@@ -92,7 +92,7 @@ const struct file_operations kernfs_file_fops = {
 }
 
 
-//创建文件夹 dir.c
+//创建文件夹
 struct kernfs_node *kernfs_create_dir_ns(struct kernfs_node *parent,
 					 const char *name, umode_t mode,
 					 void *priv, const void *ns){
@@ -103,7 +103,7 @@ struct kernfs_node *kernfs_create_dir_ns(struct kernfs_node *parent,
 	}
 }@dir.c
 
-//创建文件 file.c
+//创建文件
 struct kernfs_node *__kernfs_create_file(struct kernfs_node *parent,
 					 const char *name,
 					 umode_t mode, loff_t size,

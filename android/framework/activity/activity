@@ -17,25 +17,7 @@
 	}
  
 */
-
-
-
-
-
-/*
- ActivtyRecord
-*/
-
-ActivityRecord(ActivityManagerService _service, Intent _intent){
-- ActivityManagerService service = _service
-- IApplicationToken.Stub appToken = new Token(this)
-}@ActivityRecord.java
-
-
-
-/*
- Activity
-*/
+//关联到窗口
 activity.attach(appContext, this, getInstrumentation(), r.token....)@ActivityThread.java-->
 attach(Context context, ActivityThread aThread,){
 - mWindow = new PhoneWindow(this, window, activityConfigCallback){ //创建窗口
@@ -71,36 +53,34 @@ finishActivityLocked{
 	}
 }@ActivityStack.java
 
+/********
+ config,分屏状态变化
+*/
+//config
+onConfigurationChanged(@NonNull Configuration newConfig) {}
 
-/* 事件
+//分屏状态.
+scheduleMultiWindowModeChanged-->handleMultiWindowModeChanged@ActivityThread.java-->
+dispatchMultiWindowModeChanged(boolean isInMultiWindowMode, Configuration newConfig){
+- mFragments.dispatchMultiWindowModeChanged(isInMultiWindowMode, newConfig)
+- mWindow.onMultiWindowModeChanged()
+- onMultiWindowModeChanged(isInMultiWindowMode, newConfig){	//应用一般实现这个方法
+	- 
+	}
+}@Activity.java
+
+//分屏状态变化
+schedulePictureInPictureModeChanged-->handlePictureInPictureModeChanged@ActivityThread.java-->
+dispatchPictureInPictureModeChanged(boolean isInPictureInPictureMode,Configuration newConfig)
+
+/********
+ 事件
  处理后退按键
 */
 
 dispatchKeyEvent-->cb.dispatchKeyEvent(event)@DecorView.java-->dispatchKeyEvent-->
 onBackPressed-->finish-->(没有父activity)ActivityManagerNative.getDefault().finishActivity
-@Activity.java-->finishActivity-->mMainStack.requestFinishActivityLocked@ActivityManagerService.java
--->finishActivityLocked-->finishActivityLocked-->finishActivityLocked-->resumeTopActivityLocked
-@ActivityStack.java
-
-
-onBackPressed-->finish-->(有父activity)mParent.finishFromChild-->finish@Activity.java
-
-finishActivityLocked-->r.makeFinishing@ActivityStack.java
-
-activityIdleInternal-->stopActivityLocked-->sendMessageDelayed(STOP_TIMEOUT_MSG)-->mHandler.handleMessage(STOP_TIMEOUT_MSG)-->activityStoppedLocked
-
-_________________________________
-back按键结束activity：
-
-moveTaskToBack-->ActivityManagerNative.getDefault().moveActivityTaskToBack@Activity.java
--->moveActivityTaskToBack-->mMainStack.moveTaskToBackLocked@ActivityManagerService.java
--->moveTaskToBackLocked@ActivityStack.java
-
-
-finish-->ActivityManagerNative.getDefault().finishActivity@Activity.java-->
-finishActivity-->mMainStack.requestFinishActivityLocked@ActivityManagerService.java
--->requestFinishActivityLocked-->finishActivityLocked-->finishActivityLocked-->
-finishCurrentActivityLocked-->resumeTopActivityLocked(恢复top位置activity)@ActivityStack.java
+@Activity.java
 
 
 frameworks/base/core/java/android/app/Activity.java
