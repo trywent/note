@@ -1,7 +1,7 @@
 /********************************************
-  displayDevice 显示器的抽象。数据填充到这里？
+  displayDevice 显示器的抽象。显示数据通过这里提交到屏幕？
 
-
+  egl绘制 --> mSurface(producer) --> FramebufferSurface(consumer) --> screen
 */
 
 SurfaceFlinger::createDefaultDisplayDevice() {
@@ -14,14 +14,15 @@ SurfaceFlinger::createDefaultDisplayDevice() {
 - hw->makeCurrent(mEGLDisplay, mEGLContext)
 }@SurfaceFlinger.cpp
 
-
+//
 DisplayDevice::DisplayDevice(const sp<SurfaceFlinger>& flinger, DisplayType type,int32_t hwcId...
 	const sp<DisplaySurface>& displaySurface, const sp<IGraphicBufferProducer>& producer){
 - mFlinger(flinger)
-- mDisplaySurface(displaySurface)       			//FramebufferSurface，显示到屏幕上
+- mDisplaySurface(displaySurface)       			//consumer FramebufferSurface，显示到屏幕上
 - Surface* surface
-- mNativeWindow = surface = new Surface(producer) 		//BufferQueue 所有应用的surface最终应该合并到这里
-- mSurface = eglCreateWindowSurface(mDisplay,mConfig,window...) //
+- mNativeWindow = surface = new Surface(producer) 		//producer egl处理的数据填入到producer
+- ANativeWindow* const window = mNativeWindow.get()
+- mSurface = eglSurface = eglCreateWindowSurface(display, config, window, NULL)
   //
 - EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY)
 - EGLSurface eglSurface = eglCreateWindowSurface(display, config, window, NULL)
@@ -58,10 +59,61 @@ DisplayDevice::setViewportAndProjection() const {
 - mFlinger->getRenderEngine().setViewportAndProjection(w, h, sourceCrop, h,false, Transform::ROT_0)
 }@DisplayDevice.cpp
 
+SurfaceFlinger::doDisplayComposition@SurfaceFlinger.cpp-->
+DisplayDevice::swapBuffers(HWComposer& hwc) const {
+- EGLBoolean success = eglSwapBuffers(mDisplay, mSurface)	//将数据提交到producer
+- status_t result = mDisplaySurface->advanceFrame(){		//conuser获取数据
+	- uint32_t slot = 0
+	- sp<GraphicBuffer> buf
+	- sp<Fence> acquireFence(Fence::NO_FENCE)
+	- nextBuffer(slot, buf, acquireFence, dataspace)
+	}@FramebufferSurface.cpp
+}@DisplayDevice.cpp
+
 
 frameworks/native/services/surfaceflinger/DisplayDevice.cpp
-/**********
- displaySurface = FramebufferSurface
-
+/********
+  FramebufferSurface 在DisplayDevice中,合成窗口，提交到hw数据
+  displaySurface = FramebufferSurface
+  监听
 */
+
+class FramebufferSurface : public ConsumerBase,public DisplaySurface
+
+//创建frambuffer
+new FramebufferSurface(*mHwc, type, consumer)-->
+FramebufferSurface(HWComposer& hwc, int disp,const sp<IGraphicBufferConsumer>& consumer){
+- ConsumerBase(consumer)
+- mConsumer->setConsumerName("FramebufferSurface")
+  //默认大小
+- mConsumer->setDefaultBufferSize(activeConfig->getWidth(),activeConfig->getHeight())
+}@FramebufferSurface.cpp
+
+//hwc2不使用这个接口
+void FramebufferSurface::onFrameAvailable(const BufferItem& /* item */) {
+- nextBuffer(buf, acquireFence);
+- mHwc.fbPost(mDisplayType, acquireFence, buf)
+}@FramebufferSurface.cpp
+
+
+FramebufferSurface::nextBuffer(uint32_t& outSlot, sp<GraphicBuffer>& outBuffer,
+	 sp<Fence>& outFence,android_dataspace_t& outDataspace) {
+  //从consumer获取buffer
+- BufferItem item
+- acquireBufferLocked(&item, 0){
+	- mConsumer->acquireBuffer(item, presentWhen, maxFrameNumber)
+	- mSlots[item->mSlot].mGraphicBuffer = item->mGraphicBuffer
+	- mSlots[item->mSlot].mFrameNumber = item->mFrameNumber
+	}@ConsumerBase.cpp
+- mCurrentBufferSlot = item.mSlot
+- mCurrentBuffer = mSlots[mCurrentBufferSlot].mGraphicBuffer
+- outDataspace = item.mDataSpace
+- mHwc.setClientTarget(mDisplayType, outSlot, outFence, outBuffer, outDataspace)
+}@FramebufferSurface.cpp
+
+
+
+frameworks/native/services/surfaceflinger/DisplayHardware/DisplaySurface.h
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.h
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
 

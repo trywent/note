@@ -27,6 +27,7 @@ start{
 }@InputManager.cpp
 
 //设置input的窗口，方位
+performTraversalLocked@DisplayManagerService.java-->
 setDisplayViewports@LocalService.java-->setDisplayViewportsInternal-->setDisplayViewport-->
 nativeSetDisplayViewport@InputManagerService.java-->setDisplayViewport(type,viewport){
 - type == ViewportType::VIEWPORT_EXTERNAL: mLocked.externalViewport = viewport

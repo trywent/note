@@ -1,5 +1,8 @@
-/*
-  surfaceFlinger中Vsync接口
+/**************
+  display事件
+ 
+  HAL --> HWC --> SurfaceFlinger --> DispSync --> EventThread --> DisplayEventReceiver
+
 */
 //设置display初始模式
 SurfaceFlinger::onInitializeDisplays-->setPowerModeInternal(getDisplayDevice(d.token), HWC_POWER_MODE_NORMAL,false)
@@ -8,12 +11,12 @@ SurfaceFlinger::onInitializeDisplays-->setPowerModeInternal(getDisplayDevice(d.t
 - int currentMode = hw->getPowerMode()
 - hw->setPowerMode(mode)
   //设置display模式
-- if (currentMode == HWC_POWER_MODE_OFF) {//当前是关闭
+- if (currentMode == HWC_POWER_MODE_OFF) {	//当前是关闭
 	- getHwComposer().setPowerMode(type, mode)
 	- mEventThread->onScreenAcquired()
 	- resyncToHardwareVsync(true)
 	- repaintEverythingLocked
-  }else if (mode == HWC_POWER_MODE_OFF) {//关闭display
+  }else if (mode == HWC_POWER_MODE_OFF) {	//关闭display
   	- disableHardwareVsync(true)
 	- mEventThread->onScreenReleased()
 	- getHwComposer().setPowerMode(type, mode)
@@ -29,7 +32,6 @@ SurfaceFlinger::onInitializeDisplays-->setPowerModeInternal(getDisplayDevice(d.t
 	- getHwComposer().setPowerMode(type, mode)
   }
 }@SurfaceFlinger.cpp
-
 
 //请求vsync
 requestNextVsync-->mFlinger.resyncWithRateLimit()@EventThread.cpp-->- resyncToHardwareVsync(false)-->
@@ -50,8 +52,23 @@ resyncToHardwareVsync(bool makeAvailable){ //两个请求之间的间隔要大�
 	}
 }@SurfaceFlinger.cpp
 
-/* 
- DispSync
+
+//从hal收到事件。onVsync，onHotplug
+ComposerCallbackBridge::onVsync(Hwc2::Display display, int64_t timestamp)/*hal层回调*/-->
+mCallback->onVsyncReceived(mSequenceId, display, timestamp)@HWC2.cpp-->
+SurfaceFlinger::onVsyncReceived(int32_t sequenceId,hwc2_display_t displayId, int64_t timestamp){
+- mHwc->onVsync(displayId, timestamp, &type)-->HWComposer::onVsync@HWComposer.cpp
+- bool needsHwVsync = mPrimaryDispSync.addResyncSample(timestamp)
+- if (needsHwVsync) {
+	- enableHardwareVsync()
+    } else {
+        - disableHardwareVsync(false)
+    }
+}@SurfaceFlinger.cpp
+
+
+/**************
+ DispSync开关同步。DispSyncThread计算并发出vsync事件提供给DispSyncSource
 
  DispSync(DispSyncThread) --> DispSyncSource --> EventThread
  
@@ -79,21 +96,22 @@ DispSync::init(bool hasSyncFramework, int64_t dispSyncPresentTimeOffset){
 }@DispSync.cpp
 
 
-
 //
 DispSync::beginResync() {
 - mModelUpdated = false
 - mNumResyncSamples = 0
 }
 
-//一个循环数组中。mFirstResyncSample永远指向最开始的一个数据（时间递增，非乱序）。
+//收到一个vsync事件时间戳
+//一个循环数组中。mFirstResyncSample永远指向最开始的一个数据（时间递增，非乱序）
 //mNumResyncSamples事件个数，可被复位为0
+SurfaceFlinger::onVsyncReceived(int32_t sequenceId,hwc2_display_t displayId, int64_t timestamp-->
 DispSync::addResyncSample(nsecs_t timestamp) {
 - size_t idx = (mFirstResyncSample + mNumResyncSamples) % MAX_RESYNC_SAMPLES
-- mResyncSamples[idx] = timestamp	//记录vsync事件发生的时间戳
-- if (mNumResyncSamples == 0) {		//复位后第一次获取vsync时间值
+- mResyncSamples[idx] = timestamp			//记录vsync事件发生的时间戳
+- if (mNumResyncSamples == 0) {				//复位后第一次获取vsync时间值
 	- mPhase = 0
-	- mReferenceTime = timestamp	//记录复位后第一个vsync的时间，作为基准值
+	- mReferenceTime = timestamp			//记录复位后第一个vsync的时间，作为基准值
 	- mThread->updateModel(mPeriod, mPhase, mReferenceTime)
 	}
 - if (mNumResyncSamples < MAX_RESYNC_SAMPLES) {
@@ -123,7 +141,7 @@ DispSync::updateModelLocked() {
 - mModelUpdated = true
 }
 
-/* 
+/*
  DispSyncThread 根据hal上报的Vsync时间，计算vsync周期。定时产生事件并发送给client
 
 */
@@ -176,14 +194,14 @@ DispSyncThread::threadLoop{
 		}
 	- return callbackInvocations
 	}
-  //触发回调,surfaceFlinger中加入listener
+  //触发回调,回调surfaceFlinger中加入的listener
 - if (callbackInvocations.size() > 0){
 	- fireCallbackInvocations(callbackInvocations)-->callbacks[i].mCallback->onDispSyncEvent(callbacks[i].mEventTime-->
  		DispSyncSource::onDispSyncEvent@SurfaceFlinger.cpp
 	}
 }@DispSync.pp
 
-//获取listener要触发的时间
+//获取listener(获取脉冲事件者)要触发的时间
 computeListenerNextEventTimeLocked(const EventListener& listener,nsecs_t baseTime/*单调递增的系统启动时间*/) {
 - baseTime -= mReferenceTime				//从第一个采样到baseTime经过的时间
 - nsecs_t phase = mPhase + listener.mPhase		//
@@ -199,8 +217,11 @@ computeListenerNextEventTimeLocked(const EventListener& listener,nsecs_t baseTim
 
 
 
-/* DispSyncSource public VSyncSource, private DispSync::Callback
-   操作vsync开关。接收DispSync事件，转发给EventThread
+/**************
+  DispSyncSource public VSyncSource, private DispSync::Callback
+   操作vsync开关
+   接收DispSync事件
+   转发DispSync事件给EventThread
 */
 //创建DispSyncSource
 SurfaceFlinger::init{
@@ -221,20 +242,23 @@ DispSyncSource::setVSyncEnabled(bool enable){
 	}
 }@SurfaceFlinger.cpp
 
-//加入回调，将事件转发给EventThread
+//加入回调EventThread
 enableVSyncLocked-->mVSyncSource->setCallback(static_cast<VSyncSource::Callback*>(this))@EventThread.cpp-->
 DispSyncSource::setCallback(const sp<VSyncSource::Callback>& callback)-->mCallback = callback@SurfaceFlinger.cpp
 
 //接收DispSync的事件，转发给callback(EventThread)
-DispSyncSource::onDispSyncEvent-->callback->onVSyncEvent@SurfaceFlinger
+fireCallbackInvocations-->callbacks[i].mCallback->onDispSyncEvent(callbacks[i].mEventTime)
+@DispSync.cpp-->DispSyncSource::onDispSyncEvent-->callback->onVSyncEvent@SurfaceFlinger
 -->EventThread::onVSyncEvent@EventThread.cpp
 
 
 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 frameworks/native/services/surfaceflinger/DispSync.cpp
-/* EventThread接收事件(从DispSyncSource,surfaceflinger获取)，转发给client
-   	获取display的连接移除事件
-  	获取DispSync的脉冲事件vsync。分发脉冲事件给上层的client
+/**************
+   EventThread接收事件，并发出事件。MessageQueue监听EventThread等待事件
+   	获取display的连接移除事件。从surfaceflinger获取
+  	获取脉冲事件vsync。从DispSyncSource获取
+   
 */
 EventThread(const sp<VSyncSource>& src, SurfaceFlinger& flinger, bool interceptVSyncs){
 - mVSyncSource(src),mFlinger(flinger),
@@ -248,20 +272,23 @@ EventThread(const sp<VSyncSource>& src, SurfaceFlinger& flinger, bool interceptV
 - timer_create(CLOCK_MONOTONIC, &se, &mTimerId)
 }@EventThread.cpp
 
-//应用获取vsync, 建立连接(相当一个listener)
+//app或者surfaceFlinger获取vsync, 建立连接connection(相当一个listener)
 sp<IDisplayEventConnection> SurfaceFlinger::createDisplayEventConnection(ISurfaceComposer::VsyncSource vsyncSource) {
-- return mSFEventThread->createEventConnection()	//surfaceflinger
-- return mEventThread->createEventConnection()-->return new Connection(const_cast<EventThread*>(this))	//app
+- if (vsyncSource == eVsyncSourceSurfaceFlinger) {
+	- return mSFEventThread->createEventConnection()//surfaceflinger
+  else{
+	- return mEventThread->createEventConnection()	//app
+  }
 }@SurfaceFlinger.cpp
 
 EventThread::createEventConnection()-->new Connection(const_cast<EventThread*>(this)){
-- count(-1)		//vsync事件，请求一次发送一次
+- count(-1)						//vsync事件，请求一次发送一次
 - mEventThread(eventThread)
 - mChannel(gui::BitTube::DefaultSize)
 }
 
 EventThread::Connection::onFirstRef()-->mEventThread->registerDisplayEventConnection(this)-->
-EventThread::registerDisplayEventConnection{
+EventThread::registerDisplayEventConnection(const sp<EventThread::Connection>& connection){
 - mDisplayEventConnections.add(connection)
 - mCondition.broadcast()
 }@EventThread.cpp
@@ -276,7 +303,7 @@ enableVSyncLocked() {
 - sendVsyncHintOnLocked(){
 	- mPowerHAL.vsyncHint(true)
 	- struct itimerspec ts	
-	- ts.it_value.tv_nsec = vsyncHintOffDelay //40ms
+	- ts.it_value.tv_nsec = vsyncHintOffDelay 	//40ms
 	- timer_settime(mTimerId, 0, &ts, NULL)
 	}
 }@EventThread.cpp
@@ -285,7 +312,7 @@ enableVSyncLocked() {
 EventThread::Connection::requestNextVsync()-->mEventThread->requestNextVsync(this){
 - mFlinger.resyncWithRateLimit()
 - if (connection->count < 0) {
-	- connection->count = 0	//默认值为-1(不发送vsync)，0(发送一次vsync)
+	- connection->count = 0				//默认值为-1(不发送vsync)，0(发送一次vsync)
 	- mCondition.broadcast()
 	}
 }@EventThread.cpp
@@ -302,32 +329,40 @@ onVSyncEvent(nsecs_t timestamp) {
 }@EventThread.cpp
 
 //发送display拔插事件
-SurfaceFlinger::handleTransactionLocked-->mEventThread->onHotplugReceived(draw[i].type, false)@SurfaceFlinger.cpp
+SurfaceFlinger::handleTransactionLocked(eDisplayTransactionNeeded)-->mEventThread->onHotplugReceived(draw[i].type, false)@SurfaceFlinger.cpp
 onHotplugReceived(int type, bool connected) {
+- DisplayEventReceiver::Event event
 - event.header.type = DisplayEventReceiver::DISPLAY_EVENT_HOTPLUG
+- mPendingEvents.add(event)
 - mCondition.broadcast()
 }@EventThread.cpp
 
-//获取并处理事件，发送给client
+//从mVSyncEvent获取并处理事件。发出事件，MessageQueue中监听EventThread
 onFirstRef()-->run("EventThread",)-->
 EventThread::threadLoop() {
-  //等待获取事件
+  //等待获取event，有底层上报事件会调动onVSyncEvent通知
 - Vector< sp<EventThread::Connection> > signalConnections =  waitForEvent(&event)
   //发出vsync事件
 - for (size_t i=0 ; i<signalConnections.size() ; i++) {
 	- const sp<Connection>& conn(signalConnections[i])
-	  //发送给指定channel(每个client不同channel)，MessageQueue中读取
-	- status_t err = conn->postEvent(event)-->DisplayEventReceiver::sendEvents(&mChannel, &event, 1)
+	  //发送给指定channel(每个client不同channel)，MessageQueue中监听EventThread并读取
+	- status_t err = conn->postEvent(event)-->DisplayEventReceiver::sendEvents(&mChannel, &event, 1){
+			- gui::BitTube::sendObjects(dataChannel, events, count)		
+			}
 	}
 }@EventThread.cpp
 
-//等待获取event
-Vector< sp<EventThread::Connection> > EventThread::waitForEvent(DisplayEventReceiver::Event* event){
-  //是否有事件
+Vector< sp<EventThread::Connection> > EventThread::waitForEvent(DisplayEventReceiver::Event* event){//等待获取event
+  //是否有vsync事件
 - for (int32_t i=0 ; i<DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES ; i++) {
 	- timestamp = mVSyncEvent[i].header.timestamp
 	- *event = mVSyncEvent[i]
 	}
+  //是否有其它事件。热插拔
+- if (!timestamp) {
+	- eventPending = !mPendingEvents.isEmpty();
+	- *event = mPendingEvents[0]
+        }
   //是否有client等待事件
 - size_t count = mDisplayEventConnections.size()
 - for (size_t i=0 ; i<count ; i++) {
@@ -337,18 +372,20 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(DisplayEventRece
 		}
 	}
   //打开关闭vsync
-- if (timestamp && !waitForVSync) {	//收到事件却没有client
+- if (timestamp && !waitForVSync) {						//收到事件却没有client
 	- disableVSyncLocked()
-  }else if (!timestamp && waitForVSync){//有client
+  }else if (!timestamp && waitForVSync){					//有client
 	- enableVSyncLocked()
   }
-  //一直等不到硬件vsync,主动产生一个事件
+  //发出事件
 - if (!timestamp && !eventPending) {
 	- if (waitForVSync) {
-		- nsecs_t timeout = softwareSync ? ms2ns(16) : ms2ns(1000) //16ms
-		- mCondition.waitRelative(mLock, timeout)
-		- mVSyncEvent[0].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC
-	  }else{//不等待vsysn
+		- nsecs_t timeout = softwareSync ? ms2ns(16) : ms2ns(1000) 	//16ms,一直等不到硬件vsync,主动产生一个事件
+		- if (mCondition.waitRelative(mLock, timeout) == TIMED_OUT) {	//等待事件，
+			- mVSyncEvent[0].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC
+			- mVSyncEvent[0].header.id = DisplayDevice::DISPLAY_PRIMARY
+			}
+	  }else{//不等待vsysn，继续睡眠
 		- mCondition.wait(mLock)
 		}
 	}
@@ -356,9 +393,66 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(DisplayEventRece
 }@EventThread.cpp
 
 
-
-
-
-
 frameworks/native/services/surfaceflinger/EventThread.cpp
+
+
+/*******
+   上层应用获取display事件
+   DisplayEventReceiver
+   从EventThread获取帧同步事件
+
+*/
+//创建displayEvent接收器：
+new Choreographer-->new FrameDisplayEventReceiver(VSYNC_SOURCE_SURFACE_FLINGER/VSYNC_SOURCE_APP/*两种源*/)@Choregrapher.java-->
+DisplayEventReceiver(Looper looper, int vsyncSource) {
+- mMessageQueue = looper.getQueue
+  //创建receiver，mMessageQueue用于事件读取
+- mReceiverPtr = nativeInit(this, mMessageQueue,vsyncSource){
+	- 转换成本地消息队列，android_os_MessageQueue_getMessageQueue
+	- receiver= new NativeDisplayEventReceiver(env,receiverWeak, messageQueue, vsyncSource)-->DisplayEventDispatcher
+	- receiver->initialize(){
+		- mLooper->addFd(mReceiver.getFd(), 0, Looper::EVENT_INPUT,this)//监听fd,设置事件处理
+		}@DisplayEventDispatcher.cpp
+	}@android_view_DisplayEventReceiver.cpp
+}DisplayEventReceiver.java
+
+//创建DisplayEventDispatcher,DisplayEventReceiver
+DisplayEventDispatcher(const sp<Looper>& looper,ISurfaceComposer::VsyncSource vsyncSource){
+- mLooper(looper)
+- mReceiver(vsyncSource)-->DisplayEventReceiver(ISurfaceComposer::VsyncSource vsyncSource){
+	- sp<ISurfaceComposer> sf(ComposerService::getComposerService())
+	- mEventConnection = sf->createDisplayEventConnection(vsyncSource)
+	- mDataChannel = std::make_unique<gui::BitTube>()
+	- mEventConnection->stealReceiveChannel(mDataChannel.get())
+	}@DisplayEventReceiver.cpp
+}@DisplayEventDispatcher.cpp
+
+
+//请求事件。发送请求才会收到vsync。请求一次接收一次
+scheduleVsync@DisplayEventReceiver.java-->nativeScheduleVsync-->receiver->scheduleVsync-->
+NativeDisplayEventReceiver::scheduleVsync@android_view_DisplayEventReceiver.cpp-->
+DisplayEventDispatcher::scheduleVsync-->mReceiver.requestNextVsync()@DisplayEventDispatcher.cpp-->
+DisplayEventReceiver::requestNextVsync-->mEventConnection->requestNextVsync()@DisplayEventReceiver.cpp
+
+//looper中读取到事件并回调处理：
+Looper::pollInner-->response.request.callback->handleEvent-->
+DisplayEventDispatcher::handleEvent(int, int events, void*){
+  //读取事件
+- processPendingEvents(&vsyncTimestamp, &vsyncDisplayId, &vsyncCount){
+	- mReceiver.getEvents(buf, EVENT_BUFFER_SIZE)
+	- dispatchHotplug(ev.header.timestamp, ev.header.id, ev.hotplug.connected)
+  	}
+  //分发vsync事件
+- dispatchVsync(vsyncTimestamp, vsyncDisplayId, vsyncCount){
+	- NativeDisplayEventReceiver::dispatchVsync@android_view_DisplayEventReceiver.cpp-->dispatchVsync-->onVsync@DisplayEventReceiver.java
+	}
+}@DisplayEventReceiver.cpp
+
+
+
+frameworks/base/core/java/android/view/Choreographer.java
+frameworks/base/core/java/android/view/DisplayEventReceiver.java
+frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp
+frameworks/native/libs/gui/DisplayEventReceiver.cpp
+frameworks/base/libs/androidfw/DisplayEventDispatcher.cpp
 

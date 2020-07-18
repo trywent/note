@@ -99,7 +99,7 @@ animateBounds-->animateBoundsImpl{
 - animator.start()
 }@BoundsAnimationController.java
 
-
+//动画结束
 animateBoundsImpl-->BoundsAnimator.onAnimationStart@BoundsAnimationController.java
 -->setPinnedStackSize@TaskStack.java
 

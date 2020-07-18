@@ -153,6 +153,7 @@ Composer::detachChildren(const sp<SurfaceComposerClient>& client, const sp<IBind
 
 
 
+
 frameworks/base/core/java/android/view/SurfaceControl.java
 frameworks/base/core/jni/android_view_SurfaceControl.cpp
 frameworks/native/libs/gui/SurfaceControl.cpp

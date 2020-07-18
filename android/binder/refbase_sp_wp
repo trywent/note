@@ -1,1 +1,104 @@
-//
+/******
+ LightRefBase 提供基本的计数方法。只能进行强引用管理
+*/
+class LightRefBase{
+- mutable std::atomic<int32_t> mCount	//计数变量
+}
+
+inline void incStrong(__attribute__((unused)) const void* id) const {
+- mCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+
+inline void decStrong(__attribute__((unused)) const void* id) const {
+- if (mCount.fetch_sub(1, std::memory_order_release) == 1) {
+  	- std::atomic_thread_fence(std::memory_order_acquire);
+      	- delete static_cast<const T*>(this);
+        }
+}
+
+
+
+system/core/include/utils/LightRefBase.h
+/******
+ StrongPointer提供构造，对象操作函数。管理LightRefBase
+  
+*/
+//对象构造，增加计数
+template<typename T>
+sp<T>::sp(T* other) m_ptr(other) {
+- if (other)
+        other->incStrong(this);
+}
+
+//赋值，析构老对象，计数新对象
+template<typename T>
+sp<T>& sp<T>::operator =(const sp<T>& other) {
+    // Force m_ptr to be read twice, to heuristically check for data races.
+    T* oldPtr(*const_cast<T* volatile*>(&m_ptr));
+    T* otherPtr(other.m_ptr);
+    if (otherPtr) otherPtr->incStrong(this);
+    if (oldPtr) oldPtr->decStrong(this);
+    if (oldPtr != *const_cast<T* volatile*>(&m_ptr)) sp_report_race();
+    m_ptr = otherPtr;
+    return *this;
+}
+system/core/libutils/include/utils/StrongPointer.h
+/******
+ RefBase 支持强引用，弱引用管理
+
+*/
+class weakref_type{
+- RefBase*            refBase() const;
+- void                incWeak(const void* id);
+- void                decWeak(const void* id);
+- bool                attemptIncStrong(const void* id);
+- bool                attemptIncWeak(const void* id);
+};
+
+class RefBase::weakref_impl : public RefBase::weakref_type{
+- weakref_impl(RefBase* base)
+        : mStrong(INITIAL_STRONG_VALUE)
+        , mWeak(0)
+        , mBase(base)
+        , mFlags(0)
+        , mStrongRefs(NULL)
+        , mWeakRefs(NULL)
+        , mTrackEnabled(!!DEBUG_REFS_ENABLED_BY_DEFAULT)
+        , mRetain(false)
+- std::atomic<int32_t>    mStrong;
+- std::atomic<int32_t>    mWeak;
+- RefBase* const          mBase;
+- std::atomic<int32_t>    mFlags;
+}
+
+class RefBase{
+- void incStrong(const void* id) const{	//操作weakref_impl进行计数
+	- weakref_impl* const refs = mRefs
+	- refs->incWeak(id)
+	- refs->addStrongRef(id)
+	- const int32_t c= refs->mStrong.fetch_add(1, std::memory_order_relaxed)
+	  //第一次 c==INITIAL_STRONG_VALUE.执行函数
+	- int32_t old = refs->mStrong.fetch_sub(INITIAL_STRONG_VALUE,std::memory_order_relaxed)	//判断值是否为小于0，有可能被释放
+	- refs->mBase->onFirstRef()
+	}
+- void            decStrong(const void* id) const;
+- void            forceIncStrong(const void* id) const;
+- weakref_type*   createWeak(const void* id) const;
+- weakref_type*   getWeakRefs() const;
+- virtual                 ~RefBase();
+- virtual void            onFirstRef()
+- virtual void            onLastStrongRef(const void* id)
+- virtual bool            onIncStrongAttempted(uint32_t flags, const void* id)
+- virtual void            onLastWeakRef(const void* id)
+- weakref_impl* const mRefs;
+}
+
+//构造对象
+RefBase::RefBase() : mRefs(new weakref_impl(this))@RefBase.cpp
+
+
+
+system/core/libutils/include/utils/RefBase.h
+system/core/libutils/RefBase.cpp
+

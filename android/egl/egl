@@ -48,13 +48,15 @@ typedef struct ANativeWindow*           EGLNativeWindowType;
 typedef EGLNativeWindowType  NativeWindowType;
 
 //使用流程
-native_surface = session()->createSurface()			//创建本地surface
-EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY)		//获取display
-eglInitialize(display, 0, 0);					//egl初始
-eglChooseConfig(display, attribs, &config, 1, &numConfigs)	//参数配置
-surface = eglCreateWindowSurface(display, config, native_surface.get())	//将平台上的surface，转为gles的surface
-context = eglCreateContext(display, config)			//
-eglSwapBuffers(display, surface)				//交换数据
+native_surface = session()->createSurface()				//创建本地surface
+EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY)			//获取display
+eglInitialize(display, 0, 0);						//egl初始
+eglChooseConfig(display, attribs, &config, 1, &numConfigs)		//参数配置
+surface = eglCreateWindowSurface(display, config, native_surface.get())	//创建带nativeWindow的surface
+context = eglCreateContext(display, config)				//
+eglSwapBuffers(display, surface)					//将egl绘制的数据数据填入到surface的nativeWindow。
+									//If surface is a back-buffered window surface, then the color buffer is copied (posted) 
+									//to the native window associated with that surface
 
 //context
 jni_eglGetCurrentContext@com_google_android_gles_jni_EGLImpl.cpp-->
@@ -83,6 +85,8 @@ eglGetCurrentSurface(EGLint readdraw){
 }@eglApi.cpp
 
 
+//关联texture到当前上下文？
+void glBindTexture(GLenum target,GLuint texture);
 
 frameworks/native/opengl/include/EGL/eglplatform.h
 frameworks/base/core/jni/com_google_android_gles_jni_EGLImpl.cpp

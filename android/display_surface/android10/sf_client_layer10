@@ -1,0 +1,73 @@
+/*********************************************
+ surfaceFlihger端 client layer
+
+*/
+//创建Client
+SurfaceFlinger::createConnection() {
+- initClient(new Client(this))
+}@SurfaceFlinger.cpp
+
+//实现接口ISurfaceComposer
+class BnSurfaceComposer: public BnInterface<ISurfaceComposer>
+class SurfaceFlinger : public BnSurfaceComposer, public PriorityDumper,  private IBinder::DeathRecipient, private HWC2::ComposerCallback
+
+
+//提交事务
+SurfaceFlinger::setTransactionState(const Vector<ComposerState>& states, const Vector<DisplayState>& displays, uint32_t flags,
+     const sp<IBinder>& applyToken, const InputWindowCommands& inputWindowCommands,int64_t desiredPresentTime,
+     const client_cache_t& uncacheBuffer,const std::vector<ListenerCallbacks>& listenerCallbacks) {
+- auto itr = mTransactionQueues.find(applyToken)
+- 
+}@SurfaceFlinger.cpp
+
+SurfaceFlinger::setClientStateLocked(const ComposerState& composerState, int64_t desiredPresentTime,
+        const std::vector<ListenerCallbacks>& listenerCallbacks, int64_t postTime,bool privileged) {
+- const layer_state_t& s = composerState.state
+- sp<Client> client(static_cast<Client*>(composerState.client.get()))
+- sp<Layer> layer(client->getLayerUser(s.surface))
+  //应用变化值
+- if (what & layer_state_t::ePositionChanged) {
+
+	}
+- if (what & layer_state_t::eCornerRadiusChanged) {
+        - layer->setCornerRadius(s.cornerRadius)
+   	- flags |= eTraversalNeeded
+    }
+
+}@SurfaceFlinger.cpp
+
+/**********
+ client 对应surfaceCompoerClient
+
+*/
+class Client : public BnSurfaceComposerClient{
+- createSurface
+- createWithSurfaceParent
+- clearLayerFrameStats
+- getLayerFrameStats
+}
+
+createSurface(const String8& name, uint32_t w, uint32_t h, PixelFormat format, uint32_t flags, const sp<IBinder>& parentHandle,
+             LayerMetadata metadata, sp<IBinder>* handle,sp<IGraphicBufferProducer>* gbp)-->
+-->mFlinger->createLayer(name, this, w, h, format, flags, std::move(metadata), handle, gbp, parentHandle)@Client.cpp
+
+
+
+frameworks/native/services/surfaceflinger/Client.cpp
+/**********
+ layer
+
+*/
+
+SurfaceFlinger::createLayer(const String8& name, const sp<Client>& client, uint32_t w,uint32_t h, PixelFormat format, uint32_t flags,
+ LayerMetadata metadata, sp<IBinder>* handle,sp<IGraphicBufferProducer>* gbp, const sp<IBinder>& parentHandle,const sp<Layer>& parentLayer){
+
+}@SurfaceFlinger.cpp
+
+
+//设置类型
+Layer::setCompositionType(const sp<const DisplayDevice>& display,Hwc2::IComposerClient::Composition type) {
+- 
+- 
+}@Layer.cpp
+

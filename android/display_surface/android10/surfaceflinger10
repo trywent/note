@@ -1,0 +1,169 @@
+/*********************************************
+ surfaceflinger 
+ 
+
+*/
+main(int, char**) {
+  //GraphicsAllocator
+- startGraphicsAllocatorService(){
+	- android::sysprop::start_graphics_allocator_service(false)
+	- hardware::registerPassthroughServiceImplementation<android::hardware::graphics::allocator::V3_0::IAllocator>()
+	}
+  //创建sufaceflinger.传入内部类Factory
+- sp<SurfaceFlinger> flinger = surfaceflinger::createSurfaceFlinger()-->new SurfaceFlinger(factory)@SurfaceFlingerFactory.cpp
+- flinger->init()
+  //加入服务
+- sp<IServiceManager> sm(defaultServiceManager())
+- sm->addService(String16(SurfaceFlinger::getServiceName()), flinger, false,
+                   IServiceManager::DUMP_FLAG_PRIORITY_CRITICAL | IServiceManager::DUMP_FLAG_PROTO)
+  //display服务
+- startDisplayService(){
+	- sp<IDisplayService> displayservice = new DisplayService()
+	- displayservice->registerAsService()
+	}
+- flinger->run()
+}@main_surfaceflinger.cpp
+
+SurfaceFlinger::SurfaceFlinger(Factory& factory, SkipInitializationTag)
+      : mFactory(factory),
+        mPhaseOffsets(mFactory.createPhaseOffsets()),
+        mInterceptor(mFactory.createSurfaceInterceptor(this)),
+        mTimeStats(mFactory.createTimeStats()),
+        mEventQueue(mFactory.createMessageQueue()),
+        mCompositionEngine(mFactory.createCompositionEngine()) {}
+
+SurfaceFlinger::SurfaceFlinger(Factory& factory) : SurfaceFlinger(factory, SkipInitialization) {
+-
+- 
+}@SurfaceFlinger.cpp
+
+//设置消息处理函数
+SurfaceFlinger::onFirstRef()-->mEventQueue->init(this){
+- mFlinger = flinger
+- mLooper = new Looper(true)
+- mHandler = new Handler(*this)
+}@MessageQueue.cpp
+
+
+SurfaceFlinger::init() {
+- mScheduler = getFactory().createScheduler([this](bool enabled) { setPrimaryVsyncEnabled(enabled); },mRefreshRateConfigs)
+- auto resyncCallback = mScheduler->makeResyncCallback(std::bind(&SurfaceFlinger::getVsyncPeriod, this))
+- mAppConnectionHandle = mScheduler->createConnection("app", mPhaseOffsets->getCurrentAppOffset(),
+                          	resyncCallback, impl::EventThread::InterceptVSyncsCallback())
+- mSfConnectionHandle = mScheduler->createConnection("sf", mPhaseOffsets->getCurrentSfOffset(),
+                           resyncCallback, [this](nsecs_t timestamp) { mInterceptor->saveVSyncEvent(timestamp);})
+- mEventQueue->setEventConnection(mScheduler->getEventConnection(mSfConnectionHandle))
+  //renderEngine
+- renderEngineFeature |= (enable_protected_contents(false) ? renderengine::RenderEngine::ENABLE_PROTECTED_CONTEXT: 0)
+  //CompositionEngine
+- mCompositionEngine->setRenderEngine(renderengine::RenderEngine::create(static_cast<int32_t>
+	(defaultCompositionPixelFormat), renderEngineFeature, maxFrameBufferAcquiredBuffers))
+- mCompositionEngine->setHwComposer(getFactory().createHWComposer(getBE().mHwcServiceName))
+- mCompositionEngine->getHwComposer().registerCallback(this, getBE().mComposerSequenceId)
+}@SurfaceFlinger.cpp
+
+//surfaceFlinger等待事件.MessageQueue
+SurfaceFlinger::run()-->SurfaceFlinger::waitForEvent()-->
+mEventQueue->waitMessage()@MessageQueue.cpp-->
+onMessageReceived(message.what){
+- case MessageQueue::INVALIDATE: {
+	- updateVrFlinger()
+	- updateCursorAsync()
+	- updateInputFlinger()
+	}
+- case MessageQueue::REFRESH: {
+	- handleMessageRefresh()
+	}
+}@SurfaceFligner.cp
+
+
+SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags){
+- 
+- if (transactionFlags & eDisplayTransactionNeeded) {
+	- processDisplayChangesLocked()
+	- processDisplayHotplugEventsLocked()
+	}
+}@SurfaceFlinger.cpp
+
+/*
+ 处理上层设置。surfaceComposerClient
+*/
+SurfaceFlinger::setTransactionState(const Vector<ComposerState>& states,...)-->
+SurfaceFlinger::applyTransactionState(const Vector<ComposerState>& states,const Vector<DisplayState>& displays, uint32_t flags,
+    const InputWindowCommands& inputWindowCommands,const int64_t desiredPresentTime,const client_cache_t& uncacheBuffer,
+    const std::vector<ListenerCallbacks>& listenerCallbacks, const int64_t postTime, bool privileged, bool isMainThread){
+- 
+  //设置display
+- for (const DisplayState& display : displays) {
+  	- transactionFlags |= setDisplayStateLocked(display);
+  }
+  //触发消息,处理设置
+- setTransactionFlags(transactionFlags, start)-->signalTransaction
+}@SurfaceFlinger.cpp
+
+
+
+
+//设置display
+SurfaceFlinger::setDisplayStateLocked(const DisplayState& s) {
+- if (what & DisplayState::eSurfaceChanged) {
+	- state.surface = s.surface
+	- flags |= eDisplayTransactionNeeded
+	}
+- if (what & DisplayState::eDisplayProjectionChanged) {
+	- state.orientation = s.orientation
+	- flags |= eDisplayTransactionNeeded
+	}
+}SurfaceFlinger.cpp
+
+frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlingerFactory.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.cpp
+/***********
+ Display
+
+ 旋转时：
+	上层绘制的数据宽高要变化
+	底层填写数据要旋转，填入正确位置
+*/
+
+DisplayDevice(DisplayDeviceCreationArgs&& args){
+- mFlinger(args.flinger)
+- Display mCompositionDisplay{mFlinger->getCompositionEngine().createDisplay(
+                compositionengine::DisplayCreationArgs{args.isSecure, args.isVirtual,args.displayId})
+  //
+- mCompositionDisplay->createRenderSurface
+- mCompositionDisplay->createDisplayColorProfile
+- mCompositionDisplay->getRenderSurface()->initialize()
+  //设置显示
+- setProjection(DisplayState::eOrientationDefault, Rect::INVALID_RECT, Rect::INVALID_RECT)
+}@DisplayDevice.cpp
+
+
+initializeDisplays-->onInitializeDisplays{
+- const auto display = getDefaultDisplayDeviceLocked()
+- const sp<IBinder> token = display->getDisplayToken().promote()
+- DisplayState d
+- d.token = token
+- d.orientation = DisplayState::eOrientationDefault
+- setTransactionState(state, displays, 0, nullptr, mPendingInputWindowCommands, -1, {}, {})
+- setCompositorTimingSnapped(stats, 0)
+}@SurfaceFlinger.cpp
+
+
+
+setProjection
+
+
+frameworks/native/services/surfaceflinger/DisplayDevice.cpp
+
+/***********
+ CompositionEngine
+
+*/
+
+
+/***********
+ hwcomposer
+*/

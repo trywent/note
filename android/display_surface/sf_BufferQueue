@@ -11,8 +11,8 @@
 //创建队列，管理producer,consumer
 BufferQueue::createBufferQueue(sp<IGraphicBufferProducer>* outProducer, 
 	sp<IGraphicBufferConsumer>* outConsumer,bool consumerIsSurfaceFlinger) {
-- sp<BufferQueueCore> core(new BufferQueueCore())-->BufferQueueCore{
-	- mConsumerListener	//一般有consumer设置，用来监听producer数据
+- sp<BufferQueueCore> core(new BufferQueueCore())-->BufferQueueCore{	//consumer和producer的中介。数据分发通过这里的listener
+	- mConsumerListener						//一般由consumer设置，用来监听producer数据
 	}@BufferQueueCore.cpp
 - sp<IGraphicBufferProducer> producer(new BufferQueueProducer(core, consumerIsSurfaceFlinger))
 - sp<IGraphicBufferConsumer> consumer(new BufferQueueConsumer(core))
@@ -20,7 +20,7 @@ BufferQueue::createBufferQueue(sp<IGraphicBufferProducer>* outProducer,
 }BufferQueue.cpp
 
 
-//监听器接口。用于producer通知consumer
+//监听器接口。用于producer通知consumer。ConsumerBase中创建对象并使用
 BufferQueue::ProxyConsumerListener::ProxyConsumerListener(const wp<ConsumerListener>& consumerListener)
 -->mConsumerListener(consumerListener)@BufferQueue.cpp
 
@@ -38,10 +38,10 @@ frameworks/native/libs/gui/BufferQueueCore.cpp
 /********
   producer
 
-  BufferQueueProducer : public BnGraphicBufferProducer : public BnInterface<IGraphicBufferProducer>
 */
+BufferQueueProducer : public BnGraphicBufferProducer : public BnInterface<IGraphicBufferProducer>
 
-//提交数据，通知consumer
+//提交数据，通知listener --> consumer
 BufferQueueProducer::queueBuffer{
 - sp<IConsumerListener> frameAvailableListener
 - if (mCore->mQueue.empty()) {
@@ -60,12 +60,12 @@ onSidebandStreamChanged@SurfaceFlingerConsumer.cpp-->onSidebandStreamChanged@Lay
 
 frameworks/native/libs/gui/BufferQueueProducer.cpp
 /********
- consumer
+ consumer 设置listener到mCore
 
- BufferQueueConsumer : public BnGraphicBufferConsumer :public SafeBnInterface<IGraphicBufferConsumer>
 */
+BufferQueueConsumer : public BnGraphicBufferConsumer :public SafeBnInterface<IGraphicBufferConsumer>
 
-//设置监听器。供producer分发数据使用
+//设置listener。供producer分发数据使用
 consumerConnect(const sp<IConsumerListener>& consumer,bool controlledByApp)@BufferQueueConsumer.h-->
 BufferQueueConsumer::connect(const sp<IConsumerListener>& consumerListener, bool controlledByApp) {
 - mCore->mConsumerListener = consumerListener
@@ -78,9 +78,9 @@ BufferQueueConsumer::connect(const sp<IConsumerListener>& consumerListener, bool
 frameworks/native/include/gui/BufferQueueConsumer.h
 frameworks/native/libs/gui/BufferQueueConsumer.cpp
 /********
- ConsumerBase 作为监听器，监听producer是否有可用数据。再转给frameAvailableListener
-
- 
+ ConsumerBase 作为监听器，监听producer是否有可用数据。处理数据：
+	- onFrameAvailable
+	- 若子类没有重写onFrameAvailable，则再转给frameAvailableListener
 */
 ConsumerBase : public virtual RefBase, protected ConsumerListener
 
@@ -88,10 +88,14 @@ ConsumerBase::ConsumerBase(const sp<IGraphicBufferConsumer>& bufferQueue, bool c
 - mConsumer(bufferQueue)
 - wp<ConsumerListener> listener = static_cast<ConsumerListener*>(this)
 - sp<IConsumerListener> proxy = new BufferQueue::ProxyConsumerListener(listener)
-- mConsumer->consumerConnect(proxy, controlledByApp)
+- mConsumer->consumerConnect(proxy, controlledByApp)	//设置listener
 - mConsumer->setConsumerName("unnamed-%d-%d")
 }@ConsumerBase.cpp
 
+//设置listener
+ConsumerBase::setFrameAvailableListener(const wp<FrameAvailableListener>& listener) {
+- mFrameAvailableListener = listener;
+}
 
 //有数据可用
 ConsumerBase::onFrameAvailable(const BufferItem& item) {
@@ -103,14 +107,14 @@ ConsumerBase::onFrameAvailable(const BufferItem& item) {
 
 frameworks/native/libs/gui/ConsumerBase.cpp
 /********
-  SurfaceFlingerConsumer Layer处理应用的数据
+  SurfaceFlingerConsumer Layer处理应用的数据。将所有应用的数据获取到surfaceflinger
 
-  监听MonitoredProducer(传给应用)的数据
+  监听MonitoredProducer的数据(应用填入数据)
 */
 //GL_TEXTURE_EXTERNAL_OES 从bufferQueue中消耗数据
 SurfaceFlingerConsumer : public GLConsumer : public ConsumerBase
 
-//监听器
+//监听器，监听数据是否可用
 mSurfaceFlingerConsumer.setContentsChangedListener(this)@Layer.cpp-->
 SurfaceFlingerConsumer::setContentsChangedListener(const wp<ContentsChangedListener>& listener){
 - setFrameAvailableListener(listener){
@@ -126,44 +130,7 @@ frameworks/native/services/surfaceflinger/SurfaceFlingerConsumer.cpp
  
   监听
 */
-
 class FramebufferSurface : public ConsumerBase,public DisplaySurface
 
-//创建frambuffer
-new FramebufferSurface(*mHwc, type, consumer)-->
-FramebufferSurface(HWComposer& hwc, int disp,const sp<IGraphicBufferConsumer>& consumer){
-- ConsumerBase(consumer)
-- mConsumer->setConsumerName("FramebufferSurface")
-  //默认大小
-- mConsumer->setDefaultBufferSize(activeConfig->getWidth(),activeConfig->getHeight())
-}@FramebufferSurface
 
-//有可用数据，提交数据到hw
-FramebufferSurface::onFrameAvailable(const BufferItem& /* item */) {
-  //获取数据
-- sp<GraphicBuffer> buf
-- nextBuffer(buf, acquireFence)
-  //提交到硬件层
-- mHwc.fbPost(mDisplayType, acquireFence, buf)
-}@FramebufferSurface.cpp
-
-FramebufferSurface::nextBuffer(uint32_t& outSlot, sp<GraphicBuffer>& outBuffer,
-	 sp<Fence>& outFence,android_dataspace_t& outDataspace) {
-  //从consumer获取buffer
-- acquireBufferLocked(&item, 0){
-	- mConsumer->acquireBuffer(item, presentWhen, maxFrameNumber)
-	- mSlots[item->mSlot].mGraphicBuffer = item->mGraphicBuffer
-	- mSlots[item->mSlot].mFrameNumber = item->mFrameNumber
-	}@ConsumerBase.cpp
-- mCurrentBufferSlot = item.mSlot
-- mCurrentBuffer = mSlots[mCurrentBufferSlot].mGraphicBuffer
-- outDataspace = item.mDataSpace
-- mHwc.setClientTarget(mDisplayType, outSlot, outFence, outBuffer, outDataspace)
-}@FramebufferSurface.cpp
-
-
-
-frameworks/native/services/surfaceflinger/DisplayHardware/DisplaySurface.h
-frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.h
-frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
 

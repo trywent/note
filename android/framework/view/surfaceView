@@ -89,6 +89,8 @@ frameworks/base/core/java/android/view/SurfaceHolder.java
 
  SurfaceView extends View implements ViewRootImpl.WindowStoppedCallback 
 */
+SurfaceHolder mSurfaceHolder = new SurfaceHolder()
+
 //窗口可见性发生变化,会通知到view
 onWindowVisibilityChanged(int visibility) {
 - super.onWindowVisibilityChanged(visibility)

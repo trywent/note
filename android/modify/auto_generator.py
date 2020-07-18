@@ -90,7 +90,7 @@ def lsecconf(val):
     cur_dir = './'
     unpack_dir = cur_dir+ 'config'
 
-    packagefile_path = cur_dir + '/Allapp.pkg'    
+    packagefile_path = cur_dir + '/AllAppUpdate.bin'    
     partitionfile = cur_dir + 'sql_config.pkg'
     
     tchfile = unpack_dir + '/gtsql_config'
@@ -306,7 +306,8 @@ def app1(argv):
 
 
 def app2(argv):
-    os.system('rm -rf preinstall/*')
+    os.system('rm -rf preinstall')
+    os.system('mkdir preinstall')
     os.system('unzip -q -P 048a02243bb74474b25233bda3cd02f8 AllAppUpdate.bin -d preinstall')
     os.system('cp config.txt preinstall/')
     lsecconf('1')
@@ -337,6 +338,8 @@ def app2(argv):
 		if fn!='Android.mk' and fn!='preinstall.mk':
 		  includefile.write('PRODUCT_COPY_FILES +=$(CUR_PATH)/syu/product/preinstall/app/%s:oem/app/%s \n' % (fn , fn))
             for filename in dirs:
+		if filename =='RKUpdateService':
+			continue
                 apk = appdir+'/'+filename+'/'+filename+'.apk'
 		libsrc = ''
                 if os.path.exists(apk):
@@ -414,8 +417,34 @@ def app2(argv):
             break
         includefile.close()
 
+def app3(argv):
+    os.system('rm -rf preinstall')
+    os.system('mkdir preinstall')
+    os.system('unzip -q -P 048a02243bb74474b25233bda3cd02f8 AllAppUpdate.bin -d preinstall')
+    os.system('cp config.txt preinstall/')
+    lsecconf('1')
+    preinstall_dir = os.path.join(argv[1],argv[2])
+    if os.path.exists(preinstall_dir):
+        #Use to include modules
+        include_path = preinstall_dir + '/preinstall.mk'
+
+        if os.path.exists(include_path):
+            os.remove(include_path)
+
+        includefile = file(include_path, 'w')
+
+	#config file
+        for root, dirs,files in os.walk(preinstall_dir):
+            for filename in files:
+		print(filename)
+		if filename!='Android.mk' and filename!='preinstall.mk':
+	                includefile.write('PRODUCT_COPY_FILES +=$(CUR_PATH)/syu/product/preinstall/%s:oem/app/%s \n' % (filename, filename))
+            break
+        includefile.close()
+
 def main(argv):
     #app1(argv)
-    app2(argv)
+    #app2(argv)
+    app3(argv)
 if __name__=="__main__":
   main(sys.argv)

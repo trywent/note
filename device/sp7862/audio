@@ -181,16 +181,58 @@ vendor/sprd/modules/audio/whale/debug/audio_debug.cpp
  proprietories-source/factorytest
  proprietories-source/autotest
 */
+dump方法如下(dump文件保存在data/vendor/local/media/下):
+1．dump hal送给dsp/vbc或从dsp/vbc读到的数据
+打开dump: echo "dumpvbc=1" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump: echo "dumpvbc=0" > /data/vendor/local/media/mmi.audio.ctrl
+文件保存在/data/vendor/local/media/下面,适合于录音 与播放场景(包含voip),不包含a2dp dump.
+
+2.  dump audioflinger从hal拿到的数据
+开启dump:  echo "dumpinread=1" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump:  echo "dumpinread=0" > /data/vendor/local/media/mmi.audio.ctrl
+
+3.  dump audioflinger写到hal的数据
+打开dump: echo "dumpmusic=1" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump: echo "dumpmusic=0" > /data/vendor/local/media/mmi.audio.ctrl
+
+4.  dump播放场景vbc输出的数据
+开启dump: echo "vbc_pcm_dump=vbc_dac0" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump: echo "vbc_pcm_dump=disable" > /data/vendor/local/media/mmi.audio.ctrl
+注意:vbc输出的数据dump与录音场景充突,有录音场景时无法dump.
+
+5.  dump通话场景vbc输出的数据
+开启dump:  echo "vbc_pcm_dump=vbc_dac1" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump: echo "vbc_pcm_dump=disable" > /data/vendor/local/media/mmi.audio.ctrl
+注意:vbc输出的数据dump与录音场景充突,有录音场景时无法dump. 
+
+//命令和操作函数
+const struct ext_control_t  ext_contrl_table[] = {
+    {"codec_mute",                      audio_codec_mute},
+    {"AudioTester_enable",              audiotester_enable},
+    {"vbc_pcm_dump",                    vbc_playback_dump},
+    {"set_dump_data_switch",            set_audiohal_pcmdump},
+    {"dumpmusic",                       set_audiohal_musicpcmdump},
+    {"dumpsco",                         set_audiohal_voippcmdump},
+    {"dumpinread",                      set_audiohal_recordhalpcmdump},
+    {"dumpvbc",                         set_audiohal_vbcpcmdump},
+    {"dumploop",                        set_audiohal_looppcmdump},
+    {"pipeprocess_exit",                ext_process_exit},
+}
+
+//dump数据控制
 adev_open-->ext_control_init(adev)@audio_hw-->
 ext_control_init(struct tiny_audio_device *adev){
-- create_audio_pipe(AUDIO_EXT_DATA_CONTROL_PIPE){	//创建"/data/vendor/local/media/mmi.audio.ctrl"
+  //dump控制接口 .创建"/data/vendor/local/media/mmi.audio.ctrl"
+- create_audio_pipe(AUDIO_EXT_DATA_CONTROL_PIPE){	
 	- mkfifo(pipe_name,S_IFIFO|0666)
 	- chmod(pipe_name, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP| S_IROTH|S_IWOTH)
 	- stat(pipe_name, &buf)
 	- chmod(pipe_name, S_IRUSR|S_IWUSR|S_IRGRP| S_IWGRP|S_IROTH|S_IWOTH)
 	}
-- create_audio_pipe(MMI_DEFAULT_PCM_FILE)		//创建"/data/vendor/local/media/aploopback.pcm"
+  //创建"/data/vendor/local/media/aploopback.pcm"
+- create_audio_pipe(MMI_DEFAULT_PCM_FILE)		
 - pthread_t control_audio_loop;
+  //读取pip命令数据，设置开关
 - pthread_create(&control_audio_loop, NULL, control_audio_loop_process, (void *)adev)-->
 	control_audio_loop_process(void *arg){
 	- int pipe_fd = open(AUDIO_EXT_CONTROL_PIPE, O_RDWR)
@@ -206,9 +248,21 @@ ext_control_init(struct tiny_audio_device *adev){
 - pthread_detach(pthread_self())
 }@ext_control.c
 
+ext_contrtol_process(struct tiny_audio_device *adev,const char *cmd_string){
+- struct str_parms *parms = str_parms_create_str(cmd_string)
+  //遍历ext_contrl_table
+- str_parms_get_str(parms,ext_contrl_table[i].cmd_string,value,sizeof(value))
+- fun=ext_contrl_table[i].fun
+- fun(adev,parms,val_int,value)				//执行函数
+}@ext_control.c
+
+
 /******
  dump数据
 */
+
+
+
 typedef enum {
     PCMDUMP_PRIMARY_PLAYBACK_VBC,
     PCMDUMP_PRIMARY_PLAYBACK_MUSIC,

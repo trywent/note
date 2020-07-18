@@ -140,10 +140,11 @@ getDisplayInfo(int displayId)-->getDisplayInfoInternal(displayId, callingUid){
 
 
 /****************************
- 设置输入事件窗口大小方位
+ 设置InputManager,SurfaceFlinger方位
  
 */
-//android6.0
+
+//android6 
 LocalService.performTraversal-->performTraversalInternal-->
 performTraversalLocked{
 - clearViewportsLocked //清除viewport
@@ -155,11 +156,16 @@ performTraversalLocked{
 		}
 	- device.performTraversalLocked(t)
 	}
-- mHandler.sendEmptyMessage(MSG_UPDATE_VIEWPORT)-->mInputManagerInternal.setDisplayViewports //更显inputManager中viewport
+  //更显inputManager中viewport
+- mHandler.sendEmptyMessage(MSG_UPDATE_VIEWPORT)-->mInputManagerInternal.setDisplayViewports 
 }@DisplayManagerService.java
 
 
-//android8.0
+/**********
+ android8.0
+
+*/
+applyRotationLocked(final int oldRotation, final int rotation)@DisplayContent.java-->
 performTraversalInTransactionFromWindowManager-->performTraversalInTransactionFromWindowManagerInternal
 -->performTraversalInTransactionLocked{
  //清除viewport
@@ -190,12 +196,55 @@ configureDisplayLocked(DisplayDevice){
 - setProjectionLocked@DisplayDevice.java
 }@LogicalDisplay.java
 
-
 //获取display信息
 getDisplayInfo(int displayId)-->getDisplayInfoInternal(int displayId, int callingUid){
 - LogicalDisplay display = mLogicalDisplays.get(displayId)
 - DisplayInfo info = display.getDisplayInfoLocked()
 }
+
+/*********
+ android10
+
+ windowManager设置到surfaceFlinger
+*/
+applyRotationLocked(final int oldRotation, final int rotation)-->@DisplayContent.java-->
+mWmService.mDisplayManagerInternal.performTraversal(getPendingTransaction())-->performTraversal-->
+performTraversalInternal(SurfaceControl.Transaction t){
+- performTraversalLocked(t){
+	- clearViewportsLocked()
+	- final int count = mDisplayDevices.size()
+	  //更新到surfaceFlinger
+	- for (int i = 0; i < count; i++) {
+		- DisplayDevice device = mDisplayDevices.get(i)
+		- configureDisplayLocked(t, device)
+		- device.performTraversalLocked(t)
+		}
+	  //更新到InputManager
+	- mHandler.sendEmptyMessage(MSG_UPDATE_VIEWPORT)
+	}
+- for (DisplayTransactionListener listener : mDisplayTransactionListeners) {
+	- listener.onDisplayTransaction(t)
+	}
+}@DisplayManagerService.java
+
+configureDisplayLocked(SurfaceControl.Transaction t, DisplayDevice device) {
+- LogicalDisplay display = findLogicalDisplayForDeviceLocked(device)
+  //设置的到surfaceFlinger
+- display.configureDisplayLocked(t, device, info.state == Display.STATE_OFF){
+	- device.setLayerStackLocked(t, isBlanked ? BLANK_LAYER_STACK : mLayerStack)
+	- orientation = (orientation + displayDeviceInfo.rotation) % 4
+	- device.setProjectionLocked(t, orientation, mTempLayerStackRect, mTempDisplayRect)	//设置到surfaceControl
+	}@LogicDisplay.java
+- populateViewportLocked(viewportType, display.getDisplayIdLocked(), device, info.uniqueId){
+	- DisplayViewport viewport = getViewportLocked(viewportType, uniqueId)
+	- device.populateViewportLocked(viewport)
+	}
+}@DisplayManagerService.java
+
+setProjectionLocked(SurfaceControl.Transaction t, int orientation,Rect layerStackRect, Rect displayRect) {
+- 
+- t.setDisplayProjection(mDisplayToken, orientation, layerStackRect, displayRect);
+}@DisplayDevice.java
 
 
 frameworks/base/services/core/java/com/android/server/display/DisplayManagerService.java

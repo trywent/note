@@ -2,8 +2,10 @@
  locationManagerService
 
 */
-服务启动：
-new LocationManagerService().systemReady--new Thread(null,this,"").run()@SystemServer.java-->
+LocationManagerService(Context context) {
+
+}
+systemReady--new Thread(null,this,"").run()@SystemServer.java-->
 run-->initialize-->loadProviders-->loadProvidersLocked-->_loadProvidersLocked-->
 updateProvidersLocked-->updateProviderListenersLocked@LocationManagerService.java-->
 enableLocationTracking
@@ -32,7 +34,7 @@ sendExtraCommand(String command, Bundle extras) {
 }@GnssLocationProvider.java
 
 
-/*
+/********
  provider
 
  gnss
@@ -57,7 +59,6 @@ updateProvidersLocked-->(获取provider的状态)isAllowedBySettingsLocked--upda
 - 获取改record中的接收者，并通知他们provider的状态更新。
 - 移除已死亡的接收者receiver
 - 使能或关闭provider。 p.enable(),p.enableLocationTracking
-
 }@LocationManagerService.java-->(打开gps为例)enableLocationTracking-->sendMessage(ENABLE_TRACKING)
 -->ProviderHandler.handleMessage-->handleEnableLocationTracking-->startNavigating@GpsLocationProvider.java
 

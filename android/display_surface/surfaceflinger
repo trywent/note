@@ -53,7 +53,6 @@ SurfaceFlinger::onTransact{
 - 
 }
 
-
 //处理message
 SurfaceFlinger::onMessageReceived(int32_t what) {
 - MessageQueue::INVALIDATE{
@@ -102,8 +101,6 @@ handleTransactionLocked{
 - commitTransaction()
 }@SurafaceFlinger.cpp
 
-
- 
 onHotplugReceived-->createDefaultDisplayDevice{	//显示屏热插拔事务
 - BufferQueue::createBufferQueue(&producer, &consumer)
 - fbs = new FramebufferSurface(*mHwc, type, consumer)
@@ -114,7 +111,11 @@ onHotplugReceived-->createDefaultDisplayDevice{	//显示屏热插拔事务
 }@SurfaceFlinger.cppp
 
 
-//
+/******
+ 将layer合成显示到屏幕。通过HWComposer接口
+
+*/
+//刷新数据
 handleMessageRefresh{
 - preComposition
 - rebuildLayerStacks
@@ -123,7 +124,6 @@ handleMessageRefresh{
 - doComposition
 - postComposition
 }@SurfaceFlinger
-
 
 setUpHWComposer{
 - 若layer变化了(mHwWorkListDirty){
@@ -145,30 +145,67 @@ setUpHWComposer{
 - hw->prepareFrame@DisplayDevice.cpp
 }@SurfaceFlinger
 
-doComposition{
-//遍历所有显示器
-- 计算新的脏区,dirtyRegion(hw->getDirtyRegion())
-- doDisplayComposition(hw,dirtyRegion){	
-	- doComposeSurfaces
-	- displayDevice->swapBuffers
-	}
-- postFramebuffer
-}
 
-doComposeSurfaces{
-- 若有hasGlesComposition{
-
+//合成并显示
+doComposition(){
+ //遍历所有显示器
+- for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
+	- const sp<DisplayDevice>& hw(mDisplays[dpy])
+	- const Region dirtyRegion(hw->getDirtyRegion(repaintEverything))
+	  //合成layer数据
+	- doDisplayComposition(hw,dirtyRegion){	
+		- doComposeSurfaces
+		- displayDevice->swapBuffers				//将数据提交到DisplayDevice的producer
+		}
+	- hw->dirtyRegion.clear()
+	- hw->flip(hw->swapRegion)-->DisplayDevice::flip(const Region& dirty){
+		- 
+		}@DisplayDevice.cpp
 	}
-- hw->getVisibleLayersSortedByZ{	//遍历layer
-	- 获取layer需更新的可见区域,clip
-	- 根据合成类型执行操作,layer->getCompositionType{
-		- hwc处理,HWC_OVERLAY
-		- surfaceFlinger绘制HWC_FRAMEBUFFER,layer->draw
+  //显示数据到屏幕
+- postFramebuffer(){
+	- for (size_t displayId = 0; displayId < mDisplays.size(); ++displayId) {
+		- const auto hwcId = displayDevice->getHwcDisplayId()
+		- mHwc->presentAndGetReleaseFences(hwcId)		//提交到屏幕。从consumer中获取数据显示到屏幕
+		- displayDevice->onSwapBuffersCompleted()
 		}
 	}
+}@SurfaceFlinger.cpp
+
+ //合成layer
+SurfaceFlinger::doComposeSurfaces( const sp<const DisplayDevice>& displayDevice, const Region& dirty){
+- bool hasClientComposition = mHwc->hasClientComposition(hwcId)
+- if (hasClientComposition) {
+
+  }
+- 
+  //render
+- const Transform& displayTransform = displayDevice->getOriginalTransform()
+- if(hwcId >= 0){							//HWComposer
+   - for (auto& layer : displayDevice->getVisibleLayersSortedByZ()) {	//遍历layer
+	- const Region clip(dirty.intersect(  displayTransform.transform(layer->visibleRegion)))
+	- switch (layer->getCompositionType(hwcId)) {
+		- HWC2::Composition::Cursor				//鼠标
+		  
+
+		- HWC2::Composition::Client{
+			- layer->draw(displayDevice, clip)
+			}
+		}
+	}
+  else{									//非HWComposer
+	- for (auto& layer : displayDevice->getVisibleLayersSortedByZ()) {
+		- const Region clip(dirty.intersect(displayTransform.transform(layer->visibleRegion)))
+		- layer->draw(displayDevice, clip)
+		}
+	}
+- getRenderEngine().setupColorTransform(oldColorMatrix)
+- mRenderEngine->disableScissor()
 }
 
-postComposition{
+
+//合成完成
+SurfaceFlinger::postComposition(nsecs_t refreshStartTime){
 - 
 - mAnimFrameTracker.setActualPresentFence/setActualPresentTime
 - mAnimFrameTracker.advanceFrame
@@ -181,8 +218,8 @@ frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlinger_hwc1.cpp
 /**************
     MessageQueue两个作用：
-    - 接受display的热拔插事件，脉冲事件，发出消息 Message(MessageQueue::INVALIDATE)
-    - ipc调用接口后发送对应处理消息，在surfaceFlinger主线程中处理消息   Message(MessageQueue::REFRESH)
+    - 接受线程mSFEventThread发出的，display热拔插事件，脉冲事件。收到事件，发出消息 Message(MessageQueue::INVALIDATE)
+    - 应用调用ipc接口后发送消息，在surfaceFlinger主线程中处理消息。发出消息Message(MessageQueue::REFRESH)
 
 */
 SurfaceFlinger::onFirstRef-->mEventQueue.init(this)@SurfaceFlinger.cpp-->
@@ -192,7 +229,27 @@ init{
 - mHandler = new Handler(*this)
 }@MessageQueue.cpp
 
-//设置接收一个线程发出的事件(显示屏的脉冲事件)。并处理
+
+//发出message消息
+MessageQueue::postMessage(const sp<MessageBase>& messageHandler, nsecs_t relTime)-->
+mLooper->sendMessageDelayed(relTime, messageHandler, dummyMessage)@MessageQueue.cpp
+
+//处理message
+SurfaceFlinger::run-->MessageQueue::waitMessage{
+- IPCThreadState::self()->flushCommands							//传完当前所有的ipc数据
+- mLooper->pollOnce-->MessageQueue::Handler::handleMessage(const Message& message)	//读取EventThread事件，并处理
+}@MessageQueue.cpp
+
+MessageQueue::Handler::handleMessage(const Message& message){
+- INVALIDATE:mQueue.mFlinger->onMessageReceived(message.what)
+- REFRESH:mQueue.mFlinger->onMessageReceived(message.what)
+}@MessageQueue.cpp
+
+
+/*
+ 设置接收一个线程发出的事件(显示屏的脉冲事件)。并处理
+ 接收mSFEventThread线程发出的显示器事件
+*/
 SurfaceFlinger::init-->mEventQueue.setEventThread(mSFEventThread)@SurfaceFlinger.cpp-->
 setEventThread(const sp<EventThread>& eventThread){
 - mEventThread = eventThread
@@ -201,32 +258,17 @@ setEventThread(const sp<EventThread>& eventThread){
 - mLooper->addFd(mEventTube.getFd(), 0, Looper::EVENT_INPUT,MessageQueue::cb_eventReceiver, this)
 }@MessageQueue.cpp
 
-//请求脉冲事件
+//请求脉冲事件。。最后收到脉冲事件时发出INVALIDATE消息
 MessageQueue::invalidate-->mEvents->requestNextVsync@MessageQueue.cpp-->mEventConnection->requestNextVsync()
 @DisplayEventReceiver.cpp
 
-//接收事件
+//接收到脉冲事件
 MessageQueue::cb_eventReceiver(int fd, int events, void* data)-->MessageQueue::eventReceiver{
 - DisplayEventReceiver::getEvents(&mEventTube, buffer, 8)
   //收到脉冲事件，后发送消息
 - if (buffer[i].header.type == DisplayEventReceiver::DISPLAY_EVENT_VSYNC)
 	- mHandler->dispatchInvalidate()-->mQueue.mLooper->sendMessage(this, Message(MessageQueue::INVALIDATE))
 }
-
-//MessageQueue::postMessage发出的message
-MessageQueue::postMessage(const sp<MessageBase>& messageHandler, nsecs_t relTime)-->
-mLooper->sendMessageDelayed(relTime, messageHandler, dummyMessage)@MessageQueue.cpp
-
-//处理message
-SurfaceFlinger::run-->MessageQueue::waitMessage{
-- IPCThreadState::self()->flushCommands					//传完当前所有的ipc数据
-- mLooper->pollOnce-->MessageQueue::Handler::handleMessage(const Message& message)//读取EventThread事件，并处理
-}@MessageQueue.cpp
-
-MessageQueue::Handler::handleMessage(const Message& message){
-- INVALIDATE:mQueue.mFlinger->onMessageReceived(message.what)
-- REFRESH:mQueue.mFlinger->onMessageReceived(message.what)
-}@MessageQueue.cpp
 
 
 //Looper
@@ -243,6 +285,30 @@ MessageQueue::Handler::handleMessage(const Message& message){
 
 frameworks/native/services/surfaceflinger/MessageQueue.cpp
 system/core/libutils/Looper.cpp
+/**************
+  上层操作接口
+  更新窗口大小，位置，层次   
+  signalTransaction/signalLayerUpdate-->mEventQueue.invalidate()  需要显示屏的脉冲事件
+*/
+SurfaceFlinger::setTransactionState(const Vector<ComposerState>& state,const Vector<DisplayState>& displays, uint32_t flags){
+- if (flags & eAnimation) {
+	- 
+	}
+ //遍历设置display
+- transactionFlags |= setDisplayStateLocked(displays[i]){
+
+	}
+ //遍历设置ComposerState
+- const ComposerState& s(state[i])
+- sp<Client> client( static_cast<Client *>(s.client.get()) )
+- transactionFlags |= setClientStateLocked(client, s.state)
+ //设置
+- if (transactionFlags) {
+	- setTransactionFlags(transactionFlags)-->signalTransaction()-->mEventQueue.invalidate()
+	}
+}@SurfaceFlinger.cpp
+
+
 /**************
    client{ 客户端操作接口
 	- createSurface 创建surface(layer)
@@ -327,6 +393,12 @@ frameworks/native/services/surfaceflinger/Client.cpp
   layer
 
 */
+class Layer : public SurfaceFlingerConsumer::ContentsChangedListener { 	//实现listener监听处理数据
+  //设置mTexture,关联到SurfaceFlingerConsumer
+- mFlinger->getRenderEngine().genTextures(1, &mTextureName)
+- mTexture.init(Texture::TEXTURE_EXTERNAL, mTextureName)
+}
+
 //surfaceFlinger创建对应的bufferQueue(包含producer，consumer)
 new Layer(this, client, name, w, h)-->onFirstRef{
 - sp<IGraphicBufferProducer> producer
@@ -337,19 +409,10 @@ new Layer(this, client, name, w, h)-->onFirstRef{
 	- mFlinger(flinger)
 	- mLayer(layer)
 	}@MonitoredProducer.cpp
-- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer)	//consumer
+- mSurfaceFlingerConsumer = new SurfaceFlingerConsumer(consumer, mTextureName, this)//consumer，关联到mTexture
 - mSurfaceFlingerConsumer.setContentsChangedListener(this) 		//bufferqueu监听器回调
 }@Layer.cpp
 
-//应用提交了数据，
-Layer::onFrameAvailable(const BufferItem& item) {
-- while (item.mFrameNumber != mLastFrameNumberReceived + 1) {		//若编号不对，则继续等待
-	- mQueueItemCondition.waitRelative(mQueueItemLock,ms2ns(500))
-	}
-- mQueueItems.push_back(item)
-- mQueueItemCondition.broadcast()
-- mFlinger->signalLayerUpdate()
-}@Layer.cpp
 
 //移除
 Layer::onRemoved() {
@@ -363,56 +426,60 @@ Layer::onRemoved() {
 //销毁
 ~LayerCleaner()-->mFlinger->onLayerDestroyed(mLayer)
 
-frameworks/native/services/surfaceflinger/Layer.cpp
-/**************
-  更新窗口大小，位置，层次
-   
-   signalTransaction/signalLayerUpdate-->mEventQueue.invalidate()  需要显示屏的脉冲事件
+/* layer 数据处理
+  SurfaceFlingerConsumer Layer处理应用的数据。将所有应用的数据获取到surfaceflinger
+  监听MonitoredProducer的数据(应用填入数据)
 */
-SurfaceFlinger::setTransactionState(const Vector<ComposerState>& state,const Vector<DisplayState>& displays, uint32_t flags){
-- if (flags & eAnimation) {
+//GL_TEXTURE_EXTERNAL_OES 从bufferQueue中消耗数据
+SurfaceFlingerConsumer : public GLConsumer : public ConsumerBase
+
+//监听应用绘制数据是否可用。SurfaceFlingerConsumer没有重写onFrameAvailable，由layer中函数处理
+mSurfaceFlingerConsumer.setContentsChangedListener(this)@Layer.cpp-->
+SurfaceFlingerConsumer::setContentsChangedListener(const wp<ContentsChangedListener>& listener){
+- setFrameAvailableListener(listener){
+	- mFrameAvailableListener = listener
+	}@ConsumerBase.cpp
+- mContentsChangedListener = listener
+}
+
+//应用提交了数据，数据可用时。
+BufferQueueProducer::queueBuffer-->frameAvailableListener->onFrameAvailable
+-->listener->onFrameAvailable@ProxyConsumerListener.cpp
+ConsumerBase::onFrameAvailable-->listener->onFrameAvailable(item)-->
+Layer::onFrameAvailable(const BufferItem& item) {
+- while (item.mFrameNumber != mLastFrameNumberReceived + 1) {		//若编号不对，则继续等待
+	- mQueueItemCondition.waitRelative(mQueueItemLock,ms2ns(500))
+	}
+- mQueueItems.push_back(item)
+- mQueueItemCondition.broadcast()
+- mFlinger->signalLayerUpdate()
+}@Layer.cpp
+
+//
+Layer::draw(const sp<const DisplayDevice>& hw, const Region& clip)-->
+Layer::onDraw(const sp<const DisplayDevice>& hw, const Region& clip,bool useIdentityTransform){
+- if (CC_UNLIKELY(mActiveBuffer == 0)) {	//surfaceView第一次没有绘制
 	- 
 	}
- //遍历设置display
-- transactionFlags |= setDisplayStateLocked(displays[i]){
-
+  //绘制
+- mSurfaceFlingerConsumer->bindTextureImage()	//GLConsumer关联到egl上下文。mTexture
+- bool blackOutLayer = isProtected() || (isSecure() && !hw->isSecure());
+- RenderEngine& engine(mFlinger->getRenderEngine())
+- if(blackOutLayer){
+	  //mTexture和mSurfaceFlingerConsumer关联
+	- mTexture.setDimensions(mActiveBuffer->getWidth(), mActiveBuffer->getHeight())
+	- mTexture.setFiltering(useFiltering)
+	- engine.setupLayerTexturing(mTexture)
+  }else{
+	- engine.setupLayerBlackedOut(
 	}
- //遍历设置ComposerState
-- const ComposerState& s(state[i])
-- sp<Client> client( static_cast<Client *>(s.client.get()) )
-- transactionFlags |= setClientStateLocked(client, s.state)
- //设置
-- if (transactionFlags) {
-	- setTransactionFlags(transactionFlags)-->signalTransaction()-->mEventQueue.invalidate()
-	}
-}@SurfaceFlinger.cpp
-
-/**************
-  更新窗口显示内容
-   
-   signalRefresh-->mEventQueue.refresh()
-*/
-
-//producer
-createDefaultDisplayDevice-->new DisplayDevice(fbs,producer)-->new Surface(producer)@DisplayDevice.cpp
--->
+- drawWithOpenGL(hw, useIdentityTransform)
+- engine.disableTexturing()
+}@Layer.cpp
 
 
-//consumer显示到fb
-createDefaultDisplayDevice-->new FramebufferSurface(consumer)
-
-
-FramebufferSurface::onFrameAvailable-->HWComposer::fbPost
-
-
-
-
-
-frameworks/native/services/surfaceflinger/DisplayDevice.cpp
-frameworks/native/services/surfaceflinger/MonitoredProducer.cpp
-frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
-
-
+frameworks/native/services/surfaceflinger/Layer.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlingerConsumer.cpp
 /**************
 
 */

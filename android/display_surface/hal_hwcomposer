@@ -1,8 +1,9 @@
-/* HAL hwcomposer
+/************************
+  HAL hwcomposer1
 
 */
 
-//composer模块
+//module
 typedef struct hwc_module {
     struct hw_module_t common;
 } hwc_module_t;
@@ -11,30 +12,21 @@ typedef struct hwc_module {
 typedef struct hwc_composer_device_1 {
     struct hw_device_t common;
     int (*prepare)(struct hwc_composer_device_1 *dev,size_t numDisplays, hwc_display_contents_1_t** displays);	
-
     int (*set)(struct hwc_composer_device_1 *dev,size_t numDisplays, hwc_display_contents_1_t** displays);	//eglSwapBuffers
-
     int (*eventControl)(struct hwc_composer_device_1* dev, int disp,int event, int enabled);	//关闭或打开h/w composer事件(HWC_EVENT_VSYNC)
-
     union {
         int (*blank)(struct hwc_composer_device_1* dev, int disp, int blank);
         int (*setPowerMode)(struct hwc_composer_device_1* dev, int disp,int mode);		//替代blank
     };
-
     int (*query)(struct hwc_composer_device_1* dev, int what, int* value);
     void (*registerProcs)(struct hwc_composer_device_1* dev,hwc_procs_t const* procs);		//注册回调
     void (*dump)(struct hwc_composer_device_1* dev, char *buff, int buff_len);
-
     int (*getDisplayConfigs)(struct hwc_composer_device_1* dev, int disp,uint32_t* configs, size_t* numConfigs);	//获取显示屏config
-
     int (*getDisplayAttributes)(struct hwc_composer_device_1* dev, int disp, uint32_t config, const uint32_t* attributes, int32_t* values);
-
     int (*getActiveConfig)(struct hwc_composer_device_1* dev, int disp);
-
     int (*setActiveConfig)(struct hwc_composer_device_1* dev, int disp,int index);
     int (*setCursorPositionAsync)(struct hwc_composer_device_1 *dev, int disp, int x_pos, int y_pos);	//鼠标箭头，在prepare()/set()之间调用
     void* reserved_proc[1];
-
 } hwc_composer_device_1_t;
 
 
@@ -79,13 +71,10 @@ typedef struct hwc_layer_1 {
      * HWC_CURSOR_OVERLAY 	该层不被HWC合成
      */
     int32_t compositionType;
-
     uint32_t hints;
     uint32_t flags;
-
     union {
-        hwc_color_t backgroundColor;	//HWC_BACKGROUND layer
-	
+        hwc_color_t backgroundColor;	//HWC_BACKGROUND layer	
 	struct {			//正常layer	    
             union {			//数据源
                 /* HWC_FRAMEBUFFER, HWC_OVERLAY,HWC_FRAMEBUFFER_TARGET要合成的数据buffer,一般从 gralloc中分配 */
@@ -102,16 +91,14 @@ typedef struct hwc_layer_1 {
             };
             hwc_rect_t displayFrame;		//绘制到屏幕哪个区域
             hwc_region_t visibleRegionScreen;	//在屏幕上的可见区域
-            int acquireFenceFd;		//用来获取通知buffer中数据可用
-            int releaseFenceFd;		//为sync fence object设置的文件描述符，用于hwc读取buffer后发送信号
-            uint8_t planeAlpha;		//透明度
+            int acquireFenceFd;			//用来获取通知buffer中数据可用
+            int releaseFenceFd;			//为sync fence object设置的文件描述符，用于hwc读取buffer后发送信号
+            uint8_t planeAlpha;			//透明度
             uint8_t _pad[3];
-            hwc_region_t surfaceDamage;	//source buffer内容被修改的大小
+            hwc_region_t surfaceDamage;		//source buffer内容被修改的大小
         };
     };
-
     uint8_t reserved[96 - 84];
-
 } hwc_layer_1_t;
 
 
@@ -141,11 +128,9 @@ hwc_device_open{
 - dev->device.set = hwc_set
 }
 
-
+//hwcomper1中才使用
 HWComposer::fbPost-->mFbDev->post(/*写入位置fb地址保存在module中*/, /*要写入的数据*/buffer->handle)
 @HWComposer.cpp-->fb_post@framebuffer.cpp
-
-
 
 
 //获取display信息
@@ -158,5 +143,41 @@ queryDisplayProperties{
 
 hardware/libhardware/include/hardware/hwcomposer.h
 hardware/libhardware/modules/hwcomposer/hwcomposer.cpp
+/************************
+  HAL hwcomposer2
 
+  IComposer为hal接口
+*/
+interface IComposer {
+    getCapabilities() generates (vec<Capability> capabilities);
+    dumpDebugInfo() generates (string debugInfo);
+    createClient() generates (Error error, IComposerClient client);
+}@IComposer.hal
 
+interface IComposerClient {
+    registerCallback(IComposerCallback callback)
+    getMaxVirtualDisplayCount() generates (uint32_t count)
+    createLayer(Display display, uint32_t bufferSlotCount)
+    destroyLayer(Display display, Layer layer) generates (Error error)
+    getActiveConfig(Display display) generates (Error error, Config config)
+    getDisplayName(Display display) generates (Error error, string name)
+}@IComposerClient.hal
+
+//hal服务启动
+int main() {
+- android::ProcessState::initWithDriver("/dev/vndbinder");
+- android::ProcessState::self()->setThreadPoolMaxThreadCount(4);
+- android::ProcessState::self()->startThreadPool();
+  //打开android.hardware.xxx@1.0::Ixxx库文件。获取接口HIDL_FETCH_Ixxx
+- return defaultPassthroughServiceImplementation<IComposer>(4);	//IComposer服务
+}@service.cpp
+
+//加载库
+IComposer* HIDL_FETCH_IComposer(const char*){
+- const hw_module_t* module = nullptr;
+- hw_get_module(HWC_HARDWARE_MODULE_ID, &module)
+- return new HwcHal(module)
+}@Hwc.cpp
+
+hardware/interfaces/graphics/composer/2.1/default/service.cpp
+hardware/interfaces/graphics/composer/2.1/default/Hwc.cpp

@@ -1,0 +1,200 @@
+/*********************************************
+ surfaceControl
+
+*/
+
+SurfaceSession(){
+- mNativeClient = nativeCreate(JNIEnv* env, jclass clazz) {
+	- SurfaceComposerClient* client = new SurfaceComposerClient()
+	- client->incStrong((void*)nativeCreate)
+	- return reinterpret_cast<jlong>(client)
+	}@android_view_SurfaceSession.cpp
+}@SurfaceSession.java
+
+Builder(SurfaceSession).build-->
+SurfaceControl(SurfaceSession session, String name, int w, int h, int format,
+	 int flags, SurfaceControl parent, SparseIntArray metadata){
+- Parcel metaParcel = Parcel.obtain()
+- metaParcel.writeInt(metadata.size())
+- mNativeObject = nativeCreate(session, name, w, h, format, flags, parent != null ? parent.mNativeObject : 0, metaParcel){
+	- sp<SurfaceComposerClient> client = android_view_SurfaceSession_getClient(env, sessionObj)
+	  //创建surfaceControl
+	- sp<SurfaceControl> surface
+	- client->createSurfaceChecked(String8(name.c_str()), w, h, format, &surface, flags, parent, std::move(metadata))
+	}@android_view_SurfaceControl.cpp
+}@SurfaceControl.java
+
+
+
+//释放。若有应用自己在Callback.surfaceDestroyed中调用了SurfaceControl.release窗口不会立即消失。要等父窗口消失
+release()@SurfaceControl.java-->
+nativeRelease(JNIEnv* env, jclass clazz, jlong nativeObject){
+- sp<SurfaceControl> ctrl(reinterpret_cast<SurfaceControl *>(nativeObject))
+- ctrl->release()--> release(){
+	- mClient.clear()
+	- mHandle.clear()
+	- mGraphicBufferProducer.clear()
+	}
+}@android_view_SurfaceControl.cpp
+
+//销毁
+remove()@SurfaceControl.java-->
+nativeDestroy(JNIEnv* env, jclass clazz, jlong nativeObject){
+- sp<SurfaceControl> ctrl(reinterpret_cast<SurfaceControl *>(nativeObject))
+- ctrl->destroy()-->destroy(){
+	- if(isValid())SurfaceComposerClient::Transaction().reparent(this, nullptr).apply()
+	-  release()
+	}@SurfaceControl.cpp
+}@android_view_SurfaceControl.cpp
+
+
+frameworks/base/core/java/android/view/SurfaceSession.java
+frameworks/base/core/jni/android_view_SurfaceSession.cpp
+frameworks/base/core/java/android/view/SurfaceControl.java
+frameworks/base/core/jni/android_view_SurfaceControl.cpp
+frameworks/native/libs/gui/SurfaceControl.cpp
+
+/**********
+ transaction事务,设置窗口操作
+*/
+ativeAllocationRegistry sRegistry = new NativeAllocationRegistry(
+                Transaction.class.getClassLoader(),
+                nativeGetNativeTransactionFinalizer(), 512)
+//开始事务
+SurfaceControl.openTransaction(){
+- sGlobalTransaction = new Transaction(){
+	- mNativeObject = nativeCreateTransaction() -->new SurfaceComposerClient::Transaction
+	- mFreeNativeResources = sRegistry.registerNativeAllocation(this, mNativeObject)
+	}
+- sTransactionNestCount++
+}@SurfaceControl.java
+
+
+
+//设置cornorRadius
+setCornerRadius(float cornerRadius)-->sGlobalTransaction.setCornerRadius(this, cornerRadius)-->
+Transaction.setCornerRadius(SurfaceControl sc, float cornerRadius)@SurfaceControl.java-->-->
+nativeSetCornerRadius(mNativeObject, sc.mNativeObject, cornerRadius){
+- auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj)
+- SurfaceControl* const ctrl = reinterpret_cast<SurfaceControl *>(nativeObject)
+- transaction->setCornerRadius(ctrl, cornerRadius)-->
+	SurfaceComposerClient::Transaction::setCornerRadius
+}@android_view_SurfaceControl.cpp
+
+
+//提交事务
+closeTransaction() {
+- --sTransactionNestCount
+- sGlobalTransaction.apply()-->apply(false){
+	- applyResizedSurfaces()
+	- nativeApplyTransaction(mNativeObject, sync)--> transaction->apply(sync)-->
+		SurfaceComposerClient::Transaction::apply(bool synchronous)
+}@SurfaceControl.java
+
+
+/**********
+ surfaceComposerClinet 对应上层surfaceSession
+
+*/
+//获取服务
+sp<ISurfaceComposer> mComposerService
+
+ComposerService::getComposerService() {
+- ComposerService& instance = ComposerService::getInstance()-->ComposerService()-->
+	connectLocked(){
+	- const String16 name("SurfaceFlinger")			//获取surfaceFlinger服务
+	- getService(name, &mComposerService)
+	- mDeathObserver = new DeathObserver(*const_cast<ComposerService*>(this))
+	- IInterface::asBinder(mComposerService)->linkToDeath(mDeathObserver)
+	}
+}
+//创建surfaceComposerClinet
+SurfaceComposerClient(const sp<ISurfaceComposerClient>& client):mStatus(NO_ERROR), mClient(client)
+
+SurfaceComposerClient::onFirstRef() {
+- sp<ISurfaceComposer> sf(ComposerService::getComposerService())
+- sp<ISurfaceComposerClient> conn = sf->createConnection()	//surfaceFlinger端Client
+- mClient = conn
+}@SurfaceComposerClient.cpp
+
+
+//创建surfaceControl
+SurfaceComposerClient::createSurfaceChecked(const String8& name, uint32_t w, uint32_t h,PixelFormat format,
+      sp<SurfaceControl>* outSurface, uint32_t flags, SurfaceControl* parent, LayerMetadata metadata) {
+- sp<IBinder> handle
+- sp<IGraphicBufferProducer> gbp
+- mClient->createSurface(name, w, h, format, flags, parentHandle, std::move(metadata),&handle, &gbp)
+- *outSurface = new SurfaceControl(this, handle, gbp, true /* owned */)
+}@SurfaceComposerClient.cpp
+
+//事务
+SurfaceComposerClient::Transaction::Transaction(const Transaction& other)
+      : mForceSynchronous(other.mForceSynchronous),
+        mTransactionNestCount(other.mTransactionNestCount),
+        mAnimation(other.mAnimation),
+        mEarlyWakeup(other.mEarlyWakeup),
+        mDesiredPresentTime(other.mDesiredPresentTime) {
+    mDisplayStates = other.mDisplayStates;
+    mComposerStates = other.mComposerStates;
+- mInputWindowCommands = other.mInputWindowCommands;
+}
+
+
+/**********
+  设置窗口，layer
+ 
+*/
+//surfaceControl加入到transaction中容器mComposerStates
+SurfaceComposerClient::Transaction::getLayerState(const sp<SurfaceControl>& sc){
+- ComposerState s
+- s.client = sc->getClient()->mClient
+- s.state.surface = sc->getHandle()
+- mComposerStates[sc] = s
+}@SurfaceComposerClient.cpp
+
+//设置圆角
+SurfaceComposerClient::Transaction::setCornerRadius({
+- layer_state_t* s = getLayerState(sc)
+- s->what |= layer_state_t::eCornerRadiusChanged
+- s->cornerRadius = cornerRadius
+}@SurfaceComposerClient.cpp
+
+
+
+/**********
+ 设置display操作
+
+*/
+//设置方位
+SurfaceComposerClient::Transaction::setDisplayProjection(const sp<IBinder>& token,
+	uint32_t orientation,const Rect& layerStackRect, const Rect& displayRect) {
+- DisplayState& s(getDisplayState(token))
+- s.orientation = orientation
+- s.viewport = layerStackRect
+- s.frame = displayRect;
+- s.what |= DisplayState::eDisplayProjectionChanged
+}
+
+//设置大小
+SurfaceComposerClient::Transaction::setDisplaySize(const sp<IBinder>& token, uint32_t width, uint32_t height) {
+- DisplayState& s(getDisplayState(token));
+- s.width = width;
+- s.height = height;
+- s.what |= DisplayState::eDisplaySizeChanged;
+}
+
+
+//提交事务
+SurfaceComposerClient::Transaction::apply(bool synchronous) {
+- sp<ISurfaceComposer> sf(ComposerService::getComposerService())
+  //layer信息，大小，层次
+- for (auto const& kv : mComposerStates){
+	- composerStates.add(kv.second)
+	}
+  //diaplay信息，方位，大小
+- displayStates = mDisplayStates
+- sf->setTransactionState(composerStates, displayStates, flags, applyToken,...)
+}@SurfaceComposerClient.cpp
+
+frameworks/native/libs/gui/SurfaceComposerClient.cpp
+

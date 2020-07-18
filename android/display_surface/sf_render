@@ -1,0 +1,25 @@
+/************************
+ render
+
+*/
+init-->RenderEngine::create(mEGLDisplay, HAL_PIXEL_FORMAT_RGBA_8888, 0)@SurfaceFlinger.cpp-->
+RenderEngine::create(EGLDisplay display, int hwcFormat, uint32_t featureFlags) {
+- 
+- EGLContext ctxt = eglCreateContext(display, config, NULL, contextAttributes.data())
+- RenderEngine* engine = new GLES20RenderEngine(featureFlags)
+- engine->setEGLHandles(config, ctxt)
+- eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)
+}@RenderEngine.cpp
+
+
+
+frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.h
+frameworks/native/services/surfaceflinger/RenderEngine/RenderEngine.cpp
+frameworks/native/services/surfaceflinger/RenderEngine/GLES20RenderEngine.cpp
+/************************
+
+*/
+setView@ViewRootImpl-->HardwareRenderer.createGlRenderer-->
+Gl20Renderer.create-->new Gl20Renderer
+
+frameworks/base/core/java/android/view/HardwareRenderer.java
