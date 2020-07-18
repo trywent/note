@@ -103,6 +103,12 @@ WindowConfiguration windowConfiguration = new WindowConfiguration()
 - Configuration mMergedOverrideConfiguration		//父mMergedOverrideConfiguration和mResolvedOverrideConfiguration
 }@ConfigurationContainer.java
 
+//改变parent.加入父容器或者发生移栈
+onParentChanged() {
+- onConfigurationChanged
+- onMergedOverrideConfigurationChanged
+}@ConfigurationContainer.java
+
 //设置位置大小。改变mRequestedOverrideConfiguration
 setBounds(int left, int top, int right, int bottom) {
 - mTmpRect.set(left, top, right, bottom)
@@ -113,7 +119,6 @@ setBounds(int left, int top, int right, int bottom) {
 	- onRequestedOverrideConfigurationChanged(mTmpConfig)
 	}
 }@ConfigurationContainer.java
-
 
 //设置窗口模式  
 setWindowingMode(int windowingMode) {
@@ -134,6 +139,8 @@ onRequestedOverrideConfigurationChanged(Configuration overrideConfiguration) {
 		}
 	}
 }@ConfigurationContainer.java
+
+
 
 
 frameworks/base/services/core/java/com/android/server/wm/ConfigurationContainer.java
@@ -298,7 +305,7 @@ resize(Rect bounds, Rect tempTaskBounds, Rect tempTaskInsetBounds) {
 - setBounds(bounds)
 }@ActivityStack.java
 
-onConfigurationChanged(Configuration newParentConfig) {	//改变大小会调用
+onConfigurationChanged(Configuration newParentConfig) {	//改变大小,父容器,位置调用
 - int prevWindowingMode = getWindowingMode()
 - super.onConfigurationChanged(newParentConfig)
 - if (overrideWindowingMode == WINDOWING_MODE_PINNED) {
@@ -338,6 +345,12 @@ createTask(boolean onTop, boolean showForAllUsers) {
 - stack.addTask(mTask, position, showForAllUsers, onTop /* moveParents */)
 }@TaskRecord.java
 
+//设置栈
+addTask@ActivityStack.java-->
+setStack(ActivityStack stack){
+- stack.onActivityAddedToStack(activity)
+- onParentChanged()
+}@TaskRecord.java
 
 //改变大小。调用mTask.setOverrideDisplayedBounds设置到task
 resize(Rect bounds, int resizeMode, boolean preserveWindow, boolean deferResume) {
@@ -357,6 +370,11 @@ updateOverrideConfiguration(Rect bounds, @Nullable Rect insetBounds) {
 	}
 - Rect steadyBounds = hasSetDisplayedBounds ? insetBounds : bounds
 - setBounds(steadyBounds)
+}@TaskRecord.java
+
+onConfigurationChanged(Configuration newParentConfig) {	//配置发生变化
+- 
+- saveLaunchingStateIfNeeded
 }@TaskRecord.java
 
 frameworks/base/services/core/java/com/android/server/wm/TaskRecord.java

@@ -1,3 +1,21 @@
 /************************
  proc文件系统
 */
+
+//创建proc文件
+//proc_create("tty/drivers", 0, NULL, &proc_tty_drivers_operations)@proc_tty.c
+static inline struct proc_dir_entry *proc_create(const char *name, umode_t mode, 
+	struct proc_dir_entry *parent,const struct file_operations *proc_fops)@proc_fs.h-->
+struct proc_dir_entry *proc_create_data(const char *name, umode_t mode,struct proc_dir_entry *parent,
+	const struct file_operations *proc_fops,void *data)(name, mode, parent, proc_fops, NULL){
+- struct proc_dir_entry *pde = __proc_create(&parent, name, mode, 1)
+- pde->proc_fops = proc_fops
+- pde->proc_iops = &proc_file_inode_operations
+- proc_register(parent, pde)
+}@generic.c
+
+
+
+
+kernel/include/linux/proc_fs.h
+kernel/fs/proc/generic.c
