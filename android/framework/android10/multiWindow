@@ -1,0 +1,29 @@
+/*******************************************
+ split, pip
+
+*/
+
+//注册task监听forceresize
+ForcedResizableInfoActivityController--> ActivityManagerWrapper.getInstance().registerTaskStackListener(
+                new TaskStackChangeListener() {
+			public void onActivityForcedResizable(String packageName, int taskId,
+                            int reason) {
+                        activityForcedResizable(packageName, taskId, reason);
+                    }
+		})@ForcedResizableInfoActivityController.java
+
+//有activity forceresize
+activityForcedResizable(String packageName, int taskId, int reason) {
+- mPendingTasks.add(new PendingTaskRecord(taskId, reason))
+}@ForcedResizableInfoActivityController.java
+
+//显示应用可能无法在分屏模式下正常运行
+showPending{
+- Intent intent = new Intent(mContext, ForcedResizableInfoActivity.class)
+- options.setLaunchTaskId(pendingRecord.taskId)
+- options.setTaskOverlay(true, true /* canResume */)
+- mContext.startActivityAsUser(intent, options.toBundle(), UserHandle.CURRENT)
+}@ForcedResizableInfoActivityController.java
+
+SystemUI/src/com/android/systemui/stackdivider/ForcedResizableInfoActivityController.java
+SystemUI/src/com/android/systemui/stackdivider/ForcedResizableInfoActivity.java

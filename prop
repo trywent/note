@@ -58,6 +58,8 @@ setprop sys.fyt.debug.set debugoon
 
 #打开root
 setprop sys.fyt.setparama lsecadbdebug9 
+setprop sys.fyt.setparama debuglevel6
+
 
 #打开a2dpsrc
 persist.lsec.enable_a2dp=true

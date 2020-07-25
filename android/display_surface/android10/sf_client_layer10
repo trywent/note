@@ -1,5 +1,5 @@
 /*********************************************
- surfaceFlihger端 client layer
+ surfaceFlinger端 client layer
 
 */
 //创建Client
@@ -11,15 +11,31 @@ SurfaceFlinger::createConnection() {
 class BnSurfaceComposer: public BnInterface<ISurfaceComposer>
 class SurfaceFlinger : public BnSurfaceComposer, public PriorityDumper,  private IBinder::DeathRecipient, private HWC2::ComposerCallback
 
-
-//提交事务
-SurfaceFlinger::setTransactionState(const Vector<ComposerState>& states, const Vector<DisplayState>& displays, uint32_t flags,
-     const sp<IBinder>& applyToken, const InputWindowCommands& inputWindowCommands,int64_t desiredPresentTime,
-     const client_cache_t& uncacheBuffer,const std::vector<ListenerCallbacks>& listenerCallbacks) {
-- auto itr = mTransactionQueues.find(applyToken)
+/*
+ 提交事务
+ 处理surfaceComposerClient上层调用。将修改暂时保存到layer.mCurrentState，
+ 最终到surfaceFlinger主线程messagequeue中处理,应该是作用到layer.mDrawingState
+*/
+SurfaceFlinger::setTransactionState(const Vector<ComposerState>& states,...)-->
+SurfaceFlinger::applyTransactionState(const Vector<ComposerState>& states,const Vector<DisplayState>& displays, uint32_t flags,
+    const InputWindowCommands& inputWindowCommands,const int64_t desiredPresentTime,const client_cache_t& uncacheBuffer,
+    const std::vector<ListenerCallbacks>& listenerCallbacks, const int64_t postTime, bool privileged, bool isMainThread){
 - 
+  //设置display
+- for (const DisplayState& display : displays) {
+  	- transactionFlags |= setDisplayStateLocked(display);
+  }
+  //设置client。所有事务封装到states
+- for (const ComposerState& state : states) {
+	- clientStateFlags |= setClientStateLocked(state, desiredPresentTime, listenerCallbacks,postTime, privileged)
+	}
+  //触发消息,处理设置
+- mInterceptor->saveTransaction(states, mCurrentState.displays, displays, flags)
+- setTransactionFlags(transactionFlags, start)-->signalTransaction
 }@SurfaceFlinger.cpp
 
+
+//设置client(layer)。状态保存到layer的mCurrentState
 SurfaceFlinger::setClientStateLocked(const ComposerState& composerState, int64_t desiredPresentTime,
         const std::vector<ListenerCallbacks>& listenerCallbacks, int64_t postTime,bool privileged) {
 - const layer_state_t& s = composerState.state
@@ -29,12 +45,33 @@ SurfaceFlinger::setClientStateLocked(const ComposerState& composerState, int64_t
 - if (what & layer_state_t::ePositionChanged) {
 
 	}
-- if (what & layer_state_t::eCornerRadiusChanged) {
+- if (what & layer_state_t::eFlagsChanged) {
+       	- layer->setFlags(s.flags, s.mask)
+        - flags |= eTraversalNeeded
+    }
+- if (what & layer_state_t::eCropChanged_legacy) {	//radius必须设置crop_legacy
+        - (layer->setCrop_legacy(s.crop_legacy, !geometryAppliesWithResize))
+        - flags |= eTraversalNeeded
+    }
+- if (what & layer_state_t::eCornerRadiusChanged) {	//radius
         - layer->setCornerRadius(s.cornerRadius)
    	- flags |= eTraversalNeeded
     }
 
 }@SurfaceFlinger.cpp
+
+
+//设置display
+SurfaceFlinger::setDisplayStateLocked(const DisplayState& s) {
+- if (what & DisplayState::eSurfaceChanged) {
+	- state.surface = s.surface
+	- flags |= eDisplayTransactionNeeded
+	}
+- if (what & DisplayState::eDisplayProjectionChanged) {
+	- state.orientation = s.orientation
+	- flags |= eDisplayTransactionNeeded
+	}
+}SurfaceFlinger.cpp
 
 /**********
  client 对应surfaceCompoerClient
@@ -58,16 +95,115 @@ frameworks/native/services/surfaceflinger/Client.cpp
  layer
 
 */
+class Layer : public virtual compositionengine::LayerFE {
+- nName
+- mCurrentState		//当前状态，设置layer的参数开始作用到这里
+- mDrawingState		//绘制状态，
+}
+class BufferLayer : public Layer
+class BufferQueueLayer : public BufferLayer, public BufferLayerConsumer::ContentsChangedListener
 
+//创建
 SurfaceFlinger::createLayer(const String8& name, const sp<Client>& client, uint32_t w,uint32_t h, PixelFormat format, uint32_t flags,
  LayerMetadata metadata, sp<IBinder>* handle,sp<IGraphicBufferProducer>* gbp, const sp<IBinder>& parentHandle,const sp<Layer>& parentLayer){
-
+- sp<Layer> layer
+- switch (flags & ISurfaceComposerClient::eFXSurfaceMask) {
+	- ISurfaceComposerClient::eFXSurfaceBufferQueue:	//BufferQueueLayer 普通的layer
+            result = createBufferQueueLayer(client, uniqueName, w, h, flags, std::move(metadata),format, handle, gbp, &layer)
+	- ISurfaceComposerClient::eFXSurfaceBufferState:	//BufferStateLayer 上层没有的类型？
+            result = createBufferStateLayer(client, uniqueName, w, h, flags, std::move(metadata), handle, &layer);
+        - ISurfaceComposerClient::eFXSurfaceColor:		//ColorLayer dim layer
+            result = createColorLayer(client, uniqueName, w, h, flags, std::move(metadata), handle,&layer)
+        - ISurfaceComposerClient::eFXSurfaceContainer:		//ContainerLayer 容器layer
+            result = createContainerLayer(client, uniqueName, w, h, flags, std::move(metadata),\ handle, &layer)
+    }
+  //保存
+- addClientLayer(client, *handle, *gbp, layer, parentHandle, parentLayer, addToCurrentState){
+	- sp<Layer> parent = parentLayer
+	- if (parent == nullptr && addToCurrentState) {
+ 		- mCurrentState.layersSortedByZ.add(lbc)
+	  }else if(parent == nullptr){
+		- lbc->onRemovedFromCurrentState()
+	  }else if(parent->isRemovedFromCurrentState()){
+		- parent->addChild(lbc)
+		- lbc->onRemovedFromCurrentState()
+	  }else{
+		- parent->addChild(lbc)	
+	  }
+	- client->attachLayer(handle, lbc)
+	}
+- mGraphicBufferProducerList.insert(IInterface::asBinder(gbc).get())
+- setTransactionFlags(eTransactionNeeded)
 }@SurfaceFlinger.cpp
 
+//
+SurfaceFlinger::createBufferQueueLayer-->
+getFactory().createBufferQueueLayer(LayerCreationArgs(this, client, name, w, h, flags, std::move(metadata)))-->
+new BufferQueueLayer(args)@SurfaceFlingerFactory.cpp-->BufferQueueLayer(const LayerCreationArgs& args) : BufferLayer(args)
+@BufferQueueLayer.cpp
 
-//设置类型
-Layer::setCompositionType(const sp<const DisplayDevice>& display,Hwc2::IComposerClient::Composition type) {
-- 
-- 
+
+BufferLayer::BufferLayer(const LayerCreationArgs& args) //BufferLayer
+      : Layer(args),
+        mTextureName(args.flinger->getNewTexture()),
+        mCompositionLayer{mFlinger->getCompositionEngine().createLayer(
+                compositionengine::LayerCreationArgs{this})} {
+- mPremultipliedAlpha = !(args.flags & ISurfaceComposerClient::eNonPremultiplied)
+- mPotentialCursor = args.flags & ISurfaceComposerClient::eCursorWindow
+- mProtectedByApp = args.flags & ISurfaceComposerClient::eProtectedByApp
+}@BufferLayer.cpp
+
+Layer(const LayerCreationArgs& args)
+      : mFlinger(args.flinger),
+        mName(args.name),
+        mClientRef(args.client)) {
+- mCurrentCrop.makeInvalid();
+- mCurrentState.active_legacy.w = args.w;
+- mCurrentState.active_legacy.h = args.h;
+- mCurrentState.flags = layerFlags;
 }@Layer.cpp
 
+//设置类型
+INVALID = 0,CLIENT = 1, DEVICE = 2,SOLID_COLOR = 3,CURSOR = 4,SIDEBAND = 5
+Layer::setCompositionType(const sp<const DisplayDevice>& display,Hwc2::IComposerClient::Composition type) {
+- 
+- auto& compositionState = outputLayer->editState()
+}@Layer.cpp
+
+
+Layer::latchCompositionState(LayerFECompositionState& compositionState,bool includeGeometry)-->
+Layer::latchGeometry(compositionengine::LayerFECompositionState& compositionState){
+- const auto& drawingState{getDrawingState()}
+- int type = drawingState.metadata.getInt32(METADATA_WINDOW_TYPE, 0) 
+  //
+- compositionState.geomLayerTransform = getTransform()
+- compositionState.type = type
+- compositionState.appId = appId
+  ...
+}@Layer.cpp
+
+//准备合成
+prepareClientLayer(const RenderArea& , const Region& ,bool useIdentityTransform, Region& ,renderengine::LayerSettings& layer){
+- layer.geometry.positionTransform = m
+- layer.geometry.roundedCornersRadius = roundedCornerState.radius
+- layer.alpha = alpha
+}@Layer.cpp
+
+
+//提交设置
+handleTransactionLocked@SurfaceFlinger.cpp-->
+Layer::doTransaction(uint32_t flags) {
+  //处理pending
+- pushPendingState()
+- State c = getCurrentState()
+- applyPendingStates(&c)
+  //
+- doTransactionResize(flags, &c);
+  //提交，更新mDrawingState
+- commitTransaction(const State& stateToCommit)-->mDrawingState = stateToCommit
+}
+
+
+frameworks/native/services/surfaceflinger/Layer.cpp
+frameworks/native/services/surfaceflinger/BufferLayer.cpp
+frameworks/native/services/surfaceflinger/BufferQueueLayer.cpp

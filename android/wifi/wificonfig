@@ -1,0 +1,10 @@
+/***************************************
+  wifi
+  加载配置 WifiConfigStore.xml
+*/
+
+
+//读取配置，判断完整性
+
+
+frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiConfigStore.java

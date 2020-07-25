@@ -11,6 +11,20 @@ SurfaceSession(){
 	}@android_view_SurfaceSession.cpp
 }@SurfaceSession.java
 
+
+
+//layer的类型
+FX_SURFACE_NORMAL   = 0x00000000	普通layer
+FX_SURFACE_DIM = 0x00020000		dim
+FX_SURFACE_CONTAINER = 0x00080000	container
+@ISurfaceComposerClient.h
+
+eFXSurfaceBufferQueue = 0x00000000,
+eFXSurfaceColor = 0x00020000,
+eFXSurfaceBufferState = 0x00040000,
+eFXSurfaceContainer = 0x00080000
+@ISurfaceComposerClient.h
+
 Builder(SurfaceSession).build-->
 SurfaceControl(SurfaceSession session, String name, int w, int h, int format,
 	 int flags, SurfaceControl parent, SparseIntArray metadata){
@@ -46,6 +60,11 @@ nativeDestroy(JNIEnv* env, jclass clazz, jlong nativeObject){
 	-  release()
 	}@SurfaceControl.cpp
 }@android_view_SurfaceControl.cpp
+
+
+setGeometryAppliesWithResize(SurfaceControl sc)@SurfaceControl.java-->
+nativeSetGeometryAppliesWithResize(mNativeObject, sc.mNativeObject)-->
+transaction->setGeometryAppliesWithResize(ctrl)@android_view_SurfaceControl.cpp
 
 
 frameworks/base/core/java/android/view/SurfaceSession.java
@@ -140,7 +159,7 @@ SurfaceComposerClient::Transaction::Transaction(const Transaction& other)
 }
 
 
-/**********
+/*
   设置窗口，layer
  
 */
@@ -159,9 +178,19 @@ SurfaceComposerClient::Transaction::setCornerRadius({
 - s->cornerRadius = cornerRadius
 }@SurfaceComposerClient.cpp
 
+//设置标记，显示，隐藏
+Transaction::setFlags( const sp<SurfaceControl>& sc, uint32_t flags, uint32_t mask) {
+- layer_state_t* s = getLayerState(sc)
+-  if ((mask & layer_state_t::eLayerOpaque) ||		//显示，隐藏要设置eFlagsChanged标记
+            (mask & layer_state_t::eLayerHidden) ||
+            (mask & layer_state_t::eLayerSecure)) {
+        s->what |= layer_state_t::eFlagsChanged;
+    }
+- s->flags &= ~mask
+- s->flags |= (flags & mask)
+}@SurfaceComposerClient.cpp
 
-
-/**********
+/*
  设置display操作
 
 */
@@ -177,12 +206,17 @@ SurfaceComposerClient::Transaction::setDisplayProjection(const sp<IBinder>& toke
 
 //设置大小
 SurfaceComposerClient::Transaction::setDisplaySize(const sp<IBinder>& token, uint32_t width, uint32_t height) {
-- DisplayState& s(getDisplayState(token));
+- DisplayState& s(getDisplayState(token))
 - s.width = width;
 - s.height = height;
-- s.what |= DisplayState::eDisplaySizeChanged;
+- s.what |= DisplayState::eDisplaySizeChanged
 }
 
+//
+SurfaceComposerClient::Transaction::setGeometryAppliesWithResize(const sp<SurfaceControl>& sc){
+- DisplayState& s(getDisplayState(token))
+- s->what |= layer_state_t::eGeometryAppliesWithResize
+}
 
 //提交事务
 SurfaceComposerClient::Transaction::apply(bool synchronous) {

@@ -1,7 +1,0 @@
-/*
- 
-*/
-
-automake 读取 Makefile.am 来产生 Makefile.in,
-configure 读取 Makefile.in 来产生 Makefile
-configure 脚本通常由 autoconf 读取 configure.in 产生

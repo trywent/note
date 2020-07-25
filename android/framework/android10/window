@@ -15,7 +15,12 @@ createSurfaceControl(SurfaceControl outSurfaceControl, int result, WindowState w
  WindowState
 
 */
-
+addWindow-->new WindowState(this, session, client, token, parentWindow,appOp[0], seq,attrs, 
+viewVisibility, session.mUid,session.mCanAddInternalSystemWindow)@WindowManagerService.java-->
+WindowState(){
+- 
+- mWinAnimator = new WindowStateAnimator(this)
+}@WindowState.java
 
 //大小
 从task中获取大小，计算windowState的frame大小。再设置到surfaceControler。（其它容器不会设置大小）
@@ -56,7 +61,12 @@ setSurfaceBoundariesLocked(final boolean recoveringMemory) {
   }else{
 	- mSurfaceController.setPositionInTransaction(xOffset, yOffset, recoveringMemory)		//设置位置
   }
-- 
+  //非屏幕旋转中
+- if (!w.mSeamlesslyRotated) {
+	- applyCrop(clipRect, recoveringMemory
+	- mSurfaceController.setMatrixInTransaction
+	}
+
 }@WindowStateAnimator.java
 
 calculateSurfaceBounds(WindowState w, LayoutParams attrs, Rect outSize) {//计算大小
@@ -71,6 +81,16 @@ calculateSurfaceBounds(WindowState w, LayoutParams attrs, Rect outSize) {//计�
 }@WindowStateAnimator.java
 
 
+//crop
+applyCrop(Rect clipRect, boolean recoveringMemory) {
+- if (clipRect != null) {
+	- mSurfaceController.setCropInTransaction(clipRect, recoveringMemory)
+  }else{
+	- mSurfaceController.clearCropInTransaction(recoveringMemory)
+  }
+}
+
+
 //销毁
 //stop状态等... 销毁后每次relayoutWindow@WindowManagerService.java都会尝试重建。应该没问题
 - destroySurfaceLocked
@@ -81,9 +101,8 @@ destroySurface() {
 }@WindowStateAnimator.java
 
 
+
 frameworks/base/services/core/java/com/android/server/wm/WindowStateAnimator.java
-
-
 /**************  
  WindowSurfaceController
 
@@ -107,12 +126,29 @@ setBufferSizeInTransaction(int width, int height, boolean recoveringMemory) {
 - mSurfaceControl.setBufferSize(width, height)
 }@WindowSurfaceController.java
 
+//设置crop
+applyCrop(Rect clipRect, boolean recoveringMemory) {
+- setCropInTransaction
+
+
+clearCropInTransaction
+}
+
+
+//显示，隐藏
+showSurfaceRobustlyLocked
+
+
+
+
 //销毁surface
 destroyNotInTransaction{
 - mSurfaceControl.remove()	//销毁surfaceControl
 - setShown(false)
 - mSurfaceControl = null
 }@WindowSurfaceController.java
+
+
 
 
 frameworks/base/services/core/java/com/android/server/wm/WindowSurfaceController.java

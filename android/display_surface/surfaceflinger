@@ -53,7 +53,9 @@ SurfaceFlinger::onTransact{
 - 
 }
 
-//处理message
+/******
+ 处理message
+*/
 SurfaceFlinger::onMessageReceived(int32_t what) {
 - MessageQueue::INVALIDATE{
 	- updateVrFlinger
@@ -61,7 +63,9 @@ SurfaceFlinger::onMessageReceived(int32_t what) {
 	- handleMessageInvalidate
 	- signalRefresh
 	}
-- MessageQueue::REFRESH-->handleMessageRefresh
+- MessageQueue::REFRESH{
+	- handleMessageRefresh
+	}
 }@SurfaceFlinger.cpp
 
 
@@ -76,7 +80,9 @@ onMessageReceived(INVALIDATE){
 }
 
 
-//处理事务。创建默认显示器。初始化display信息
+/*
+ 处理事务
+*/
 handleMessageTransaction-->handleTransaction-->
 handleTransactionLocked{
   //layer的处理
@@ -111,7 +117,7 @@ onHotplugReceived-->createDefaultDisplayDevice{	//显示屏热插拔事务
 }@SurfaceFlinger.cppp
 
 
-/******
+/*
  将layer合成显示到屏幕。通过HWComposer接口
 
 */

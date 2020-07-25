@@ -1,8 +1,32 @@
 /*********************************************
  surfaceflinger 
- 
 
 */
+dumpsys SurfaceFlinger
+
+dumpAllLocked{
+  //打印current
+- dumpProtoInfo(LayerVector::StateSet::Current){
+	- bool useDrawing = stateSet == LayerVector::StateSet::Drawing
+	- const State& state = useDrawing ? mDrawingState : mCurrentState
+	- state.traverseInZOrder([&](Layer* layer) {
+		- layer->writeToProto(layerProto, stateSet, traceFlags)
+		}
+	}
+  //打印drawing的Composition layers
+- mDrawingState.traverseInZOrder([&](Layer* layer) {
+	- 
+	}
+  //display
+- display->dump(result){
+	- getCompositionDisplay()->dump(result){
+		- mState.dump(out)
+		}@Output.cpp
+	}@DisplayDevice.cpp
+}@SurfaceFlinger.cpp
+
+
+//
 main(int, char**) {
   //GraphicsAllocator
 - startGraphicsAllocatorService(){
@@ -10,7 +34,10 @@ main(int, char**) {
 	- hardware::registerPassthroughServiceImplementation<android::hardware::graphics::allocator::V3_0::IAllocator>()
 	}
   //创建sufaceflinger.传入内部类Factory
-- sp<SurfaceFlinger> flinger = surfaceflinger::createSurfaceFlinger()-->new SurfaceFlinger(factory)@SurfaceFlingerFactory.cpp
+- sp<SurfaceFlinger> flinger = surfaceflinger::createSurfaceFlinger(){
+	- Factory factory
+	- new SurfaceFlinger(factory)
+	}@SurfaceFlingerFactory.cpp
 - flinger->init()
   //加入服务
 - sp<IServiceManager> sm(defaultServiceManager())
@@ -55,6 +82,8 @@ SurfaceFlinger::init() {
 - mEventQueue->setEventConnection(mScheduler->getEventConnection(mSfConnectionHandle))
   //renderEngine
 - renderEngineFeature |= (enable_protected_contents(false) ? renderengine::RenderEngine::ENABLE_PROTECTED_CONTEXT: 0)
+- mCompositionEngine->setRenderEngine(renderengine::RenderEngine::create(static_cast<int32_t>(defaultCompositionPixelFormat),
+                                               renderEngineFeature, maxFrameBufferAcquiredBuffers))
   //CompositionEngine
 - mCompositionEngine->setRenderEngine(renderengine::RenderEngine::create(static_cast<int32_t>
 	(defaultCompositionPixelFormat), renderEngineFeature, maxFrameBufferAcquiredBuffers))
@@ -62,12 +91,17 @@ SurfaceFlinger::init() {
 - mCompositionEngine->getHwComposer().registerCallback(this, getBE().mComposerSequenceId)
 }@SurfaceFlinger.cpp
 
-//surfaceFlinger等待事件.MessageQueue
+/***********
+ 消息处理。在主线程中执行
+	-layer状态设置
+	-layer合成绘制 
+*/
 SurfaceFlinger::run()-->SurfaceFlinger::waitForEvent()-->
 mEventQueue->waitMessage()@MessageQueue.cpp-->
 onMessageReceived(message.what){
 - case MessageQueue::INVALIDATE: {
 	- updateVrFlinger()
+	- bool refreshNeeded = handleMessageTransaction()
 	- updateCursorAsync()
 	- updateInputFlinger()
 	}
@@ -77,62 +111,172 @@ onMessageReceived(message.what){
 }@SurfaceFligner.cp
 
 
+
+/*
+ 更新layer状态
+*/
+SurfaceFlinger::handleMessageTransaction() {
+- uint32_t transactionFlags = peekTransactionFlags()
+- bool runHandleTransaction = transactionFlags &&((transactionFlags != eTransactionFlushNeeded) || flushedATransaction)
+- if (runHandleTransaction) {
+	- handleTransaction(eTransactionMask)-->handleTransactionLocked
+  }else{
+	- 
+  }
+}
+
 SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags){
-- 
+  //eTraversalNeeded,更新layer
+- mCurrentState.traverseInZOrder([&](Layer* layer) {
+	- layer->doTransaction(0)
+	}
+  //
 - if (transactionFlags & eDisplayTransactionNeeded) {
 	- processDisplayChangesLocked()
 	- processDisplayHotplugEventsLocked()
 	}
 }@SurfaceFlinger.cpp
 
+
+
 /*
- 处理上层设置。surfaceComposerClient
+ 合成layer并显示
 */
-SurfaceFlinger::setTransactionState(const Vector<ComposerState>& states,...)-->
-SurfaceFlinger::applyTransactionState(const Vector<ComposerState>& states,const Vector<DisplayState>& displays, uint32_t flags,
-    const InputWindowCommands& inputWindowCommands,const int64_t desiredPresentTime,const client_cache_t& uncacheBuffer,
-    const std::vector<ListenerCallbacks>& listenerCallbacks, const int64_t postTime, bool privileged, bool isMainThread){
-- 
-  //设置display
-- for (const DisplayState& display : displays) {
-  	- transactionFlags |= setDisplayStateLocked(display);
+SurfaceFlinger::handleMessageRefresh() {
+- preComposition()
+- rebuildLayerStacks()					//创建要处理的layer栈
+- calculateWorkingSet()					//设置layer的信息
+  //遍历合成每个display中layer
+- for (const auto& [token, display] : mDisplays) {
+	- beginFrame(display)
+	- prepareFrame(display)
+	- doDebugFlashRegions(display, repaintEverything)
+	- doComposition(display, repaintEverything)
+	}
+- postFrame()
+- postComposition()
+}
+
+ //设置layer。需要显示的layer保存到layersSortedByZ，并设置到composition::display
+SurfaceFlinger::rebuildLayerStacks() {
+  //遍历mDisplay设置
+- for (const auto& pair : mDisplays){
+- computeVisibleRegions(displayDevice, dirtyRegion, opaqueRegion){	//计算显示区域
+	- visibleRegion.set(bounds)
+	- layer->setVisibleRegion(visibleRegion)			//设置可视区域
+	- layer->setVisibleNonTransparentRegion(visibleRegion.subtract(transparentRegion))	//非透明区域
+	}
+- const auto& displayDevice = pair.second
+- auto display = displayDevice->getCompositionDisplay()
+- compositionengine::Output::OutputLayers layersSortedByZ		//保存layer的容器
+- const Rect bounds = displayState.bounds				//diaplay的显示大小
+- mDrawingState.traverseInZOrder([&](Layer* layer) {			//遍历layersSortedByZ。创建Layer时保存的
+	- auto compositionLayer = layer->getCompositionLayer()
+	- if (display->belongsInOutput(layer->getLayerStack(),layer->getPrimaryDisplayOnly())) {//layer的显示区域在display中则显示
+		- Region drawRegion(tr.transform(layer->visibleNonTransparentRegion))		//非透明的区域不为空
+		- drawRegion.andSelf(bounds)
+		- if (!drawRegion.isEmpty()) needsOutputLayer = true
+		}
+	- if (needsOutputLayer) {					//将要显示的layer加入到容器
+		- layersSortedByZ.emplace_back(display->getOrCreateOutputLayer(displayId, compositionLayer,layerFE))
+		}
+	}
+- display->setOutputLayersOrderedByZ(std::move(layersSortedByZ))	//设置到display
   }
-  //触发消息,处理设置
-- setTransactionFlags(transactionFlags, start)-->signalTransaction
+}
+
+ //计算layer
+SurfaceFlinger::calculateWorkingSet() {
+ //计算layer几何大小
+- if (CC_UNLIKELY(mGeometryInvalid)) {
+	- for (const auto& [token, displayDevice] : mDisplays) 
+	- auto display = displayDevice->getCompositionDisplay()
+	- for (auto& layer : display->getOutputLayersOrderedByZ()) {
+		- layer->getLayerFE().latchCompositionState(layer->getLayer().editState().frontEnd,true)
+		- layer->updateCompositionState(true)
+		}
+	}
+ //设置每个layer数据
+- for (const auto& [token, displayDevice] : mDisplays) {
+	- auto display = displayDevice->getCompositionDisplay() 
+	- for (auto& layer : displayDevice->getVisibleLayersSortedByZ()) {
+		- if (layer->getRoundedCornerState().radius > 0.0f) 		//radius强制设置CLIENT
+			- layer->forceClientComposition(displayDevice)
+		- if (layer->getForceClientComposition(displayDevice))
+			- layer->setCompositionType(displayDevice,Hwc2::IComposerClient::Composition::CLIENT)
+			- continue
+		- layer->setPerFrameData(displayDevice, displayState.transform...)
+		}
+	}
+ //设置composition layer类型
+- for (auto& layer : displayDevice->getVisibleLayersSortedByZ()) {
+	- auto& layerState = layer->getCompositionLayer()->editState().frontEnd
+	- layerState.compositionType = static_cast<Hwc2::IComposerClient::Composition>(layer->getCompositionType(displayDevice))
+	}
+}
+
+ //合成
+SurfaceFlinger::doDisplayComposition(const sp<DisplayDevice>& displayDevice,const Region& inDirtyRegion) {
+- 
+- doComposeSurfaces(displayDevice, Region::INVALID_REGION, &readyFence)
+- display->getRenderSurface()->queueBuffer(std::move(readyFence))
 }@SurfaceFlinger.cpp
 
-
-
-
-//设置display
-SurfaceFlinger::setDisplayStateLocked(const DisplayState& s) {
-- if (what & DisplayState::eSurfaceChanged) {
-	- state.surface = s.surface
-	- flags |= eDisplayTransactionNeeded
+SurfaceFlinger::doComposeSurfaces(const sp<DisplayDevice>& displayDevice,
+	const Region& debugRegion, base::unique_fd* readyFence) {
+- auto& renderEngine = getRenderEngine()
+- const bool hasClientComposition = getHwComposer().hasClientComposition(displayId)
+- buf = display->getRenderSurface()->dequeueBuffer(&fd)
+  //render the layers targeted at the framebuffer
+- std::vector<renderengine::LayerSettings> clientCompositionLayers
+- for (auto& layer : displayDevice->getVisibleLayersSortedByZ()) {
+	- const Region viewportRegion(displayState.viewport)
+	- const Region clip(viewportRegion.intersect(layer->visibleRegion))
+	- layer->prepareClientLayer(renderArea, clip, clearRegion,supportProtectedContent, layerSettings)
+	- clientCompositionLayers.push_back(layerSettings)
 	}
-- if (what & DisplayState::eDisplayProjectionChanged) {
-	- state.orientation = s.orientation
-	- flags |= eDisplayTransactionNeeded
-	}
-}SurfaceFlinger.cpp
+- renderEngine.drawLayers(clientCompositionDisplay, clientCompositionLayers, buf->getNativeBuffer(),	//绘制layer
+	 true, std::move(fd),readyFence)
+}
 
 frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlingerFactory.cpp
 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.cpp
 /***********
- Display
+ DisplayDevice
 
  旋转时：
 	上层绘制的数据宽高要变化
 	底层填写数据要旋转，填入正确位置
 */
+SurfaceFlinger::processDisplayChangesLocked() {
+  //新增DisplayDevice。创建producer,consumer
+- getFactory().createBufferQueue(&bqProducer, &bqConsumer, false)			//bufferqueu
+- sp<compositionengine::DisplaySurface> dispSurface = new FramebufferSurface(getHwComposer(), *displayId, bqConsumer)
+- producer = bqProducer
+- mDisplays.emplace(displayToken,etupNewDisplayDeviceInternal(displayToken, displayId, state, dispSurface, producer))
+}@SurfaceFlinger.cpp
 
+
+SurfaceFlinger::setupNewDisplayDeviceInternal( const wp<IBinder>& displayToken, const std::optional<DisplayId>& displayId,
+ const DisplayDeviceState& state, const sp<compositionengine::DisplaySurface>& dispSurface,const sp<IGraphicBufferProducer>& producer) {
+  //创建display参数
+- DisplayDeviceCreationArgs creationArgs(this, displayToken, displayId)
+- creationArgs.displaySurface = dispSurface						//surface   	consumer 投送到屏幕数据
+- auto nativeWindowSurface = getFactory().createNativeWindowSurface(producer)		//NativeWindow  producer layer合成的数据
+- creationArgs.nativeWindow = nativeWindow = nativeWindowSurface->getNativeWindow()	
+- sp<DisplayDevice> display = getFactory().createDisplayDevice(std::move(creationArgs))	//创建display
+- return display
+}@SurfaceFlinger.cpp
+
+//创建
 DisplayDevice(DisplayDeviceCreationArgs&& args){
 - mFlinger(args.flinger)
+  //compositionDisplay
 - Display mCompositionDisplay{mFlinger->getCompositionEngine().createDisplay(
                 compositionengine::DisplayCreationArgs{args.isSecure, args.isVirtual,args.displayId})
-  //
+  //设置composition display
 - mCompositionDisplay->createRenderSurface
 - mCompositionDisplay->createDisplayColorProfile
 - mCompositionDisplay->getRenderSurface()->initialize()
@@ -159,11 +303,163 @@ setProjection
 frameworks/native/services/surfaceflinger/DisplayDevice.cpp
 
 /***********
- CompositionEngine
+ CompositionEngine 保存display,layer信息
 
 */
+class CompositionEngine : public compositionengine::CompositionEngine 
+
+//创建
+SurfaceFlinger-->mCompositionEngine(mFactory.createCompositionEngine())@SurfaceFlinger.cpp-->
+compositionengine::impl::createCompositionEngine()@SurfaceFlingerFactory.cpp-->
+CompositionEngine@CompositionEngine.cpp
+
+//设置engine为GLESRenderEngine，实际绘制图层的
+SurfaceFlinger::init()@SurfaceFlinger.cpp-->
+CompositionEngine::setRenderEngine(std::unique_ptr<renderengine::RenderEngine> renderEngine) {
+- mRenderEngine = std::move(renderEngine)
+}@CompositionEngine.cpp
 
 
+frameworks/native/services/surfaceflinger/CompositionEngine/include/compositionengine/impl/CompositionEngine.h
+frameworks/native/services/surfaceflinger/CompositionEngine/src/CompositionEngine.cpp
+/*
+ composition display
+
+*/
+class Display : public compositionengine::impl::Output, public compositionengine::Display 
+
+Output{
+- std::string mName
+- OutputCompositionState mState
+}
+
+//创建display。display的namespace在compositonengine::impl
+CompositionEngine::createDisplay(DisplayCreationArgs&& args)-->
+compositionengine::impl::createDisplay(*this, std::move(args))@CompositionEngine.cpp
+createDisplay( const compositionengine::CompositionEngine& compositionEngine,
+        compositionengine::DisplayCreationArgs&& args)-->
+:Display(const CompositionEngine& compositionEngine, DisplayCreationArgs&& args)
+      : compositionengine::impl::Output(compositionEngine),
+        mIsVirtual(args.isVirtual),
+        mId(args.displayId) {
+- editState().isSecure = args.isSecure;
+}@Display.cpp
+
+//设置要处理的layers到display
+SurfaceFlinger::rebuildLayerStacks()-->display->setOutputLayersOrderedByZ(std::move(layersSortedByZ))@SurfaceFlinger.cpp
+-->Output::setOutputLayersOrderedByZ(OutputLayers&& layers) {	//左值右值都可以传输
+- mOutputLayersOrderedByZ = std::move(layers)
+}@Output.cpp
+
+//设置投屏风向，大小
+Output::setProjection(const ui::Transform& transform, int32_t orientation, const Rect& frame,
+	const Rect& viewport, const Rect& scissor, bool needsFiltering){
+- mState.transform = transform
+- mState.frame = frame
+}@Output.cpp
+
+
+frameworks/native/services/surfaceflinger/CompositionEngine/src/Display.cpp
+/*
+ composition renderSurface
+*/
+class RenderSurface : public compositionengine::RenderSurface
+
+//创建
+mCompositionDisplay->createRenderSurface@DisplayDevice.cpp-->
+createRenderSurface(const compositionengine::CompositionEngine& compositionEngine,
+        compositionengine::Display& display, compositionengine::RenderSurfaceCreationArgs&& args)-->
+-->std::make_unique<RenderSurface>(compositionEngine, display, std::move(args))-->
+RenderSurface::RenderSurface(const CompositionEngine& compositionEngine, Display& display,RenderSurfaceCreationArgs&& args){
+- mCompositionEngine(compositionEngine)
+- mDisplay(display)
+- mNativeWindow(args.nativeWindow)				//producer 合成layer数据
+- mDisplaySurface(args.displaySurface)				//consumer 投送屏幕的数据
+}@RenderSurface.cpp
+
+
+
+frameworks/native/services/surfaceflinger/CompositionEngine/src/RenderSurface.cpp
+/*
+ composition layer
+*/
+class Layer : public compositionengine::Layer {
+- const compositionengine::CompositionEngine& mCompositionEngine
+- const wp<LayerFE> mLayerFE					//layer的信息
+- LayerCompositionState mState					//LayerFECompositionState 状态信息
+}
+//将Layer::Layer当做参数传到android::compositionengine::Layer
+BufferLayer@BufferLayer.cpp-->mFlinger->getCompositionEngine().createLayer(compositionengine::LayerCreationArgs{this})
+-->compositionengine::impl::createLayer(*this, std::move(args))@CompositionEngine.cpp-->
+createLayer(const compositionengine::CompositionEngine& compositionEngine, compositionengine::LayerCreationArgs&& args)
+-->std::make_shared<Layer>(compositionEngine, std::move(args))-->Layer{
+- mCompositionEngine(compositionEngine)
+- mLayerFE(args.layerFE)
+}@Layer.cpp
+
+//mOutputLayersOrderedByZ
+Layer::findOutputLayerForDisplay(const sp<const DisplayDevice>& display)-->
+display->getCompositionDisplay()->getOutputLayerForLayer(getCompositionLayer().get())
+Output::getOutputLayerForLayer(compositionengine::Layer* layer){
+- for (const auto& outputLayer : mOutputLayersOrderedByZ) {	//返回layer
+	- if (outputLayer && &outputLayer->getLayer() == layer) return outputLayer.get();
+	}
+}@Output.cpp
+
+//layer设置state类型
+SurfaceFlinger::calculateWorkingSet()-->layerState.compositionType = 
+static_cast<Hwc2::IComposerClient::Composition>(layer->getCompositionType(displayDevice))
+
+//创建outputLayer。从display调用创建
+Output::getOrCreateOutputLayer-->createOutputLayer@Output.cpp
+std::unique_ptr<compositionengine::OutputLayer> createOutputLayer(compositionEngine, displayId,output,layer,layerFE) {
+    auto result = std::make_unique<OutputLayer>(output, layer, layerFE);
+    result->initialize(compositionEngine, displayId);
+    return result;
+}@OutputLayer.cpp
+
+
+frameworks/native/services/surfaceflinger/CompositionEngine/src/Layer.cpp
+frameworks/native/services/surfaceflinger/CompositionEngine/src/LayerCompositionState.cpp
+frameworks/native/services/surfaceflinger/CompositionEngine/src/OutputLayer.cpp
+/*
+ framebufferSurface
+*/
+class FramebufferSurface : public ConsumerBase, public compositionengine::DisplaySurface 
+
+class DisplaySurface : public virtual RefBase {
+    virtual status_t beginFrame(bool mustRecompose) = 0			//
+    virtual status_t prepareFrame(CompositionType compositionType) = 0	//
+    virtual status_t advanceFrame() = 0					//gles合成完成，提交数据到hwc
+    virtual void onFrameCommitted() = 0
+}
+
+
+
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.h
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+/***********
+ RenderEngine 绘制layer图像
+*/
+RenderEngine::create(int hwcFormat, uint32_t featureFlags,uint32_t imageCacheSize) {
+- renderengine::gl::GLESRenderEngine::create(hwcFormat, featureFlags, imageCacheSize){
+	- EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY)
+	- GLESRenderEngine>(featureFlags, display, config, ctxt, dummy, protectedContext, protectedDummy,imageCacheSize)
+	}@GLESRenderEngine.cpp
+}@RenderEngine.cpp
+
+//绘制layer
+
+SurfaceFlinger::doComposeSurfaces-->renderEngine.drawLayers(clientCompositionDisplay, clientCompositionLayers,
+	 buf->getNativeBuffer(), true, std::move(fd),readyFence)@SurfaceFlinger.cpp-->
+GLESRenderEngine::drawLayers(const DisplaySettings& display, const std::vector<LayerSettings>& layers,
+    ANativeWindowBuffer* const buffer,const bool useFramebufferCache, base::unique_fd&& bufferFence, base::unique_fd* drawFence) {
+-
+- 
+}@GLESRenderEngine.cpp
+
+frameworks/native/libs/renderengine/RenderEngine.cpp
+frameworks/native/libs/renderengine/gl/GLESRenderEngine.cpp
 /***********
  hwcomposer
 */

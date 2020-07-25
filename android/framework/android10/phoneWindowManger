@@ -1,0 +1,15 @@
+/******************************
+ phonePolicy
+
+*/
+
+
+layoutWindowLw(WindowState win, WindowState attached, DisplayFrames displayFrames) {
+- win.computeFrameLw()
+}@DisplayPolicy.java
+
+
+
+
+frameworks/base/services/core/java/com/android/server/policy/WindowManagerPolicy.java
+frameworks/base/services/core/java/com/android/server/wm/DisplayPolicy.java

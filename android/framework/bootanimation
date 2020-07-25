@@ -11,7 +11,18 @@ zip -Z store bootanimation.zip part0/ *PNG part1/ *PNG desc.txt
 p 0 0 part0   //c(显示完这部分complete)/p(部分)类型 重复次数 睡眠时间 文件夹
 
 system/core/include/private/android_filesystem_config.h
-===========================
+
+//andoid10启动动画
+SurfaceFlinger::init()-->mStartPropertySetThread->Start()-->
+StartPropertySetThread::Start()-->threadLoop(){
+- property_set(kTimestampProperty, mTimestampPropertyValue ? "1" : "0")
+- property_set("service.bootanim.exit", "0")
+- property_set("ctl.start", "bootanim"
+}
+
+
+
+frameworks/native/services/surfaceflinger/StartPropertySetThread.cpp
 //开始动画：
 readyToRun-->startBootAnim-->(开始动画服务)property_set("ctl.start", "bootanim")@SurfaceFlinger.cpp
 
