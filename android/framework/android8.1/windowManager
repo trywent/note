@@ -155,20 +155,22 @@ updateOrientationFromAppTokens-->updateOrientationFromAppTokensLocked(currentCon
 }
 
 //应用触发窗口方位更新.先根据非应用窗口计算,然后再计算应用窗口
-updateOrientationFromAppTokensLocked{
+updateOrientationFromAppTokensLocked(boolean inTransaction, int displayId) {
+  //获取当前方位
 - DisplayContent dc = mRoot.getDisplayContent(displayId)
 - req = dc.getOrientation{
 	- 屏幕冻结,返回mLastWindowForcedOrientation
-	- 返回mAboveAppWindowsContainers.getOrientation() //非应用窗口
-	- 返回 mTaskStackContainers.getOrientation //应用窗口
+	- 返回mAboveAppWindowsContainers.getOrientation()	//非应用窗口
+	- 返回 mTaskStackContainers.getOrientation		//应用窗口
 	}
-- req!=dc.getLastOrientation(){//方位发生变化
-	- dc.setLastOrientation(req) //记录最后一次方位
+  //后去上一次方位。对比方位发生变化
+- req!=dc.getLastOrientation(){					
+	- dc.setLastOrientation(req) 				//记录最后一次方位
 	- mPolicy.setCurrentOrientationLw(req){
-		- mCurrentAppOrientation =req //设置app方位	
+		- mCurrentAppOrientation =req 			//设置app方位	
 		- updateOrientationListenerLp
 		}@PhoneWindowManager.java
-	- dc.updateRotationUnchecked //更新屏幕..最终调用位置
+	- dc.updateRotationUnchecked 				//更新屏幕..最终调用位置
 	}
 }@WindowManagerService.java
 

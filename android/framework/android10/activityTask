@@ -397,6 +397,9 @@ createAppWindowToken() {
 - task.addActivityToTop(this)
 }
 
+//根据比例计算bounds大小
+computeBounds(Rect outBounds, Rect containingAppBounds) {}
+
 
 frameworks/base/services/core/java/com/android/server/wm/ActivityRecord.java
 /**************

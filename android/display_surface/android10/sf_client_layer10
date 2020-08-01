@@ -14,7 +14,7 @@ class SurfaceFlinger : public BnSurfaceComposer, public PriorityDumper,  private
 /*
  提交事务
  处理surfaceComposerClient上层调用。将修改暂时保存到layer.mCurrentState，
- 最终到surfaceFlinger主线程messagequeue中处理,应该是作用到layer.mDrawingState
+ 最终到surfaceFlinger主线程messagequeue中handleTransactionLocked处理,应该是作用到layer.mDrawingState
 */
 SurfaceFlinger::setTransactionState(const Vector<ComposerState>& states,...)-->
 SurfaceFlinger::applyTransactionState(const Vector<ComposerState>& states,const Vector<DisplayState>& displays, uint32_t flags,
@@ -29,7 +29,7 @@ SurfaceFlinger::applyTransactionState(const Vector<ComposerState>& states,const 
 - for (const ComposerState& state : states) {
 	- clientStateFlags |= setClientStateLocked(state, desiredPresentTime, listenerCallbacks,postTime, privileged)
 	}
-  //触发消息,处理设置
+  //触发消息。到handleTransactionLocked处理设置
 - mInterceptor->saveTransaction(states, mCurrentState.displays, displays, flags)
 - setTransactionFlags(transactionFlags, start)-->signalTransaction
 }@SurfaceFlinger.cpp
@@ -61,8 +61,11 @@ SurfaceFlinger::setClientStateLocked(const ComposerState& composerState, int64_t
 }@SurfaceFlinger.cpp
 
 
-//设置display
+//设置display。状态保存到mCurrentState中DisplayDeviceState
 SurfaceFlinger::setDisplayStateLocked(const DisplayState& s) {
+- const ssize_t index = mCurrentState.displays.indexOfKey(s.token)
+- DisplayDeviceState& state = mCurrentState.displays.editValueAt(index)
+  //保存值
 - if (what & DisplayState::eSurfaceChanged) {
 	- state.surface = s.surface
 	- flags |= eDisplayTransactionNeeded
@@ -72,6 +75,20 @@ SurfaceFlinger::setDisplayStateLocked(const DisplayState& s) {
 	- flags |= eDisplayTransactionNeeded
 	}
 }SurfaceFlinger.cpp
+
+//上面只是保存设置值到。提交设置
+handleTransactionLocked@SurfaceFlinger.cpp-->
+Layer::doTransaction(uint32_t flags) {
+  //处理pending
+- pushPendingState()
+- State c = getCurrentState()
+- applyPendingStates(&c)
+  //
+- doTransactionResize(flags, &c);
+  //提交，更新mDrawingState
+- commitTransaction(const State& stateToCommit)-->mDrawingState = stateToCommit
+}
+
 
 /**********
  client 对应surfaceCompoerClient
@@ -171,6 +188,7 @@ Layer::setCompositionType(const sp<const DisplayDevice>& display,Hwc2::IComposer
 }@Layer.cpp
 
 
+//设置compositionState  composition中layer信息
 Layer::latchCompositionState(LayerFECompositionState& compositionState,bool includeGeometry)-->
 Layer::latchGeometry(compositionengine::LayerFECompositionState& compositionState){
 - const auto& drawingState{getDrawingState()}
@@ -190,18 +208,6 @@ prepareClientLayer(const RenderArea& , const Region& ,bool useIdentityTransform,
 }@Layer.cpp
 
 
-//提交设置
-handleTransactionLocked@SurfaceFlinger.cpp-->
-Layer::doTransaction(uint32_t flags) {
-  //处理pending
-- pushPendingState()
-- State c = getCurrentState()
-- applyPendingStates(&c)
-  //
-- doTransactionResize(flags, &c);
-  //提交，更新mDrawingState
-- commitTransaction(const State& stateToCommit)-->mDrawingState = stateToCommit
-}
 
 
 frameworks/native/services/surfaceflinger/Layer.cpp

@@ -12,6 +12,8 @@ logcat -b radio
 event:
 logcat -b events
 
+//屏蔽tag
+tag:^(?!IMGSRV) tag:^(?!dalvikvm) tag:^(?!mdpservice) tag:^(?!inputm)    
 
 Systrace tool:
 1.确保设备通过usb调试选项打开，并成功连接到电脑

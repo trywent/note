@@ -212,3 +212,96 @@ packages/apps/PackageInstaller/src/com/android/packageinstaller/EventResultPersi
 frameworks/base/core/java/android/app/ApplicationPackageManager.java
 frameworks/base/core/java/android/content/pm/PackageInstaller.java
 frameworks/base/core/java/android/os/FileBridge.java
+
+
+/***********************
+ andoid10
+
+*/
+//开始安装
+onCreate(Bundle savedInstanceState) {
+- Intent intent = getIntent()
+- final boolean isSessionInstall = PackageInstaller.ACTION_CONFIRM_INSTALL.equals(intent.getAction())
+
+  //启动下一个安装应用
+- Intent nextActivity = new Intent(intent)
+- if (isSessionInstall) {
+	- nextActivity.setClass(this, PackageInstallerActivity.class)
+  }else{
+	- Uri packageUri = intent.getData()
+	- if (packageUri != null && packageUri.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
+		- nextActivity.setClass(this, InstallStaging.class)
+	  }else if(packageUri != null && packageUri.getScheme().equals(PackageInstallerActivity.SCHEME_PACKAGE)){
+		- nextActivity.setClass(this, PackageInstallerActivity.class)
+ 	  }else{	//不支持的url
+		- Intent result = new Intent()
+		- result.putExtra(Intent.EXTRA_INSTALL_RESULT,PackageManager.INSTALL_FAILED_INVALID_URI)
+		- nextActivity = null
+		}
+  }
+- startActivity(nextActivity)
+}@InstallStart.java
+
+
+
+onCreate(Bundle icicle) {
+- if (PackageInstaller.ACTION_CONFIRM_INSTALL.equals(intent.getAction())) {
+	- mSessionId = sessionId
+	- packageUri = Uri.fromFile(new File(info.resolvedBaseCodePath))
+  }else{
+	- packageUri = intent.getData()
+	- mOriginatingURI = intent.getParcelableExtra(Intent.EXTRA_ORIGINATING_URI)	
+  }
+  //创建安装框UI，取消，确认
+- bindUi(){
+	- mAlert.setView(R.layout.install_content_view)
+	- mAlert.setButton(DialogInterface.BUTTON_POSITIVE)-->startInstall	//开始安装
+	- mAlert.setButton(DialogInterface.BUTTON_NEGATIVE)-->finish		//取消
+	- mOk = mAlert.getButton(DialogInterface.BUTTON_POSITIVE)		//ok按钮
+	}
+  //
+- checkIfAllowedAndInitiateInstall(){
+	- 
+	- if (mAllowUnknownSources || !isInstallRequestFromUnknownSource(getIntent())) {
+		- initiateInstall()
+	  }else{
+		- handleUnknownSources()
+	  }	
+	}
+}@PackageInstallerActivity.java
+
+
+initiateInstall() {
+- mAppInfo = mPm.getApplicationInfo(pkgName,PackageManager.MATCH_UNINSTALLED_PACKAGES)
+- startInstallConfirm(){
+	- if (mAppInfo != null) {
+		- viewToEnable = (mAppInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0
+                    ? requireViewById(R.id.install_confirm_question_update_system)
+	  }else{
+		- viewToEnable = requireViewById(R.id.install_confirm_question)
+	  }
+	- mOk.setEnabled(true)							//允许点击确认
+	}
+}@PackageInstallerActivity.java
+
+//启动最终安装Activity InstallInstalling
+startInstall{
+- Intent newIntent = new Intent()
+- newIntent.setClass(this, InstallInstalling.class)
+- startActivity(newIntent)
+}@PackageInstallerActivity.java
+
+
+//安装
+onCreate(@Nullable Bundle savedInstanceState) {
+
+}
+
+onResume() {
+- 
+}@InstallInstalling.java
+
+
+frameworks/base/packages/PackageInstaller/src/com/android/packageinstaller/InstallStart.java
+frameworks/base/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+frameworks/base/packages/PackageInstaller/src/com/android/packageinstaller/InstallInstalling.java

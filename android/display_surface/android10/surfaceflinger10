@@ -113,7 +113,7 @@ onMessageReceived(message.what){
 
 
 /*
- 更新layer状态
+ 更新上层设置状态
 */
 SurfaceFlinger::handleMessageTransaction() {
 - uint32_t transactionFlags = peekTransactionFlags()
@@ -126,11 +126,11 @@ SurfaceFlinger::handleMessageTransaction() {
 }
 
 SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags){
-  //eTraversalNeeded,更新layer
+  //eTraversalNeeded,更新layer设置
 - mCurrentState.traverseInZOrder([&](Layer* layer) {
 	- layer->doTransaction(0)
 	}
-  //
+  //更新display设置
 - if (transactionFlags & eDisplayTransactionNeeded) {
 	- processDisplayChangesLocked()
 	- processDisplayHotplugEventsLocked()
@@ -225,6 +225,7 @@ SurfaceFlinger::doDisplayComposition(const sp<DisplayDevice>& displayDevice,cons
 SurfaceFlinger::doComposeSurfaces(const sp<DisplayDevice>& displayDevice,
 	const Region& debugRegion, base::unique_fd* readyFence) {
 - auto& renderEngine = getRenderEngine()
+- DisplayRenderArea renderArea(displayDevice)								//区域，上层更新config会影响瞬间显示
 - const bool hasClientComposition = getHwComposer().hasClientComposition(displayId)
 - buf = display->getRenderSurface()->dequeueBuffer(&fd)
   //render the layers targeted at the framebuffer
@@ -255,7 +256,7 @@ SurfaceFlinger::processDisplayChangesLocked() {
 - getFactory().createBufferQueue(&bqProducer, &bqConsumer, false)			//bufferqueu
 - sp<compositionengine::DisplaySurface> dispSurface = new FramebufferSurface(getHwComposer(), *displayId, bqConsumer)
 - producer = bqProducer
-- mDisplays.emplace(displayToken,etupNewDisplayDeviceInternal(displayToken, displayId, state, dispSurface, producer))
+- mDisplays.emplace(displayToken,setupNewDisplayDeviceInternal(displayToken, displayId, state, dispSurface, producer))
 }@SurfaceFlinger.cpp
 
 
@@ -273,11 +274,10 @@ SurfaceFlinger::setupNewDisplayDeviceInternal( const wp<IBinder>& displayToken, 
 //创建
 DisplayDevice(DisplayDeviceCreationArgs&& args){
 - mFlinger(args.flinger)
-  //compositionDisplay
+  //compositionDisplay,并设置composition display
 - Display mCompositionDisplay{mFlinger->getCompositionEngine().createDisplay(
-                compositionengine::DisplayCreationArgs{args.isSecure, args.isVirtual,args.displayId})
-  //设置composition display
-- mCompositionDisplay->createRenderSurface
+                compositionengine::DisplayCreationArgs{args.isSecure, args.isVirtual,args.displayId})  
+- mCompositionDisplay->createRenderSurface(args.nativeWindow)				//将nativeWindow传到render.egl合成的数据写入窗口
 - mCompositionDisplay->createDisplayColorProfile
 - mCompositionDisplay->getRenderSurface()->initialize()
   //设置显示
@@ -301,7 +301,22 @@ setProjection
 
 
 frameworks/native/services/surfaceflinger/DisplayDevice.cpp
+/*
+ framebufferSurface 合成后提交到屏幕
+*/
+class FramebufferSurface : public ConsumerBase, public compositionengine::DisplaySurface 
 
+class DisplaySurface : public virtual RefBase {
+    virtual status_t beginFrame(bool mustRecompose) = 0			//
+    virtual status_t prepareFrame(CompositionType compositionType) = 0	//
+    virtual status_t advanceFrame() = 0					//gles合成完成，提交数据到hwc
+    virtual void onFrameCommitted() = 0
+}
+
+
+
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.h
+frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
 /***********
  CompositionEngine 保存display,layer信息
 
@@ -422,22 +437,7 @@ std::unique_ptr<compositionengine::OutputLayer> createOutputLayer(compositionEng
 frameworks/native/services/surfaceflinger/CompositionEngine/src/Layer.cpp
 frameworks/native/services/surfaceflinger/CompositionEngine/src/LayerCompositionState.cpp
 frameworks/native/services/surfaceflinger/CompositionEngine/src/OutputLayer.cpp
-/*
- framebufferSurface
-*/
-class FramebufferSurface : public ConsumerBase, public compositionengine::DisplaySurface 
 
-class DisplaySurface : public virtual RefBase {
-    virtual status_t beginFrame(bool mustRecompose) = 0			//
-    virtual status_t prepareFrame(CompositionType compositionType) = 0	//
-    virtual status_t advanceFrame() = 0					//gles合成完成，提交数据到hwc
-    virtual void onFrameCommitted() = 0
-}
-
-
-
-frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.h
-frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
 /***********
  RenderEngine 绘制layer图像
 */

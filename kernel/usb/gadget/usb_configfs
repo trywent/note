@@ -1,0 +1,240 @@
+/************************************
+ kernel usb gadget操作接口
+
+
+*/
+//sysfs节点
+/sys/class/android_usb/android0
+
+
+//configfs节点
+mkdir /config/usb_gadget/g1
+mkdir /config/usb_gadget/g1/functions/rndis.gs4
+mkdir /config/usb_gadget/g1/functions/ncm.gs0
+
+sys.usb.controller=musb-hdrc.0.auto sprd默认的控制器
+/*****
+ android4.4
+*/
+static struct device_attribute *android_usb_attributes[] = {
+	&dev_attr_idVendor,
+	&dev_attr_idProduct,
+	&dev_attr_bcdDevice,
+	&dev_attr_bDeviceClass,
+	&dev_attr_bDeviceSubClass,
+	&dev_attr_bDeviceProtocol,
+	&dev_attr_iManufacturer,
+	&dev_attr_iProduct,
+	&dev_attr_iSerial,
+	&dev_attr_functions,
+	&dev_attr_enable,
+	&dev_attr_state,
+	NULL
+}
+
+//
+module_init(init)-->init{
+- android_class = class_create(THIS_MODULE, "android_usb")
+- struct android_dev *dev = kzalloc(sizeof(*dev), GFP_KERNEL)
+- dev->functions = supported_functions
+- INIT_WORK(&dev->work, android_work)
+- android_create_device(dev){
+	- struct device_attribute **attrs = android_usb_attributes
+	- dev->dev = device_create(android_class, NULL,MKDEV(0, 0), NULL, "android0")
+	- while ((attr = *attrs++)) 
+		- device_create_file(dev->dev, attr)
+	}
+- usb_composite_probe(&android_usb_driver, android_bind)
+}@android.c
+
+
+kernel/drivers/usb/gadget/android.c
+
+/*****
+
+ android8.0
+
+*/
+//创建文件节点
+module_init(gadget_cfs_init)-->gadget_cfs_init{
+  //创建configfs
+- config_group_init(&gadget_subsys.su_group)
+- configfs_register_subsystem(&gadget_subsys)
+  //sysfs class
+- class_create(THIS_MODULE, "android_usb")
+}@configfs.cs
+
+
+//andrid configfs 操作函数
+static struct configfs_group_operations gadgets_ops = {	//文件操作函数
+	.make_group     = &gadgets_make,
+	.drop_item      = &gadgets_drop,
+};
+
+static struct config_item_type gadgets_type = {		//文件类型
+	.ct_group_ops   = &gadgets_ops,
+	.ct_owner       = THIS_MODULE,
+};
+
+static struct configfs_subsystem gadget_subsys = {	//文件节点
+	.su_group = {
+		.cg_item = {
+			.ci_namebuf = "usb_gadget",
+			.ci_type = &gadgets_type,
+		},
+	},
+	.su_mutex = __MUTEX_INITIALIZER(gadget_subsys.su_mutex),
+}
+//创建/config/usb_gadget
+mkdir "/config/usb_gadget/g1"@init.usb.rc-->gadgets_ops-->make_group-->
+gadgets_make(struct config_group *group,const char *name){
+  //创建文件夹gi
+- struct gadget_info *gi = kzalloc(sizeof(*gi), GFP_KERNEL)
+- config_group_init_type_name(&gi->group, name, &gadget_root_type)			//默认节点bcdDevice,bcdUSB,UDC...
+- config_group_init_type_name(&gi->functions_group, "functions",&functions_type)	//functions子目录
+- config_group_init_type_name(&gi->configs_group, "configs",&config_desc_type)		//
+- config_group_init_type_name(&gi->strings_group,"strings",&gadget_strings_strings_type)//
+- config_group_init_type_name(&gi->os_desc_group, "os_desc",&os_desc_type)		//
+  //composite初始化
+- gi->composite.bind = configfs_do_nothing
+- gi->composite.unbind = configfs_do_nothing
+- gi->composite.gadget_driver = configfs_driver_template
+  //cdev初始化
+- composite_init_dev(&gi->cdev){
+	- INIT_LIST_HEAD(&cdev->configs)
+	- INIT_LIST_HEAD(&cdev->gstrings)
+	}
+- gi->cdev.desc.bLength = USB_DT_DEVICE_SIZE
+  //sysfs
+- android_device_create{
+}@configfs.c
+
+//udc属性操作。关联gadget，使能相关接口
+gadget_dev_desc_UDC_store(struct config_item *item,const char *page, size_t len){
+- char* name = kstrdup(page, GFP_KERNEL)
+- struct gadget_info *gi = to_gadget_info(item)
+- if (!strlen(name) || strcmp(name, "none") == 0) {	//
+	- unregister_gadget(gi)
+  }else{
+	- gi->composite.gadget_driver.udc_name = name
+	- usb_gadget_probe_driver(&gi->composite.gadget_driver)@core.c
+  }
+}@configfs.c
+
+//bind 绑定到udc
+configfs_composite_bind(struct usb_gadget *gadget,struct usb_gadget_driver *gdriver){
+- struct usb_composite_driver *composite = to_cdriver(gdriver)
+- struct gadget_info *gi = container_of(composite,struct gadget_info, composite)
+  //string
+- list_for_each_entry(gs, &gi->string_list, list) {
+	- gi->gstrings[i] = &gs->stringtab_dev
+	- gs->strings[USB_GADGET_MANUFACTURER_IDX].s = gs->manufacturer
+	- gs->strings[USB_GADGET_PRODUCT_IDX].s = gs->product
+	}
+  //config
+- list_for_each_entry(c, &gi->cdev.configs, list) {
+	- struct config_usb_cfg *cfg = container_of(c, struct config_usb_cfg, c)
+	- list_for_each_entry_safe(f, tmp, &cfg->func_list, list) {
+		- usb_add_function(c, f)
+		- list_add(&f->list, &cfg->func_list)
+		}
+	}
+- usb_ep_autoconfig_reset(cdev->gadget)
+}@configfs.c
+
+/*
+ functions 目录 
+ 
+*/
+mkdir /config/usb_gadget/g1/functions/ffs.adb 0770 shell shell
+mkdir /config/usb_gadget/g1/functions/mtp.gs0 0770 shell shell
+mkdir /config/usb_gadget/g1/functions/ptp.gs1 0770 shell shell
+mkdir /config/usb_gadget/g1/functions/rndis.gs4 0770 shell shel
+@etc/init/hw/init.ums512_1h10.usb.rc
+
+static struct configfs_group_operations functions_ops = {
+	.make_group     = &function_make,
+	.drop_item      = &function_drop,
+}
+
+static struct config_item_type functions_type = {
+	.ct_group_ops   = &functions_ops,
+	.ct_owner       = THIS_MODULE,
+}
+
+//
+struct config_group *function_make(struct config_group *group,const char *name){
+- 
+- 
+}
+
+/*
+ configs 目录 
+ 
+ symlink /config/usb_gadget/g1/functions/ffs.adb /config/usb_gadget/g1/configs/b.1/f1 @init.usb.configfs.rc
+*/
+static struct configfs_group_operations config_desc_ops = {
+	.make_group     = &config_desc_make,			//创建目录
+	.drop_item      = &config_desc_drop,
+}
+
+static struct config_item_type config_desc_type = {
+	.ct_group_ops   = &config_desc_ops,
+	.ct_owner       = THIS_MODULE,
+}
+
+//configs下创建目录。创建config
+struct config_group *config_desc_make(struct config_group *group,const char *name){
+- struct gadget_info *gi = container_of(group, struct gadget_info, configs_group)
+- struct config_usb_cfg *cfg = kzalloc(sizeof(*cfg), GFP_KERNEL)
+- cfg->c.bmAttributes = USB_CONFIG_ATT_ONE
+- usb_add_config_only(&gi->cdev, &cfg->c)
+}
+
+/*
+ sysfs 操作函数
+*/
+static struct device_attribute *android_usb_attributes[] = {
+	&dev_attr_state,
+	NULL
+}
+
+android_device_create(struct gadget_info *gi){
+  //开始work
+- INIT_WORK(&gi->work, android_work)
+  //创建sys节点 android0
+- char dev_name[10]
+- sprintf(dev_name, "android%d", gi->count);
+- android_device[gi->count] = device_create(android_class, NULL,MKDEV(0, gi->count), NULL, dev_name);
+- dev_set_drvdata(android_device[gi->count], gi);
+  //属性节点
+- struct device_attribute *attr
+- struct device_attribute **attrs = android_usb_attributes 	//state节点DISCONNECTED,CONNECTED,CONFIGURED
+- while ((attr = *attrs++)) {
+	- device_create_file(android_device[gi->count], attr)
+	}
+}
+
+//
+android_setup(struct usb_gadget *gadget,const struct usb_ctrlrequest *c){
+- 
+}
+
+
+android_work(struct work_struct *data){
+- struct gadget_info *gi = container_of(data, struct gadget_info, work)
+- if (gi->connected != gi->sw_connected) {
+	- if (gi->connected)
+		- status[0] = true
+	  else
+		- status[2] = true
+	}
+- if (status[0]) kobject_uevent_env(&android_device[gi->count]->kobj,KOBJ_CHANGE, connected)
+- if (status[1]) kobject_uevent_env(&android_device[gi->count]->kobj,KOBJ_CHANGE, configured)
+- if (status[2]) kobject_uevent_env(&android_device[gi->count]->kobj,KOBJ_CHANGE, disconnected)
+}
+
+
+kernel/drivers/usb/gadget/configfs.c
+
+

@@ -20,6 +20,7 @@ startService@SystemServer.java-->onStart(){
 
 //displsy设备消息处理
 DisplayManagerHandler.handleMessage(Message msg){
+  //注册默认display
 - MSG_REGISTER_DEFAULT_DISPLAY_ADAPTERS:
 	registerDefaultDisplayAdapters{
 	- registerDisplayAdapterLocked(new LocalDisplayAdapter(mHandler, mDisplayAdapterListener)){
@@ -43,19 +44,24 @@ LocalDisplayAdapter(DisplayManagerService.SyncRoot syncRoot,Context context, Han
 - mListener = listener
 }@DisplayAdapter.java
 
+//从surfaceFlinger获取display信息
 registerDisplayAdapterLocked@DisplayManagerService.java-->registerLocked{
 - super.registerLocked()
   //监听热拔插
 - mHotplugReceiver = new HotplugDisplayEventReceiver(getHandler().getLooper())
   //遍历获取默认屏幕，hdmi屏幕信息BUILT_IN_DISPLAY_IDS_TO_SCAN
 - tryConnectDisplayLocked(builtInDisplayId){
+	  //surfaceFlinger获取getActiveConfig
 	- IBinder displayToken = SurfaceControl.getBuiltInDisplay(builtInDisplayId)
 	- SurfaceControl.PhysicalDisplayInfo[] configs = SurfaceControl.getDisplayConfigs(displayToken)
-	- int activeConfig = SurfaceControl.getActiveConfig(displayToken)
+	- int activeConfig = SurfaceControl.getActiveConfig(displayToken)	
 	- int activeColorMode = SurfaceControl.getActiveColorMode(displayToken)
 	- int[] colorModes = SurfaceControl.getDisplayColorModes(displayToken)
 	  //创建display
-	- LocalDisplayDevice device = new LocalDisplayDevice(displayToken, builtInDisplayId,configs, activeConfig)
+	- LocalDisplayDevice device = new LocalDisplayDevice(displayToken, builtInDisplayId,configs, activeConfig){
+		- 
+		- updatePhysicalDisplayInfoLocked(physicalDisplayInfos, activeDisplayInfo,allowedDisplayInfos, colorModes, activeColorMode)
+		}
 	- mDevices.put(builtInDisplayId, device)
 	- sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_ADDED){
 		- mHandler.post(new Runnable() {public void run() { mListener.onDisplayDeviceEvent(device, event)}})	
@@ -100,47 +106,9 @@ setDisplayInfoOverrideFromWindowManager-->setDisplayInfoOverrideFromWindowManage
 -->setDisplayInfoOverrideFromWindowManagerLocked@LogicalDisplay.java
 
 
-/****************************
- DisplayManager接口
-
-*/
-mDisplayManager = (DisplayManager)context.getSystemService(Context.DISPLAY_SERVICE)@ContextImpl.java-->
-new DisplayManager(ctx.getOuterContext())@SystemServiceRegistry.java-->
-DisplayManager(Context context){
-- mContext = context
-- mGlobal = DisplayManagerGlobal.getInstance(){
-	- IBinder b = ServiceManager.getService(Context.DISPLAY_SERVICE)
-	- sInstance = new DisplayManagerGlobal(IDisplayManager.Stub.asInterface(b))
-	}@DisplayManagerGlobal.java
-}DisplayManager.java
-
-
-getDisplay(int displayId)-->getOrCreateDisplayLocked(displayId, false /*assumeValid*/){
-- Display display = mGlobal.getCompatibleDisplay(displayId, context.getResources()){
-	- getDisplayInfo{
-		- DisplayInfo info = mDm.getDisplayInfo(displayId)
-		- registerCallbackIfNeededLocked
-		}
-	- new Display(this, displayId, displayInfo, daj)
-	}
-- mDisplays.put(displayId, display)
-}@DisplayManager.java
-
-
-getDisplayInfo(int displayId)-->getDisplayInfoInternal(displayId, callingUid){
-- LogicalDisplay display = mLogicalDisplays.get(displayId)
-- DisplayInfo info = display.getDisplayInfoLocked(){
-	- mInfo = new DisplayInfo()
-	- mInfo.copyFrom(mBaseDisplayInfo)
-	- if(mOverrideDisplayInfo!=null)
-	- return mInfo
-	}
-- return inof
-}@DisplayManangerService.java
-
 
 /****************************
- 设置InputManager,SurfaceFlinger方位
+ 设置屏幕方位。设置SurfaceFlinger，InputManager
  
 */
 
@@ -165,7 +133,7 @@ performTraversalLocked{
  android8.0
 
 */
-applyRotationLocked(final int oldRotation, final int rotation)@DisplayContent.java-->
+updateRotationUnchecked(boolean inTransaction)@DisplayContent.java-->
 performTraversalInTransactionFromWindowManager-->performTraversalInTransactionFromWindowManagerInternal
 -->performTraversalInTransactionLocked{
  //清除viewport
@@ -245,6 +213,81 @@ setProjectionLocked(SurfaceControl.Transaction t, int orientation,Rect layerStac
 - 
 - t.setDisplayProjection(mDisplayToken, orientation, layerStackRect, displayRect);
 }@DisplayDevice.java
+
+
+/****************************
+ DisplayManager接口。上层获取屏幕信息
+
+*/
+mDisplayManager = (DisplayManager)context.getSystemService(Context.DISPLAY_SERVICE)@ContextImpl.java-->
+new DisplayManager(ctx.getOuterContext())@SystemServiceRegistry.java-->
+DisplayManager(Context context){
+- mContext = context
+- mGlobal = DisplayManagerGlobal.getInstance(){
+	- IBinder b = ServiceManager.getService(Context.DISPLAY_SERVICE)
+	- sInstance = new DisplayManagerGlobal(IDisplayManager.Stub.asInterface(b))
+	}@DisplayManagerGlobal.java
+}DisplayManager.java
+
+
+getDisplay(int displayId)-->getOrCreateDisplayLocked(displayId, false /*assumeValid*/){
+- Display display = mGlobal.getCompatibleDisplay(displayId, context.getResources()){
+	- getDisplayInfo{
+		- DisplayInfo info = mDm.getDisplayInfo(displayId)
+		- registerCallbackIfNeededLocked
+		}
+	- new Display(this, displayId, displayInfo, daj)
+	}
+- mDisplays.put(displayId, display)
+}@DisplayManager.java
+
+
+getDisplayInfo(int displayId)-->getDisplayInfoInternal(displayId, callingUid){
+- LogicalDisplay display = mLogicalDisplays.get(displayId)
+- DisplayInfo info = display.getDisplayInfoLocked(){
+	- mInfo = new DisplayInfo()
+	- mInfo.copyFrom(mBaseDisplayInfo)
+	- if(mOverrideDisplayInfo!=null)
+	- return mInfo
+	}
+- return inof
+}@DisplayManangerService.java
+
+
+/*********
+   app   获取display信息接口
+*/
+//通过resource获取分辨率
+getResources-->mResource@ContextImpl.java-->getDisplayMetrics-->mResourcesImpl.getDisplayMetrics()@Resource.java
+
+//通过display获取分辨率 android8.0
+getWindowManager-->mWindowManager@Activity.java-->mWindowManager@Window.java-->WindowManagerImpl@WindowManagerImpl.java
+
+getDefaultDisplay@WindowManagerImpl.java-->mContext.getDisplay()-->getDisplay-->mResourcesManager.getAdjustedDisplay
+@ContextImpl.java-->getAdjustedDisplay@ResourceManager.java
+
+//最终调用到getAdjustedDisplay
+getAdjustedDisplay{
+- DisplayManagerGlobal dm = DisplayManagerGlobal.getInstance(){
+	  //只创建一个实例
+	- IBinder b = ServiceManager.getService(Context.DISPLAY_SERVICE)
+	- sInstance = new DisplayManagerGlobal(IDisplayManager.Stub.asInterface(b))
+	}
+- dm.getCompatibleDisplay(displayId, resources){
+	- DisplayInfo displayInfo = getDisplayInfo(displayId){
+		- info = mDm.getDisplayInfo(displayId) //从服务端获取displayInfo
+		- registerCallbackIfNeededLocked	
+		}
+	- return new Display(this, displayId, displayInfo, daj)
+	}@DisplayManangerGlobal.java
+}@ResourceManager.java
+
+//获取display android6.1
+getWindowManager(dm.getDisplay)@ContextImpl.java-->getDisplay-->getOrCreateDisplayLocked
+@DisplayManager.java-->getCompatibleDisplay{
+- getDisplayInfo-->mDm.getDisplayInfo-->display.getDisplayInfoLocked@DisplayManagerService.java
+- new Display(displayInfo)
+}@DisplayManagerGlobal.java
 
 
 frameworks/base/services/core/java/com/android/server/display/DisplayManagerService.java

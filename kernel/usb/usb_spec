@@ -1,106 +1,80 @@
-/*
+/**************************
+ usb
 
 */
-//id  state=0 为host
-对于Host端，只需将连接线的USB_ID pin和地短接即可，
-对于Slave端，USB连接线的USB_IDpin是悬空的
 
-Default Address:
-当usb设备第一次上电或复位后使用的地址，默认值是00H。
+Default Address:	当usb设备第一次上电或复位后使用的地址，默认值是00H
+Default Pipe: 		host和usb设备的0端点之间的消息管道。用来传输控制，状态信息
+Device Address:	 	一个7位数，用来表示设备地址。设备地址是唯一的且有USB系统分配。第一次上电时地址为00H
+Device Endpoint: 	usb设备上能够编址的端口，是host与usb设备通信的消息源。
+Endpoint： 		See device endpoint.
+Endpoint Address：	一个endpoint号和endpoint方向的组合。一个端点地址用于单向的数据传输
+Endpoint Direction：	数据的传输方向，IN(传送到host)，或OUT(从host发出)
+Endpoint Number：	一个在0H～FH之间的4位数，标识一个usb设备端点
+Message Pipe：		双向管道，用来传输request/data/status规范的数据包
+Stream Pipe：		一个用于传输流数据的管道(数据没有USB定义的结构)
+Pipe：			设备端点和host连接的逻辑抽象。管道有流管道，消息管道
 
-Default Pipe: 
-host和usb设备的0端点之间的消息管道。用来传输控制，状态信息。
-
-Device Address:
-一个7位数，用来表示设备地址。设备地址是唯一的且有USB系统分配。第一次上电时地址为00H
-
-Device Endpoint:
-usb设备上能够编址的端口，是host与usb设备通信的消息源。
-
-Endpoint： See device endpoint.
-Endpoint Address：
-一个endpoint号和endpoint方向的组合。一个端点地址用于单向的数据传输
-
-Endpoint Direction：
-数据的传输方向，IN(传送到host)，或OUT(从host发出)
-
-Endpoint Number：
-一个在0H～FH之间的4位数，标识一个usb设备端点
-
-Message Pipe：
-双向管道，用来传输request/data/status规范的数据包。
-
-Stream Pipe：
-一个用于传输流数据的管道(数据没有USB定义的结构)
-
-Pipe：
-设备端点和host连接的逻辑抽象。管道有流管道，消息管道
-
-
-___________________________
-总线结构：
+//总线结构
 USB host：Host Controler
-
-USB device：(集线器hub，功能设备)
-设备实现的标准接口：
+USB device：集线器hub，功能设备
+device实现的标准接口：
 - 遵循usb协议
 - 对usb基本操作的响应。配置，复位....
 - 提供标准的功能描述信息
 
-system configuration：
-USB设备的探测：
-usb设备连接到hubs上，Hubs上有状态位用于向系统报告usb设备的状态(移除或插入)。
-usb host通过查询Hubs中状态位获取usb设备的状态。若是插入事件，host在默认地址上
-通过设备控制管道，使能设备的port,address。
+//otg设备A检测接入设备B类型
+USB_ID脚接地则B为HOST.USB_ID脚悬空则B为DEVICE
 
-host分配一个唯一的usb地址给设备，然后判断设备是hubs还是功能设备。host使用分配的地址
-和0号端点，建立usb设备的控制管道
+/*******
+ host
+
+*/
+
+
+//USB设备的探测：
+- device插入,host查询hub状态(hub有状态位显示接口有设备)
+- hub通过状态改变管道回复host的状态查询结果，设备插入
+- host分配设备唯一地址
+- host获取设备configuration信息
+- host分配configuration值
+配置：通过设备0号端口的通道进行控制
+移除：hub上报设备状态给host
+
+
 
 若设备是hubs，对hubs上的usb设备重复以上步骤。若是功能设备，则通知与改功能设备对应的驱动处理。
 
 
-USB设备的移除：
+//USB设备的移除：
 当设备从hubs上移除，hub关闭port并设置相应的标识。然后驱动程序处理设备的移除
+/*******
+ hub 功能：设备连接移除检测，传输错误恢复
+*/
+大概三個模块Hub Repeater, the Hub Controller, and the Transaction Translator
+hub的本地始终维持一个帧计数器，并且通过SOF(start of frame)和host同步
 
-____________________
-设备状态：
-Attached
+/*******
+ device
 
-Powered
+*/
 
-Default
-
-Address
-
-Configured
-
-Suspended 
+//设备状态：
+Attached, Powered, Default, Address, Configured, Suspended 
 
 
-Bus Enumeration：(枚举设备状态)
-1.连接了usb设备的hub，通过状态改变管道返回事件通知host。这时usb设备状态为powered，端口不可用。
-
-2.host查询hub获取最新的设备状态
-
-3.host设备插入的端口，等待至少100ms是插入操作完成和电压稳定。然后host使能端口并发送reset命令
-
-4.hub执行reset，usb设备的寄存器已经复位，并能在默认地址上响应。
-
-5.host分配USB设备唯一地址，这是设备处于Address状态。
-
-6.在设备收到唯一地址前，默认控制管道还是能够通过默认地址访问。host读取设备描述信息，获取默认管道的
+//Bus Enumeration：枚举设备状态过程
+1 连接了usb设备的hub，通过状态改变管道返回事件通知host。这时usb设备状态为powered，端口不可用。
+2 host查询hub获取最新的设备状态
+3 host设备插入的端口，等待至少100ms是插入操作完成和电压稳定。然后host使能端口并发送reset命令
+4 hub执行reset，usb设备的寄存器已经复位，并能在默认地址上响应。
+5 host分配USB设备唯一地址，这是设备处于Address状态。
+6 在设备收到唯一地址前，默认控制管道还是能够通过默认地址访问。host读取设备描述信息，获取默认管道的
   最大数据传输量
+7 host读取所有的configuration信息，从0～n-1(n为配置编号)
+8 根据配置信息和设备将要如何使用，host向设备设置一个新的配置信息。这是设备处于Configured状态
+  所有的端点都已经被设置。这时是可使用状态。
 
-7.host读取所有的configuration信息，从0～n-1(n为配置编号)
-
-8.根据配置信息和设备将要如何使用，host向设备设置一个新的配置信息。这是设备处于Configured状态
-，所有的端点都已经被设置。这时是可使用状态。
-
-
-//usb USB-IF(USB Implementers Forum)
-
-请求的格式：
-bmRequestType | bRequest |  wValue | wIndex | wLength
 
 device{
 - configuration{
@@ -113,19 +87,6 @@ device{
 
 }
 
-设备识别：
-插入：host查询hub状态(hub有状态位显示接口有设备)
-- hub通过状态改变管道回复host的状态查询结果，设备插入
-- host分配设备唯一地址
-- host获取设备configuration信息
-- host分配configuration值
-
-移除：hub上报设备状态给host
-
-
-
-配置：通过设备0号端口的通道进行控制
-______________
 //命令，接口函数
 SetAddress()
 GetInterface() //获取接口的当前设置
@@ -135,9 +96,9 @@ SetInterface() //选择接口的一个设置
 FUNCTION_SUSPEND
 DEVICE_REMOTE_WAKEUP
 
-==============
-数据传输：host 和device interface的端点
-
+/*******
+ 数据传输：host 和device interface的端点
+*/
 I/O Request Packets (IRPs)
 
 
@@ -153,10 +114,7 @@ host:
 中断数据传输：中断传输(usb触摸)
 同步传输：同步传输(视频，音频)
 
-
-===============
-//hub 设备连接移除检测，传输错误恢复
-大概三個模塊Hub Repeater, the Hub Controller, and the Transaction Translator
+//请求的格式：
+bmRequestType | bRequest |  wValue | wIndex | wLength
 
 
-hub的本地始终维持一个帧计数器，并且通过SOF(start of frame)和host同步

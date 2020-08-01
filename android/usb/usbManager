@@ -1,5 +1,6 @@
 /****************************
  USBService
+
 */
 startOtherServices-->mSystemServiceManager.startService(USB_SERVICE_CLASS)@SystemServer.java
 -->startService("com.android.server.usb.UsbService$Lifecycle")@SystemServiceManager.java-->
@@ -188,43 +189,9 @@ setAdbEnabled(boolean enable) {
 - updateAdbNotification(false)
 }@UsbDeviceManager.java
 
+
 frameworks/base/services/usb/java/com/android/server/usb/UsbDeviceManager.java
 frameworks/base/services/core/jni/com_android_server_UsbDeviceManager.cpp
 
 
-/************************
- android10
-*/
 
-UsbDeviceManager(Context context, UsbAlsaManager alsaManager, UsbSettingsManager settingsManager) {
-  //是否存在usbhal服务。创建usbhandler
-- boolean halNotPresent = false
-- try{IUsbGadget.getService(true)}catch (NoSuchElementException e){ halNotPresent = true }
-- if (halNotPresent) {
-	- mHandler = new UsbHandlerLegacy(FgThread.get().getLooper(), mContext, this,alsaManager, settingsManager)
-  }else{
-	- mHandler = new UsbHandlerHal(FgThread.get().getLooper(), mContext, this,alsaManager, settingsManager)
-  }
-  //广播处理
-- BroadcastReceiver portReceiver = new BroadcastReceiver()
-- BroadcastReceiver chargingReceiver = new BroadcastReceiver()
-- BroadcastReceiver hostReceiver = new BroadcastReceiver()
-- BroadcastReceiver languageChangedReceiver = new BroadcastReceiver()
-- mContext.registerReceiver(portReceiver,new IntentFilter(UsbManager.ACTION_USB_PORT_CHANGED))
-- mContext.registerReceiver(chargingReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-- IntentFilter filter = new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED)
-- mContext.registerReceiver(hostReceiver, filter)
-- mContext.registerReceiver(languageChangedReceiver,new IntentFilter(Intent.ACTION_LOCALE_CHANGED))
-  //uevent 
-- mUEventObserver = new UsbUEventObserver()
-- mUEventObserver.startObserving(USB_STATE_MATCH)
-- mUEventObserver.startObserving(ACCESSORY_START_MATCH)
-}@usb/UsbDeviceManager.java
-
-
-
-
-
-
-frameworks/base/services/usb/java/com/android/server/usb/UsbDeviceManager.java
-frameworks/base/services/core/java/com/android/server/adb/AdbDebuggingManager.java

@@ -1,12 +1,20 @@
-/*
-
- mount -t configfs none /config
- 
- 通过sysfs管理内核object或config_items
+/***********************************
+ configfs　和sysfs类似。。但文件节点可以由用户空间创建，删除
 */
+//挂载
+mount -t configfs none /config
+
+//创建节点。创建节点后,会生成属性节点
+mkdir /config/xxx
+/config/xxx/attr1		//自动生成属性
+/config/xxx/attr2
+
+write /config/xxx/attr1		//读写属性节点
 
 /*
- config_item代表一个目录节点,节点中包含子节点提供属性信息
+ config_item 代表一个目录，包含子节点提供属性信息。
+
+ 包含在group中，通过mkdir，rmdik创建删除。会调用group中对应的函数
 */
 struct config_item {
 	char                    *ci_name;
@@ -15,7 +23,7 @@ struct config_item {
 	struct list_head        ci_entry;
 	struct config_item      *ci_parent;
 	struct config_group     *ci_group;
-	struct config_item_type *ci_type;//属性
+	struct config_item_type *ci_type;	//属性
 	struct dentry           *ci_dentry;
 }
 
@@ -25,12 +33,20 @@ struct config_item *config_item_get(struct config_item *);
 void config_item_put(struct config_item *);
 
 /*
- config_item_type代表一个属性
+ config_item_type代表一个属性。 一个文件节点
 */
 struct configfs_item_operations {
 	void (*release)(struct config_item *);
 	int (*allow_link)(struct config_item *src,struct config_item *target);
 	int (*drop_link)(struct config_item *src,struct config_item *target);
+};
+
+struct configfs_attribute {			//节点属性。可以执行读写操作
+	char                    *ca_name;
+	struct module           *ca_owner;
+	umode_t                  ca_mode;
+	ssize_t (*show)(struct config_item *, char *);
+	ssize_t (*store)(struct config_item *, const char *, size_t);
 };
 
 struct config_item_type {
@@ -39,13 +55,7 @@ struct config_item_type {
 	struct configfs_group_operations        *ct_group_ops;
 	struct configfs_attribute               **ct_attrs;
 };
-struct configfs_attribute {
-	char                    *ca_name;
-	struct module           *ca_owner;
-	umode_t                  ca_mode;
-	ssize_t (*show)(struct config_item *, char *);
-	ssize_t (*store)(struct config_item *, const char *, size_t);
-};
+
 
 
 /*
@@ -72,7 +82,7 @@ struct configfs_group_operations {
 };
 
 /*
- configfs初始,configfs_register_subsystem
+ subsystem根目录初始
 */
 struct configfs_subsystem {
 	struct config_group	su_group;
@@ -80,8 +90,6 @@ struct configfs_subsystem {
 };
 int configfs_register_subsystem(struct configfs_subsystem *subsys);
 void configfs_unregister_subsystem(struct configfs_subsystem *subsys);
-
-
 
 
 

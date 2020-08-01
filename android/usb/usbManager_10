@@ -1,0 +1,184 @@
+/************************
+ UsbService
+ 
+*/
+
+
+//"com.android.server.usb.UsbService$Lifecycle"
+startOtherServices-->mSystemServiceManager.startService(USB_SERVICE_CLASS)@SystemServer.java
+Lifecycle.onStart() {
+- mUsbService = new UsbService(getContext())
+- publishBinderService(Context.USB_SERVICE, mUsbService)
+}@UsbService.java
+
+UsbService(Context context) {
+- mUserManager = context.getSystemService(UserManager.class)
+- mSettingsManager = new UsbSettingsManager(context)					//设备权限设置？
+- mAlsaManager = new UsbAlsaManager(context)
+- mHostManager = new UsbHostManager(context, mAlsaManager, mSettingsManager)		//host功能
+- mDeviceManager = new UsbDeviceManager(context, mAlsaManager, mSettingsManager)	//device功能
+- mPortManager = new UsbPortManager(context)
+  //设置host,device的处理函数 UsbProfileGroupSettingsManager
+- onSwitchUser(UserHandle.USER_SYSTEM){
+	- UsbProfileGroupSettingsManager settings = mSettingsManager.getSettingsForProfileGroup(UserHandle.of(newUserId))
+	- mHostManager.setCurrentUserSettings(settings)
+	- mDeviceManager.setCurrentUser(newUserId, settings)
+	}
+  //监听device policy
+- filter.addAction(DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED)
+- mContext.registerReceiver(receiver, filter, null, null)
+}@UsbService.java
+
+
+frameworks/base/services/usb/java/com/android/server/usb/UsbService.java
+frameworks/base/services/usb/java/com/android/server/usb/UsbSettingsManager.java
+/************************
+ portManager
+ 
+*/
+
+/************************
+ UsbHostManager 连接的设备为device。 连接U盘，鼠标
+
+ 监听目录/dev/bus/usb获取底层状态
+*/
+UsbHostManager(Context context, UsbAlsaManager alsaManager, UsbSettingsManager settingsManager) {
+- mHostBlacklist = context.getResources().getStringArray(com.android.internal.R.array.config_usbHostBlacklist)
+  //设备连接的处理app
+- String deviceConnectionHandler = context.getResources().getString(
+	com.android.internal.R.string.config_UsbDeviceConnectionHandling_component)
+- setUsbDeviceConnectionHandler(ComponentName.unflattenFromString(deviceConnectionHandler)){
+	- mUsbDeviceConnectionHandler = usbDeviceConnectionHandler
+	}
+}@UsbHostManager.java
+
+//系统准备好。监听底层usb状态
+systemReady-->new Thread(null, runnable, "UsbService host thread").start()-->monitorUsbHostBus
+android_server_UsbHostManager_monitorUsbHostBus(JNIEnv* /* env */, jobject thiz){
+- struct usb_host_context* context = usb_host_init()
+- usb_host_run(context, usb_device_added, usb_device_removed, NULL, (void *)thiz)
+}@com_android_server_UsbHostManager.cpp
+
+//监听/dev/bus/usb
+usb_host_run(struct usb_host_context *context, usb_device_added_cb added_cb,usb_device_removed_cb removed_cb,
+             usb_discovery_done_cb discovery_done_cb,void *client_data){
+- usb_host_load(context, added_cb, removed_cb, discovery_done_cb, client_data)
+- while (!done) {
+	-  done = usb_host_read_event(context)
+	}
+}@usbhost.c
+
+
+frameworks/base/services/usb/java/com/android/server/usb/UsbHostManager.java
+frameworks/base/services/core/jni/com_android_server_UsbHostManager.cpp
+system/core/libusbhost/usbhost.c
+/************************
+ UsbDeviceManager 连接的设备为accessory。 充电，被电脑访问数据
+
+ 通过UsbHandlerHal获取底层状态
+*/
+
+UsbDeviceManager(Context context, UsbAlsaManager alsaManager, UsbSettingsManager settingsManager) {
+  //不存在IUsbGadget服务。创建UsbHandlerLegacy,操作设备的接口
+- boolean halNotPresent = false
+- try{IUsbGadget.getService(true)}catch (NoSuchElementException e){ halNotPresent = true }
+- if (halNotPresent) {
+	- mHandler = new UsbHandlerLegacy(FgThread.get().getLooper(), mContext, this,alsaManager, settingsManager)
+  }else{
+	- mHandler = new UsbHandlerHal(FgThread.get().getLooper(), mContext, this,alsaManager, settingsManager)
+  }
+  //mtp,ptp控制接口
+- FileDescriptor mtpFd = nativeOpenControl(UsbManager.USB_FUNCTION_MTP)
+- mControlFds.put(UsbManager.FUNCTION_MTP, mtpFd)
+- FileDescriptor ptpFd = nativeOpenControl(UsbManager.USB_FUNCTION_PTP)
+- mControlFds.put(UsbManager.FUNCTION_PTP, ptpFd)
+  //广播处理
+- BroadcastReceiver portReceiver = new BroadcastReceiver()
+- BroadcastReceiver chargingReceiver = new BroadcastReceiver()
+- BroadcastReceiver hostReceiver = new BroadcastReceiver()
+- BroadcastReceiver languageChangedReceiver = new BroadcastReceiver()
+- mContext.registerReceiver(portReceiver,new IntentFilter(UsbManager.ACTION_USB_PORT_CHANGED))
+- mContext.registerReceiver(chargingReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+- IntentFilter filter = new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+- mContext.registerReceiver(hostReceiver, filter)
+- mContext.registerReceiver(languageChangedReceiver,new IntentFilter(Intent.ACTION_LOCALE_CHANGED))
+  //uevent 
+- mUEventObserver = new UsbUEventObserver()
+- mUEventObserver.startObserving(USB_STATE_MATCH)
+- mUEventObserver.startObserving(ACCESSORY_START_MATCH)
+}@UsbDeviceManager.java
+
+//系统准备好
+systemReady() {
+- LocalServices.getService(ActivityTaskManagerInternal.class).registerScreenObserver(this)
+- mHandler.sendEmptyMessage(MSG_SYSTEM_READY)-->handleMessage(MSG_SYSTEM_READY){
+	- mConnectivityManager = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE)
+	- LocalServices.getService(AdbManagerInternal.class).registerTransport(new AdbTransport(this))
+	}
+}@UsbDeviceManager.java
+
+//uevent处理
+onUEvent(UEventObserver.UEvent event) {
+- String state = event.get("USB_STATE")
+- String accessory = event.get("ACCESSORY")
+- if (state != null) {
+	- mHandler.updateState(state)		//更新状态
+  } else if ("START".equals(accessory)) {
+	- startAccessoryMode()			//设置accessory
+  }
+}UsbUEventObserver extends UEventObserver@UsbDeviceManager.java
+
+
+/*****
+ handler 底层操作接口
+
+*/
+sys.usb.config 		//当前的功能配置
+sys.usb.state  		//和config值一致
+sys.usb.controller	//控制器，sys.usb.controller=musb-hdrc.0.auto
+
+USB_STATE_MATCH = "DEVPATH=/devices/virtual/android_usb/android0"	
+FUNCTIONS_PATH =  "/sys/class/android_usb/android0/functions"
+STATE_PATH = "/sys/class/android_usb/android0/state"			//状态
+
+UsbHandlerLegacy extends UsbHandler
+
+UsbHandlerLegacy(Looper looper, Context context, UsbDeviceManager deviceManager,
+                UsbAlsaManager alsaManager, UsbSettingsManager settingsManager) {
+- super(looper, context, deviceManager, alsaManager, settingsManager){
+	- mUsbDeviceManager = deviceManager
+	- mUsbAlsaManager = alsaManager
+	}
+  //读取oem设置的功能。config_oemUsbModeOverride
+- readOemUsbOverrideConfig(context)
+- String state = FileUtils.readTextFile(new File(STATE_PATH), 0, null).trim()
+- updateState(state)
+}@UsbDeviceManager.java
+
+//事件处理。
+UsbHandler.handleMessage(Message msg) {
+
+}@UsbDeviceManager.java
+
+//function 功能
+setEnabledFunctions(long functions, boolean forceRestart) {
+- 
+- 
+}@UsbDeviceManager.java
+
+
+
+frameworks/base/services/usb/java/com/android/server/usb/UsbDeviceManager.java
+frameworks/base/services/core/java/com/android/server/adb/AdbDebuggingManager.java
+frameworks/base/services/core/jni/com_android_server_UsbDeviceManager.cpp
+
+/************************
+ UsbProfileGroupSettingsManager usb在当前user下的设置接口。device,host
+ 
+*/
+
+
+
+
+frameworks/base/services/usb/java/com/android/server/usb/UsbProfileGroupSettingsManager.java
+

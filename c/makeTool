@@ -1,5 +1,6 @@
 /*********************
- CMake
+ CMake 用于生成makefile
+
 */
 1 编写CMakeList
 {
@@ -22,6 +23,7 @@ ADD_LIBRARY(myprint SHARED ${SRC_LIST_CPP} ${SRC_LIST_C})
 
 /*********************
  automake
+
 */
 
 automake 读取 Makefile.am 来产生 Makefile.in,

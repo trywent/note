@@ -58,6 +58,7 @@ setprop sys.fyt.debug.set debugoon
 
 #打开root
 setprop sys.fyt.setparama lsecadbdebug9 
+#loglevel
 setprop sys.fyt.setparama debuglevel6
 
 

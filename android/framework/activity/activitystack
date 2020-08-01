@@ -123,7 +123,8 @@ startPausingLocked(boolean userLeaving, boolean uiSleeping,ActivityRecord resumi
    mStackSupervisor.mStoppingActivities 保存要stopping的activity
 */
 
-//将不可见的Activity才加入mStackSupervisor.mStoppingActivities。等idle时执行stop流程
+//将不可见的Activity才加入mStackSupervisor.mStoppingActivities。在全屏activity后面不可见
+//等idle时执行stop流程
 ensureActivitiesVisibleLocked-->
 makeInvisible(ActivityRecord r){
 - r.setVisible(false)
