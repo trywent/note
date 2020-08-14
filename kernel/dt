@@ -57,10 +57,10 @@ compatible = "xxx,xxx"   //该属性用于区分一个节点，一个设备。�
 节点名                   //节点格式名字+地址 <name>[@<unit-address>] 。地址一般会写在节点的reg属性中
 设备                     //
 
-//地址
+//地址。描述了寄存器的地址和个数，addr1+len1  addr2+len2 (两组不同起始位置的寄存器) 
 reg  = <address1 length1 [address2 length2] [address3 length3] ... >
-#address-cells          //reg中地址的个数。如总线中设备号 + 地址
-#size-cells             //reg地址的大小个数
+#address-cells          //addr占用的个数
+#size-cells             //length个数
 
 Ranges (Address Translation):
 	ranges = <0 0  0x10100000   0x10000     // Chipselect 1, Ethernet

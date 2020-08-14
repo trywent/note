@@ -1,0 +1,22 @@
+/****************************
+ 
+*/
+
+checkLocationPermission( Context context, LocationPermissionQuery query){
+- 
+- LocationPermissionResult resultForFine = checkAppLocationPermissionHelper(
+	context, query, Manifest.permission.ACCESS_FINE_LOCATION)
+- LocationPermissionResult resultForCoarse = checkAppLocationPermissionHelper(
+                    context, query, Manifest.permission.ACCESS_COARSE_LOCATION)
+- return LocationPermissionResult.ALLOWED
+}
+
+checkAppLocationPermissionHelper
+
+
+
+
+
+
+
+frameworks/base/telephony/java/android/telephony/LocationAccessPolicy.java

@@ -19,16 +19,27 @@ addWindow-->new WindowState(this, session, client, token, parentWindow,appOp[0],
 viewVisibility, session.mUid,session.mCanAddInternalSystemWindow)@WindowManagerService.java-->
 WindowState(){
 - 
-- mWinAnimator = new WindowStateAnimator(this)
+- mWinAnimator = new WindowStateAnimator(this)	//创建windowStateAnimator
 }@WindowState.java
 
 //大小
 从task中获取大小，计算windowState的frame大小。再设置到surfaceControler。（其它容器不会设置大小）
 
+
+//隐藏
+sendAppVisibilityToClients() {			//通知到应用，窗口已经隐藏
+- boolean clientHidden = mAppToken.isClientHidden()
+  //隐藏前，detach子窗口（为了防止应用清除子窗口，导致影响动画效果？）
+- if (clientHidden) {
+	- mWinAnimator.detachChildren()
+	}
+- mClient.dispatchAppVisibility(!clientHidden
+}
+
 //销毁
 destroySurface(boolean cleanupOnResume, boolean appStopped) {
 - 
-- 
+- mWinAnimator.destroyPreservedSurfaceLocked()
 }@WindowState.java
 
 
@@ -135,8 +146,29 @@ clearCropInTransaction
 }
 
 
-//显示，隐藏
-showSurfaceRobustlyLocked
+//显示
+showSurfaceRobustlyLocked@WindowStateAnimator.java
+showRobustlyInTransaction-->updateVisibility-->showSurface
+
+setCropInTransaction-->showSurface
+
+showSurface{
+- setShown(true)
+- mSurfaceControl.show()
+}@WindowSurfaceController.java
+
+//隐藏
+hide(SurfaceControl.Transaction transaction, String reason) {
+- if (mSurfaceShown) hideSurface(transaction){
+	- setShown(false){
+		- mSurfaceShown = surfaceShown
+		- mWindowSession.onWindowSurfaceVisibilityChanged(this, mSurfaceShown, mWindowType)
+		}
+	- transaction.hide(mSurfaceControl)
+	}
+}@WindowSurfaceController.java
+
+
 
 
 

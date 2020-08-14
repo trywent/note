@@ -245,13 +245,5 @@ frameworks/base/core/java/android/content/pm/PermissionInfo.java
 frameworks/base/services/core/java/com/android/server/pm/permission/DefaultPermissionGrantPolicy.java
 
 
-/**************************************
-  ops
-
-*/
 
 
-
-
-frameworks/base/core/java/android/app/AppOpsManager.java
-frameworks/base/services/core/java/com/android/server/AppOpsService.java

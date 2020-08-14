@@ -255,7 +255,6 @@ LOCAL_POST_INSTALL_CMD := mkdir -p $(addprefix $(TARGET_ROOT_OUT)/, \
 
 
 
-
 /*******************************************************
  ramdisk.img:(root目录TARGET_ROOT_OUT)
 */
@@ -268,14 +267,27 @@ $(INSTALLED_RAMDISK_TARGET): $(MKBOOTFS) $(INTERNAL_RAMDISK_FILES) $(INSTALLED_F
 
 @build/core/Makefile
 /*******************************************************
- boot.img:bootimage
+ boot.img:bootimage 和dtb
+
 */
+//dtb.img
+INSTALLED_DTBIMAGE_TARGET := $(PRODUCT_OUT)/dtb.img
+$(INSTALLED_DTBIMAGE_TARGET) : $(PRODUCT_OUT)/$(BSP_DTB_NAME).dtb
+	cat $^ > $@
+$(PRODUCT_OUT)/$(BSP_DTB_NAME).dtb : $(TARGET_PREBUILT_DTB)
+	@cp $^ $@
+
+
+//boot.img
 INSTALLED_KERNEL_TARGET := $(PRODUCT_OUT)/kernel
 INSTALLED_RAMDISK_TARGET := $(BUILT_RAMDISK_TARGET):=$(PRODUCT_OUT)/ramdisk.img
 
 INSTALLED_BOOTIMAGE_TARGET := $(PRODUCT_OUT)/boot.img
 bootimage:$(INSTALLED_BOOTIMAGE_TARGET)
 boot.img:kernel ramdisk.img
+
+
+INTERNAL_BOOTIMAGE_ARGS += --dtb $(INSTALLED_DTBIMAGE_TARGET) 	//boot 打包dtb
 
 
 //kernel编译 sprd

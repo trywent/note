@@ -57,7 +57,10 @@ SurfaceFlinger::setClientStateLocked(const ComposerState& composerState, int64_t
         - layer->setCornerRadius(s.cornerRadius)
    	- flags |= eTraversalNeeded
     }
-
+- if (what & layer_state_t::eReparent) {
+        - layer->reparent(s.parentHandleForChild)
+        - flags |= eTransactionNeeded|eTraversalNeeded
+    }
 }@SurfaceFlinger.cpp
 
 
@@ -199,6 +202,9 @@ Layer::latchGeometry(compositionengine::LayerFECompositionState& compositionStat
 - compositionState.appId = appId
   ...
 }@Layer.cpp
+
+//reparent
+
 
 //准备合成
 prepareClientLayer(const RenderArea& , const Region& ,bool useIdentityTransform, Region& ,renderengine::LayerSettings& layer){

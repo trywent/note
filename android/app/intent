@@ -1,0 +1,81 @@
+/*************************
+ intent
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*************************
+ PendingIntent
+
+ PendingIntentRecord extends IIntentSender.Stub
+*/
+
+getActivity	//获取一个intent，必须是显式的指定component，能够启动acivity
+getService	//启动服务
+getBroadcast	//能够发送广播到特定应用
+send()		//执行intent
+
+//创建
+getActivity(Context context, int requestCode,Intent intent,int flags,Bundle options) {
+- intent.prepareToLeaveProcess(context)
+- ActivityManager.getService().getIntentSender(ActivityManager.INTENT_SENDER_ACTIVITY, packageName,..){
+	- 
+	- if (type == ActivityManager.INTENT_SENDER_ACTIVITY_RESULT) {
+		- mAtmInternal.getIntentSender(type, packageName, callingUid, userId,..)
+	  }else{
+		- mPendingIntentController.getIntentSender(type, packageName, callingUid,...)
+	  }
+	}@ActivtyManagerService.java
+}@PendingIntent.java
+
+PendingIntentRecord getIntentSender(int type, String packageName, int callingUid,int userId, IBinder token,
+	 String resultWho, int requestCode, Intent[] intents, String[] resolvedTypes, int flags, Bundle bOptions) {
+  //根据key查找对应的PendingIntentRecord
+- PendingIntentRecord.Key key = new PendingIntentRecord.Key(type, packageName, token,
+                    resultWho, requestCode, intents, resolvedTypes, flags,...)
+- ref = mIntentSenderRecords.get(key)
+  //没有找到。创建
+- rec = new PendingIntentRecord(this, key, callingUid)
+- mIntentSenderRecords.put(key, rec.ref)
+}@PendingIntentController.java
+
+
+//启动
+send-->sendAndReturnResult-->ActivityManager.getService().sendIntentSender@PendingIntent.java-->
+sendIntentSender(IIntentSender target, IBinder whitelistToken, int code,Intent intent, String resolvedType,
+            IIntentReceiver finishedReceiver, String requiredPermission, Bundle options) {
+- if (target instanceof PendingIntentRecord) {
+	- ((PendingIntentRecord)target).sendWithResult(code, intent, resolvedType,
+		 whitelistToken, finishedReceiver, requiredPermission, options)
+  }else{
+	- target.send(code, intent, resolvedType, whitelistToken, null, requiredPermission, options)
+	- finishedReceiver.performReceive(intent, 0, null, null, false, false, UserHandle.getCallingUserId())
+  }
+}@ActivityManagerService.java
+
+
+
+
+frameworks/base/core/java/android/app/PendingIntent.java
+frameworks/base/services/core/java/com/android/server/am/PendingIntentController.java

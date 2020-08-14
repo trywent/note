@@ -7,7 +7,10 @@ echo device > /sys/devices/platform/soc/soc:aon/5fff0000.usb/host_dev
 echo host > /sys/devices/platform/soc/soc:aon/5fff0000.usb/host_dev
 dd if=/sdcard/boot.img of=/dev/block/platform/soc/soc:ap-apb/71400000.sdio/by-name/boot
 dd if=/sdcard/u-boot-sign.bin of=/dev/block/platform/soc/soc:ap-apb/71400000.sdio/by-name/uboot
+
 dd if=/sdcard/dtbo.img of=/dev/block/platform/soc/soc:ap-apb/71400000.sdio/by-name/dtbo
+dd if=/sdcard/recovery.img of=/dev/block/platform/soc/soc:ap-apb/71400000.sdio/by-name/recovery
+
 
 lunch ums512_1h10_Natv-userdebug-native
 m audio.primary.ums512

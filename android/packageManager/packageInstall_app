@@ -1,0 +1,281 @@
+/***********************
+ 应用安装器
+
+ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.DEFAULT] dat=file:///mnt/sdcard/000000000_com.syu.ms.apk typ=application/vnd.android.package-archive flg=0x10000000 cmp=com.android.packageinstaller/.InstallStart} from uid 10005, pid 3759
+ActivityManager: ->startActivity for ActivityRecord{4d1c65f u0 com.android.packageinstaller/.InstallStart t81} result:0
+ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.DEFAULT] dat=file:///mnt/sdcard/000000000_com.syu.ms.apk typ=application/vnd.android.package-archive flg=0x2000000 cmp=com.android.packageinstaller/.InstallStaging (has extras)} from uid 10034, pid 2416
+
+ActivityManager: ->startActivity for ActivityRecord{96becba u0 com.android.packageinstaller/.InstallStaging t81} result:0
+
+ActivityManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.DEFAULT] dat=file:///data/user_de/0/com.android.packageinstaller/no_backup/package2792227523307545888.apk flg=0x10000 cmp=com.android.packageinstaller/.PackageInstallerActivity (has extras)} from uid 10034, pid 2416
+ActivityManager: ->startActivity for ActivityRecord{9d15999 u0 com.android.packageinstaller/.PackageInstallerActivity t81} result:0
+
+*/
+
+/***********************
+ android6.0
+*/
+onClick(mOk)-->startInstall(InstallAppProgress.class)@PackageInstallerActivity.java-->onCreate-->
+initView{
+- PackageManager pm = getPackageManager()
+- PackageInstallObserver observer = new PackageInstallObserver()
+  //apk已经安装
+- if("package".equals(mPackageURI.getScheme())){
+	- pm.installExistingPackage(mAppInfo.packageName)
+  }else{
+	- pm.installPackageWithVerificationAndEncryption(mPackageURI, observer, installFlags,...)
+	}
+}@InstallAppProgress.java
+
+
+packages/apps/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/InstallAppProgress.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+/***********************
+ andoid8.0
+*/
+onCreate@InstallStart.java-->onCreate@InstallStageing.java-->
+
+onCreate(Bundle icicle) {
+- mPm = getPackageManager()
+- mInstaller = mPm.getPackageInstaller()
+- if (PackageInstaller.ACTION_CONFIRM_PERMISSIONS.equals(intent.getAction())) {//确认权限
+	- packageUri = Uri.fromFile(new File(info.resolvedBaseCodePath))
+  }else{//安装
+	- packageUri = intent.getData() 
+  }
+- processPackageUri(packageUri)
+  //创建安装界面
+- bindUi(R.layout.install_confirm, false)
+  //检查，初始化安装
+- checkIfAllowedAndInitiateInstall{
+	 //检查是否允许安装应用
+	- installAppsRestrictionSource = mUserManager.getUserRestrictionSource(UserManager.DISALLOW_INSTALL_APPS)
+	- 
+	- 
+	- if (mAllowUnknownSources || !isInstallRequestFromUnknownSource(getIntent())){
+		- initiateInstall
+		}
+	 //检查是否允许安装未知来源应用
+	- unknownSourcesRestrictionSource = mUserManager.getUserRestrictionSource(UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES)
+	- if ((unknownSourcesRestrictionSource & UserManager.RESTRICTION_SOURCE_SYSTEM) != 0){
+		- showDialogInner(DLG_UNKNOWN_SOURCES_RESTRICTED_FOR_USER)
+		}
+	- handleUnknownSources
+	}
+}@PackageInstallerActivity.java
+
+
+handleUnknownSources{
+- appOpCode = AppOpsManager.permissionToOpCode(Manifest.permission.REQUEST_INSTALL_PACKAGES)
+- appOpMode = mAppOpsManager.checkOpNoThrow(appOpCode,mOriginatingUid, mOriginatingPackage)
+- switch (appOpMode){
+	- AppOpsManager.MODE_DEFAULT:
+	- AppOpsManager.MODE_ERRORED:{//显示未知来源弹框
+		- showDialogInner(DLG_EXTERNAL_SOURCE_BLOCKED)	
+		}
+	- AppOpsManager.MODE_ALLOWED
+	}
+}@PackageInstallerActivity.java
+
+initiateInstall{
+- String pkgName = mPkgInfo.packageName
+  //根据包名获取应用信息。是否已经安装过
+- mAppInfo = mPm.getApplicationInfo(pkgName)
+- startInstallConfirm{
+	  //创建ui，设置监听器
+	- bindUi(R.layout.install_confirm_perm_update, true){
+		- setContentView(layout)
+		- mOk = (Button) findViewById(R.id.ok_button)
+		- mCancel = (Button)findViewById(R.id.cancel_button)
+       		- mOk.setOnClickListener(this)
+        	- mCancel.setOnClickListener(this)
+		}
+	- ((TextView) findViewById(R.id.install_confirm_question)).setText(R.string.install_confirm_question)
+	  //不显示权限
+	- if(!permVisible){
+		- bindUi(R.layout.install_confirm, true)
+		}
+	}
+}@PackageInstallerActivity.java
+
+//确认安装
+onClick(View v) {
+- v == mOk{
+	- startInstall(){
+		- Intent newIntent = new Intent()
+		- newIntent.setData(mPackageURI)
+		- newIntent.setClass(this, InstallInstalling.class)
+		- startActivity(newIntent)
+		}
+	}
+- v == mCancel{
+	- finish
+	}
+}@PackageInstallerActivity.java
+
+/****
+ installing
+*/
+
+//准备安装
+onCreate(@Nullable Bundle savedInstanceState) {
+- setContentView(R.layout.install_installing)
+  //package文件，直接安装
+- if ("package".equals(mPackageURI.getScheme())) {
+	- getPackageManager().installExistingPackage(appInfo.packageName)-->installExistingPackageAsUser--> mPM.installExistingPackageAsUser
+		@ApplicationPackageManager.java-->installExistingPackageAsUser@PackageManagerService.java
+	- launchSuccess	//安装成功退出activity
+  }else{//通过文件流安装？
+	- final File sourceFile = new File(mPackageURI.getPath())
+	- PackageUtil.initSnippetForNewApp(this, PackageUtil.getAppSnippet(this, appInfo, sourceFile), R.id.app_snippet)
+	  //监听安装结果
+	- mInstallId = InstallEventReceiver.addObserver(this, EventResultPersister.GENERATE_NEW_ID
+	  //创建session
+	- mSessionId = getPackageManager().getPackageInstaller().createSession(params)
+	- mSessionCallback = new InstallSessionCallback()
+	}
+}@InstallInstalling.java
+
+//注册session回调
+onStart-->getPackageManager().getPackageInstaller().registerSessionCallback(mSessionCallback)@InstallInstalling.java
+
+//安装状态
+InstallEventReceiver.addObserver(this, EventResultPersister.GENERATE_NEW_ID)-->
+getReceiver(context).addObserver(id, observer){
+- sReceiver = getReceiver-->EventResultPersister(TemporaryFileManager.getInstallStateFile(context)){
+	- mResultsFile = new AtomicFile(resultFile) //安装状态文件 "install_results.xml"
+	- FileInputStream stream = mResultsFile.openRead()
+	- XmlPullParser parser = Xml.newPullParser()
+	- parser.setInput(stream, StandardCharsets.UTF_8.name())
+	- nextElement(parser)
+	}@EventResultPersister.java
+- sReceiver.addObserver-->addObserver@EventResultPersister.java
+}@InstallEventReceiver.java
+
+//安装
+onResume() {
+- PackageInstaller installer = getPackageManager().getPackageInstaller()
+- PackageInstaller.SessionInfo sessionInfo = installer.getSessionInfo(mSessionId)
+- mInstallingTask = new InstallingAsyncTask()
+- mInstallingTask.execute()-->doInBackground{
+	- PackageInstaller.Session session = getPackageManager().getPackageInstaller().openSession(mSessionId){
+		- new Session(mInstaller.openSession(sessionId))
+		}@PackageInstaller.java
+	- File file = new File(mPackageURI.getPath())
+	  //读取apk文件发送到PackageInstaller
+	- InputStream in = new FileInputStream(file)
+	- long sizeBytes = file.length()
+	- OutputStream out = session.openWrite("PackageInstaller", 0, sizeBytes)
+	- int numRead = in.read(buffer)
+	- out.write(buffer, 0, numRead)
+	}
+  //传输文件完成
+- mInstallingTask.onPostExecute{
+	- Intent broadcastIntent = new Intent(BROADCAST_ACTION)
+	- PendingIntent pendingIntent = PendingIntent.getBroadcast(InstallInstalling.this,mInstallId...)
+	- session.commit(pendingIntent.getIntentSender())
+	}
+}@InstallInstalling.java
+
+
+
+package/app/PackageInstaller/src/com/android/packageInstaller/PackageInstallerActivity.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/InstallInstalling.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/TemporaryFileManager.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/InstallEventReceiver.java
+packages/apps/PackageInstaller/src/com/android/packageinstaller/EventResultPersister.java
+
+
+
+/***********************
+ andoid10
+
+*/
+//开始安装
+onCreate(Bundle savedInstanceState) {
+- Intent intent = getIntent()
+- final boolean isSessionInstall = PackageInstaller.ACTION_CONFIRM_INSTALL.equals(intent.getAction())
+
+  //启动下一个安装应用
+- Intent nextActivity = new Intent(intent)
+- if (isSessionInstall) {
+	- nextActivity.setClass(this, PackageInstallerActivity.class)
+  }else{
+	- Uri packageUri = intent.getData()
+	- if (packageUri != null && packageUri.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
+		- nextActivity.setClass(this, InstallStaging.class)
+	  }else if(packageUri != null && packageUri.getScheme().equals(PackageInstallerActivity.SCHEME_PACKAGE)){
+		- nextActivity.setClass(this, PackageInstallerActivity.class)
+ 	  }else{	//不支持的url
+		- Intent result = new Intent()
+		- result.putExtra(Intent.EXTRA_INSTALL_RESULT,PackageManager.INSTALL_FAILED_INVALID_URI)
+		- nextActivity = null
+		}
+  }
+- startActivity(nextActivity)
+}@InstallStart.java
+
+
+
+onCreate(Bundle icicle) {
+- if (PackageInstaller.ACTION_CONFIRM_INSTALL.equals(intent.getAction())) {
+	- mSessionId = sessionId
+	- packageUri = Uri.fromFile(new File(info.resolvedBaseCodePath))
+  }else{
+	- packageUri = intent.getData()
+	- mOriginatingURI = intent.getParcelableExtra(Intent.EXTRA_ORIGINATING_URI)	
+  }
+  //创建安装框UI，取消，确认
+- bindUi(){
+	- mAlert.setView(R.layout.install_content_view)
+	- mAlert.setButton(DialogInterface.BUTTON_POSITIVE)-->startInstall	//开始安装
+	- mAlert.setButton(DialogInterface.BUTTON_NEGATIVE)-->finish		//取消
+	- mOk = mAlert.getButton(DialogInterface.BUTTON_POSITIVE)		//ok按钮
+	}
+  //
+- checkIfAllowedAndInitiateInstall(){
+	- 
+	- if (mAllowUnknownSources || !isInstallRequestFromUnknownSource(getIntent())) {
+		- initiateInstall()
+	  }else{
+		- handleUnknownSources()
+	  }	
+	}
+}@PackageInstallerActivity.java
+
+
+initiateInstall() {
+- mAppInfo = mPm.getApplicationInfo(pkgName,PackageManager.MATCH_UNINSTALLED_PACKAGES)
+- startInstallConfirm(){
+	- if (mAppInfo != null) {
+		- viewToEnable = (mAppInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0
+                    ? requireViewById(R.id.install_confirm_question_update_system)
+	  }else{
+		- viewToEnable = requireViewById(R.id.install_confirm_question)
+	  }
+	- mOk.setEnabled(true)							//允许点击确认
+	}
+}@PackageInstallerActivity.java
+
+//启动最终安装Activity InstallInstalling
+startInstall{
+- Intent newIntent = new Intent()
+- newIntent.setClass(this, InstallInstalling.class)
+- startActivity(newIntent)
+}@PackageInstallerActivity.java
+
+
+//安装
+onCreate(@Nullable Bundle savedInstanceState) {
+
+}
+
+onResume() {
+- 
+}@InstallInstalling.java
+
+
+frameworks/base/packages/PackageInstaller/src/com/android/packageinstaller/InstallStart.java
+frameworks/base/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+frameworks/base/packages/PackageInstaller/src/com/android/packageinstaller/InstallInstalling.java

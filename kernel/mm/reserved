@@ -1,0 +1,27 @@
+/**********************
+ 设置保留内存
+
+*/
+arm64_memblock_init@init.c
+early_init_fdt_scan_reserved_mem{
+- for (n = 0; ; n++) {
+	- fdt_get_mem_rsv(initial_boot_params, n, &base, &size)
+	- early_init_dt_reserve_memory_arch(base, size, 0)
+	}
+- of_scan_flat_dt(__fdt_scan_reserved_mem, NULL)-->__fdt_scan_reserved_mem{
+	- if (!found && depth == 1 && strcmp(uname, "reserved-memory") == 0) {
+		- found = 1
+		- return 0
+		} 
+	}
+- fdt_init_reserved_mem(){
+	- struct reserved_mem *rmem = &reserved_mem[i]
+	- __reserved_mem_alloc_size(node, rmem->name, &rmem->base, &rmem->size)
+	- __reserved_mem_init_node(rmem)
+	}@of_reserved_mem.c
+}@fdt.c
+
+
+arch/arm64/mm/init.c
+drivers/of/fdt.c
+drivers/of/of_reserved_mem.c

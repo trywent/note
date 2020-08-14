@@ -45,10 +45,10 @@ release()@SurfaceControl.java-->
 nativeRelease(JNIEnv* env, jclass clazz, jlong nativeObject){
 - sp<SurfaceControl> ctrl(reinterpret_cast<SurfaceControl *>(nativeObject))
 - ctrl->release()--> release(){
-	- mClient.clear()
+	- mClient.clear()-->clear@StrongPointer.cpp-->~			//释放对象
 	- mHandle.clear()
 	- mGraphicBufferProducer.clear()
-	}
+	}@SurfaceControl.cpp
 }@android_view_SurfaceControl.cpp
 
 //销毁
@@ -73,8 +73,8 @@ frameworks/base/core/java/android/view/SurfaceControl.java
 frameworks/base/core/jni/android_view_SurfaceControl.cpp
 frameworks/native/libs/gui/SurfaceControl.cpp
 
-/**********
- transaction事务,设置窗口操作
+/* SurfaceControl
+   transaction事务,设置窗口操作
 */
 ativeAllocationRegistry sRegistry = new NativeAllocationRegistry(
                 Transaction.class.getClassLoader(),
@@ -159,8 +159,8 @@ SurfaceComposerClient::Transaction::Transaction(const Transaction& other)
 }
 
 
-/*
-  设置窗口，layer
+/*transaction
+  设置layer 
  
 */
 //surfaceControl加入到transaction中容器mComposerStates
@@ -190,8 +190,21 @@ Transaction::setFlags( const sp<SurfaceControl>& sc, uint32_t flags, uint32_t ma
 - s->flags |= (flags & mask)
 }@SurfaceComposerClient.cpp
 
-/*
- display操作
+//reparent,设置为null时销毁layer
+reparent(const sp<SurfaceControl>& sc,const sp<IBinder>& newParentHandle){
+- layer_state_t* s = getLayerState(sc)
+- s->what |= layer_state_t::eReparent
+- s->parentHandleForChild = newParentHandle
+}
+
+//detach
+detachChildren(const sp<SurfaceControl>& sc)){
+- layer_state_t* s = getLayerState(sc)
+- s->what |= layer_state_t::eDetachChildren
+}
+
+/*trasaction
+ display操作 
 
 */
 //获取display信息

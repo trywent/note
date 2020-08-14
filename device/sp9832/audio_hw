@@ -264,27 +264,54 @@ AudioPolicyManagerSPRD::startOutput{
 /******************
  vbc
 */
+
 vbc_ctrl_open{
 - vbc_ctrl_init{
-	- st_vbc_ctrl_thread_para //分配参数内存
+	- st_vbc_ctrl_thread_para	//分配参数内存
 	  //从adev拷贝pipe信息，modem.csfb@audio_hw.xml
 	- memcpy(st_vbc_ctrl_thread_para ,adev->cp->vbc_ctrl_pipe_info)
 	}
-
-- vbc_ctrl_thread_routine{
- - para->vbpipe_fd = open(para->vbpipe) //打开 /dev/spipe_lte6
- - read_common_head.cmd_type{
-	- VBC_CMD_HAL_OPEN{
-		- force_all_standby
-		
-		}
-	}
- }
+  //创建线程
+- pthread_create((pthread_t *)(s_vbc_ctrl_thread_id+i), NULL,vbc_ctrl_thread_routine, (void *)(st_vbc_ctrl_thread_para+i))	
 }
 
-SetParas_Route_Incall-->SetCall_ModePara{
-- 根据mode_gain_paras设置开关
-- 根据开关设置设备，//蓝牙电话mic1 s_call_ul_devices |= AUDIO_DEVICE_IN_BACK_MIC;
+//循环处理命令
+vbc_ctrl_thread_routine(void *arg){
+- para->vbpipe_fd = open(para->vbpipe) //打开 /dev/spipe_lte6
+- fcntl(para->vbpipe_fd,F_SETFL,O_NONBLOCK)
+- 
+ - while(1){
+  //监听pipe消息
+- FD_SET(para->vbpipe_fd,&fds_read)
+- select(maxfd,&fds_read,NULL,NULL,cur_timeout)
+- ReadParas_Head(para->vbpipe_fd, &read_common_head)
+  //处理消息
+- switch (read_common_head.cmd_type){
+	- VBC_CMD_HAL_OPEN
+	- 
+	- 
+ 	}
+}
+
+//
+SetParas_DeviceCtrl_Incall(int fd_pipe,struct tiny_audio_device *adev){
+- GetParas_DeviceCtrl_Incall(fd_pipe,&device_ctrl_paras){
+	- ReadParas_DeviceCtrl(fd_pipe,device_ctrl_param)
+	}
+- SetCall_ModePara(adev,&device_ctrl_paras.paras_mode)
+- SetCall_VolumePara(adev,&device_ctrl_paras.paras_mode)
+}
+
+//蓝牙通话gain
+SetParas_Route_Incall(int fd_pipe,struct tiny_audio_device *adev){
+- GetParas_Route_Incall(fd_pipe,&mode_gain_paras)-->ReadParas_ModeGain(fd_pipe,mode_gain_paras){
+	- read_nonblock(fd_pipe, paras_ptr, sizeof(paras_mode_gain_t))
+	}
+- SetCall_ModePara{
+	- 根据mode_gain_paras设置开关
+	- 根据开关设置设备，//蓝牙电话mic1 s_call_ul_devices |= AUDIO_DEVICE_IN_BACK_MIC;
+	}
+- SetCall_VolumePara(adev,&mode_gain_paras)
 }
 
 
@@ -319,10 +346,3 @@ SetParas_DeviceCtrl_Incall
 
 vendor/sprd/modules/audio/normal/vb_control_parameters.c
 
-
-
-============
-alsa
-pcm_read{
-- ioctl(pcm->fd, SNDRV_PCM_IOCTL_READI_FRAMES,&x)
-}

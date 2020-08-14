@@ -1,6 +1,8 @@
 /**************************************
-
+ 应用检查自己权限
 */
+
+checkSelfPermission(String permission) 
 
 /**************************************
  android8 用户分配权限 PackageInstaller响应分配权限

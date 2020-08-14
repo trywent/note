@@ -1,0 +1,137 @@
+diff --git a/frameworks/base/services/core/java/com/android/server/wm/ActivityRecord.java b/frameworks/base/services/core/java/com/android/server/wm/ActivityRecord.java
+index 96aca54..f98b55b 100644
+--- a/frameworks/base/services/core/java/com/android/server/wm/ActivityRecord.java
++++ b/frameworks/base/services/core/java/com/android/server/wm/ActivityRecord.java
+@@ -40,6 +40,7 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
+ import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
+ import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
+ import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
++import static android.app.WindowConfiguration.WINDOWING_MODE_MPIP;
+ import static android.app.WindowConfiguration.activityTypeToString;
+ import static android.content.Intent.ACTION_MAIN;
+ import static android.content.Intent.CATEGORY_HOME;
+@@ -2096,7 +2097,10 @@ final class ActivityRecord extends ConfigurationContainer {
+         }
+         return false;
+     }
+-
++    //wb
++    private boolean ismpip(){
++        return getWindowingMode() == WINDOWING_MODE_MPIP;
++    }
+     /**
+      * Check if activity should be moved to PAUSED state. The activity:
+      * - should be eligible to be made active (see {@link #shouldMakeActive(ActivityRecord)})
+@@ -2106,7 +2110,7 @@ final class ActivityRecord extends ConfigurationContainer {
+      *                       resume if this activity is active.
+      */
+     private boolean shouldPauseActivity(ActivityRecord activeActivity) {
+-        return shouldMakeActive(activeActivity) && !isFocusable() && !isState(PAUSING, PAUSED);
++        return shouldMakeActive(activeActivity) && !isFocusable()&&!ismpip() && !isState(PAUSING, PAUSED);
+     }
+ 
+     /**
+@@ -2118,7 +2122,7 @@ final class ActivityRecord extends ConfigurationContainer {
+      */
+     @VisibleForTesting
+     boolean shouldResumeActivity(ActivityRecord activeActivity) {
+-        return shouldMakeActive(activeActivity) && isFocusable() && !isState(RESUMED)
++        return shouldMakeActive(activeActivity) && (isFocusable()||ismpip()) && !isState(RESUMED)
+                 && getActivityStack().getVisibility(activeActivity) == STACK_VISIBILITY_VISIBLE;
+     }
+ 
+diff --git a/frameworks/base/services/core/java/com/android/server/wm/ActivityStack.java b/frameworks/base/services/core/java/com/android/server/wm/ActivityStack.java
+index ed3adfc..fe51c04 100644
+--- a/frameworks/base/services/core/java/com/android/server/wm/ActivityStack.java
++++ b/frameworks/base/services/core/java/com/android/server/wm/ActivityStack.java
+@@ -1676,9 +1676,9 @@ class ActivityStack extends ConfigurationContainer {
+      */
+     final boolean startPausingLocked(boolean userLeaving, boolean uiSleeping,
+             ActivityRecord resuming, boolean pauseImmediately) {
+-        /*if(getWindowingMode()==WINDOWING_MODE_MPIP){//wb
++        if(getWindowingMode()==WINDOWING_MODE_MPIP && mForceHidden==false){//wb
+             return false;
+-        }*/
++        }
+         if (mPausingActivity != null) {
+             Slog.wtf(TAG, "Going to pause when pause is already pending for " + mPausingActivity
+                     + " state=" + mPausingActivity.getState());
+@@ -2486,8 +2486,12 @@ class ActivityStack extends ConfigurationContainer {
+                 case RESUMED:
+                 case PAUSING:
+                 case PAUSED:
+-                    addToStopping(r, true /* scheduleIdle */,
+-                            canEnterPictureInPicture /* idleDelayed */, "makeInvisible");
++                    if(r.packageName.equals(SystemProperties.get("persist.launcher.packagename"))){//wb
++                        stopActivityLocked(r);
++                    }else{
++                        addToStopping(r, true /* scheduleIdle */,
++                        canEnterPictureInPicture /* idleDelayed */, "makeInvisible");
++                    }
+                     break;
+ 
+                 default:
+diff --git a/frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java b/frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java
+index 2658fb4d..b73e9fb 100644
+--- a/frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java
++++ b/frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java
+@@ -1575,7 +1575,7 @@ class ActivityStarter {
+                     //return START_SUCCESS;
+                 }else if(!inPin && forcePip){
+                     //move fullscreen to pip
+-                    mRootActivityContainer.moveActivityToMpip(reusedActivity, null, 0, "lsec");
++                    mRootActivityContainer.moveActivityToMpip(reusedActivity, null, 0, "lsec");                    
+                     TaskRecord tr = reusedActivity.getTaskRecord();
+                     if(tr!=null) {
+                         mSupervisor.scheduleUpdateMultiWindowMode(tr);
+diff --git a/frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerDebugConfig.java b/frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerDebugConfig.java
+index 1f37c03..2f98eed 100644
+--- a/frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerDebugConfig.java
++++ b/frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerDebugConfig.java
+@@ -69,18 +69,18 @@ public class ActivityTaskManagerDebugConfig {
+     static boolean DEBUG_FOCUS = false;
+     static boolean DEBUG_IMMERSIVE = DEBUG_ALL || false;
+     static boolean DEBUG_LOCKTASK = DEBUG_ALL || false;
+-    static boolean DEBUG_PAUSE = DEBUG_ALL || false;
++    static boolean DEBUG_PAUSE = DEBUG_ALL || true;
+     static boolean DEBUG_RECENTS = DEBUG_ALL || false;
+     static boolean DEBUG_RECENTS_TRIM_TASKS = DEBUG_RECENTS || false;
+     static boolean DEBUG_SAVED_STATE = DEBUG_ALL_ACTIVITIES || false;
+-    static boolean DEBUG_STACK = DEBUG_ALL || false;
+-    static boolean DEBUG_STATES = DEBUG_ALL_ACTIVITIES || false;
++    static boolean DEBUG_STACK = DEBUG_ALL || true;
++    static boolean DEBUG_STATES = DEBUG_ALL_ACTIVITIES || true;
+     public static boolean DEBUG_SWITCH = DEBUG_ALL || false;
+     static boolean DEBUG_TASKS = DEBUG_ALL || false;
+     static boolean DEBUG_TRANSITION = DEBUG_ALL || false;
+-    static boolean DEBUG_VISIBILITY = DEBUG_ALL || false;
++    static boolean DEBUG_VISIBILITY = DEBUG_ALL || true;
+     static boolean DEBUG_APP = DEBUG_ALL_ACTIVITIES || false;
+-    static boolean DEBUG_IDLE = DEBUG_ALL_ACTIVITIES || false;
++    static boolean DEBUG_IDLE = DEBUG_ALL_ACTIVITIES || true;
+     static boolean DEBUG_RELEASE = DEBUG_ALL_ACTIVITIES || false;
+     static boolean DEBUG_USER_LEAVING = DEBUG_ALL || false;
+     static boolean DEBUG_PERMISSIONS_REVIEW = DEBUG_ALL || false;
+diff --git a/frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java b/frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+index c4e5d27..3b12c7d 100644
+--- a/frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
++++ b/frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+@@ -7693,10 +7693,16 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
+             stack.mForceHidden = !visible;
+             Slog.d(TAG,"lsec pin stack forcehidden:"+stack.mForceHidden);
+             ActivityRecord ar = stack.getTopActivity();
+-            ar.setVisible(visible);
+             if(!visible) {
+-                ar.mAppWindowToken.destroySurfaces_force();
++                stack.startPausingLocked(false, false, null, true);
++                mStackSupervisor.moveTasksToFullscreenStackLocked(stack, false);
++                //stack.startPausingLocked(false, false, null, true);
++                //stack.ensureActivitiesVisibleLocked(null,0,false);
+             }
++            /*ar.setVisible(visible);
++            if(!visible) {
++                ar.mAppWindowToken.destroySurfaces_force();
++            }*/
+             /*if(!visible) {
+                 if(ar.mAppWindowToken!=null) {
+                     ar.mAppWindowToken.detachChildren();

@@ -86,19 +86,33 @@ sendMessage(ENABLE,0)-->handleMessage-->handleDisable-->stopNavigating-->native_
 @com_android_server_location_GpsLocationProvider.cpp-->stop-->mstar_gps_stop-->
 gps_state_stop()@MstarGps.c
 
-____________________
-添加addGpsStatusListener：
+//添加addGpsStatusListener：
 addGpsStatusListener-->mService.addGpsStatusListener@LocationManager.java-->addGpsStatusListener
 @LocationManagerService.java-->mGpsStatusProvider.addGpsStatusListener--> mListeners.add(l)
 @GpsLocationProvider.java
 
-添加addNmeaListener：
+//添加addNmeaListener：
 addNmeaListener-->mService.addGpsStatusListener@LocationManager.java-->同上
 
-添加LocationListener：
-requestLocationUpdates-->_requestLocationUpdates-->mService.requestLocationUpdates@LocationManager.java
--->requestLocationUpdate(将listener加入mReceivers)-->requestLocationUpdatesLocked(添加监听器的记录
-UpdateRecord)
+//添加LocationListener：
+requestLocationUpdates-->_requestLocationUpdates-->mService.requestLocationUpdates@LocationManager.java-->
+requestLocationUpdates(LocationRequest request, ILocationListener listener,PendingIntent intent, String packageName) {
+  //request
+- LocationRequest sanitizedRequest = createSanitizedRequest(request,allowedResolutionLevel,callerHasLocationHardwarePermission)
+  //创建receiver，加入到mReceivers
+- getReceiverLocked(listener, pid, uid, packageName, workSource,hideFromAppOps){
+	- Receiver receiver = mReceivers.get(intent)
+	- if(receiver == null){
+		- receiver = new Receiver(null, intent, pid, uid, packageName, workSource,hideFromAppOps)
+		- mReceivers.put(intent, receiver)
+		}
+	}
+- requestLocationUpdatesLocked(sanitizedRequest, receiver, uid, packageName){
+	- LocationProvider provider = getLocationProviderLocked(name)
+	- UpdateRecord record = new UpdateRecord(name, request, receiver)	//创建UpdateRecord
+	- receiver.mUpdateRecords.put(name, record)
+	}
+}@LocationManagerService.java
 
 
 jb/frameworks/base/location/java/android/location/LocationManager.java
@@ -107,7 +121,6 @@ jb/frameworks/base/services/java/com/android/server/location/GpsLocationProvider
 frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 
 /**********************
- android8.0 
 
  gnss　provider
 */
@@ -140,10 +153,6 @@ startNavigating-->native_start@GnssLocationProvider.java-->
 android_location_GnssLocationProvider_start-->gnssHal->start()
 
 
-
-frameworks/base/services/core/java/com/android/server/location/GnssLocationProvider.java
-frameworks/base/services/core/jni/com_android_server_location_GnssLocationProvider.cpp
-
 /**********************
  定位信息上报
 
@@ -162,12 +171,36 @@ mNmeaListener.onNmeaReceived@LocationManager.java
 
 //LocationListener回调:
 GnssCallback::gnssLocationCb@com_android_server_location_GpsLocationProvider.cpp-->
-reportLocation@GnssLocationProvider.java-->
-LocationWorkerHandler(MSG_LOCATION_CHANGED)-->handleLocationChangedLocked(从记录UpdateRecord获取监听器)
--->receiver.callLocationChangedLocked(callLocationChangedLocked,callStatusChangedLocked)
--->mListener.onLocationChanged@LocationManagerService.java
+reportLocation@GnssLocationProvider.java-->mLocationProviderManager.onReportLocation(location)
+@AbstractLocationProvider.java-->LocationProvider.onReportLocation@-->
+handleLocationChangedLocked(Location location, LocationProvider provider){
+- ArrayList<UpdateRecord> records = mRecordsByProvider.get(provider.getName())	//获取UpdateRecord
+- for (UpdateRecord r : records) {
+	- 
+	 //通知位置
+	- Location notifyLocation						//设置位置精度
+	- if (receiver.mAllowedResolutionLevel < RESOLUTION_LEVEL_FINE) {
+		- notifyLocation = coarseLocation
+	  }else{
+		- notifyLocation = location
+	  }
+	- if (notifyLocation != null) {
+		  //AppOpsManager判断是否有权限
+		- reportLocationAccessNoThrow(receiver.mCallerIdentity.mPid,...receiver.mAllowedResolutionLevel){	
+			- int op = resolutionLevelToOp(allowedResolutionLevel)
+			- if (mAppOps.noteOpNoThrow(op, uid, packageName) != AppOpsManager.MODE_ALLOWED) return false
+			- return getAllowedResolutionLevel(pid, uid) >= allowedResolutionLevel
+			}
+		- receiver.callLocationChangedLocked(notifyLocation)
+		}
+	}
+}@LocationManagerService.java
 
 
+
+frameworks/base/services/core/java/com/android/server/location/AbstractLocationProvider.java
+frameworks/base/services/core/java/com/android/server/location/GnssLocationProvider.java
+frameworks/base/services/core/jni/com_android_server_location_GnssLocationProvider.cpp
 /***********************
  应用使用位置服务：
 

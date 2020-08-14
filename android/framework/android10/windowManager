@@ -248,6 +248,17 @@ frameworks/base/services/core/java/com/android/server/wm/Task.java
 */
 createAppWindow-->new AppWindowToken@ActivityRecord.java-->
 
+//隐藏
+setVisibility(boolean visible, boolean deferHidingClient) {
+- 
+- setClientHidden(false){
+	- mClientHidden = hideClient
+	- sendAppVisibilityToClients		//遍历windowContainer ,windowState通知到app
+	}
+- commitVisibility(null, visible, TRANSIT_UNSET, true, mVoiceInteraction)
+- 
+}
+
 
 //销毁surface
 destroySurfaces-->destroySurfaces(boolean cleanupOnResume) {
@@ -259,5 +270,10 @@ destroySurfaces-->destroySurfaces(boolean cleanupOnResume) {
  //
 - 
 }@AppWindowToken.java
+
+//relaunch activity 通知窗口
+relaunchActivityLocked@ActivtyRecord.java-->activityRelaunchingLocked@ActivityStackSuperVisor.java-->
+notifyAppRelaunching@WindowManagerService.java-->appWindow.startRelaunching()
+
 
 frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java

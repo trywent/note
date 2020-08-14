@@ -1,0 +1,57 @@
+/**************************
+ slog
+
+*/
+#define DEFAULT_DEBUG_SLOG_CONFIG	"/system/etc/slog.conf"
+#define DEFAULT_USER_SLOG_CONFIG	"/system/etc/slog.conf.user"
+#define TMP_FILE_PATH			"/data/local/tmp/slog/"
+#define SLOG_SOCKET_FILE		TMP_FILE_PATH "slog_sock"
+#define TMP_SLOG_CONFIG			TMP_FILE_PATH "slog.conf"
+
+main(){
+- parse_config{					//读取配置
+	- if(stat(TMP_SLOG_CONFIG, &st)){	//"/data/local/tmp/slog/slog.conf"不存在。则拷贝/system/etc/slog.conf
+		- mkdir(TMP_FILE_PATH, S_IRWXU | S_IRWXG | S_IRWXO)
+		- cp_file(DEFAULT_USER_SLOG_CONFIG, TMP_SLOG_CONFIG)
+		}
+	  //打开文件，解析
+	- fp = fopen(TMP_SLOG_CONFIG, "r")
+	}@parse_conf.c
+- do_init{					//开始
+	- handler_internal_log_size
+	- handle_top_logdir()
+	- capture_all(snapshot_log_head)
+	- start_sub_threads			//开始子线程，每个子模块的log
+	}
+}@slog.c
+
+
+start_sub_threads{
+- pthread_create(&stream_tid, NULL, stream_log_handler, NULL)
+- pthread_create(&kernel_tid, NULL, kernel_log_handler, NULL)	//kernel
+  ...
+- pthread_create(&bt_tid, NULL, bt_snoop_start, NULL)		//bt
+}@slog.c
+
+
+
+
+//bt
+bt_snoop_start{
+  //读取开关配置，打开log
+- log_ctrl = bt_log_ctrl_state(){
+	- stream_log_head									//配置文件是否打开
+	- if( !strncmp(current_log_path, INTERNAL_LOG_PATH, strlen(INTERNAL_LOG_PATH)) ) {	//"/storage/emulated/0/slog"路径不对也是off
+		- bt->state = SLOG_STATE_OFF
+		}
+	}
+- if (BTLOG_ON == log_ctrl) {
+        - hci_log_enable(FALSE)
+        - hci_log_enable(TRUE)
+    } else if (BTLOG_OFF == log_ctrl) {
+	- hci_log_enable(FALSE)
+    }
+}
+
+vendor/sprd/open-source/tools/slog/slog.c
+vendor/sprd/open-source/tools/slog/bt.c

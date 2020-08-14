@@ -181,13 +181,11 @@ show/hide@SurfaceControl.java-->nativeSetFlags@android_view_SurfaceControl.cpp
 
 
 /******************************
- surfaceControl
+ android10
 */
 
 
-nativeSeverChildren
 
-frameworks/base/core/java/android/view/SurfaceControl.java
 
 
 
