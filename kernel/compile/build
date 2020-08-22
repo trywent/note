@@ -1,0 +1,66 @@
+/*****************
+  编译：配置，编译kernel,编译dtb
+*/
+
+//make menuconfig 提示undefined
+sudo apt-get install libncurses5  libncurses5-dev
+
+//编译配置
+KBUILD_CFLAGS   := 
+
+-Wall //开启警告
+-Werror  //它要求gcc将所有的警告当成错误进行处理
+
+
+/*
+  kernel
+*/
+
+//头文件
+$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) headers_install
+
+//编译image
+$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) -j${JOBS}
+
+//编译module
+$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=$(TARGET_KERNEL_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) modules
+
+
+
+//制作启动kernel
+保证liunx下机器的定义(include/asm-ppc/tqm8xx.h)包含uboot中开发板的信息(include/asm-<arch>/u-boot.h)。
+同时保证IMAP_ADDR与uboot中CONFIG_SYS_IMMR是相同的。
+
+要有root设备(根文件系统？？)
+
+编译镜像：
+* build a standard "vmlinux" kernel image (in ELF binary format):
+
+* convert the kernel into a raw binary image:
+
+	${CROSS_COMPILE}-objcopy -O binary  -R .note -R .comment -S vmlinux linux.bin
+
+* compress the binary image:
+
+	gzip -9 linux.bin
+
+* package compressed binary image for U-Boot:
+
+	mkimage -A ppc -O linux -T kernel -C gzip \
+		-a 0 -e 0 -n "Linux Kernel Image" \
+		-d linux.bin.gz uImage
+
+mkimage可以用来制作ramdisk镜像，可以与kernel合并成一个文件也可分开。
+
+
+
+
+
+
+/*
+  dtb
+
+*/
+
+
+kernel/arc/arm/boot/dts/Makefile

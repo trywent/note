@@ -1,5 +1,5 @@
 /*
-
+ 
 */
 //锁屏状态控制
 mSystemServiceManager.startService(LOCK_SETTINGS_SERVICE_CLASS)-->Lifecycle
@@ -44,16 +44,47 @@ isUserUnlocked@UserManager.java-->isUserUnlocked-->LocalService.isUserUnlockingO
 - state == UserState.STATE_RUNNING_UNLOCKED
 }@UserManagerService.java
 
-/*
- android.intent.category.HOME android:priority="-1000"
+/***********
+ CryptKeeper
+
+ 检查设备是否加密
+*/
+//priority值越大优先级越高
+<intent-filter android:priority="10">
+	<action android:name="android.intent.action.MAIN" />
+	<category android:name="android.intent.category.HOME" />
+	<category android:name="android.intent.category.DEFAULT" />
+</intent-filter>
+
+
+packages/apps/Settings/src/com/android/settings/CryptKeeper.java
+/***********
+ fallback home
 
  启动完成后还有当前activity的界面。需要设置userunlock状态
 */
+<intent-filter android:priority="-1000">
+	<action android:name="android.intent.action.MAIN" />
+	<category android:name="android.intent.category.HOME" />
+	<category android:name="android.intent.category.DEFAULT" />
+</intent-filter>
+
 //Android is starting  
 onCreate{
-- registerReceiver(mReceiver, new IntentFilter(Intent.ACTION_USER_UNLOCKED))//监听ACTION_USER_UNLOCKED
-- maybeFinish//判断是否要结束
-}
+- mProvisioned = Settings.Global.getInt(getContentResolver(),Settings.Global.DEVICE_PROVISIONED, 0) != 0	//是否准备好
+- registerReceiver(mReceiver, new IntentFilter(Intent.ACTION_USER_UNLOCKED)){//监听ACTION_USER_UNLOCKED
+	- onReceive(Context context, Intent intent)-->maybeFinish
+	}
+- maybeFinish{//判断是否要结束
+	- getSystemService(UserManager.class).isUserUnlocked()	//获取是否解锁状态
+	- getPackageManager().resolveActivity(homeIntent)	//查找home应用
+	- if (Objects.equals(getPackageName(), homeInfo.activityInfo.packageName)) {
+		- mHandler.sendEmptyMessageDelayed(0, 500)	//没有找到home
+	  }else{
+		- finish()					//有另外的homne
+	  }
+	}
+}@FallbackHome.java
 
 //开始动画
 onResume-->mHandler.postDelayed(mProgressTimeoutRunnable)-->
@@ -64,18 +95,22 @@ mProgressTimeoutRunnable{
 //结束
 onPause-->mHandler.removeCallbacks(mProgressTimeoutRunnable)
 
-maybeFinish{
-- getSystemService(UserManager.class).isUserUnlocked() //获取是否解锁状态
-- getPackageManager().resolveActivity(homeIntent) //查找home应用
-- finish()
-}@FallbackHome.java
-
 packages/apps/Settings/src/com/android/settings/FallbackHome.java
 frameworks/base/core/java/android/os/UserManager.java
 frameworks/base/services/core/java/com/android/server/pm/UserManagerService.java
 
+/***********
+ DefaultActivity
+
+*/
+<intent-filter android:priority="1">
+	<action android:name="android.intent.action.MAIN" />
+	<category android:name="android.intent.category.HOME" />
+	<category android:name="android.intent.category.DEFAULT" />
+	<category android:name="android.intent.category.SETUP_WIZARD" />
+</intent-filter>
 
 
 
-
+packages/apps/Provision/src/com/android/provision/DefaultActivity.java
 

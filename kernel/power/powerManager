@@ -1,4 +1,7 @@
-//
+/**************************
+
+ cat /sys/power/wake_lock  
+*/
 suspend/resume:
 
 用户空间接口：

@@ -1,9 +1,21 @@
 /*********
  uboot
+
 */
+//config文件
+UBOOT_DEFCONFIG := ums512_1h10
+@ums512_1h10/ums512_1h10_Natv.mk
 
 
 
+#define SIMLOCK_ADR      (0x891FE800+0x4)   //0x4 just for data header
+#define KERNEL_ADR      0x80080000
+#define DT_ADR          0x85400000
+#define RAMDISK_ADR     0x85500000
+#define VLX_TAG_ADDR    0x82000100
+@ums512_1h10.h
+
+CONFIG_SEPARATE_DT 			//是否使用分开dt。。7862使用合并的dt
 
 /*********
  模式

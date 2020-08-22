@@ -128,8 +128,7 @@ struct snd_soc_pcm_runtime {
 }
 
 
-(1)
-/***********************
+(1)/***********************
   初始数据准备
 
   注册驱动codec_drv.创建struct snd_soc_codec *codec,
@@ -141,9 +140,9 @@ struct snd_soc_pcm_runtime {
 	}
 */
 
-snd_soc_register_codec(struct device *dev,
-			   const struct snd_soc_codec_driver *codec_drv,
-			   struct snd_soc_dai_driver *dai_drv,int num_dai){
+//注册codec
+snd_soc_register_codec(struct device *dev,const struct snd_soc_codec_driver *codec_drv,
+			struct snd_soc_dai_driver *dai_drv,int num_dai){
 - struct snd_soc_codec *codec= kzalloc(sizeof(struct snd_soc_codec)
  //设置,初始化component
 - snd_soc_component_initialize(&codec->component,&codec_drv->component_driver, dev){
@@ -189,10 +188,8 @@ static int soc_probe_component(struct snd_soc_card *card,
 }
 
 //注册component
-snd_soc_register_component(struct device *dev,
-			 const struct snd_soc_component_driver *cmpnt_drv,
-			 struct snd_soc_dai_driver *dai_drv,
-			 int num_dai){
+snd_soc_register_component(struct device *dev,const struct snd_soc_component_driver *cmpnt_drv,
+			 struct snd_soc_dai_driver *dai_drv, int num_dai){
 - 创建snd_soc_component *cmpnt
 - cmpnt->driver	= cmpnt_drv
 - list_add(&cmpnt->list, &component_list)	//加入component_list
@@ -217,8 +214,7 @@ snd_soc_register_platform(struct device *dev,
 	}
 }
 
-(2)
-/***********************
+(2)/***********************
  注册soc驱动.注册声卡,并注册所有子设备
  struct snd_soc_card
  struct snd_card
@@ -229,37 +225,40 @@ snd_soc_register_platform(struct device *dev,
  初始化struct snd_soc_pcm_runtime
  struct snd_soc_dai_link *dai_link
 */
-static LIST_HEAD(dai_list)       //注册struct snd_soc_dai,加入该链表..codec,component都是struct snd_soc_dai dai
-static LIST_HEAD(platform_list)  //注册struct snd_soc_platform_driver 
-static LIST_HEAD(codec_list)     //注册struct snd_soc_codec,加入该链表
-static LIST_HEAD(component_list) //注册struct snd_soc_component,加入该链表
+static LIST_HEAD(dai_list)       				//struct snd_soc_dai,注册加入该链表..codec,component都是struct snd_soc_dai dai
+static LIST_HEAD(platform_list)  				//struct snd_soc_platform_driver 注册
+static LIST_HEAD(codec_list)    				//struct snd_soc_codec,注册加入该链表
+static LIST_HEAD(component_list) 				//struct snd_soc_component,注册加入该链表
 //soc device 一般soc不注册这个设备。直接注册声卡struct snd_soc_card
 "soc-audio"
 
 //soc driver
 static struct platform_driver soc_driver = {
-	.driver		= {
-		.name		= "soc-audio",
-		.pm		= &snd_soc_pm_ops,
+	.driver	= {
+		.name	= "soc-audio",
+		.pm	= &snd_soc_pm_ops,
 	},
-	.probe		= soc_probe,
+	.probe	= soc_probe,
 }
 
 snd_soc_init{
 - snd_soc_util_init
-- platform_driver_register(&soc_driver) //soc_driver.driver.name= "soc-audio"
+- platform_driver_register(&soc_driver) 			//soc_driver.driver.name= "soc-audio"
 }@soc-core.c
 
 soc_probe(struct platform_device *pdev){
 - struct snd_soc_card *card = platform_get_drvdata
-- snd_soc_register_card	//注册声卡。。一般soc不走这个流程，都是自己直接注册struct snd_soc_card
+- snd_soc_register_card						//注册声卡。。一般soc不走这个流程，都是自己直接注册struct snd_soc_card
 }@soc-core.c
 
 //初始化所有soc_card中运行时设备，struct snd_soc_pcm_runtime *rtd
 snd_soc_register_card(card){
-- snd_soc_initialize_card_lists(card)	//初始化链表
-- card->rtd = devm_kzalloc(card->dev)	//创建card->num_links + card->num_aux_devs个struct snd_soc_pcm_runtime 
-- 遍历dai_link,card->rtd[i].dai_link = &card->dai_link[i]
+- snd_soc_initialize_card_lists(card)				//初始化链表
+- card->rtd = devm_kzalloc(card->dev)				//创建card->num_links + card->num_aux_devs个struct snd_soc_pcm_runtime 
+- for (i = 0; i < card->num_links; i++) {
+	- struct snd_soc_dai_link *link = &card->dai_link[i]	//dai_link,一般dts中配置
+	- ret = soc_init_dai_link(card, link)
+	}
 - 初始化soc_card，snd_soc_instantiate_card  ------------->
 }
 -------------> snd_soc_instantiate_card(struct snd_soc_card *card){
@@ -271,13 +270,13 @@ snd_soc_register_card(card){
 	- list_for_each_entry(cpu_dai,dai_list){		//dai_list中有和dai_link匹配的cpu_dai，设置rtd.cpu_dai
 		- rtd->cpu_dai = cpu_dai		
 	  }	  
-	- list_for_each_entry(codec,codec_list){		//codec_list中和dail_link匹配的codec ,设置rtd.codec
+	- list_for_each_entry(codec,codec_list){		//codec_list中和dai_link匹配的codec ,设置rtd.codec
 		- rtd->codec = codec
 		- list_for_each_entry(codec_dai, &dai_list ){	//dai_list中有和dai_link匹配的codec_dai，设置rtd.codec_dai
 			- rtd->codec_dai = codec_dai
 			}
 	  }
-	- list_for_each_entry(platform,platform_list){		//platform_list中和dail_link匹配的platform ,设置rtd.platform
+	- list_for_each_entry(platform,platform_list){		//platform_list中和dai_link匹配的platform ,设置rtd.platform
 		- rtd->platform = platform
 		}
 	}
@@ -323,7 +322,7 @@ snd_soc_register_card(card){
 		}
 	- soc_probe_dai(rtd->codec_dais[i])
 	- dai_link->init(rtd)		
-	- !dai_link->params,soc_new_pcm(rtd, num)//创建pcm
+	- !dai_link->params,soc_new_pcm(rtd, num)				//创建pcm
 	- else,soc_link_dai_widgets(card, dai_link, rtd)
 	}
   //
@@ -342,8 +341,7 @@ snd_soc_register_card(card){
 }@soc-core.c
 
 
-(3)
-/***********************
+(3)/***********************
  soc ctl设备对应snd_card
 
  snd_device保存在链表card->device中
@@ -360,8 +358,7 @@ struct snd_kcontrol *snd_soc_cnew(const struct snd_kcontrol_new *_template,
 //加入control
 snd_soc_add_component_controls-->snd_soc_add_controls-->snd_ctl_add(card, snd_soc_cnew)
 
-(4)
-/***********************
+(4)/***********************
  soc pcm设备 对应dai_link
 
 */
@@ -375,7 +372,7 @@ int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 - snd_pcm_new(rtd->card->snd_card, new_name, num, playback,capture, &pcm)
 - rtd->pcm = pcm
 - 初始化rtd->ops
-- snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &rtd->ops) //根据playback或者capture设置
+- snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &rtd->ops)			//根据playback或者capture设置
 }@soc-pcm.c
 
 
@@ -389,8 +386,7 @@ sound/core/pcm.c
 sound/core/pcm_lib.c
 sound/core/sound.c
 
-(5)
-/***********************
+(5)/***********************
  节点操作函数
   open 
   ioctl

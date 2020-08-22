@@ -5,7 +5,7 @@
 #include "sharkl5Pro.dtsi"	//usb,
 @ums512.dtsi
 
-
+ums512-1h10-p.dts
 #include "ums512-mach.dtsi"
 #include "ums512.dtsi"
 #include "sc2730.dtsi"		//usb配置

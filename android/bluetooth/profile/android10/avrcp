@@ -1,0 +1,168 @@
+/*****************
+ Avrcp controller 控制target播放歌曲
+
+ BluetoothMediaBrowserService 管理播放信息
+*/
+start() {
+- initNative()
+- sBrowseTree = new BrowseTree(null)
+- Intent startIntent = new Intent(this, BluetoothMediaBrowserService.class)
+- startService(startIntent)
+}@AvrcpControllerService.java
+
+//启动stateMachine，支持连接多个设备
+getOrCreateStateMachine{	
+- AvrcpControllerStateMachine stateMachine = mDeviceStateMap.get(device)
+- if (stateMachine == null) {
+	- stateMachine = newStateMachine(device)
+	- mDeviceStateMap.put(device, stateMachine)
+	- stateMachine.start()
+	}
+}@AvrcpControllerService.java
+
+//启动播放信息的服务
+onCreate() {
+- mSession = new MediaSession(this, TAG)
+- mSession.setQueue(mMediaQueue)
+- PlaybackState.Builder playbackStateBuilder = new PlaybackState.Builder()
+- mSession.setPlaybackState(playbackStateBuilder.build())
+}@BluetoothMediaBrowserService.java
+
+
+/* 
+ 收到事件
+*/
+
+//连接事件
+onConnectionStateChanged(boolean remoteControlConnected, boolean browsingConnected, byte[] address) {
+- BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address)
+- AvrcpControllerStateMachine stateMachine = getOrCreateStateMachine(device)
+- stateMachine.connect(event)
+}@AvrcpControllerService.java
+
+
+//播放状态变化,发送到stateMachine
+sBluetoothAvrcpCallbacks.btavrcp_track_changed_callback@
+onTrackChanged(byte[] address, byte numAttributes, int[] attributes,String[] attribVals){
+- BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address)
+- AvrcpControllerStateMachine stateMachine = getStateMachine(device)
+- stateMachine.sendMessage(AvrcpControllerStateMachine.MESSAGE_PROCESS_TRACK_CHANGED,
+                    TrackInfo.getMetadata(attributes, attribVals))
+}@AvrcpControllerService.java
+
+/* 
+ stateMachine
+*/
+
+/*
+ Connected
+*/
+enter() {
+- broadcastConnectionStateChanged(BluetoothProfile.STATE_CONNECTED)
+- BluetoothMediaBrowserService.addressedPlayerChanged(mSessionCallbacks){	//设置控制器。现在都通过mediasession控制
+	- sBluetoothMediaBrowserService.mSession.setCallback(callback)
+	}
+}@AvrcpControllerStateMachine.java
+
+//播放状态
+Connected.processMessage(Message msg) {
+- MESSAGE_PROCESS_TRACK_CHANGED{						//播放信息变化
+	- mAddressedPlayer.updateCurrentTrack((MediaMetadata) msg.obj){
+		- mPlaybackState = new PlaybackState.Builder(mPlaybackState).setActiveQueueItemId(trackNumber - 1).build()
+		- mCurrentTrack = update
+		}@AvrcpPlayer.java
+	- BluetoothMediaBrowserService.trackChanged((MediaMetadata) msg.obj){	//更新mediaSession
+		- sBluetoothMediaBrowserService.mSession.setMetadata(mediaMetadata)
+		}@BluetoothMediaBrowserService
+	}
+- MESSAGE_PROCESS_PLAY_STATUS_CHANGED{						//播放状态变化
+	- mAddressedPlayer.setPlayStatus(msg.arg1)
+	- BluetoothMediaBrowserService.notifyChanged(mAddressedPlayer.getPlaybackState()){
+		- if (node.getScope() == AvrcpControllerService.BROWSE_SCOPE_NOW_PLAYING) {
+			- sBluetoothMediaBrowserService.updateNowPlayingQueue(node)
+		  }else{
+			- sBluetoothMediaBrowserService.notifyChildrenChanged(node.getID())
+			}
+		}
+	}
+}@AvrcpControllerStateMachine.java
+
+
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/AvrcpControllerService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/BluetoothMediaBrowserService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/AvrcpControllerStateMachine.java
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcpcontroller/AvrcpPlayer.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp_controller.cpp
+/*****************
+ Avrcp target 由controller控制，播放歌曲
+
+ 通过MediaSessionManager 操作播放器？
+*/
+start() {
+- mCurrentData = new MediaData(null, null, null)
+- mMediaPlayerList = new MediaPlayerList(Looper.myLooper(), this){
+	- 
+	- 
+	}@MediaPlayerList.java
+  //native
+- mNativeInterface = AvrcpNativeInterface.getInterface{
+	- sInstance = new AvrcpNativeInterface()
+	}
+- mNativeInterface.init(AvrcpTargetService.this)
+- mVolumeManager = new AvrcpVolumeManager(this, mAudioManager, mNativeInterface)
+}@AvrcpTargetService.java
+
+init-->initNative@AvrcpNativeInterface.java-->
+initNative{
+- sServiceInterface = getBluetoothInterface()->get_avrcp_service()
+- sServiceInterface->Init(&mAvrcpInterface, &mVolumeInterface)
+}com_android_bluetooth_avrcp_target.cpp
+
+
+//收到命令,上下曲
+AvrcpMediaInterfaceImpl.SendKeyEvent-->sendMediaKeyEvent(int key, KeyState state)@com_android_bluetooth_avrcp_target.cpp
+-->sendMediaKeyEventsendMediaKeyEvent(int keyEvent, boolean pushed)-->mAvrcpService.sendMediaKeyEvent(keyEvent, pushed)
+@AvrcpNativeInterface.java-->sendMediaKeyEvent(int event, boolean pushed)-->mMediaPlayerList.sendMediaKeyEvent(event, pushed)
+@AvrcpTargetService.java-->sendMediaKeyEvent(int key, boolean pushed) {
+- int action = pushed ? KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP
+- KeyEvent event = new KeyEvent(action, AvrcpPassthrough.toKeyCode(key))
+- mMediaSessionManager.dispatchMediaKeyEvent(event)
+}@MediaPlayerList.java
+
+
+//获取播放信息
+AvrcpMediaInterfaceImpl.GetSongInfo(SongInfoCallback cb)-->getSongInfo()@com_android_bluetooth_avrcp_target.cpp-->
+getCurrentSongInfo-->mAvrcpService.getCurrentSongInfo()@AvrcpNativeInterface.java-->getCurrentSongInfo-->
+mMediaPlayerList.getCurrentSongInfo()@AvrcpTargetService.java-->
+getCurrentSongInfo{
+- MediaPlayerWrapper player = getActivePlayer(){
+	- mMediaPlayers.get(mActivePlayerId)
+	}
+- player.getCurrentMetadata()
+}@MediaPlayerList.java
+
+packages/apps/Bluetooth/src/com/android/bluetooth/newavrcp/AvrcpTargetService.java
+packages/apps/Bluetooth/src/com/android/bluetooth/newavrcp/AvrcpNativeInterface.java
+packages/apps/Bluetooth/jni/com_android_bluetooth_avrcp_target.cpp
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcp/MediaPlayerList.java
+packages/apps/Bluetooth/src/com/android/bluetooth/avrcp/MediaPlayerWrapper.java
+/*****************
+ bluetooth stack
+*/
+
+bluetoothInterface.get_avrcp_service@bluetooth.cc-->bluetooth::avrcp::AvrcpService::GetServiceInterface(){
+- service_interface_ = new ServiceInterfaceImpl()
+- return service_interface_
+}@avrcp_service.cc
+
+
+
+bta_av_open_rc{
+- 
+- bluetooth::avrcp::AvrcpService::Get()->ConnectDevice
+}@
+
+
+bt/btif/src/bluetooth.cc
+bt/bta/av/bta_av_aact.cc
+bt/btif/avrcp/avrcp_service.cc

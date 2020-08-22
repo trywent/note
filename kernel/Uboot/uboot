@@ -51,21 +51,32 @@ main_loop{
 		  //震动
 		- vibrator_hw_init
 		- set_vibrator(1)
-		  //
+		  //加载分区文件。。#define BOOT_PART "boot"
 		- vlx_nand_boot(BOOT_PART, BACKLIGHT_ON, LCD_ON)
 		}@boot_mode.c
 	}@cmd_cboot.c
 }@main.c
 
 
+/******
+ image地址
+ KERNEL_ADR
+ DT_ADR
+ 
+*/
+//加载分区文件
 vlx_nand_boot(char *kernel_pname, int backlight_set, int lcd_enable){
 - wakeup_source_enable()
  //打开显示
 - save_lcd_bpix_to_kernel(pic_bpix)
 - drv_lcd_init()
-- lcd_splash(LOGO_PART)
+- lcd_splash(LOGO_PART)					//define LOGO_PART "logo"
 - lcd_enable()
- //加载kernel
+ //加载image.lte td gsm wifi
+- while (s_boot_image_table[i]) {
+	- _boot_load_required_image(s_boot_image_table[i][j])
+	}
+ //加载kernel。boot分区
 - _boot_load_kernel_ramdisk_image(kernel_pname, hdr, &dt_adr){
 	  //根据启动模式加载分区
 	- if (0 == memcmp(bootmode, RECOVERY_PART, strlen(RECOVERY_PART))) {
@@ -73,12 +84,50 @@ vlx_nand_boot(char *kernel_pname, int backlight_set, int lcd_enable){
 	  }else{
 		- partition = "boot"
 		}
-	- _get_kernel_ramdisk_dt_offset(hdr, partition) //读取头信息
-	- common_raw_read(partition, size, (uint64_t)(boot_img_offset.kernel_offset) , (char *)KERNEL_ADR)){//读取kernel镜像
+	  //读取头信息，包含kernel,ramdisk,dt的偏移位置
+	- _get_kernel_ramdisk_dt_offset(hdr, partition)
+	  //读取kernel镜像到KERNEL_ADR
+	- common_raw_read(partition, size, (uint64_t)(boot_img_offset.kernel_offset) , (char *)KERNEL_ADR)){
 		- 
 		}
+	  //读取dt 设备树
+	- struct boot_img_hdr_v2 *hdr_v2 = get_boot_img_hdr_v2(hdr)
+	- if (hdr_v2->dtb_size && hdr_v2->dtb_addr) {
+		- dtb_partname = partition
+		- boot_img_offset.dt_offset = hdr_v2->dtb_addr
+	  }else if (0 == common_raw_read("dtb", 10, 0, (char *)DT_ADR)) {
+		- dtb_partname = "dtb"
+		- boot_img_offset.dt_offset = 0
+	  }
+	- load_fixup_dt_img(dtb_partname, dt_addr)	//修正dt值，cmdline...
+	- if(hdr->ramdisk_size ) {
+	
+		}
+	}
+  //启动
+- vlx_entry(dt_adr){
+	- char *bootmode = getenv("bootmode")
+	- start_linux_armv8(dt_addr)		//arm64
 	}
 }@loader_nvm.c
+
+/******
+ 启动进入kernel
+*/
+
+start_linux_armv8(uchar *dt_addr){
+  //kernel入口地址
+- void (*theKernel) (void *dtb_addr, int zero, int arch, int reserved)
+- theKernel = (void (*)(void *, int, int, int))KERNEL_ADR
+  //启动
+- armv8_switch_to_el2()
+- theKernel(dt_addr, 0, 0, 0)
+}@loader_common.c
+
+
+//启动
+do_bootm@cmd_bootm.c-->do_bootm_states@bootm.c-->bootm_os_get_boot_func@bootm_os.c
+
 
 arch/arm/cpu/armv7/start.S
 arch/arm/lib/crt0.S
@@ -87,6 +136,29 @@ common/main.c
 common/autoboot.c
 common/loader/boot_mode.c
 common/loader/loader_nvm.c
+common/loader/loader_common.c
+common/bootm_os.c
+common/bootm.c
+common/cmd_bootm.c
+/*****************
+  参数传递到kernel。不同架构不同操作
+
+  arm中将dtb或者taggedlist在内存中的物理地址写入r2寄存器。
+  kernel根据地址addr+0x4 中的值判断是dtb(0xd00dfeed)还是taglist
+*/
+
+//ATAG
+do_bootm_linux-->boot_prep_linux@bootm.c
+
+
+//Command line
+和dtb一起
+
+
+//Device Tree
+dt
+
+arch/arm/lib/bootm.c
 /*****************
  uboot命令：(命令实现位置common/cmd_xxx.c)
 */
@@ -97,7 +169,7 @@ cmd_tbl_t __u_boot_cmd_##name Struct_Section = {#name, maxargs, rep/*自动重�
 
 board/rockchip/common/armlinux/command.h
 
-执行命令：
+//执行命令：
 run_command_list-->builtin_run_command_list{
 - 循环取出命令
 - 执行，builtin_run_command{
@@ -123,6 +195,24 @@ run_command_list-->builtin_run_command_list{
 
 common/main.c
 common/command.c
+
+/******
+  bootcmd
+*/
+
+main_loop@mian.c--getenv("bootcmd")--run_command-->do_bootm-->bootm_start-->boot_get_kernel
+-->image_get_kernel(校验头信息和数据)@cmd_bootm.c
+
+bootm_start{
+- 获取变量是否校验kernel,getenv_yesno
+- 获取内核，boot_get_kernel{
+		- 
+	}
+
+- 获取文件系统，boot_get_ramdisk@image.c
+}@cmd_boom.c-->
+
+
 /*****************
  输出函数：
 */
@@ -157,72 +247,9 @@ drv_system_init{
 serial_putc-->get_current()->putc(c)-->default_serial_console(获取到已经实现的串口设备)@serial.c
 drivers/serial/serial.c
 
-/*****************
-  参数传递到kernel
-
-  arm中将dtb或者taggedlist在内存中的物理地址写入r2寄存器。
-  kernel根据地址addr+0x4 中的值判断时dtb(0xd00dfeed)还是taglist
-*/
-
-//Command line
-
-
-//ATAG
 
 
 
-
-
-//Device Tree
-
-
-
-
-
-/*****************
- 加载kernel：
-
-
-*/
-
-//制作启动kernel
-保证liunx下机器的定义(include/asm-ppc/tqm8xx.h)包含uboot中开发板的信息(include/asm-<arch>/u-boot.h)。
-同时保证IMAP_ADDR与uboot中CONFIG_SYS_IMMR是相同的。
-
-要有root设备(根文件系统？？)
-
-编译镜像：
-* build a standard "vmlinux" kernel image (in ELF binary format):
-
-* convert the kernel into a raw binary image:
-
-	${CROSS_COMPILE}-objcopy -O binary  -R .note -R .comment -S vmlinux linux.bin
-
-* compress the binary image:
-
-	gzip -9 linux.bin
-
-* package compressed binary image for U-Boot:
-
-	mkimage -A ppc -O linux -T kernel -C gzip \
-		-a 0 -e 0 -n "Linux Kernel Image" \
-		-d linux.bin.gz uImage
-
-mkimage可以用来制作ramdisk镜像，可以与kernel合并成一个文件也可分开。
-
-
-//启动
-main_loop@mian.c--getenv("bootcmd")--run_command-->do_bootm-->bootm_start-->boot_get_kernel
--->image_get_kernel(校验头信息和数据)@cmd_bootm.c
-
-bootm_start{
-- 获取变量是否校验kernel,getenv_yesno
-- 获取内核，boot_get_kernel{
-		- 
-	}
-
-- 获取文件系统，boot_get_ramdisk@image.c
-}@cmd_boom.c-->
 
 
 

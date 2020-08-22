@@ -1,4 +1,6 @@
-//PCM audio:
+/***************************
+ PCM audio:
+*/
 
 1,获取PCM设备
 2,设置PCM流的方向(播放，捕获)
@@ -217,25 +219,14 @@ PCM capture
     }
 
 
-===================
-android:
-(AudioFlinger中打开流，写入流数据)
+/***************************
+ tinyalsa
 
-AudioHardware::openOutputStream{
-- 创建输出流，AudioStreamOutALSA
-- 设置参数，AudioStreamOutALSA.set
-}
+*/
 
-
-PlaybackThread::threadLoop_write-->AudioStreamOutALSA::write{
-- open_l
-- mHardware->getPcm
-- pcm_write
-}
-
-route_pcm_open
+struct pcm *pcm_open(unsigned int card, unsigned int device, unsigned int flags, struct pcm_config *config)
 
 
 
-hardware/rk29/audio/alsa_route.c
+external/tinyalsa/pcm.c
 

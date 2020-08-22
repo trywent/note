@@ -24,7 +24,7 @@ device/sprd/pike2/sp7731e_1h10/rootdir/system/etc/audio_params/tiny_hw.xml@7731
 /**************************************************
  audio_hw
 
- adb logcat -s audio_hw_primary audio_hw_control
+ adb logcat -s audio_hw_ext audio_hw_primary audio_hw_control audio_hw_voice
  不使用tiny_hw.xml
 */
 
@@ -92,8 +92,17 @@ adev_create_audio_patch(struct audio_hw_device *dev,unsigned int num_sources,con
 - select_devices_new
 }@audio_hw.cpp
 
+
+//参数设置
+adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs){
+- struct str_parms *parms = str_parms_create_str(kvpairs)
+- ext_contrtol_process((struct tiny_audio_device *)dev,kvpairs)
+}@audio_hw.c
+
 /**************************************************
  设置route
+
+ 设备节点接口
 */
 
 //route设置线程。等待命令
@@ -173,10 +182,34 @@ vendor/sprd/modules/audio/whale/audio_control.cpp
 vendor/sprd/modules/audio/whale/audio_parse.cpp
 vendor/sprd/modules/audio/whale/debug/audio_debug.cpp
 
-
-
 /**************************************************
- 测试工具 
+ voice
+*/
+start_hfp_call(struct audio_control *actl){
+- voice_out=get_output_stream(adev,AUDIO_HW_APP_CALL){
+	- 
+	}
+- set_usecase(actl, UC_CALL, true)
+- switch_vbc_route(adev->dev_ctl,voice_out->devices)
+  //打开pcm上下行
+- voice_out->pcm_modem_dl = pcm_open(adev->dev_ctl->cards.s_tinycard, actl->pcm_handle.playback_devices[AUD_PCM_HFP_DL]..)
+- pcm_is_ready(voice_out->pcm_modem_dl)
+- voice_out->pcm_modem_ul = pcm_open(adev->dev_ctl->cards.s_tinycard, actl->pcm_handle.record_devices[AUD_RECORD_PCM_HFP_UL]..)
+- pcm_is_ready(voice_out->pcm_modem_ul)
+- select_devices_new(actl,voice_out->audio_app_type,voice_out->devices,false,false,true,true)
+- set_voice_status(&adev->hw_device,VOICE_START_STATUS)
+- set_dsp_volume(adev->dev_ctl,adev->hfp_voice_volume)
+}
+
+
+
+
+
+
+
+vendor/sprd/modules/audio/whale/voice_call.c
+/**************************************************
+ control设置接口
 
  proprietories-source/factorytest
  proprietories-source/autotest

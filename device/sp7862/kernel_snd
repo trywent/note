@@ -2,6 +2,7 @@
  snd 注册声卡设备
 
 */
+//dai_link配置
 sound_vbc_v4_sprd_codec: sound@0 {
 - compatible = "sprd,vbc-v4-codec-sc2730";
 - sprd-audio-card,dai-link@0 {
@@ -38,9 +39,10 @@ vbc_rxpx_codec_sc27xx_probe(struct platform_device *pdev){
 asoc_sprd_card_probe(struct platform_device *pdev,struct snd_soc_card **card){
 - agcp_ahb_gpr = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "sprd,syscon-agcp-ahb")
 - arch_audio_set_agcp_ahb_gpr(agcp_ahb_gpr)
-- num_links = of_get_child_count(np)	//分配dail_link空间
+  //分配dail_link空间
+- num_links = of_get_child_count(np)	
 - priv = devm_kzalloc(dev,sizeof(*priv) + sizeof(*dai_link) * num_links,GFP_KERNEL)
-- asoc_sprd_card_parse_of(np, priv)	//解析dts，初始化dail_link
+- asoc_sprd_card_parse_of(np, priv)					//解析dts，初始化dail_link
 - snd_soc_card_set_drvdata(&priv->snd_card, priv)
 }@sprd-asoc-card-utils.c
 
@@ -57,10 +59,10 @@ platform_driver sprd_codec_codec_driver = {
 	.driver = {
 		.name = "sprd-codec-sc2730",
 		.owner = THIS_MODULE,
-		.of_match_table = codec_of_match,	//"sprd,sc2730-audio-codec"
+		.of_match_table = codec_of_match,			//"sprd,sc2730-audio-codec"
 	},
 	.probe = sprd_codec_probe,
-}
+}@sprd-codec.c
 
 sprd_codec_probe(struct platform_device *pdev){
 - struct sprd_codec_priv *sprd_codec = devm_kzalloc(&pdev->dev,sizeof(struct sprd_codec_priv), GFP_KERNEL)

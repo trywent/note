@@ -1,6 +1,7 @@
 /****************************
  powerManager
 
+ cat /sys/power/wake_lock  
 */
 
 updateDisplayPowerStateLocked(int dirty) {

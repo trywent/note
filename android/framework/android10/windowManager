@@ -95,8 +95,11 @@ createDisplayContent(display, null /* controller */){
 }@RootWindowContainer.java
 
 
-
-
+performSurfacePlacementNoTrace(boolean recoveringMemory){
+- mWmService.mAnimator.executeAfterPrepareSurfacesRunnables()
+  //应用切换
+- checkAppTransitionReady(surfacePlacer)
+}
 
 frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
 frameworks/base/services/core/java/com/android/server/wm/ActivityDisplay.java
@@ -248,6 +251,8 @@ frameworks/base/services/core/java/com/android/server/wm/Task.java
 */
 createAppWindow-->new AppWindowToken@ActivityRecord.java-->
 
+
+
 //隐藏
 setVisibility(boolean visible, boolean deferHidingClient) {
 - 
@@ -259,6 +264,26 @@ setVisibility(boolean visible, boolean deferHidingClient) {
 - 
 }
 
+commitVisibility(WindowManager.LayoutParams lp, boolean visible, int transit, 
+	boolean performLayout, boolean isVoiceInteraction) {
+  //显示 
+- if (isHidden() == visible || (isHidden() && mIsExiting) || (visible && waitingForReplacement())) {
+	- if (transit != WindowManager.TRANSIT_UNSET) {						//设置了动画
+		- runningAppAnimation = applyAnimationLocked(lp, transit, visible, isVoiceInteraction)
+		- delayed = runningAppAnimation
+		- WindowState window = findMainWindow()
+		- accessibilityController.onAppWindowTransitionLocked(window, transit)
+		}
+	}
+- if (visibilityChanged) {
+	- if (visible || !isReallyAnimating()) {						//显示
+		- setClientHidden(!visible)
+		}
+	- if (isHidden() && !delayed && !getDisplayContent().mAppTransition.isTransitionSet()) {//隐藏
+		- mChildren.get(i).mWinAnimator.hide("immediately hidden")
+		}
+	}
+}@AppWindowToken.java
 
 //销毁surface
 destroySurfaces-->destroySurfaces(boolean cleanupOnResume) {
@@ -276,4 +301,19 @@ relaunchActivityLocked@ActivtyRecord.java-->activityRelaunchingLocked@ActivitySt
 notifyAppRelaunching@WindowManagerService.java-->appWindow.startRelaunching()
 
 
+
+
+//应用切换
+checkAppTransitionReady-->curDisplay.mAppTransitionController.handleAppTransitionReady()@RootWindowContainer.java
+-->handleAppTransitionReady{
+- 
+- handleClosingApps(transit, animLp, voiceInteraction)
+- handleOpeningApps(transit, animLp, voiceInteraction)
+- handleChangingApps(transit, animLp, voiceInteraction)
+}@AppTransitionController.java
+
+
+
 frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
+frameworks/base/services/core/java/com/android/server/wm/AppTransitionController.java
+
