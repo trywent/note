@@ -85,14 +85,15 @@ git rm -r --cached <added_file_to_undo>
 /*
  git补丁
 */
-git format-patch -n <sha> 			//生成从<sha>开始的n个提交的补丁
+git format-patch -n <sha> 			//生成从<sha>开始的n个提交的补丁 -N no-number
+git format-patch -s  sha			//从sha开始所有提交
 git diff old_commit new_commit dir > xx.patch   //生成new 和 old之间的dir文件夹的补丁
 git apply xx.patch				//打入补丁
 git apply -p2 xx
 git apply --whiteSpace=fix xx.patch
 patch -p1 <xx.patch 				//git apply 不行就用patch 
 
-
+git am	xxx.patch				//直接提交补丁
 /*
  合并
 */

@@ -232,17 +232,34 @@ frameworks/base/core/java/android/content/pm/PermissionInfo.java
  权限分配
 
  android10 中pria-app目录下会自动分配权限
- 
 
 */
 
 
 
 
-
-
-
 frameworks/base/services/core/java/com/android/server/pm/permission/DefaultPermissionGrantPolicy.java
+/*******
+ android6
+*/
+grantRuntimePermission(String packageName, String name, final int userId) {
+- PackageParser.Package pkg = mPackages.get(packageName)
+- BasePermission bp = mSettings.mPermissions.get(name)
+- SettingBase sb = (SettingBase) pkg.mExtras
+- PermissionsState permissionsState = sb.getPermissionsState()
+  //分配权限
+- int result = permissionsState.grantRuntimePermission(bp, userId)
+- mSettings.writeRuntimePermissionsForUserLPr(userId, false)
+}@PackageManangerService.java
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/pm/PackageManagerService.java
+
+
+
 
 
 

@@ -87,6 +87,17 @@ AudioPolicyManager::installPatch(const char *caller,ssize_t index,audio_patch_ha
 - mpClientInterface->onAudioPatchListUpdate()
 }
 
+/**********
+ 其它调用流程
+
+*/
+
+//AudioPolicyManager到AudioFlinger(PatchPanel)
+createAudioPatch(const struct audio_patch *patch,audio_patch_handle_t *handle,uid_t uid)-->
+installPatch(const char *caller,ssize_t index,audio_patch_handle_t *patchHandle,const struct audio_patch *patch...)
+-->mpClientInterface->createAudioPatch@AudioPolicyManager.java-->createAudioPatch@AudioPolicyClientImpl.cpp-->
+clientCreateAudioPatch-->af->createAudioPatch@AudioPolicyManagerService.cpp-->createAudioPatch@PatchPanel.cpp
+
 frameworks/base/media/java/android/media/AudioManager.java
 frameworks/base/media/java/android/media/AudioPatch.java
 frameworks/base/media/java/android/media/AudioSystem.java

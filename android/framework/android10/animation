@@ -1,3 +1,199 @@
 /*******************************
+  设置动画
+*/
+
+performSurfacePlacementNoTrace(boolean recoveringMemory) {
+- applySurfaceChangesTransaction(recoveringMemory)
+  //应用切换
+- checkAppTransitionReady(surfacePlacer){
+	  //遍历DisplayContent
+	- DisplayContent curDisplay = mChildren.get(i)
+	- curDisplay.mAppTransitionController.handleAppTransitionReady()	//准备好切换
+	}
+  //移除要销毁的surface
+- WindowState win = mWmService.mDestroySurface.get(i)
+- win.destroySurfaceUnchecked()
+- win.mWinAnimator.destroyPreservedSurfaceLocked()
+- mWmService.mDestroySurface.clear()
+  //移除不要的窗口
+- mWmService.mPendingRemove.toArray(mWmService.mPendingRemoveTmp)
+- final WindowState w = mWmService.mPendingRemoveTmp[i]
+- w.removeImmediately()
+  //执行动画
+- mWmService.scheduleAnimationLocked()-->mAnimator.scheduleAnimation()
+}@RootWindowContainer.java
+
+//处理app切换
+handleAppTransitionReady() {
+- AppTransition appTransition = mDisplayContent.mAppTransition
+- int transit = appTransition.getAppTransition()
+- transit = maybeUpdateTransitToTranslucentAnim(transit)
+- transit = maybeUpdateTransitToWallpaper(transit, openingAppHasWallpaper,closingAppHasWallpaper)	//切换类型受壁纸影响
+  //设置应用动画
+- processApplicationsAnimatingInPlace(transit){								//设置焦点窗口
+	- WindowState win = mDisplayContent.findFocusedWindow()
+	- wtoken.applyAnimationLocked(null, transit, false, false)
+	- wtoken.updateReportedVisibilityLocked()
+	}
+- handleClosingApps(transit, animLp, voiceInteraction){							//处理closing app
+	- wtoken.commitVisibility(animLp, false, transit, false, voiceInteraction)
+	- wtoken.updateReportedVisibilityLocked()
+	}
+- handleOpeningApps(transit, animLp, voiceInteraction){
+	- wtoken.updateReportedVisibilityLocked()
+	- wtoken.showAllWindowsLocked()
+	}
+- handleChangingApps(transit, animLp, voiceInteraction){
+	- wtoken.applyAnimationLocked(null, transit, true, false)					//设置动画
+	- wtoken.showAllWindowsLocked()
+	}
+- appTransition.setLastAppTransition(transit, topOpeningApp, topClosingApp, topChangingApp)
+- appTransition.postAnimationCallback()
+}@AppTransitionController.java
+
+
+//获取动画
+loadAnimation(LayoutParams lp, int transit, boolean enter, int uiMode,int orientation, Rect frame, Rect displayFrame, Rect insets,
+           Rect surfaceInsets, @Nullable Rect stableInsets, boolean isVoiceInteraction,boolean freeform, int taskId){
+- loadAnimationRes(lp, com.android.internal.R.anim.wallpaper_open_exit)
+- 
+}@AppTransition.java
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/AppTransition.java
+frameworks/base/services/core/java/com/android/server/wm/WindowContainer.java
+/*******
+ AppWindowToken 应用切换动画
+*/
+applyAnimationLocked(WindowManager.LayoutParams lp, int transit, boolean enter,boolean isVoiceInteraction) {
+- if (okToAnimate()) {
+	- AnimationAdapter adapter
+	- boolean isChanging = AppTransition.isChangeTransit(transit) && enter && getDisplayContent().mChangingApps.contains(this)
+	- if (getDisplayContent().mAppTransition.getRemoteAnimationController() != null
+                    && !mSurfaceAnimator.isAnimationStartDelayed()) {
+		- 
+	  }else if(){
+		- adapter = new LocalAnimationAdapter
+		- mTransit = transit
+	  }else{
+		- Animation a = loadAnimation(lp, transit, enter, isVoiceInteraction)
+		- adapter = new LocalAnimationAdapter(new WindowAnimationSpec(a, mTmpPoint, mTmpRect..)	//创建AnimationAdapter
+					,mWmService.mSurfaceAnimationRunner)				//mSurfaceAnimationRunner执行动画
+		- mTransit = transit
+	  }
+	- startAnimation(getPendingTransaction(), adapter, !isVisible())
+  }else{
+	- cancelAnimation()
+  }
+- isReallyAnimating()
+}@AppWindowToken.java
+
+
+//开始动画
+startAnimation(Transaction t, AnimationAdapter anim, boolean hidden)@WindowContainer.java-->
+startAnimation(Transaction t, AnimationAdapter anim, boolean hidden){
+- mAnimation = anim
+- mLeash = createAnimationLeash(surface, t, mAnimatable.getSurfaceWidth(), mAnimatable.getSurfaceHeight(), hidden)
+- mAnimation.startAnimation(mLeash, t, mInnerAnimationFinishedCallback)-->
+	startAnimation(SurfaceControl animationLeash, Transaction t,OnAnimationFinishedCallback finishCallback)-->
+	mAnimator.startAnimation(mSpec, animationLeash, t,() -> finishCallback.onAnimationFinished(this))@LocalAnimationAdapter.java-->
+	mSurfaceAnimationRunner.startAnimation@WindowManagerService.java-->
+}@SurfaceAnimator.java
+
+startAnimation(AnimationSpec a, SurfaceControl animationLeash, Transaction t,Runnable finishCallback) {
+  //将动画提交到mChoreographer
+- RunningAnimation runningAnim = new RunningAnimation(a, animationLeash,finishCallback)
+- mPendingAnimations.put(animationLeash, runningAnim)
+- mChoreographer.postFrameCallback(this::startAnimations)
+  //有些动画要马上设置，初始状态。0时间
+- applyTransformation(runningAnim, t, 0 /* currentPlayTime */)
+}@SurfaceAnimationRunner.java
+
+//加载动画
+loadAnimation(WindowManager.LayoutParams lp, int transit, boolean enter, boolean isVoiceInteraction) {
+  //获取窗口大小等信息
+- WindowState win = findMainWindow()
+- Rect frame = new Rect(0, 0, width, height)
+- Rect insets = new Rect()
+- win.getContentInsets(insets)
+  //获取动画
+- Animation a = getDisplayContent().mAppTransition.loadAnimation(lp, transit, enter...)
+}@AppWindowToken.java
+
+
+frameworks/base/services/core/java/com/android/server/wm/AppWindowToken.java
+frameworks/base/services/core/java/com/android/server/wm/SurfaceAnimator.java
+frameworks/base/services/core/java/com/android/server/wm/LocalAnimationAdapter.java
+/*******
+ WindowStateAnimator  窗口显示隐藏动画
 
 */
+//设置enter动画
+mWinAnimator.applyEnterAnimationLocked@WindowState.java-->
+applyEnterAnimationLocked{
+- if (mWin.mSkipEnterAnimationForSeamlessReplacement) return
+- if (mEnterAnimationPending) {
+	- transit = WindowManagerPolicy.TRANSIT_ENTER
+  }else{
+	- transit = WindowManagerPolicy.TRANSIT_SHOW
+  }
+- applyAnimationLocked(transit, true)
+}@WindowStateAnimator.java
+
+//设置动画
+applyAnimationLocked(int transit, boolean isEntrance){
+- if (mWin.mToken.okToAnimate()) {
+	- int anim = mWin.getDisplayContent().getDisplayPolicy().selectAnimationLw(mWin, transit)
+ 	  //anim为0
+	- switch (transit) {
+		- WindowManagerPolicy.TRANSIT_ENTER:attr = com.android.internal.R.styleable.WindowAnimation_windowEnterAnimation
+		- WindowManagerPolicy.TRANSIT_EXIT:attr = com.android.internal.R.styleable.WindowAnimation_windowExitAnimation
+		- WindowManagerPolicy.TRANSIT_SHOW:attr = com.android.internal.R.styleable.WindowAnimation_windowShowAnimation
+		- WindowManagerPolicy.TRANSIT_HIDE:attr = com.android.internal.R.styleable.WindowAnimation_windowHideAnimation
+		}
+	- a = mWin.getDisplayContent().mAppTransition.loadAnimationAttr(mWin.mAttrs, attr, TRANSIT_NONE)
+	- mWin.startAnimation(a)
+  }else{
+	- mWin.cancelAnimation()
+  }
+}
+
+frameworks/base/services/core/java/com/android/server/wm/WindowStateAnimator.java
+/*******************************
+  执行动画
+*/
+scheduleAnimation-->mChoreographer.postFrameCallback(mAnimationFrameCallback)-->
+mAnimationFrameCallback-->animate(frameTimeNs){
+
+}@WindowAnimator.java
+
+
+
+//AppWindowToken设置的切换动画
+startAnimations(long frameTimeNanos)-->startPendingAnimationsLocked(){
+- for (int i = mPendingAnimations.size() - 1; i >= 0; i--) 
+	- startAnimationLocked(mPendingAnimations.valueAt(i)){
+		- ValueAnimator anim = mAnimatorFactory.makeAnimator()
+		- anim.addUpdateListener(){
+			- applyTransformation(a, mFrameTransaction, currentPlayTime)
+			- scheduleApplyTransaction()	
+			}
+		- anim.addListener(){
+			- onAnimationStart
+			- onAnimationEnd	
+			}
+		- mRunningAnimations.put(a.mLeash, a)
+		- anim.start()
+		- anim.doAnimationFrame(mChoreographer.getFrameTime())
+		}
+- mPendingAnimations.clear()
+}@SurfaceAnimationRunner.java
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/WindowAnimator.java
+frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
+frameworks/base/services/core/java/com/android/server/wm/WindowSurfacePlacer.java
+frameworks/base/services/core/java/com/android/server/wm/AppTransitionController.java
+frameworks/base/services/core/java/com/android/server/wm/SurfaceAnimationRunner.java

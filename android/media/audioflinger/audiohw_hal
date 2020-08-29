@@ -1,4 +1,5 @@
-/*audio hal接口
+/**************************
+  audio hal接口。最开始audio库实现的接口
   
 */
 
@@ -99,9 +100,25 @@ struct audio_hw_device {
 }@audio.h
 
 
-
-
-
-
 hardware/libhardware/include/hardware/audio.h
 frameworks/av/media/libaudiohal/include/media/audiohal/DeviceHalInterface.h
+
+/******
+ 实现打开module
+*/
+static struct hw_module_methods_t hal_module_methods = {
+    .open = adev_open,
+}
+
+struct audio_module HAL_MODULE_INFO_SYM = {
+    .common = {
+        .tag = HARDWARE_MODULE_TAG,
+        .module_api_version = AUDIO_MODULE_API_VERSION_0_1,
+        .hal_api_version = HARDWARE_HAL_API_VERSION,
+        .id = AUDIO_HARDWARE_MODULE_ID,
+        .methods = &hal_module_methods,
+    },
+}
+
+
+

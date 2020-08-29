@@ -1,6 +1,9 @@
 /************************
  proc文件系统
 */
+//挂载。hidepid为2时不允许读取/proc/pid/
+mount("proc", "/proc", "proc", 0, "hidepid=0,gid=" MAKE_STR(AID_READPROC))
+
 
 //创建proc文件
 //proc_create("tty/drivers", 0, NULL, &proc_tty_drivers_operations)@proc_tty.c

@@ -337,6 +337,7 @@ frameworks/native/libs/binder/IMemory.cpp
 //AudioTrack
 sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                CreateTrackOutput& output,status_t *status){
+  //从policy获取合适的output信息
 - audio_attributes_t localAttr = input.attr
 - output.outputId = AUDIO_IO_HANDLE_NONE
 - AudioSystem::getOutputForAttr(&localAttr, &output.outputId, sessionId, &streamType,...)

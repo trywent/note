@@ -1,8 +1,12 @@
 /***************************************************
  audiopolicyService接口和数据结构
 
+  调用流程
+ 上层应用--- audioPolicyManager(AudioPolicyInterfaceImpl) --- AudioPolicyClient --- audioPolicyService
+
 */
-//接口 在AudioPolicyInterfaceImpl.cpp中实现
+//接口 在AudioPolicyInterfaceImpl.cpp中实现。AudioSystem调用
+{
 setPhoneState(audio_mode_t state)
 audio_io_handle_t getOutput(audio_stream_type_t stream)					//output接口
 status_t getOutputForAttr(const audio_attributes_t *attr,audio_io_handle_t *output,...)
@@ -27,50 +31,8 @@ status_t listAudioPatches(unsigned int *num_patches,struct audio_patch *patches,
 status_t setAudioPortConfig(const struct audio_port_config *config)
 status_t startAudioSource(const struct audio_port_config *source...)			//源
 status_t stopAudioSource(audio_port_handle_t portId)
+}@frameworks/av/services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp
 
-@frameworks/av/services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp
-
-
-class AudioPort
-class IOProfile : public AudioPort
-class DeviceDescriptor : public AudioPort, public AudioPortConfig
-//结构。输入设备---路径---流---路径---输出设备
-module{
-  //mixport 流
-- IOProfile{
-	- name
-	- role		//sink source
-	- flags		//AUDIO_OUTPUT_FLAG_PRIMARY AUDIO_OUTPUT_FLAG_DEEP_BUFFER
-	- AudioProfile
-	}
-  //deviceport 设备
-- DeviceDescriptor {
-	- name
-	- type
-	- role		//sink source
-	- AudioProfile
-	}
-  //route 路径
-- AudioRoute{
-    - AudioPort sink	//只有一个sink. 将route加入sink
-    - AudioPort source  //多个source 将route加入source
-   }
-}
-
-//module实例
-HwModule{
-  //mixport
-- mOutputProfiles
-- mInputProfiles
-  //deviceport
-- DeviceVector mDeclaredDevices
-  //route
-- AudioRouteVector mRoutes 
-  //包含mixport ,deviceport
-- AudioPortVector mPorts  
-}
-
-AudioOutputDescriptor //output
 
 
 frameworks/av/services/audiopolicy/AudioPolicyInterface.h

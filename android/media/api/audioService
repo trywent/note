@@ -13,38 +13,59 @@ AudioService{
 getDeviceForStream-->AudioSystem.getDevicesForStream@AudioService.java-->
 getDevicesForStream@AudioSystem.java-->android_media_AudioSystem_getDevicesForStream
 AudioSystem::getDevicesForStream@android_media_AudioSystem.cpp-->getDevicesForStream
-@AudioSystem.cpp
+@AudioSystem.cpp-->getDevicesForStream@AudioPolicyInterfaceImpl.cpp-->
+getDevicesForStream@AudioPolicyManager.cpp
 
 
-//服务设置流音量：
+//设置流音量：最终是设置device音量
 //streamState保存音量在mIndex中，同时将音量设置到AudioSystem
-AudioManager.setStreamVolume-->AudioService.setStreamVolume{
-- 检查状态是否正确，ensureValidStreamType
-- 获取streamstate，streamState = mStreamStates[streamTypeAlias = mStreamVolumeAlias]
-- device，getDeviceForStream //获取流对应的设备
+AudioManager.setStreamVolume-->AudioService.setStreamVolume(int streamType, int index, int flags, String callingPackage)
+--setStreamVolume(int streamType, int index, int flags, String callingPackage,String caller, int uid) {
+- ensureValidStreamType						//检查状态是否正确
+- streamState = mStreamStates[streamTypeAlias = mStreamVolumeAlias]
+- int device = getDeviceForStream(streamType)			//获取流对应的设备
 - syncronised{
 	- streamState.getIndex
 	- 将要设置的音量根据mIndex转换，rescaleIndex
 	- 若是a2dp，则设置setAvrcpAbsoluteVolume
-	- 音量超标checkSafeMediaVolume// 损害耳朵?
-	- - onSetStreamVolume-->setStreamVolumeInt{
-		- 设置流音量值，streamState.setIndex
-		- sendMsg(mAudioHandler,MSG_SET_DEVICE_VOLUME)-->setDeviceVolume{
-			- StreamStates.applyDeviceVolume //设置到audioSystem
-			- 保存音量，sendMsg(MSG_PERSIST_VOLUME)-->persistVolume
+	- 音量超标checkSafeMediaVolume				// 损害耳朵?
+	- onSetStreamVolume(streamType, index, flags, device, caller)-->
+		setStreamVolumeInt(stream, index, device, false, caller){	//设置音量
+		- VolumeStreamState streamState = mStreamStates[streamType]
+		- streamState.setIndex
+		- sendMsg(mAudioHandler,MSG_SET_DEVICE_VOLUME)-->
+			AudioHandler.setDeviceVolume(VolumeStreamState streamState, int device){
+			- streamState.applyDeviceVolume_syncVSS(device, isAvrcpAbsVolSupported)	//设置到audioSystem
+			- sendMsg(MSG_PERSIST_VOLUME)-->persistVolume				//保存音量
 			}
 		}
+	- index = mStreamStates[streamType].getIndex(device)
 	}
 
-- 音量变化UI和广播，sendVolumeUpdate
-}
+- sendVolumeUpdate						//音量变化UI和广播
+}@AudioService.java
 
-
+applyDeviceVolume_syncVSS(int device, boolean isAvrcpAbsVolSupported) {
+- index = (getIndex(device) + 5)/10
+- setStreamVolumeIndex(index, device)
+- AudioSystem.setStreamVolumeIndexAS(mStreamType, index, device)
+}@AudioService.java
 
 //设置音量到audioSystem
-VolumeStreamState.applyDeviceVolume-->AudioSystem.setStreamVolumeIndex@AudioSystem.java-->
-setStreamVolumeIndex-->aps->setStreamVolumeIndex@AudioSystem.cpp-->setStreamVolumeIndex
-@AudioPolicyManager.cpp-->setStreamVolumeIndex@AudioPolicyService.cpp-->setStreamVolume
+VolumeStreamState.applyDeviceVolume(int device, boolean isAvrcpAbsVolSupported)@AudioService.java-->
+setStreamVolumeIndexAS(int stream, int index, int device)@AudioSystem.java-->
+setStreamVolumeIndex(audio_stream_type_t stream,int index, audio_devices_t device)-->
+aps->setStreamVolumeIndex(stream, index, device)@AudioSystem.cpp-->
+setStreamVolumeIndex(audio_stream_type_t stream,int index,audio_devices_t device)-->
+setVolumeIndexForAttributes(const audio_attributes_t &attributes,int index,audio_devices_t device)-->
+checkAndSetVolume(IVolumeCurves &curves,VolumeSource volumeSource,int index,
+        const sp<AudioOutputDescriptor>& outputDesc,audio_devices_t device...){
+- float volumeDb = computeVolume(curves, volumeSource, index, device)
+- outputDesc->setVolume(volumeDb, volumeSource, curves.getStreamTypes(), device, delayMs, force){	//设置音量，设置到audioFlinger
+	-  mClientInterface->setStreamVolume(stream, volumeAmpl, mIoHandle, delayMs)
+	}
+}@AudioPolicyManager.cpp
+-->setStreamVolumeIndex@AudioPolicyService.cpp-->setStreamVolume
 @AudioSystem.cpp-->setStreamVolume@AudioFlinger.cpp
 
 //设置流静音

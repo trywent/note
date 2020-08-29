@@ -5,6 +5,7 @@ arm  	--->i2s2--->ump510g	//播放
 ump510g --->i2s2--->arm		//录音
 umw2652 --->i2s0--->arm		//蓝牙声音
 
+bt->dsp->dac0->vbc->codec
 
 /*
  audiopolicy
@@ -36,11 +37,23 @@ USE_CUSTOM_CONFIGUREABLE_AUDIO_POLICY := true
 @device/sprd/sharkl5Pro/ums512_1h10/ums512_1h10_Base.mk
 
 
-//设备
+//加载moduel,打开获取hw_device_t设备
 adev_open(const hw_module_t* module, const char* name, hw_device_t** device){
+  //初始话adev
 - struct tiny_audio_device *adev = calloc(1, sizeof(struct tiny_audio_device))
 - adev->hw_device.get_supported_devices = adev_get_supported_devices
 - adev->dev_ctl = init_audio_control(adev)
+- *device = &adev->hw_device.common		//要返回的地方
+- ext_control_init(adev)
+- list_init(&adev->active_out_list)
+- list_init(&adev->active_input_list)
+  //打开voice,fm流。将流加入active_out_list
+- voice_open(adev){
+	- struct tiny_stream_out *voice_out=(struct tiny_stream_out *)calloc(1, sizeof(struct tiny_stream_out))
+	- voice_out->dev=adev
+	- audio_add_output(adev,voice_out)
+	}@voice_call.c
+- fm_open(adev)
 }@audio_hw.c
 
 
@@ -82,14 +95,23 @@ parse_audio_pcm_config(struct pcm_handle_t *pcm){
 }@audio_parse.cpp
 
 
-//audiopatch device被修改?
+//设置通路  audiopatch device被修改?
 createAudioPatch-->adev->hw_device.create_audio_patch-->
 adev_create_audio_patch(struct audio_hw_device *dev,unsigned int num_sources,const struct audio_port_config *sources,
         unsigned int num_sinks,const struct audio_port_config *sinks,audio_patch_handle_t *handle){
-- adev_in_devices_check(adev,sources_device_type){
-	- 
+- for (i = 0; i < num_sources; i++) {	//获取输入设备
+	- sources_device_type |=sources[i].ext.device.type
 	}
-- select_devices_new
+- for (i = 0; i < num_sinks; i++) {	//获取输出设备
+	- sinks_device_type |=sinks[i].ext.device.type
+	}
+  //设置输入设备
+- adev_in_devices_check(adev,sources_device_type)	//检查并设置输入设备。。。输出设备
+- adev->in_devices=sources_device_type
+- select_devices_new(adev->dev_ctl,AUDIO_HW_APP_INVALID,sources_device_type,true,true,false,false)
+  //设置输出设备
+- do_set_output_device(adev->dev_ctl,sinks_device_type)
+- adev->out_devices=sinks_device_type
 }@audio_hw.cpp
 
 
@@ -97,6 +119,17 @@ adev_create_audio_patch(struct audio_hw_device *dev,unsigned int num_sources,con
 adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs){
 - struct str_parms *parms = str_parms_create_str(kvpairs)
 - ext_contrtol_process((struct tiny_audio_device *)dev,kvpairs)
+}@audio_hw.c
+
+
+//设置设备。检查输出流的输出设备是否正确,并设置
+do_set_output_device@audio_control.c-->SET_OUTPUT_DEVICE{
+- adev_out_devices_check(void *dev,audio_devices_t device){
+   - list_for_each_safe(item, item2,&adev->active_out_list){
+	- struct tiny_stream_out *out = node_to_item(item, struct tiny_stream_out, node)
+	- out->devices=device
+	}
+- select_devices_new(actl,AUDIO_HW_APP_INVALID,cmd->device,false,true,false,false)
 }@audio_hw.c
 
 /**************************************************
@@ -148,6 +181,21 @@ select_device_cmd_send(struct audio_control *actl,AUDIO_HW_APP_T audio_app_type,
 /**************************************************
  output
 */
+//根据使用场景获取对应的流
+get_output_stream(struct tiny_audio_device *adev,AUDIO_HW_APP_T audio_app_type)-->
+get_output_stream_unlock(struct tiny_audio_device *adev,AUDIO_HW_APP_T audio_app_type){
+  //遍历active_out_list
+- list_for_each_safe(item, item2,&adev->active_out_list){
+	- if(out->audio_app_type==audio_app_type) out_ret = out
+	}
+- return out_ret
+}@audio_hw.c
+
+out_write(struct audio_stream_out *stream, const void *buffer, size_t bytes){
+- if(adev->boot_completed==false) check_headset_status()		//未启动完成，主动获取耳机状态
+}
+
+
 
 /**************************************************
  input
@@ -183,60 +231,12 @@ vendor/sprd/modules/audio/whale/audio_parse.cpp
 vendor/sprd/modules/audio/whale/debug/audio_debug.cpp
 
 /**************************************************
- voice
+ ext control设置接口
+
+ 两种方式：参数设置ext_contrtol_process
+	  写命令到/data/vendor/local/media/mmi.audio.ctrl
 */
-start_hfp_call(struct audio_control *actl){
-- voice_out=get_output_stream(adev,AUDIO_HW_APP_CALL){
-	- 
-	}
-- set_usecase(actl, UC_CALL, true)
-- switch_vbc_route(adev->dev_ctl,voice_out->devices)
-  //打开pcm上下行
-- voice_out->pcm_modem_dl = pcm_open(adev->dev_ctl->cards.s_tinycard, actl->pcm_handle.playback_devices[AUD_PCM_HFP_DL]..)
-- pcm_is_ready(voice_out->pcm_modem_dl)
-- voice_out->pcm_modem_ul = pcm_open(adev->dev_ctl->cards.s_tinycard, actl->pcm_handle.record_devices[AUD_RECORD_PCM_HFP_UL]..)
-- pcm_is_ready(voice_out->pcm_modem_ul)
-- select_devices_new(actl,voice_out->audio_app_type,voice_out->devices,false,false,true,true)
-- set_voice_status(&adev->hw_device,VOICE_START_STATUS)
-- set_dsp_volume(adev->dev_ctl,adev->hfp_voice_volume)
-}
 
-
-
-
-
-
-
-vendor/sprd/modules/audio/whale/voice_call.c
-/**************************************************
- control设置接口
-
- proprietories-source/factorytest
- proprietories-source/autotest
-*/
-dump方法如下(dump文件保存在data/vendor/local/media/下):
-1．dump hal送给dsp/vbc或从dsp/vbc读到的数据
-打开dump: echo "dumpvbc=1" > /data/vendor/local/media/mmi.audio.ctrl
-关闭dump: echo "dumpvbc=0" > /data/vendor/local/media/mmi.audio.ctrl
-文件保存在/data/vendor/local/media/下面,适合于录音 与播放场景(包含voip),不包含a2dp dump.
-
-2.  dump audioflinger从hal拿到的数据
-开启dump:  echo "dumpinread=1" > /data/vendor/local/media/mmi.audio.ctrl
-关闭dump:  echo "dumpinread=0" > /data/vendor/local/media/mmi.audio.ctrl
-
-3.  dump audioflinger写到hal的数据
-打开dump: echo "dumpmusic=1" > /data/vendor/local/media/mmi.audio.ctrl
-关闭dump: echo "dumpmusic=0" > /data/vendor/local/media/mmi.audio.ctrl
-
-4.  dump播放场景vbc输出的数据
-开启dump: echo "vbc_pcm_dump=vbc_dac0" > /data/vendor/local/media/mmi.audio.ctrl
-关闭dump: echo "vbc_pcm_dump=disable" > /data/vendor/local/media/mmi.audio.ctrl
-注意:vbc输出的数据dump与录音场景充突,有录音场景时无法dump.
-
-5.  dump通话场景vbc输出的数据
-开启dump:  echo "vbc_pcm_dump=vbc_dac1" > /data/vendor/local/media/mmi.audio.ctrl
-关闭dump: echo "vbc_pcm_dump=disable" > /data/vendor/local/media/mmi.audio.ctrl
-注意:vbc输出的数据dump与录音场景充突,有录音场景时无法dump. 
 
 //命令和操作函数
 const struct ext_control_t  ext_contrl_table[] = {
@@ -250,6 +250,7 @@ const struct ext_control_t  ext_contrl_table[] = {
     {"dumpvbc",                         set_audiohal_vbcpcmdump},
     {"dumploop",                        set_audiohal_looppcmdump},
     {"pipeprocess_exit",                ext_process_exit},
+    {"hfp_enable",                      set_hfp_enable},
 }
 
 //dump数据控制
@@ -290,10 +291,81 @@ ext_contrtol_process(struct tiny_audio_device *adev,const char *cmd_string){
 }@ext_control.c
 
 
+
+vendor/sprd/modules/audio/whale/debug/ext_control.c
+
+/**************************************************
+  hfp voice
+*/
+//设置模式
+set_mode-->ext_setVoiceMode@ext_control.c-->
+ext_setVoiceMode(void * dev,UNUSED_ATTR struct str_parms *parms,int mode, UNUSED_ATTR char * val){
+- adev_set_mode(dev,mode)
+- if(AUDIO_MODE_IN_CALL == mode){
+	- int voice_device=AUDIO_DEVICE_OUT_EARPIECE
+	  //测试通话通路
+	- ret = str_parms_get_str(parms,"test_out_stream_route", value, sizeof(value))
+	- if(ret >= 0){
+		- voice_device= strtoul(value,NULL,0)
+		- voice_out->devices=voice_device
+		}
+	- adev->call_start=true
+	- send_cmd_to_dsp_thread(adev->dev_ctl->agdsp_ctl,AUDIO_CTL_START_VOICE,NULL)
+	}
+}@audio_hw.c
+
+//设置hfp状态
+set_hfp_enable(adev,...)-->start_hfp_call(adev->dev_ctl)@ext_control.c-->
+start_hfp_call(struct audio_control *actl){
+- struct tiny_audio_device *adev=(struct tiny_audio_device *)actl->adev
+  //获取当前使用场景下的流
+- struct tiny_stream_out *voice_out=get_output_stream(adev,AUDIO_HW_APP_CALL)-->get_output_stream_unlock
+- set_usecase(actl, UC_CALL, true)
+- switch_vbc_route(adev->dev_ctl,voice_out->devices)
+  //打开pcm上下行
+- voice_out->pcm_modem_dl = pcm_open(adev->dev_ctl->cards.s_tinycard, actl->pcm_handle.playback_devices[AUD_PCM_HFP_DL]..)
+- pcm_is_ready(voice_out->pcm_modem_dl)
+- voice_out->pcm_modem_ul = pcm_open(adev->dev_ctl->cards.s_tinycard, actl->pcm_handle.record_devices[AUD_RECORD_PCM_HFP_UL]..)
+- pcm_is_ready(voice_out->pcm_modem_ul)
+  //选择设备通路
+- select_devices_new(actl,voice_out->audio_app_type,voice_out->devices,false,false,true,true)
+- set_voice_status(&adev->hw_device,VOICE_START_STATUS)
+- set_dsp_volume(adev->dev_ctl,adev->hfp_voice_volume)
+}
+
+
+
+
+
+
+
+vendor/sprd/modules/audio/whale/voice_call.c
 /******
  dump数据
 */
+dump方法如下(dump文件保存在data/vendor/local/media/下):
+1．dump hal送给dsp/vbc或从dsp/vbc读到的数据
+打开dump: echo "dumpvbc=1" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump: echo "dumpvbc=0" > /data/vendor/local/media/mmi.audio.ctrl
+文件保存在/data/vendor/local/media/下面,适合于录音 与播放场景(包含voip),不包含a2dp dump.
 
+2.  dump audioflinger从hal拿到的数据
+开启dump:  echo "dumpinread=1" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump:  echo "dumpinread=0" > /data/vendor/local/media/mmi.audio.ctrl
+
+3.  dump audioflinger写到hal的数据
+打开dump: echo "dumpmusic=1" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump: echo "dumpmusic=0" > /data/vendor/local/media/mmi.audio.ctrl
+
+4.  dump播放场景vbc输出的数据
+开启dump: echo "vbc_pcm_dump=vbc_dac0" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump: echo "vbc_pcm_dump=disable" > /data/vendor/local/media/mmi.audio.ctrl
+注意:vbc输出的数据dump与录音场景充突,有录音场景时无法dump.
+
+5.  dump通话场景vbc输出的数据
+开启dump:  echo "vbc_pcm_dump=vbc_dac1" > /data/vendor/local/media/mmi.audio.ctrl
+关闭dump: echo "vbc_pcm_dump=disable" > /data/vendor/local/media/mmi.audio.ctrl
+注意:vbc输出的数据dump与录音场景充突,有录音场景时无法dump. 
 
 
 typedef enum {
@@ -350,7 +422,7 @@ set_audiohal_musicpcmdump(UNUSED_ATTR void *dev,UNUSED_ATTR struct str_parms *pa
 
 
 
-vendor/sprd/modules/audio/whale/debug/ext_control.c
+
 vendor/sprd/modules/audio/whale/debug/audio_debug.cpp
 
 
