@@ -1,5 +1,6 @@
-//logcat
+/********************************
 
+*/
 //android4.4 创建anr目录
 kill -s 3 pid
 
@@ -22,7 +23,6 @@ Systrace tool:
            $ python systrace.py --time=10 -o mynewtrace.html sched gfx view wm
 3.在设备上，执行任何你想要被包含进trace信息的操作
 //基本工具：
-
 prebuilt/linux-x86/toolchain/arm-eabi-4.4.0/bin
 
 在分析的时候仔细读取汇编会获得更多有用的异常发生时的信息。
@@ -38,8 +38,8 @@ prebuilt/linux-x86/toolchain/arm-eabi-4.4.0/bin
 3.arm-eabi-objdump 列出文件的详细信息
 
   arm-eabi-objdump -C -d libc.so > libc.s
-__________________________
-crash日志：
+
+//crash日志：
 prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-addr2line
 
 objdump 将库文件中的函数输出地址
@@ -51,8 +51,10 @@ addr2line 将地址转换为库中的函数:
 -e 要解析的文件
 
 addr2line -f -e lib addrssss
-__________________________
-gdb:
+
+/*
+ gdb:
+*/
 编译：gcc -g d.c
 执行：gdb ./xxx
 设置断点：(gdb) bradk file.c:lineNum  //在某行设置断点
@@ -75,54 +77,9 @@ info breakpoints - 查看所有的断点信息
 使用core文件：gdb ./xxx core
 
 
-adb
-debuggerd
+/********************************
+  hierarchyviewer
+*/
 
+./sp7862/prebuilts/devtools/tools/hierarchyviewer
 
-_________________________
-mmap出现错误
-
-ProcessState@ProcessState.cpp-->LOG_ALWAYS_FATAL_IF-->android_printAssert@log.h-->
-__android_log_assert@logd_write.c-->__builtin_trap(gcc实现的函数)-->abort
-
-
-abort
-bionic/libc/arch-arm/bionic/abort_arm.S
-
-ERR:Invalid argument
-
-frameworks/native/libs/binder/ProcessState.cpp
-system/core/include/cutils/log.h
-system/core/liblog/logd_write.c
-
-
-kernel报错：
-binder_mmap-->@binder.c-->get_vm_area(失败)-->__get_vm_area_node-->alloc_vmap_area@vmalloc.c
-
-drivers/staging/android/binder.c
-mm/vmalloc.c
-
-binder: 1299:1312 transaction failed 29189, size 80-0 
-
-vmap allocation for size 1306624 failed: use vmalloc=<size> to increase size.   
-binder_mmap: 2578 4c41e000-4c55c000 get_vm_area failed -12  
-
-
-vmap allocation for size 1306624 failed: use vmalloc=<size> to increase size.   
-binder_mmap: 3204 4c41e000-4c55c000 get_vm_area failed -1
-
-没有释放？
-binder: release proc 2877, transaction 184766, not freed                        
-binder: release proc 2877, transaction 184768, not freed     
-
-1302528   13E000
-1306624   13F000
-
-
-VmallocTotal:     385024 kB                                                     
-VmallocUsed:      156860 kB                                                     
-VmallocChunk:     170756 kB 
-
-VmallocTotal:     245760 kB                                                     
-VmallocUsed:      204224 kB                                                     
-VmallocChunk:       2820 kB  

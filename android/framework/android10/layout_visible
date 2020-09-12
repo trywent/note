@@ -1,0 +1,32 @@
+/************************************
+ 窗口布局显示
+
+*/
+applySurfaceChangesTransaction(boolean recoveringMemory){
+- if (repeats < LAYOUT_REPEAT_THRESHOLD) 			//第一次，执行布局
+	performLayout(repeats == 1, false /* updateInputWindows */)
+- forAllWindows(mApplySurfaceChangesTransaction, true /* traverseTopToBottom */)
+- prepareSurfaces()
+}@DisplayContent.java
+
+
+mApplySurfaceChangesTransaction = w -> {
+- WindowSurfacePlacer surfacePlacer = mWmService.mWindowPlacerLocked
+- w.handleWindowMovedIfNeeded()
+- WindowStateAnimator winAnimator = w.mWinAnimator
+- if (w.mHasSurface) {
+	- winAnimator.commitFinishDrawingLocked()
+	}
+  //
+- AppWindowToken atoken = w.mAppToken
+- atoken.updateLetterboxSurface(w)
+- atoken.updateDrawnWindowStates(w)
+- w.updateResizingWindowIfNeeded()
+}@DisplayContent.java
+
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java

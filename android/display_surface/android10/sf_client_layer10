@@ -112,16 +112,22 @@ createSurface(const String8& name, uint32_t w, uint32_t h, PixelFormat format, u
 
 frameworks/native/services/surfaceflinger/Client.cpp
 /**********
- layer
-
+ layer 4种layer:
+ - BufferQueueLayer
+ - BufferStateLayer
+ - ColorLayer dim laye
+ - ContainerLayer
 */
-class Layer : public virtual compositionengine::LayerFE {
+class Layer : public virtual compositionengine::LayerFE {//front-end layer
 - nName
 - mCurrentState		//当前状态，设置layer的参数开始作用到这里
 - mDrawingState		//绘制状态，
 }
 class BufferLayer : public Layer
 class BufferQueueLayer : public BufferLayer, public BufferLayerConsumer::ContentsChangedListener
+
+//
+class BufferStateLayer : public BufferLayer 
 
 //创建
 SurfaceFlinger::createLayer(const String8& name, const sp<Client>& client, uint32_t w,uint32_t h, PixelFormat format, uint32_t flags,
@@ -213,6 +219,18 @@ prepareClientLayer(const RenderArea& , const Region& ,bool useIdentityTransform,
 - layer.alpha = alpha
 }@Layer.cpp
 
+
+//设置layer数据
+SurfaceFlinger::calculateWorkingSet-->
+setPerFrameData(const sp<const DisplayDevice>& displayDevice,const ui::Transform& transform, 
+  const Rect& viewport,int32_t supportedPerFrameMetadata,const ui::Dataspace targetDataspace){
+- outputLayer = findOutputLayerForDisplay(displayDevice){
+	  //获取当前layer对应的compositionengine::OutputLayer
+	- display->getCompositionDisplay()->getOutputLayerForLayer(getCompositionLayer().get())
+	}@Layer.cpp
+- auto& hwcLayer = (*outputLayer->getState().hwc).hwcLayer
+- setHwcLayerBuffer(displayDevice)
+}@BufferLayer.cpp
 
 
 

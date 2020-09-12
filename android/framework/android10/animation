@@ -1,7 +1,34 @@
 /*******************************
+  应用准备切换
+*/
+prepareAppTransition(int transit,boolean alwaysKeepCurrent)-->prepareAppTransition@DisplayContent.java-->
+prepareAppTransitionLocked(int transit, boolean alwaysKeepCurrent, int flags, boolean forceOverride){
+- if (forceOverride || isKeyguardTransit(transit) || !isTransitionSet()
+                || mNextAppTransition == TRANSIT_NONE || allowSetCrashing) {
+	- setAppTransition(transit, flags)
+  }else if (!alwaysKeepCurrent && !isKeyguardTransit(mNextAppTransition)
+                && mNextAppTransition != TRANSIT_CRASHING_ACTIVITY_CLOSE) {
+	- if (transit == TRANSIT_TASK_OPEN && isTransitionEqual(TRANSIT_TASK_CLOSE)) {
+		- setAppTransition(transit, flags)
+	  }else if(transit == TRANSIT_ACTIVITY_OPEN && isTransitionEqual(TRANSIT_ACTIVITY_CLOSE)){
+		- setAppTransition(transit, flags)
+	  }else if(isTaskTransit(transit) && isActivityTransit(mNextAppTransition)){
+		- setAppTransition(transit, flags)
+	  } 
+  }
+- 
+}@AppTransition.java
+
+
+
+
+
+frameworks/base/services/core/java/com/android/server/wm/DisplayContent.java
+frameworks/base/services/core/java/com/android/server/wm/AppTransition.java
+/*******************************
   设置动画
 */
-
+performSurfacePlacement-->
 performSurfacePlacementNoTrace(boolean recoveringMemory) {
 - applySurfaceChangesTransaction(recoveringMemory)
   //应用切换
@@ -25,6 +52,14 @@ performSurfacePlacementNoTrace(boolean recoveringMemory) {
 
 //处理app切换
 handleAppTransitionReady() {
+  //检查mOpeningApps，mChangingApps是否准备好。是否绘制完成
+- transitionGoodToGo(mDisplayContent.mOpeningApps, mTempTransitionReasons){
+	- AppWindowToken wtoken = apps.valueAt(i)
+	- final boolean allDrawn = wtoken.allDrawn && !wtoken.isRelaunching()
+	- if (!allDrawn && !wtoken.startingDisplayed && !wtoken.startingMoved)  return false		//没有绘制完成
+	}
+- transitionGoodToGo(mDisplayContent.mChangingApps, mTempTransitionReasons)
+  //准备好了
 - AppTransition appTransition = mDisplayContent.mAppTransition
 - int transit = appTransition.getAppTransition()
 - transit = maybeUpdateTransitToTranslucentAnim(transit)

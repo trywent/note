@@ -26,7 +26,7 @@ WindowState(){
 从task中获取大小，计算windowState的frame大小。再设置到surfaceControler。（其它容器不会设置大小）
 
 
-//隐藏
+//隐藏/状态通知到应用
 sendAppVisibilityToClients() {			//通知到应用，窗口已经隐藏
 - boolean clientHidden = mAppToken.isClientHidden()
   //隐藏前，detach子窗口（为了防止应用清除子窗口，导致影响动画效果？）
@@ -49,16 +49,18 @@ frameworks/base/services/core/java/com/android/server/wm/WindowState.java
 
  WindowSurfaceController mSurfaceController
 */
+relayoutWindow-->createSurfaceControl@WindowManagerService.java-->
 createSurfaceLocked(int windowType, int ownerUid) {
 - 
 - 
-}@WindowStateAnimatro.java
+}@WindowStateAnimator.java
 
 //
+prepareSurfaces@WindowContainer.java-->prepareSurfaces@WindowState-->
 prepareSurfaceLocked{
 - computeShownFrameLocked
 - setSurfaceBoundariesLocked
-}
+}@WindowStateAnimatro.java
 
 //设置位置，大小
 setSurfaceBoundariesLocked(final boolean recoveringMemory) {

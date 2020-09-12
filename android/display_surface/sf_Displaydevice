@@ -61,12 +61,12 @@ DisplayDevice::setViewportAndProjection() const {
 
 SurfaceFlinger::doDisplayComposition@SurfaceFlinger.cpp-->
 DisplayDevice::swapBuffers(HWComposer& hwc) const {
-- EGLBoolean success = eglSwapBuffers(mDisplay, mSurface)	//将数据提交到producer
-- status_t result = mDisplaySurface->advanceFrame(){		//conuser获取数据
+- EGLBoolean success = eglSwapBuffers(mDisplay, mSurface)	//将数据提交到mSurface(producer)
+- status_t result = mDisplaySurface->advanceFrame(){		//mDisplaySurface(conuser)获取数据
 	- uint32_t slot = 0
 	- sp<GraphicBuffer> buf
 	- sp<Fence> acquireFence(Fence::NO_FENCE)
-	- nextBuffer(slot, buf, acquireFence, dataspace)
+	- nextBuffer(slot, buf, acquireFence, dataspace)	//提交到hwc
 	}@FramebufferSurface.cpp
 }@DisplayDevice.cpp
 

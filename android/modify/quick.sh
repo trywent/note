@@ -115,7 +115,8 @@ fi
 
 if [ "$GMS" == "gms" ] ;then
     echo "Build Gms Package"
-    export FYT_BUILD_WHITH_GMS="true"
+    #export FYT_BUILD_WHITH_GMS="true"
+    gms="true"
 fi
 
 #make api-stubs-docs-update-current-api
@@ -126,7 +127,7 @@ fi
 if [ "$fytpp" == "y" ] ;then
 m oem_image && make -j8 && source build/lsecpac.sh
 else
-make -j8 && make otapackage -j8
+make FYT_BUILD_WHITH_GMS=$gms -j8  && make FYT_BUILD_WHITH_GMS=$gms otapackage -j8
 fi
 
 

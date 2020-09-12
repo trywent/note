@@ -1,5 +1,5 @@
 /************************
-  HAL hwcomposer1
+  HAL hwc1
 
 */
 
@@ -60,7 +60,7 @@ typedef struct hwc_display_contents_1 {
 } hwc_display_contents_1_t;
 
 
-//
+//layer
 typedef struct hwc_layer_1 {
     /*
      * HWC_BACKGROUND 		背景层，只有backgroundColor有效
@@ -147,6 +147,124 @@ hardware/libhardware/modules/hwcomposer/hwcomposer.cpp
   HAL hwcomposer2
 
   IComposer为hal接口
+*/
+
+//device
+typedef struct hwc2_device {
+    struct hw_device_t common;
+    void (*getCapabilities)(struct hwc2_device* device, uint32_t* outCount, int32_t* /*hwc2_capability_t*/ outCapabilities)
+    hwc2_function_pointer_t (*getFunction)(struct hwc2_device* device, int32_t /*hwc2_function_descriptor_t*/ descriptor)	//获取设备操作函数
+} hwc2_device_t
+
+
+//获取操作函数
+getFunction(hwc2_device_t* /*device*/, int32_t descriptor) {
+    switch (descriptor) {
+        // global functions
+        case HWC2_FUNCTION_DUMP:
+            return asFP<HWC2_PFN_DUMP>(dumpHook);
+        case HWC2_FUNCTION_REGISTER_CALLBACK:
+            return asFP<HWC2_PFN_REGISTER_CALLBACK>(registerCallbackHook);
+
+        // virtual display functions
+        case HWC2_FUNCTION_GET_MAX_VIRTUAL_DISPLAY_COUNT:
+            return asFP<HWC2_PFN_GET_MAX_VIRTUAL_DISPLAY_COUNT>(getMaxVirtualDisplayCountHook);
+        case HWC2_FUNCTION_CREATE_VIRTUAL_DISPLAY:
+            return asFP<HWC2_PFN_CREATE_VIRTUAL_DISPLAY>(createVirtualDisplayHook);
+        case HWC2_FUNCTION_DESTROY_VIRTUAL_DISPLAY:
+            return asFP<HWC2_PFN_DESTROY_VIRTUAL_DISPLAY>(destroyVirtualDisplayHook);
+        case HWC2_FUNCTION_SET_OUTPUT_BUFFER:
+            return asFP<HWC2_PFN_SET_OUTPUT_BUFFER>(setOutputBufferHook);
+
+        // display functions
+        case HWC2_FUNCTION_GET_DISPLAY_NAME:
+            return asFP<HWC2_PFN_GET_DISPLAY_NAME>(getDisplayNameHook);
+        case HWC2_FUNCTION_GET_DISPLAY_TYPE:
+            return asFP<HWC2_PFN_GET_DISPLAY_TYPE>(getDisplayTypeHook);
+        case HWC2_FUNCTION_GET_DOZE_SUPPORT:
+            return asFP<HWC2_PFN_GET_DOZE_SUPPORT>(getDozeSupportHook);
+        case HWC2_FUNCTION_GET_HDR_CAPABILITIES:
+            return asFP<HWC2_PFN_GET_HDR_CAPABILITIES>(getHdrCapabilitiesHook);
+        case HWC2_FUNCTION_SET_POWER_MODE:
+            return asFP<HWC2_PFN_SET_POWER_MODE>(setPowerModeHook);
+        case HWC2_FUNCTION_SET_VSYNC_ENABLED:
+            return asFP<HWC2_PFN_SET_VSYNC_ENABLED>(setVsyncEnabledHook);
+        case HWC2_FUNCTION_GET_COLOR_MODES:
+            return asFP<HWC2_PFN_GET_COLOR_MODES>(getColorModesHook);
+        case HWC2_FUNCTION_SET_COLOR_MODE:
+            return asFP<HWC2_PFN_SET_COLOR_MODE>(setColorModeHook);
+        case HWC2_FUNCTION_SET_COLOR_TRANSFORM:
+            return asFP<HWC2_PFN_SET_COLOR_TRANSFORM>(setColorTransformHook);
+        case HWC2_FUNCTION_GET_CLIENT_TARGET_SUPPORT:
+            return asFP<HWC2_PFN_GET_CLIENT_TARGET_SUPPORT>(getClientTargetSupportHook);
+        case HWC2_FUNCTION_SET_CLIENT_TARGET:
+            return asFP<HWC2_PFN_SET_CLIENT_TARGET>(setClientTargetHook);
+
+        // config functions
+        case HWC2_FUNCTION_GET_DISPLAY_CONFIGS:
+            return asFP<HWC2_PFN_GET_DISPLAY_CONFIGS>(getDisplayConfigsHook);
+        case HWC2_FUNCTION_GET_DISPLAY_ATTRIBUTE:
+            return asFP<HWC2_PFN_GET_DISPLAY_ATTRIBUTE>(getDisplayAttributeHook);
+        case HWC2_FUNCTION_GET_ACTIVE_CONFIG:
+            return asFP<HWC2_PFN_GET_ACTIVE_CONFIG>(getActiveConfigHook);
+        case HWC2_FUNCTION_SET_ACTIVE_CONFIG:
+            return asFP<HWC2_PFN_SET_ACTIVE_CONFIG>(setActiveConfigHook);
+
+        // validate/present functions
+        case HWC2_FUNCTION_VALIDATE_DISPLAY:
+            return asFP<HWC2_PFN_VALIDATE_DISPLAY>(validateDisplayHook);
+        case HWC2_FUNCTION_GET_CHANGED_COMPOSITION_TYPES:
+            return asFP<HWC2_PFN_GET_CHANGED_COMPOSITION_TYPES>(getChangedCompositionTypesHook);
+        case HWC2_FUNCTION_GET_DISPLAY_REQUESTS:
+            return asFP<HWC2_PFN_GET_DISPLAY_REQUESTS>(getDisplayRequestsHook);
+        case HWC2_FUNCTION_ACCEPT_DISPLAY_CHANGES:
+            return asFP<HWC2_PFN_ACCEPT_DISPLAY_CHANGES>(acceptDisplayChangesHook);
+        case HWC2_FUNCTION_PRESENT_DISPLAY:
+            return asFP<HWC2_PFN_PRESENT_DISPLAY>(presentDisplayHook);
+        case HWC2_FUNCTION_GET_RELEASE_FENCES:
+            return asFP<HWC2_PFN_GET_RELEASE_FENCES>(getReleaseFencesHook);
+
+        // layer create/destroy
+        case HWC2_FUNCTION_CREATE_LAYER:
+            return asFP<HWC2_PFN_CREATE_LAYER>(createLayerHook);
+        case HWC2_FUNCTION_DESTROY_LAYER:
+            return asFP<HWC2_PFN_DESTROY_LAYER>(destroyLayerHook);
+
+        // layer functions; validateDisplay not required
+        case HWC2_FUNCTION_SET_CURSOR_POSITION:
+            return asFP<HWC2_PFN_SET_CURSOR_POSITION>(setCursorPositionHook);
+        case HWC2_FUNCTION_SET_LAYER_BUFFER:
+            return asFP<HWC2_PFN_SET_LAYER_BUFFER>(setLayerBufferHook);
+        case HWC2_FUNCTION_SET_LAYER_SURFACE_DAMAGE:
+            return asFP<HWC2_PFN_SET_LAYER_SURFACE_DAMAGE>(setLayerSurfaceDamageHook);
+
+        // layer state functions; validateDisplay required
+        case HWC2_FUNCTION_SET_LAYER_COMPOSITION_TYPE:
+            return asFP<HWC2_PFN_SET_LAYER_COMPOSITION_TYPE>(setLayerCompositionTypeHook);
+        case HWC2_FUNCTION_SET_LAYER_BLEND_MODE:
+            return asFP<HWC2_PFN_SET_LAYER_BLEND_MODE>(setLayerStateHook<int32_t>);
+        case HWC2_FUNCTION_SET_LAYER_COLOR:
+            return asFP<HWC2_PFN_SET_LAYER_COLOR>(setLayerStateHook<hwc_color_t>);
+        case HWC2_FUNCTION_SET_LAYER_DATASPACE:
+            return asFP<HWC2_PFN_SET_LAYER_DATASPACE>(setLayerStateHook<int32_t>);
+        case HWC2_FUNCTION_SET_LAYER_DISPLAY_FRAME:
+            return asFP<HWC2_PFN_SET_LAYER_DISPLAY_FRAME>(setLayerStateHook<hwc_rect_t>);
+        case HWC2_FUNCTION_SET_LAYER_PLANE_ALPHA:
+            return asFP<HWC2_PFN_SET_LAYER_PLANE_ALPHA>(setLayerStateHook<float>);
+        case HWC2_FUNCTION_SET_LAYER_SIDEBAND_STREAM:
+            return asFP<HWC2_PFN_SET_LAYER_SIDEBAND_STREAM>(setLayerStateHook<buffer_handle_t>);
+        case HWC2_FUNCTION_SET_LAYER_SOURCE_CROP:
+            return asFP<HWC2_PFN_SET_LAYER_SOURCE_CROP>(setLayerStateHook<hwc_frect_t>);
+        case HWC2_FUNCTION_SET_LAYER_TRANSFORM:
+            return asFP<HWC2_PFN_SET_LAYER_TRANSFORM>(setLayerStateHook<int32_t>);
+        case HWC2_FUNCTION_SET_LAYER_VISIBLE_REGION:
+            return asFP<HWC2_PFN_SET_LAYER_VISIBLE_REGION>(setLayerStateHook<hwc_region_t>);
+        case HWC2_FUNCTION_SET_LAYER_Z_ORDER:
+            return asFP<HWC2_PFN_SET_LAYER_Z_ORDER>(setLayerStateHook<uint32_t>);
+}@hardware/interface/graphics/composer/2.1/utils/hwc2onfbadapter/HWC2OnFbAdapter.cpp:
+
+/*
+ 接口
 */
 interface IComposer {
     getCapabilities() generates (vec<Capability> capabilities);

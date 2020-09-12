@@ -151,7 +151,11 @@ SurfaceFlinger::handleMessageRefresh() {
 	- beginFrame(display)
 	- prepareFrame(display)
 	- doDebugFlashRegions(display, repaintEverything)
-	- doComposition(display, repaintEverything)
+	- doComposition(display, repaintEverything){
+		- Region dirtyRegion = display->getDirtyRegion(repaintEverything)
+		- doDisplayComposition(displayDevice, dirtyRegion)
+		- postFramebuffer(displayDevice)
+		}
 	}
 - postFrame()
 - postComposition()
@@ -183,6 +187,8 @@ SurfaceFlinger::rebuildLayerStacks() {
 	}
 - display->setOutputLayersOrderedByZ(std::move(layersSortedByZ))	//设置到display
   }
+- display->editState().undefinedRegion
+- display->editState().dirtyRegion.orSelf(dirtyRegion)			//保存计算的区域
 }
 
  //计算layer
@@ -217,7 +223,6 @@ SurfaceFlinger::calculateWorkingSet() {
 
  //合成
 SurfaceFlinger::doDisplayComposition(const sp<DisplayDevice>& displayDevice,const Region& inDirtyRegion) {
-- 
 - doComposeSurfaces(displayDevice, Region::INVALID_REGION, &readyFence)
 - display->getRenderSurface()->queueBuffer(std::move(readyFence))
 }@SurfaceFlinger.cpp
@@ -317,7 +322,7 @@ class DisplaySurface : public virtual RefBase {
 
 frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.h
 frameworks/native/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
-/***********
+/*********************************************
  CompositionEngine 保存display,layer信息
 
 */
@@ -337,7 +342,7 @@ CompositionEngine::setRenderEngine(std::unique_ptr<renderengine::RenderEngine> r
 
 frameworks/native/services/surfaceflinger/CompositionEngine/include/compositionengine/impl/CompositionEngine.h
 frameworks/native/services/surfaceflinger/CompositionEngine/src/CompositionEngine.cpp
-/*
+/*********
  composition display
 
 */
@@ -373,9 +378,18 @@ Output::setProjection(const ui::Transform& transform, int32_t orientation, const
 - mState.frame = frame
 }@Output.cpp
 
+//获取layer
+
+compositionengine::OutputLayer* Output::getOutputLayerForLayer(compositionengine::Layer* layer){
+- for (const auto& outputLayer : mOutputLayersOrderedByZ) {
+	- if (outputLayer && &outputLayer->getLayer() == layer) return outputLayer.get()
+	}
+}@Output.cpp
+
 
 frameworks/native/services/surfaceflinger/CompositionEngine/src/Display.cpp
-/*
+frameworks/native/services/surfaceflinger/CompositionEngine/src/Output.cpp
+/*********
  composition renderSurface
 */
 class RenderSurface : public compositionengine::RenderSurface
@@ -395,7 +409,7 @@ RenderSurface::RenderSurface(const CompositionEngine& compositionEngine, Display
 
 
 frameworks/native/services/surfaceflinger/CompositionEngine/src/RenderSurface.cpp
-/*
+/*********
  composition layer
 */
 class Layer : public compositionengine::Layer {
@@ -438,7 +452,7 @@ frameworks/native/services/surfaceflinger/CompositionEngine/src/Layer.cpp
 frameworks/native/services/surfaceflinger/CompositionEngine/src/LayerCompositionState.cpp
 frameworks/native/services/surfaceflinger/CompositionEngine/src/OutputLayer.cpp
 
-/***********
+/*********************************************
  RenderEngine 绘制layer图像
 */
 RenderEngine::create(int hwcFormat, uint32_t featureFlags,uint32_t imageCacheSize) {
@@ -460,6 +474,6 @@ GLESRenderEngine::drawLayers(const DisplaySettings& display, const std::vector<L
 
 frameworks/native/libs/renderengine/RenderEngine.cpp
 frameworks/native/libs/renderengine/gl/GLESRenderEngine.cpp
-/***********
+/*********************************************
  hwcomposer
 */

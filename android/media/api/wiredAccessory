@@ -95,13 +95,30 @@ updateLocked(String newName, int newState) {
 
 
 
-//设置连接状态
+//设置连接状态。通过audioSystem设置
 setDeviceStateLocked@WiredAccessoryManager.java-->setWiredDeviceConnectionState
 -->queueMsgUnderWakeLock(MSG_SET_WIRED_DEVICE_CONNECTION_STATE)-->onSetWiredDeviceConnectionState
 sendDeviceConnectionIntent-->sendMsg(MSG_REPORT_NEW_ROUTES)-->
 obs.dispatchAudioRoutesChanged@AudioService.java
 
+  //android10
+setWiredDeviceConnectionState@AudioService.java-->setWiredDeviceConnectionState@AudioDeviceBroker.java
+setWiredDeviceConnectionState@AudioDeviceInventory.java-->postSetWiredDeviceConnectionState-->
+sendLMsg(MSG_L_SET_WIRED_DEVICE_CONNECTION_STATE, SENDMSG_QUEUE, connectionState, delay)-->
+BrokerHandler.handleMessage(MSG_L_SET_WIRED_DEVICE_CONNECTION_STATE)-->mDeviceInventory.onSetWiredDeviceConnectionState
+@AudioDeviceBroker.java-->onSetWiredDeviceConnectionState(AudioDeviceInventory.WiredDeviceConnectionState wdcs){
+- handleDeviceConnection(wdcs.mState == AudioService.CONNECTION_STATE_CONNECTED, wdcs.mType, wdcs.mAddress, wdcs.mName){
+	- AudioSystem.setDeviceConnectionState(device,AudioSystem.DEVICE_STATE_AVAILABLE, address, deviceName,
+                        AudioSystem.AUDIO_FORMAT_DEFAULT)
+	- 
+	}
+- sendDeviceConnectionIntent(wdcs.mType, wdcs.mState, wdcs.mAddress, wdcs.mName)
+- updateAudioRoutes(wdcs.mType, wdcs.mState)
+}@AudioDeviceInventory.java
 
+frameworks/base/services/core/java/com/android/server/audio/AudioService.java
+frameworks/base/services/core/java/com/android/server/audio/AudioDeviceBroker.java
+frameworks/base/services/core/java/com/android/server/audio/AudioDeviceInventory.java
 /*
  从inputManager获取
 

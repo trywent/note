@@ -45,7 +45,7 @@ chrdev_init(void){
 cdev_map[ma]: cdev1[ma mi1].next --> cdev[ma mi2]
 
 
-1/*
+1/********
  注册字符设备
 */
 //注册设备号
@@ -136,7 +136,7 @@ kernel/include/linux/cdev.h
 kernel/fs/char_dev.c
 kernel/drivers/base/map.c
 
-2/*
+2/********
  class创建字符设备方法
 */
 class_register-->__class_register(struct class *cls, struct lock_class_key *key)
@@ -144,7 +144,7 @@ class_register-->__class_register(struct class *cls, struct lock_class_key *key)
 struct device *device_create(struct class *class, struct device *parent,
 			     dev_t devt, void *drvdata, const char *fmt, ...)
 
-3/*
+3/********
  misc创建字符设备方法
 */
 

@@ -109,6 +109,7 @@ btif_context_switched(p_msg)-->p->p_cb@btif_core.c-->btif_dm_generic_evt(BTIF_DM
 createBond-->mAdapterService.createBondNative@BondStateMachine.java-->(/*收到回调*/)pinRequestCallback
 
 //接收到配对请求,显示配对框
+btif_dm_ble_passkey_req_evt-->HAL_CBACK(bt_hal_cbacks, pin_request_cb..)@btif_dm.c-->bt_callbacks_t.pin_request_cb@bluetooth.h-->
 sBluetoothCallbacks.pin_request_callback-->sCallbackEnv->CallVoidMethod(sJniCallbacksObj, method_pinRequestCallback)
 @com_android_bluetooth_btservice_AdapterService.cpp-->pinRequestCallback-->mBondStateMachine.pinRequestCallback@JniCallbacks.java
 -->pinRequestCallback-->sendMessage(PIN_REQUEST)-->

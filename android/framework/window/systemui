@@ -109,6 +109,7 @@ SystemGesturesPointerEventListener.onSwipeFromTop-->requestTransientBars{
 
 */
 
+//设置可见/隐藏
 updateSystemUiVisibilityLw-->statusbar.setSystemUiVisibility@PhoneWindowManager.java-->
 setSystemUiVisibility-->mBar.setSystemUiVisibility@StatusBarManagerService.java-->
 setSystemUiVisibility-->notifyUiVisibilityChanged@PhoneStatusBar.java-->

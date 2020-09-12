@@ -1,4 +1,5 @@
-/*
+/************************************
+ 应用中的根View
 
 */
 DecorView extends FrameLayout implements RootViewSurfaceTaker, WindowCallbacks
@@ -19,10 +20,24 @@ willYouTakeTheSurface@RootViewSurfaceTaker.java-->willYouTakeTheSurface{
 - mFeatureId < 0 ? mWindow.mTakeSurfaceCallback : null
 }@DeocrView.java
 
-
-
 //阴影，立体效果
 elevation
+
+
+/*****
+
+*/
+startActionMode(ActionMode.Callback callback)-->
+startActionMode(View originatingView, ActionMode.Callback callback, int type){
+- 
+- 
+}@DecorView.java
+
+
+
+startActionMode(View originatingView, ActionMode.Callback callback, int type)-->
+createActionMode(int type, ActionMode.Callback2 callback, View originatingView)-->
+createStandaloneActionMode(ActionMode.Callback callback)
 
 
 frameworks/base/core/java/com/android/internal/view/RootViewSurfaceTaker.java

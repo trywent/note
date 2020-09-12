@@ -104,6 +104,16 @@ reportNextDraw{
  performMeasure测量大小
 　measureHierarchy测量非全屏view的大小防止全屏（弹框...）
 */
+//调用scheduleTraversals的条件
+sendAppVisibilityToClients@WindowState.java-->W.dispatchAppVisibility
+dispatchAppVisibility-->ViewRootHandler.handleMessage(MSG_DISPATCH_APP_VISIBILITY)-->handleAppVisibility
+handleGetNewSurface
+mDisplayListener.onDisplayChanged
+requestFitSystemWindows
+notifyInsetsChanged
+requestLayout
+
+scheduleTraversals-->mTraversalRunnable.run()-->doTraversal()-->
 performTraversals{
 - View host = mView
 - WindowManager.LayoutParams lp = mWindowAttributes;

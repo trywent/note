@@ -1,8 +1,18 @@
-//请求焦点
-//AUDIOFOCUS_GAIN_TRANSIENT 暂时请求，上个焦点获取者暂停播放
-//AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK  暂时请求，上个焦点获取者可继续播放
-//AUDIOFOCUS_GAIN 获取焦点
-requestAudioFocus(listener,stream,类型){
+/*************************
+ 请求焦点
+
+*/
+AUDIOFOCUS_GAIN				//请求焦点不知道占用时长
+AUDIOFOCUS_GAIN_TRANSIENT		//占用一段时间
+AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK  	//占用一段事件，允许其它应用降音播放。导航播报
+AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE	//占用一段事件，不允许其它声音。语音识别
+AUDIOFOCUS_LOSS				//丢失焦点。不知道时长
+AUDIOFOCUS_LOSS_TRANSIENT		//暂时丢失焦点
+AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK	//暂时丢失焦点。可以降音播放
+
+
+
+requestAudioFocus(OnAudioFocusChangeListener l, int streamType, int durationHint) {{
 - 注册监听器，registerAudioFocusListener{
 	- 加入到，mAudioFocusIdListenerMap
 	}

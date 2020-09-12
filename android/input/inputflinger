@@ -312,7 +312,12 @@ device->process(rawEvents, count)-->InputDevice::process(const RawEvent* rawEven
 
 //键盘mapper
 void KeyboardInputMapper::process(const RawEvent* rawEvent) {
-
+- EV_KEY{
+	- processKey(rawEvent->when, rawEvent->value != 0, scanCode, usageCode)
+	}
+- EV_MSC{
+	- mCurrentHidUsage = rawEvent->value
+	}
 }@InputReader.cpp
 
 //获取开关状态

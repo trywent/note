@@ -1,0 +1,92 @@
+/*****************************
+ audioParam
+
+*/
+
+//获取播放参数
+get_playback_param(struct audiotester_config_handle *config,audio_devices_t out_devices){
+- int mode_max=config->param_config_num
+- if(out_devices&AUDIO_DEVICE_OUT_SPEAKER){
+	- device01=AUDIO_DEVICE_OUT_SPEAKER
+	}
+- if(out_devices&(AUDIO_DEVICE_OUT_WIRED_HEADSET|AUDIO_DEVICE_OUT_WIRED_HEADPHONE)){
+        - device02=AUDIO_DEVICE_OUT_WIRED_HEADSET
+	}
+  //
+- for(i=0;i<mode_max;i++){
+	- if((device01==AUDIO_DEVICE_OUT_SPEAKER)&&(device02==AUDIO_DEVICE_OUT_WIRED_HEADSET)){	//speaker,headset同时打开时。找到同时支持的参数
+		- if(0==(config->param_config[i].outdevice&(int)device01)) continue
+		- if(0==(config->param_config[i].outdevice&(int)device02)) continue
+		}
+	}
+}@audio_control.cpp
+
+//设置参数
+select_devices_new(struct audio_control *actl, int audio_app_type, audio_devices_t device, bool is_in,bool update_param, bool sync, bool force)-->
+do_select_device(struct audio_control *actl,AUDIO_HW_APP_T audio_app_type,audio_devices_t device,bool is_in,bool update_param,bool force_set)-->
+set_audioparam_unlock(struct audio_control *dev_ctl,int type, void *param_change,int force){
+- bool update = param_state_check(dev_ctl,type,param_change)
+- struct audio_param_res  *param_res = &dev_ctl->param_res
+- if((true==update)||(true==force)) select_audio_param_unlock(dev_ctl,param_res)
+}@audio_control.cpp
+
+select_audio_param_unlock(dev_ctl,param_res){
+- if(is_voice_active(param_res->usecase)) {	//voice状态
+	- if(is_hfp_active(param_res->usecase)) {
+		- param_id = get_hfp_param(&dev_ctl->config.audiotester_config,param_res->out_devices)
+		- dsp_case=DAI_ID_VOICE
+		- volume=param_res->voice_volume
+		}
+	- set_vbc_param(dev_ctl,param_id,dsp_case)
+	- set_voice_dg_param(dev_ctl,param_id,volume)
+	- set_dsp_param(dev_ctl, param_id, dsp_case,volume)
+  else{						//非voice状态
+	- if(is_fm_active(param_res->usecase)){
+
+	  }else if(is_playback_active(param_res->usecase) ){
+		- param_id = get_playback_param(&dev_ctl->config.audiotester_config,param_res->out_devices)
+		- ret = set_play_dg_param(dev_ctl, param_id, 0)
+		- set_vbc_param(dev_ctl, param_id,  DAI_ID_NORMAL_OUTDSP_PLAYBACK)
+	  }
+  }
+}@audio_param.cpp
+
+
+set_vbc_param(struct audio_control *dev_ctl,uint8_t param_id, uint8_t dsp_case)@audio_param.cpp
+
+
+vendor/sprd/modules/audio/whale/audio_control.cpp
+vendor/sprd/modules/audio/whale/audio_param/audio_param.cpp
+
+
+/*****************************
+ dsp
+
+*/
+dsp_ctrl_open(void *ctl){
+- struct audio_control *dev_ctl=(struct audio_control *)ctl
+- struct dsp_control_t * dsp_ctl = (struct dsp_control_t *)calloc(1, (sizeof(struct dsp_control_t )))
+  //接收
+- pthread_create((pthread_t *)(&dsp_ctl->rx.thread_id), &attr,dsp_ctrl_rx_thread_routine, dsp_ctl)
+  //发送
+- pthread_create((pthread_t *)(&dsp_ctl->tx.thread_id), &attr,dsp_ctrl_tx_thread_routine, dsp_ctl)
+  //
+- dsp_ctl->fd_dsp_assert_mem = open(SPRD_AUD_DSPASSERT_MEM,O_RDWR)
+- pthread_create((pthread_t *)(&dsp_ctl->modemd.thread_id), &attr,dsp_ctrl_modemd_notify_thread_routine, dsp_ctl)
+}@dsp_control.c
+
+
+*dsp_ctrl_rx_thread_routine(void *arg){
+- dsp_ctl->agdsp_pipd_fd = open(AGDSP_CTL_PIPE, O_RDWR)			//"/dev/audio_pipe_voice"
+- agdsp_pipe_process(void *arg){
+	- struct dsp_control_t * dsp_ctl=(struct dsp_control_t *)arg
+	- read(dsp_ctl->agdsp_pipd_fd,&msg,sizeof(struct dsp_smsg))
+	- agdsp_msg_process(dsp_ctl,&msg)
+	}
+}@dsp_control.c
+
+
+
+
+
+vendor/sprd/modules/audio/whale/audio_param/dsp_control.c

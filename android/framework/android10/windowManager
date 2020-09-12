@@ -253,15 +253,31 @@ createAppWindow-->new AppWindowToken@ActivityRecord.java-->
 
 
 
-//隐藏
+//隐藏/显示
 setVisibility(boolean visible, boolean deferHidingClient) {
-- 
-- setClientHidden(false){
-	- mClientHidden = hideClient
-	- sendAppVisibilityToClients		//遍历windowContainer ,windowState通知到app
+- displayContent.mOpeningApps.remove(this)
+- displayContent.mClosingApps.remove(this)
+- displayContent.mChangingApps.remove(this)
+- if (!visible) {					//隐藏
+	- removeDeadWindows()
+  }else{						//显示
+   	- setClientHidden(false){
+		- mClientHidden = hideClient
+		- sendAppVisibilityToClients		//遍历windowContainer ,windowState通知到app
 	}
+	- requestUpdateWallpaperIfNeeded()
+  }
+  //有设置应用切换。则执行切换效果。等动画执行完成后再显示
+- if (okToAnimate() && appTransition.isTransitionSet()) {
+	- if (visible) {
+		- displayContent.mOpeningApps.add(this)
+	  }else{
+		- displayContent.mClosingApps.add(this)
+	  }
+	- reportDescendantOrientationChangeIfNeeded()
+  	}
 - commitVisibility(null, visible, TRANSIT_UNSET, true, mVoiceInteraction)
-- 
+- updateReportedVisibilityLocked()
 }
 
 commitVisibility(WindowManager.LayoutParams lp, boolean visible, int transit, 
@@ -277,7 +293,10 @@ commitVisibility(WindowManager.LayoutParams lp, boolean visible, int transit,
 	}
 - if (visibilityChanged) {
 	- if (visible || !isReallyAnimating()) {						//显示
-		- setClientHidden(!visible)
+		- setClientHidden(!visible){
+			- mClientHidden = hideClient
+			- sendAppVisibilityToClients()						//通知到应用端
+			}
 		}
 	- if (isHidden() && !delayed && !getDisplayContent().mAppTransition.isTransitionSet()) {//隐藏
 		- mChildren.get(i).mWinAnimator.hide("immediately hidden")

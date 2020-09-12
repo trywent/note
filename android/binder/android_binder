@@ -2,6 +2,10 @@
  binder和本地调用类似:
 	- 函数等待调用结束才返回
 	- 支持递归回调(A-B-A)
+
+
+
+ 命令调用binder服务：service call SurfaceFlinger 1020 i32 1
 */
 
 IBInder接口：不要直接实现该接口，一般继承Binder（实现了IBinder）

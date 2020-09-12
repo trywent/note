@@ -28,6 +28,31 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
 	}
 }
 
+//设置设备连接状态，耳机，hdmi
+setDeviceConnectionState(audio_devices_t device,audio_policy_dev_state_t state,...)-->
+setDeviceConnectionStateInt(audio_devices_t deviceType,audio_policy_dev_state_t state,
+	const char *device_address,const char *device_name, audio_format_t encodedFormat){
+- sp<DeviceDescriptor> device = mHwModules.getDeviceDescriptor(deviceType, device_address, device_name,..)
+  //处理output
+- if (audio_is_output_device(deviceType)) {
+	- AUDIO_POLICY_DEVICE_STATE_AVAILABLE{
+		- broadcastDeviceConnectionState(device, state){	//设置到hal,param
+			- AudioParameter param(device->address())
+			- mpClientInterface->setParameters(AUDIO_IO_HANDLE_NONE, param.toString())
+			}
+		}
+	- AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE{
+		- broadcastDeviceConnectionState(device, state)
+		- AvailableOutputDevices.remove(device)
+		}
+	- setEngineDeviceConnectionState(device, state)
+	}
+  //处理input
+- if (audio_is_input_device(deviceType)) {
+
+	}
+}@AudioPolicyManager.java
+
 
 /************
  engine
@@ -44,6 +69,35 @@ endif
 @audiopolicy/managerdefault/Android.mk
 
 
+
+
+Engine(){
+  //policy参数
+- mPolicyParameterMgr(new ParameterManagerWrapper()){
+	  //"/vendor/etc/parameter-framework/ParameterFrameworkConfigurationPolicy.xml"
+	- mPfwConnector = new CParameterMgrPlatformConnector(mPolicyPfwVendorConfFileName)
+	}
+  //
+- status_t loadResult = loadAudioPolicyEngineConfig()
+  	//加载策略
+	- loadProductStrategies = [](auto& strategyConfigs, auto& productStrategies, auto& volumeGroups) {
+		- sp<ProductStrategy> strategy = new ProductStrategy(strategyConfig.name)
+		- strategy->addAttributes({group.stream, iter->second->getId(), attr})
+		- productStrategies[strategyId] = strategy
+	}
+ 	 //加载音量
+	- loadVolumeGroups = [](auto &volumeConfigs, auto &volumeGroups) {
+
+ 	}
+  	//加载"/vendor/etc/audio_policy_engine_configuration.xml"
+	- auto result = engineConfig::parse()
+	- loadVolumeGroups(result.parsedConfig->volumeGroups, mVolumeGroups)
+	- loadProductStrategies(result.parsedConfig->productStrategies, mProductStrategies,mVolumeGroups)
+	- mProductStrategies.initialize()
+	}@EngineBase.cpp
+}@Engine.cpp
+
+
 //根据属性获取输出设备
 Engine::getOutputDevicesForAttributes(const audio_attributes_t &attributes,
         const sp<DeviceDescriptor> &preferredDevice, bool fromCache, bool ignoreFM){
@@ -54,11 +108,38 @@ Engine::getOutputDevicesForAttributes(const audio_attributes_t &attributes,
 	- 
 	}
   //没找到
-- getDevicesForProductStrategy(strategy,ignoreFM)
+- getDevicesForProductStrategy(strategy,ignoreFM){
+	-
+	- devices = productStrategies.getDeviceTypesForProductStrategy(ps)
+	- return availableOutputDevices.getDevicesFromTypeMask(devices)
+	}
 }@Engine.cpp
 
+//获取流的strategy
+EngineBase::getProductStrategyForStream(audio_stream_type_t stream){
+- ProductStrategyMap::getProductStrategyForStream(audio_stream_type_t stream){
+	- for (const auto &iter : *this) {
+		- return iter.second->getId()
+		}
+	}
+}@EngineBase.cpp
 
 
+frameworks/av/services/audiopolicy/engineconfigurable/src/Engine.cpp
+frameworks/av/services/audiopolicy/engine/common/src/EngineBase.cpp
+/************
+ strategy 参数
+
+*/
+ParameterManagerWrapper::start(){
+- mPfwConnector->start(error)
+}
+
+
+
+
+frameworks/av/services/audiopolicy/engineconfigurable/wrapper/ParameterManagerWrapper.cpp
+frameworks/av/services/audiopolicy/engine/common/src/ProductStrategy.cpp
 /************
  output
 

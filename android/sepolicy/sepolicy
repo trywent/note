@@ -5,6 +5,10 @@
  TEAC (Type Enforcement Accesc Control)
  RBAC (Role Based Accesc Control)
 */
+//命令根据log生成规则
+adb shell "cat /proc/kmsg | grep avc" > avc_log.txt
+audit2allow -i avc_log.txt
+
 
 # enforcing - SELinux security policy is enforced.
 # permissive - SELinux prints warnings instead of enforcing.允许操作，但记录操作信息
@@ -21,9 +25,7 @@ role 			//角色 object_r / r
 type			//文件类型 / 进程标签 type/domain
 range			//安全级别 Multi-Level Security(MLS)	
 
-//根据log生成规则
-adb shell "cat /proc/kmsg | grep avc" > avc_log.txt
-audit2allow -i avc_log.txt
+
 
 /*
  定义类型

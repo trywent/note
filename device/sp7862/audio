@@ -1,4 +1,4 @@
-/*
+/*****************************
  audio
 */
 arm  	--->i2s2--->ump510g	//播放
@@ -94,7 +94,28 @@ parse_audio_pcm_config(struct pcm_handle_t *pcm){
 - parse_compress_config(&(pcm->compress),pcm_tmp)			//compress节点
 }@audio_parse.cpp
 
+//解析&control->config  "/vendor/etc/audio_config.xml"
+parse_audio_config(struct audio_config_handle *config){
+- if(access(AUDIO_DEBUG_CONFIG_TUNNING_PATH, R_OK) == 0){		//是否存在"/data/vendor/local/media/audio_config.xml"
+	- load_xml_handle(&xmlhandle, AUDIO_DEBUG_CONFIG_TUNNING_PATH)
+  }else{
+	- load_xml_handle(&xmlhandle, AUDIO_DEBUG_CONFIG_PATH)		//加载"/vendor/etc/audio_config.xml"
+  }
+- _parse_audio_config(config,&xmlhandle)
+  //解析param "/vendor/etc/audio_params/sprd" 
+- parse_audioparam_config(config,false){
+	- load_xml_handle(&xmlhandle, AUDIO_PARAM_CONFIG_PATH)		///vendor/etc/audio_params/sprd/audioparam_config.xml
+	}@param_config
+}@audio_debug.c
 
+/*******
+  设置
+
+*/
+AUDIO_PORT_TYPE_NONE = 0,
+AUDIO_PORT_TYPE_DEVICE = 1,
+AUDIO_PORT_TYPE_MIX = 2, 
+AUDIO_PORT_TYPE_SESSION = 3,
 //设置通路  audiopatch device被修改?
 createAudioPatch-->adev->hw_device.create_audio_patch-->
 adev_create_audio_patch(struct audio_hw_device *dev,unsigned int num_sources,const struct audio_port_config *sources,
@@ -110,16 +131,10 @@ adev_create_audio_patch(struct audio_hw_device *dev,unsigned int num_sources,con
 - adev->in_devices=sources_device_type
 - select_devices_new(adev->dev_ctl,AUDIO_HW_APP_INVALID,sources_device_type,true,true,false,false)
   //设置输出设备
-- do_set_output_device(adev->dev_ctl,sinks_device_type)
+- do_set_output_device(adev->dev_ctl,sinks_device_type)-->
+	select_devices_new(actl,AUDIO_HW_APP_INVALID,cmd->device,false,true,false,false)
 - adev->out_devices=sinks_device_type
 }@audio_hw.cpp
-
-
-//参数设置
-adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs){
-- struct str_parms *parms = str_parms_create_str(kvpairs)
-- ext_contrtol_process((struct tiny_audio_device *)dev,kvpairs)
-}@audio_hw.c
 
 
 //设置设备。检查输出流的输出设备是否正确,并设置
@@ -131,6 +146,27 @@ do_set_output_device@audio_control.c-->SET_OUTPUT_DEVICE{
 	}
 - select_devices_new(actl,AUDIO_HW_APP_INVALID,cmd->device,false,true,false,false)
 }@audio_hw.c
+
+/*
+ 参数
+*/
+//参数设置
+adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs){
+- struct str_parms *parms = str_parms_create_str(kvpairs)
+- ext_contrtol_process((struct tiny_audio_device *)dev,kvpairs)
+}@audio_hw.c
+
+//设备connect disconect
+disconnect_audio_devices@ext_control.c-->
+set_available_outputdevices(struct audio_control *dev_ctl,int devices,bool avaiable){
+- if(true==avaiable){
+	- dev_ctl->available_outputdevices |=devices				//out设备
+	- dev_ctl->available_inputdevices |=devices				//input设备
+  }else{
+	- dev_ctl->available_outputdevices &=~devices
+	- dev_ctl->available_inputdevices &=~(devices&~AUDIO_DEVICE_BIT_IN)
+  }
+}@audio_control.cpp
 
 /**************************************************
  设置route
@@ -153,7 +189,17 @@ pthread_create(&actl->routing_mgr.routing_switch_thread, &attr, stream_routing_t
 
 
 do_select_device(struct audio_control *actl,AUDIO_HW_APP_T audio_app_type,audio_devices_t device,bool is_in,bool update_param,bool force_set){
-- 
+- if(is_in) {
+	- if(actl->usecase&UC_HFP) device|=AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET
+  }else{
+	- if(actl->usecase&UC_HFP) device|=AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET
+  }
+- device_access_enable(actl)
+- if(is_in) {
+	- actl->in_devices=device
+  }else{
+	- if(true==update_param) set_audioparam_unlock(actl,PARAM_OUTDEVICES_CHANGE,&device,false)	//更新参数
+  }
 }
 
 
@@ -174,6 +220,9 @@ select_device_cmd_send(struct audio_control *actl,AUDIO_HW_APP_T audio_app_type,
 - cmd->cmd = cmd_param
 - cmd->audio_app_type = audio_app_type
 - cmd->device = device
+- cmd->is_in = is_in				//是否是更新输入设备
+- cmd->update_param = update_param		//是否更新参数
+- cmd->param1 = param1
 - list_add_tail(&actl->switch_device_cmd_list, &cmd->node)
 }@audio_control.cpp
 
@@ -421,11 +470,32 @@ set_audiohal_musicpcmdump(UNUSED_ATTR void *dev,UNUSED_ATTR struct str_parms *pa
 }@audio_debug.cpp
 
 
-
-
 vendor/sprd/modules/audio/whale/debug/audio_debug.cpp
+/*****************************
+ a2dp
+
+*/
+hal_module_methods.open-->adev_open(const hw_module_t* module,UNUSED_ATTR const char* name, hw_device_t** device){
+- struct sprda2dp_audio_device *sprd_adev=&sprd_a2dp_dev
+- stream_ctl=stream_ctl_init()
+- a2dp_dev=(struct audio_hw_device *)*device
+- sprd_adev->dsp_monitor = dsp_monitor_open()
+}@audio_a2dp_hw.c
 
 
 
+dsp_monitor_open(){
+- dsp_ctl->dsp_pipe_fd = open(SPRD_AUD_DSP_BTHAL,O_RDWR)
+- ioctl(dsp_ctl->dsp_pipe_fd, AUDIO_PIPE_BTHAL_STATE_SET,&bthal_state)
+- pthread_create((pthread_t *)(&dsp_ctl->thread_id), &attr,dsp_monitor_thread_routine, dsp_ctl)-->
+	dsp_monitor_thread_routine(void *arg){
+	- struct dsp_monitor_t * dsp_ctl=(struct dsp_monitor_t *)arg
+	- read(dsp_ctl->dsp_pipe_fd,&msg,sizeof(struct dsp_smsg))	//读取消息
+	- agdsp_msg_process(dsp_ctl,&msg)				//处理消息
+	}
+}@dsp_monitor.c
+
+vendor/sprd/modules/audio/a2dp_offload_hw/audio_a2dp_hw.c
+vendor/sprd/modules/audio/a2dp_offload_hw/dsp_monitor.c
 
 

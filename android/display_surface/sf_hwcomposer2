@@ -1,18 +1,20 @@
 /************************************
  hwcomposer2 hal接口
 
- device的操作都是composer接口进行。composer为hal接口
+ hwComposer@Surfaceflinger--- (Device --- composer)@HW2 --- hal
 */
 SurfaceFlinger.HWComposer-->
 
-//IComposer接口
-class Composer {
+//IComposer接口 namespace Impl
+class Composer {	
     Error createLayer(Display display, Layer* outLayer);
     Error destroyLayer(Display display, Layer layer);
     //display信息
     Error getActiveConfig(Display display, Config* outConfig);
     Error getDisplayConfigs(Display display, std::vector<Config>* outConfigs);
-    Error getDisplayName(Display display, std::string* outName);
+    Error getDisplayName(Display display, std::string* outName)
+    Error getReleaseFences(Display display, std::vector<Layer>* outLayers,std::vector<int>* outReleaseFences)
+    Error presentDisplay(Display display, int* outPresentFence)
     ......
     //设置display
     Error setOutputBuffer(Display display, const native_handle_t* buffer,int releaseFence);
@@ -29,7 +31,7 @@ class Composer {
     CommandReader mReader;
 }@ComposerHal.h
 
-//hwc2_device_t
+//Device 包含Composer
 class Device{
     uint32_t getMaxVirtualDisplayCount() const;
     Error createVirtualDisplay(uint32_t width, uint32_t height,android_pixel_format_t* format, Display** outDisplay);
@@ -47,8 +49,7 @@ class Device{
 class Display{
     [[clang::warn_unused_result]] Error createLayer(Layer** outLayer);
     [[clang::warn_unused_result]] Error destroyLayer(Layer* layer);
-    [[clang::warn_unused_result]] Error getActiveConfig(
-            std::shared_ptr<const Config>* outConfig) const;
+    [[clang::warn_unused_result]] Error getActiveConfig(std::shared_ptr<const Config>* outConfig) const;
     // Doesn't call into the HWC2 device, so no errors are possible
     std::vector<std::shared_ptr<const Config>> getConfigs() const;
 
@@ -65,17 +66,12 @@ class Display{
 //封装hwc2_device_t中的layers
 class Layer{
     [[clang::warn_unused_result]] Error setCursorPosition(int32_t x, int32_t y);
-    [[clang::warn_unused_result]] Error setBuffer(uint32_t slot,
-            const android::sp<android::GraphicBuffer>& buffer,
-            const android::sp<android::Fence>& acquireFence);
+    [[clang::warn_unused_result]] Error setBuffer(uint32_t slot,const android::sp<android::GraphicBuffer>& buffer,const android::sp<android::Fence>& acquireFence);
     [[clang::warn_unused_result]] Error setPlaneAlpha(float alpha);
-    [[clang::warn_unused_result]] Error setSidebandStream(
-            const native_handle_t* stream);
-    [[clang::warn_unused_result]] Error setSourceCrop(
-            const android::FloatRect& crop);
+    [[clang::warn_unused_result]] Error setSidebandStream( const native_handle_t* stream);
+    [[clang::warn_unused_result]] Error setSourceCrop(const android::FloatRect& crop);
     [[clang::warn_unused_result]] Error setTransform(Transform transform);
-    [[clang::warn_unused_result]] Error setVisibleRegion(
-            const android::Region& region);
+    [[clang::warn_unused_result]] Error setVisibleRegion(const android::Region& region);
     [[clang::warn_unused_result]] Error setZOrder(uint32_t z);
 }@HWC2.h
 
@@ -83,14 +79,16 @@ frameworks/native/services/surfaceflinger/DisplayHardware/ComposerHal.h
 frameworks/native/services/surfaceflinger/DisplayHardware/HWC2.h
 hardware/libhardware/include/hardware/hwcomposer2.h
 /************************
- 显示屏操作。显示屏的信息获取
+ 显示屏操作
+ Device --- composer --- hal
 
  事件上报 hal ---> ComposerCallbackBridge ---> surfaceflinger
  显示数据提交 surfaceflinger---> hwcomposer ---> （hwc2:device，layer) ---> composer
 
 */
-android8.1设置 TARGET_USES_HWC2 := true@BoardCommon.mk 使用HWComposer.cpp。老版本使用HWComposer1.cpp
-//创建hwcomposer
+//android8.1设置 TARGET_USES_HWC2 := true@BoardCommon.mk 使用HWComposer.cpp。老版本使用HWComposer1.cpp
+
+//创建Device mHwcDevice
 SurfaceFlinger::init-->new HWComposer(false)-->
 HWComposer(bool useVrComposer){
 - mLastHwVSync[i] = 0,mVSyncCounts[i] = 0
@@ -98,7 +96,7 @@ HWComposer(bool useVrComposer){
 - mRemainingHwcVirtualDisplays = mHwcDevice->getMaxVirtualDisplayCount()
 }@HWComposer.cpp
 
-//创建mComposer,获取hal服务
+//Device中创建mComposer,获取hal服务
 Device::Device(bool useVrComposer){
 - mComposer(std::make_unique<Hwc2::Composer>(useVrComposer))-->Composer(false /*不是vr*/){
 	- mWriter(kWriterInitialSize)
@@ -199,16 +197,17 @@ HWComposer::prepare(DisplayDevice& displayDevice) {
 SurfaceFlinger::postFramebuffer@SurfaceFlinger.cpp-->
 HWComposer::presentAndGetReleaseFences(int32_t displayId){
 - 
-- hwcDisplay->present(&displayData.lastPresentFence)
+- hwcDisplay->present(&displayData.lastPresentFence)-->
+	Display::present(sp<Fence>* outPresentFence){
+	- mComposer.presentDisplay(mId, &presentFenceFd)
+	- *outPresentFence = new Fence(presentFenceFd)
+	}@HWC2.cpp
 - std::unordered_map<HWC2::Layer*, sp<Fence>> releaseFences
 - hwcDisplay->getReleaseFences(&releaseFences)
 }@HWComposer.cpp
 
 
-Display::present(sp<Fence>* outPresentFence){
-- mComposer.presentDisplay(mId, &presentFenceFd)
-- *outPresentFence = new Fence(presentFenceFd)
-}@HWC2.cpp
+
 
 
 

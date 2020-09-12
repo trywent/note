@@ -1,11 +1,13 @@
-/*
- mediaSession接收音量，上下曲等控制按键
+/*************************************
+ 播放器创建mediaSession，设置callback。接收音量，上下曲等控制按键
+ 其它进程获取mediaSession,创建mediaController.获取播放器信息。控制播放器播放
 
  dumpsys media_session
+
 */
 MediaSession{
 - MediaSessionManager manager = (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE)
-  //MediaSessionService中的回调
+  //MediaSessionService通过mCbStub回调
 - CallbackStub mCbStub = new CallbackStub(this)
 - ISession mBinder = manager.createSession(mCbStub, tag, userId)
 - MediaSession.Token mSessionToken = new Token(mBinder.getController())
@@ -20,6 +22,14 @@ setCallback(@Nullable Callback callback, @Nullable Handler handler) {
 - mCallback = msgHandler
 }@MediaSession.java
 
+//接收命令
+CallbackStub extends ISessionCallback.Stub {
+- onCommand(String packageName, int pid, int uid,ISessionControllerCallback caller, String command, Bundle args, ResultReceiver cb)
+- onMediaButton(String packageName, int pid, int uid, Intent mediaButtonIntent,int sequenceNumber, ResultReceiver cb)
+- onPlay(String packageName, int pid, int uid,ISessionControllerCallback caller)
+- onPause(String packageName, int pid, int uid,ISessionControllerCallback caller)
+}
+
 @MediaSessionService.java-->CallbackStub.onXXX-->dispatchxxxx-->postToCallback-->mCallback.post-->
 CallbackMessageHandler.post(int what, Object obj, Bundle bundle)-->obtainMessage(what, obj).sendToTarget
 -->handleMessage-->mCallback.xxx@MediaSession.java
@@ -29,7 +39,8 @@ setActive(boolean active)-->mBinder.setActive(active)@MediaSession.java-->
 SessionStub.setActive-->mService.updateSession(MediaSessionRecord.this)@MediaSessionRecord.java
 -->updateSession@MediaSessionService.java
 
-/*MediaSessionService
+/******
+ MediaSessionService
 
 */
 SessionManagerImpl.createSession(String packageName, ISessionCallback cb)-->
@@ -46,8 +57,7 @@ createSessionInternal(resolvedUserId/*user 0*/,packageName, cb)-->createSessionL
 
 
 //mediabutton
-dispatchMediaKeyEventLocked@MediaSessionService.java-->
-sendMediaButton-->SessionCb.sendMediaButton
+dispatchMediaKeyEventLocked@MediaSessionService.java-->sendMediaButton-->SessionCb.sendMediaButton
 
 //按键事件
 interceptKeyBeforeQueueing{

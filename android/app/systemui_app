@@ -228,6 +228,7 @@ com.android.systemui.statusbar.phone.NavigationBarView{
 
 
 createNavigationBar() {
+   //create方法传入回调FragmentListener
 -  mNavigationBarView = NavigationBarFragment.create(mContext, (tag, fragment) -> {
 	- mNavigationBar = (NavigationBarFragment) fragment
 	- mNavigationBar.setLightBarController(mLightBarController)

@@ -256,6 +256,23 @@ AudioFlinger::RecordThread::threadLoop(){
 }@Threads.cpp
 
 
+//syncEvent接收
+RecordThread::start(RecordThread::RecordTrack* recordTrack, AudioSystem::sync_event_t event,audio_session_t triggerSession)-->
+mAudioFlinger->createSyncEvent(event,triggerSession,recordTrack->sessionId(),syncStartEventCallback,recordTrack)-->
+AudioFlinger::createSyncEvent((AudioSystem::sync_event_t type,...sync_event_callback_t callBack){
+- sp<SyncEvent> event = new SyncEvent(type, triggerSession, listenerSession, callBack, cookie)
+- mPlaybackThreads.valueAt(i)->setSyncEvent(event)
+- mRecordThreads.valueAt(i)->setSyncEvent(event)
+}@AudioFlinger.cpp
+
+//syncEvent时数据都丢弃
+AudioFlinger::RecordThread::syncStartEventCallback(const wp<SyncEvent>& event){
+- sp<SyncEvent> strongEvent = event.promote()
+- sp<RefBase> ptr = strongEvent->cookie().promote()
+- RecordTrack *recordTrack = (RecordTrack *)ptr.get()
+- recordTrack->handleSyncStartEvent(strongEvent)
+}@Threads.cpp
+
 
 
 frameworks/av/services/audioflinger/Threads.cpp
